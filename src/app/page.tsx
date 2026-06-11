@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase"; 
-import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where } from "firebase/firestore";
-// استدعاء نظام قوقل الرسمي للأمان والدخول السريع
-import { GoogleAuthProvider, signInWithPopup, getAuth, signInAnonymously } from "firebase/auth";
+import { db, auth } from "@/lib/firebase"; 
+import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
@@ -18,7 +17,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
+  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥لنكولنشاير" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
   { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
   { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
   { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
@@ -33,18 +32,25 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" }
 ];
 
+const ALL_COUNTRY_DIAL_CODES = [
+  { code: "SA", name: "السعودية", dialCode: "+966", flag: "🇸🇦" },
+  { code: "KW", name: "الكويت", dialCode: "+965", flag: "🇰🇼" },
+  { code: "AE", name: "الإمارات", dialCode: "+971", flag: "🇦🇪" },
+  { code: "QA", name: "قطر", dialCode: "+974", flag: "🇶🇦" },
+  { code: "EG", name: "مصر", dialCode: "+20", flag: "🇪🇬" }
+];
+
 export default function HomePage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [authMode, setAuthMode] = useState<"menu" | "google" | "guest" | "manual_login">("menu"); // إدارة التنقل داخل المودال
+  const [authMode, setAuthMode] = useState<"menu" | "guest" | "manual_login">("menu");
   
-  // بيانات المستخدم والتحكم بالطوارئ
   const [user, setUser] = useState<any>({ fullName: "", favoriteTeam: "", residence: "السعودية" });
-  const [manualName, setManualName] = useState(""); // اسم المستخدم للدخول اليدوي السريع
+  const [manualName, setManualName] = useState("");
   const [userPrediction, setUserPrediction] = useState({ team1Score: "", team2Score: "" });
+  const [hasPredicted, setHasPredicted] = useState(false); // إخفاء الصندوق بعد التوقع
   const [chatMessage, setChatMessage] = useState("");
   
-  // القوائم الحية من الفايربيز
   const [chatList, setChatList] = useState<any[]>([]);
   const [livePredictions, setLivePredictions] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -59,12 +65,17 @@ export default function HomePage() {
     status: "بانتظار ركلة البداية", score: "0 - 0"
   });
 
-  // فحص الجلسة المستمرة
+  // فحص الجلسة والتوقع المحفوظ
   useEffect(() => {
     const savedUser = localStorage.getItem("worldCupUser");
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
       setIsLoggedIn(true);
+      
+      // تفقد إذا كان هذا الاسم قد توقع مسبقاً في الـ LocalStorage لحجب الصندوق فوراً عنده
+      const savedPred = localStorage.getItem(`hasPredicted_${parsedUser.fullName}`);
+      if (savedPred) setHasPredicted(true);
     }
   }, []);
 
@@ -99,7 +110,7 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // العداد التنازلي
+  // العداد التنازلي للمباراة
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().getTime();
@@ -144,10 +155,9 @@ export default function HomePage() {
     return () => { unsubChat(); unsubPred(); unsubUsers(); };
   }, []);
 
-  // 🔵 1. حل الطوارئ الجذري: الدخول الفوري بضغطة زر عبر حساب قوقل الجيميل
+  // 🔵 1. الدخول الرسمي والسلس بحساب قوقل الجيميل (تم حل الدومين)
   const handleGoogleLogin = async () => {
     try {
-      const auth = getAuth();
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const googleUser = result.user;
@@ -166,23 +176,25 @@ export default function HomePage() {
         setIsLoggedIn(true);
         setIsAuthModalOpen(false);
 
-        // حفظ الحساب في قاعدة البيانات سحابياً بالخلفية بدون تعطيل الشاشة
         await addDoc(collection(db, "users"), userData);
-        alert(`أهلاً بك يا ${googleUser.displayName}، تم تفعيل حسابك بجيميل قوقل رسميًا! 🚀🏆`);
+        
+        // تفحص إذا كان قد توقع سابقاً لإخفاء الصندوق فور الدخول
+        if (localStorage.getItem(`hasPredicted_${googleUser.displayName}`)) setHasPredicted(true);
+        alert(`أهلاً بك يا ${googleUser.displayName}، تم تفعيل حسابك بنجاح! 🚀🏆`);
       }
     } catch (err) {
       console.error(err);
-      alert("تم إلغاء الدخول بقوقل أو حدث تعليق بالشبكة، يرجى تجربة خيار الضيف السريع.");
+      alert("حدث تعليق مؤقت في دومين قوقل، يرجى استخدام خيار الضيف السريع لتفعيل الحساب فوراً.");
     }
   };
 
-  // 🟢 2. الدخول السريع كضيف / زائر باسم مستعار
+  // 🟢 2. الدخول السريع كزائر / ضيف
   const handleGuestLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user.fullName.trim()) return;
 
     const userData = {
-      fullName: user.fullName.trim() + " (ضيف)",
+      fullName: user.fullName.trim(),
       favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦",
       residence: user.residence,
       points: 0, total: 0, correct: 0, wrong: 0,
@@ -194,52 +206,58 @@ export default function HomePage() {
     setIsLoggedIn(true);
     setIsAuthModalOpen(false);
 
-    try {
-      await addDoc(collection(db, "users"), userData);
-    } catch (err) { console.error(err); }
-    alert("تم تفعيل حساب الضيف السريع بنجاح! 🚀");
+    await addDoc(collection(db, "users"), userData);
+    if (localStorage.getItem(`hasPredicted_${user.fullName.trim()}`)) setHasPredicted(true);
+    alert("تم تفعيل حساب الضيف بنجاح! 🚀");
   };
 
-  // 🟡 3. خطة الطوارئ: خانة الدخول السريع المستقل للمستخدمين القدامى بالاسم فقط
+  // 🟡 3. دخول الطوارئ بالاسم للمسجلين مسبقاً
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualName.trim()) return;
 
-    try {
-      const q = query(collection(db, "users"), where("fullName", "==", manualName.trim()));
-      const snap = await getDocs(q);
+    const q = query(collection(db, "users"), where("fullName", "==", manualName.trim()));
+    const snap = await getDocs(q);
 
-      if (!snap.empty) {
-        const loggedUser = snap.docs[0].data();
-        localStorage.setItem("worldCupUser", JSON.stringify(loggedUser));
-        setUser(loggedUser);
-        setIsLoggedIn(true);
-        setIsAuthModalOpen(false);
-        alert(`مرحباً بعودتك الملكية يا ${manualName}! 👑🏆`);
-      } else {
-        alert("هذا الاسم غير مسجل باللوحة حتى الآن، يرجى عمل حساب جديد بقوقل أو كضيف أولاً.");
-      }
-    } catch (err) { console.error(err); }
+    if (!snap.empty) {
+      const loggedUser = snap.docs[0].data();
+      localStorage.setItem("worldCupUser", JSON.stringify(loggedUser));
+      setUser(loggedUser);
+      setIsLoggedIn(true);
+      setIsAuthModalOpen(false);
+      if (localStorage.getItem(`hasPredicted_${manualName.trim()}`)) setHasPredicted(true);
+      alert(`مرحباً بعودتك يا ${manualName}! 👑🏆`);
+    } else {
+      alert("الاسم غير مسجل، يرجى اختيار الدخول كضيف سريع أو عبر قوقل.");
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem("worldCupUser");
     setUser({ fullName: "", favoriteTeam: "", residence: "السعودية" });
     setIsLoggedIn(false);
+    setHasPredicted(false);
   };
 
+  // 🔥 4. إرسال التوقع الصارم (يظهر فوراً في الشريط + يخفي الصندوق ويعرض كرت الشكر الفخم)
   const handleSavePrediction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) { setIsAuthModalOpen(true); return; }
+    if (new Date().getTime() > currentMatch.kickoff.getTime()) { alert("أُغلقت التوقعات لبدء المباراة!"); return; }
+    
     try {
+      // الحفظ في الفايربيز بحقول واضحة ومطابقة 100% ليقرأها شريط البث الحي
       await addDoc(collection(db, "predictions"), {
         user: user.fullName,
         t1: currentMatch.team1, t1E: currentMatch.team1Emoji,
         t2: currentMatch.team2, t2E: currentMatch.team2Emoji,
-        s1: userPrediction.team1Score, s2: userPrediction.team2Score,
+        score1: userPrediction.team1Score, score2: userPrediction.team2Score,
         createdAt: new Date().toISOString()
       });
-      alert("تم تسجيل توقعك لايف في شريط القناة بنجاح! 🔥");
+
+      // إخفاء صندوق التوقع وحفظ الحالة في متصفح المستخدم فوراً لعدم التكرار
+      setHasPredicted(true);
+      localStorage.setItem(`hasPredicted_${user.fullName}`, "true");
     } catch (err) { console.error(err); }
   };
 
@@ -266,7 +284,7 @@ export default function HomePage() {
               ) : (
                 livePredictions.map((p, idx) => (
                   <span key={idx} className="bg-white/10 px-3.5 py-1.5 rounded-xl border border-white/10 flex items-center gap-2 shadow-lg backdrop-blur-md">
-                    ⚡ <span className="text-yellow-400 font-extrabold text-sm">{p.user}</span> يتوقع: {p.t1E} {p.t1} <span className="font-mono text-sm bg-purple-950 px-2 py-0.5 rounded text-green-400 font-black border border-green-500/20">{p.s1} - {p.s2}</span> {p.t2} {p.t2E}
+                    ⚡ <span className="text-yellow-400 font-extrabold text-sm">{p.user}</span> يتوقع: {p.t1E} {p.t1} <span className="font-mono text-sm bg-purple-950 px-2 py-0.5 rounded text-green-400 font-black border border-green-500/20">{p.score1} - {p.score2}</span> {p.t2} {p.t2E}
                   </span>
                 ))
               )}
@@ -293,7 +311,7 @@ export default function HomePage() {
                   <button onClick={handleLogout} className="text-xs font-bold text-red-400 hover:text-red-300 bg-red-950/40 border border-red-500/30 px-3 py-1.5 rounded-xl transition-all">خروج</button>
                 </div>
               ) : (
-                <button onClick={() => { setAuthMode("menu"); setIsAuthModalOpen(true); }} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs md:text-sm font-black px-5 py-2.5 rounded-xl shadow-lg shadow-purple-500/20 border border-purple-400/20 transition-all transform active:scale-95">🔐 تسجيل الدخول الحقيقي</button>
+                <button onClick={() => { setAuthMode("menu"); setIsAuthModalOpen(true); }} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs md:text-sm font-black px-5 py-2.5 rounded-xl shadow-lg shadow-purple-500/20 border border-purple-400/20 transition-all">🔐 تسجيل الدخول</button>
               )}
             </div>
           </div>
@@ -302,33 +320,45 @@ export default function HomePage() {
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
           
-          {/* صندوق التوقع الفخم Glassmorphism */}
+          {/* صندوق التوقع الفخم والمحدث بتجربة مستخدم خرافية */}
           <section className="bg-slate-900/60 backdrop-blur-xl rounded-2xl p-5 md:p-6 shadow-2xl border border-purple-500/20 relative overflow-hidden">
             <div className="absolute top-0 left-0 bg-gradient-to-r from-red-600 to-pink-600 text-white font-black text-[10px] md:text-xs px-4 py-1.5 rounded-bl-xl shadow-md border-b border-r border-purple-500/20">⏰ نهاية التوقع: {countdown}</div>
-            <div className="text-center md:text-right mb-4 mt-4 md:mt-0">
-              <h3 className="text-xs md:text-base font-black text-purple-300 flex items-center gap-1.5 justify-center md:justify-start">🔥 شارك توقعك الآن ليظهر اسمك وحسابك فوراً في شريط القناة الرياضية بالأعلى!</h3>
-            </div>
-            <form onSubmit={handleSavePrediction} className="flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-950/50 p-4 rounded-xl border border-purple-500/10">
-              <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
-                <span className="text-3xl md:text-4xl drop-shadow">{currentMatch.team1Emoji}</span>
-                <span className="font-black text-sm md:text-lg">{currentMatch.team1}</span>
-                <input type="number" min="0" placeholder="0" required value={userPrediction.team1Score} onChange={(e) => setUserPrediction({...userPrediction, team1Score: e.target.value})} className="w-14 h-11 bg-slate-900 text-green-400 border border-purple-500/30 rounded-xl text-center font-black text-lg focus:outline-none focus:border-purple-500" />
+            
+            {/* ✨ إذا توقع الزائر ينبثق له كرت الشكر الفخم والقلب فوراً ويختفي صندوق الإدخال */}
+            {hasPredicted ? (
+              <div className="text-center py-8 space-y-3 animate-fade-in">
+                <div className="text-4xl md:text-5xl animate-bounce">❤️🏆⚽</div>
+                <h3 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300">تم تسجيل توقعك الرسمي في قاعدة البيانات لايف!</h3>
+                <p className="text-xs text-purple-300 font-bold">تابع اسمك الآن وهو يتحرك في شريط البث الحي بالأعلى أمام جميع الجماهير! 🎉</p>
               </div>
-              <div className="text-purple-400 font-black text-xs md:text-base tracking-widest">VS</div>
-              <div className="flex items-center gap-4 w-full md:w-auto justify-center md:flex-row-reverse">
-                <span className="text-3xl md:text-4xl drop-shadow">{currentMatch.team2Emoji}</span>
-                <span className="font-black text-sm md:text-lg">{currentMatch.team2}</span>
-                <input type="number" min="0" placeholder="0" required value={userPrediction.team2Score} onChange={(e) => setUserPrediction({...userPrediction, team2Score: e.target.value})} className="w-14 h-11 bg-slate-900 text-green-400 border border-purple-500/30 rounded-xl text-center font-black text-lg focus:outline-none focus:border-purple-500" />
-              </div>
-              <button type="submit" className="w-full md:w-auto bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black px-8 py-3 rounded-xl text-xs md:text-sm transition-all shadow-lg border border-purple-400/20">حفظ وإرسال التوقع لايف 🚀</button>
-            </form>
+            ) : (
+              <>
+                <div className="text-center md:text-right mb-4 mt-4 md:mt-0">
+                  <h3 className="text-xs md:text-base font-black text-purple-300 flex items-center gap-1.5 justify-center md:justify-start">🔥 شارك توقعك الآن ليظهر اسمك وحسابك فوراً في شريط القناة الرياضية بالأعلى!</h3>
+                </div>
+                <form onSubmit={handleSavePrediction} className="flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-950/50 p-4 rounded-xl border border-purple-500/10">
+                  <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
+                    <span className="text-3xl md:text-4xl drop-shadow">{currentMatch.team1Emoji}</span>
+                    <span className="font-black text-sm md:text-lg">{currentMatch.team1}</span>
+                    <input type="number" min="0" placeholder="0" required value={userPrediction.team1Score} onChange={(e) => setUserPrediction({...userPrediction, team1Score: e.target.value})} className="w-14 h-11 bg-slate-900 text-green-400 border border-purple-500/30 rounded-xl text-center font-black text-lg focus:outline-none" />
+                  </div>
+                  <div className="text-purple-400 font-black text-xs md:text-base tracking-widest">VS</div>
+                  <div className="flex items-center gap-4 w-full md:w-auto justify-center md:flex-row-reverse">
+                    <span className="text-3xl md:text-4xl drop-shadow">{currentMatch.team2Emoji}</span>
+                    <span className="font-black text-sm md:text-lg">{currentMatch.team2}</span>
+                    <input type="number" min="0" placeholder="0" required value={userPrediction.team2Score} onChange={(e) => setUserPrediction({...userPrediction, team2Score: e.target.value})} className="w-14 h-11 bg-slate-900 text-green-400 border border-purple-500/30 rounded-xl text-center font-black text-lg focus:outline-none" />
+                  </div>
+                  <button type="submit" className="w-full md:w-auto bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 text-white font-black px-8 py-3 rounded-xl text-xs md:text-sm transition-all shadow-lg">حفظ وإرسال التوقع لايف 🚀</button>
+                </form>
+              </>
+            )}
           </section>
 
           {/* لوحة الصدارة والشات */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 overflow-hidden flex flex-col justify-between">
               <div>
-                <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2 flex items-center gap-2">🏆 لوحة الصدارة التلقائية والترتيب المباشر الحقيقي</h3>
+                <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2">🏆 لوحة الصدارة التلقائية والترتيب المباشر</h3>
                 <div className="overflow-x-auto w-full">
                   <table className="w-full text-xs md:text-sm text-center border-collapse">
                     <thead>
@@ -342,7 +372,7 @@ export default function HomePage() {
                     </thead>
                     <tbody className="divide-y divide-purple-950/20 font-bold text-slate-300">
                       {leaderboard.length === 0 ? (
-                        <tr><td colSpan={5} className="py-8 text-center text-slate-500 font-normal">بانتظار تسجيل أولى التوقعات لبدء الترتيب المباشر...</td></tr>
+                        <tr><td colSpan={5} className="py-8 text-center text-slate-500 font-normal">بانتظار تسجيل التوقعات لبء لوحة الشرف...</td></tr>
                       ) : (
                         leaderboard.map((u, i) => (
                           <tr key={i} className="hover:bg-purple-950/20 transition-all">
@@ -361,25 +391,25 @@ export default function HomePage() {
             </div>
 
             <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 flex flex-col justify-between">
-              <h3 className="font-black text-xs md:text-base text-purple-300 mb-3 border-b border-purple-900/30 pb-2𓃰">📊 إحصائيات لوحة التحكم الإجمالية</h3>
+              <h3 className="font-black text-xs md:text-base text-purple-300 mb-3 border-b border-purple-900/30 pb-2">📊 إحصائيات لوحة التحكم</h3>
               <div className="grid grid-cols-2 gap-4 flex-1 items-center">
                 <div className="bg-slate-950/60 p-4 rounded-xl border border-purple-500/10 text-center shadow-inner">
                   <span className="block text-[10px] text-purple-400 font-black mb-1">إجمالي التوقعات</span>
                   <span className="text-xl font-mono font-black text-white">{predictionsStats.total}</span>
                 </div>
                 <div className="bg-slate-950/60 p-4 rounded-xl border border-purple-500/10 text-center shadow-inner">
-                  <span className="block text-[10px] text-amber-400 font-black mb-1">إجمالي نقاط المنصة</span>
+                  <span className="block text-[10px] text-amber-400 font-black mb-1">نقاط المنصة</span>
                   <span className="text-xl font-mono font-black text-amber-400">{predictionsStats.points}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* مركز المباراة والشات لايف المباشر */}
+          {/* مركز المباراة والشات لايف */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 space-y-4">
               <div className="flex items-center justify-between border-b border-purple-900/20 pb-3">
-                <h3 className="font-black text-xs md:text-base text-slate-100 flex items-center gap-2"><span>📺</span> مركز المباراة التلقائي والذكي (لايف فيفا)</h3>
+                <h3 className="font-black text-xs md:text-base text-slate-100 flex items-center gap-2"><span>📺</span> مركز المباراة التلقائي والذكي (لايف)</h3>
                 <span className="bg-green-950 text-green-400 border border-green-500/30 px-3 py-1 rounded-full text-[10px] md:text-xs font-black animate-pulse">● {currentMatch.status}</span>
               </div>
               <div className="bg-slate-950 border border-purple-500/10 text-white rounded-xl p-5 flex items-center justify-between text-center shadow-2xl">
@@ -389,13 +419,13 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* الشات السحابي الحي */}
+            {/* الشات */}
             <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 h-[450px] flex flex-col justify-between">
               <div className="overflow-hidden flex flex-col h-full">
-                <h3 className="font-black text-xs md:text-base text-purple-300 border-b border-purple-900/20 pb-3 mb-3"><span>💬</span> دردشة زوار المنصة الفورية (لايف حقيقي)</h3>
+                <h3 className="font-black text-xs md:text-base text-purple-300 border-b border-purple-900/20 pb-3 mb-3"><span>💬</span> دردشة زوار المنصة الفورية</h3>
                 <div className="space-y-2.5 overflow-y-auto flex-1 text-xs md:text-sm flex flex-col-reverse hidden-scrollbar">
                   {chatList.length === 0 ? (
-                    <p className="text-slate-500 text-center py-12 font-medium">الشات فارغ حالياً.. شارك حماسك وافتتح النقاش الآن! 🔥</p>
+                    <p className="text-slate-500 text-center py-12 font-medium">الشات فارغ حالياً...</p>
                   ) : (
                     chatList.map((msg, i) => (
                       <div key={i} className="bg-slate-950/60 p-3 rounded-xl border border-purple-500/10 shadow-md">
@@ -408,7 +438,7 @@ export default function HomePage() {
               </div>
               <form onSubmit={handleSendMessage} className="mt-3 flex gap-2 border-t border-purple-900/20 pt-3">
                 <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white font-black px-4 py-2 rounded-xl text-xs md:text-sm shadow-md transition-colors">إرسال</button>
-                <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="اكتب تعليقك المباشر مع الجمهور..." className="flex-1 bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2 text-xs md:text-sm text-slate-200 focus:outline-none focus:border-purple-500" />
+                <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="اكتب تعليقك المباشر..." className="flex-1 bg-slate-500/20 border border-purple-500/20 rounded-xl px-4 py-2 text-xs md:text-sm text-slate-200 focus:outline-none" />
               </form>
             </div>
           </div>
@@ -421,9 +451,9 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
             <p className="font-bold text-slate-400">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-600">© جميع الحقوق محفوظة • النسخة التلقائية المحدثة V5.0</p>
+            <p className="text-slate-600">© جميع الحقوق محفوظة • النسخة التلقائية المحدثة V5.1</p>
           </div>
-          <div className="flex items-center gap-3 bg-slate-900/50 border border-purple-500/10 px-4 py-2 rounded-xl order-1 sm:order-2">
+          <div className="flex items-center gap-3 bg-slate-800/50 border border-purple-500/10 px-4 py-2 rounded-xl order-1 sm:order-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">ع</div>
             <div className="text-xs text-right">
               <span className="block text-[10px] text-purple-500 font-black">فكرة وتطوير</span>
@@ -433,54 +463,45 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* 🚨 مودال الطوارئ السري والمعدل جذرياً ليعمل بضغطة زر بقوقل أو كضيف */}
+      {/* مودال الدخول السريع المعاد هندسته */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-purple-500/30 w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-slate-100">
             <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-950 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border border-purple-500/20">✕</button>
             
-            {/* القائمة الرئيسية لتحديد طريقة الدخول الواضحة جداً للمستخدم */}
             {authMode === "menu" && (
               <div className="space-y-6 py-4 text-center">
                 <div>
-                  <h4 className="text-base md:text-lg font-black text-white mb-1">🔐 اختر طريقة الدخول المناسبة لك</h4>
-                  <p className="text-xs text-slate-400">ادخل بضغطة زر واحدة لحفظ نقاطك وتوقعاتك تلقائياً</p>
+                  <h4 className="text-base md:text-lg font-black text-white mb-1">🔐 اختر طريقة الدخول</h4>
+                  <p className="text-xs text-slate-400">ادخل بضغطة زر واحدة لحفظ نقاطك وتوقعاتك</p>
                 </div>
-                
                 <div className="space-y-3 pt-2">
-                  {/* 🔵 خيار الدخول الرسمي السريع بحساب قوقل جيميل المضمون */}
                   <button onClick={handleGoogleLogin} type="button" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-xl text-xs md:text-sm transition-all shadow-lg flex items-center justify-center gap-2">
-                    <span>🔵</span> الدخول السريع بواسطة Google (GMAIL)
+                    <span>🔵</span> الدخول بواسطة Google
                   </button>
-
-                  {/* 🟢 خيار الدخول السريع كزائر أو ضيف */}
                   <button onClick={() => setAuthMode("guest")} type="button" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl text-xs md:text-sm transition-all shadow-lg flex items-center justify-center gap-2">
-                    <span>🟢</span> الدخول السريع كـ زائر / ضيف (اسم مستعار)
+                    <span>🟢</span> الدخول كـ زائر / ضيف سريع
                   </button>
-
                   <div className="border-t border-purple-950/50 my-4 pt-3">
-                    {/* 🟡 خيار الدخول اليدوي السريع للمستخدمين القدامى */}
                     <button onClick={() => setAuthMode("manual_login")} type="button" className="text-xs text-purple-400 hover:text-purple-300 font-bold underline">
-                      👉 مسجل مسبقاً؟ اضغط هنا للدخول بالطوارئ اليدوية
+                      👉 مسجل مسبقاً بالاسم؟ اضغط هنا للدخول اليدوي
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* واجهة الدخول كضيف */}
             {authMode === "guest" && (
               <form onSubmit={handleGuestLogin} className="space-y-4 py-2">
                 <div className="text-center mb-3">
                   <h4 className="text-base font-black text-white">🟢 الدخول كـ زائر / ضيف سريع</h4>
-                  <p className="text-[11px] text-slate-400">اكتب اسمك المستعار وابدأ التحدي فوراً</p>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم أو اللقب المستعار</label>
+                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم أو اللقب</label>
                   <input type="text" required placeholder="مثال: أبو راكان، خالد77" value={user.fullName} onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المتوقع فوزه ببطولة كأس العالم 2026 🏆</label>
+                  <label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المرشح للقب 🏆</label>
                   <select required value={user.favoriteTeam} onChange={(e) => setUser({...user, favoriteTeam: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-3 py-2.5 text-xs md:text-sm focus:outline-none text-slate-100">
                     <option value="" disabled>اختر مرشحك للقب...</option>
                     {WORLD_CUP_2026_TEAMS.map((t, i) => ( <option key={i} value={t.name}>{t.emoji} {t.name}</option> ))}
@@ -488,25 +509,23 @@ export default function HomePage() {
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-black py-2.5 rounded-xl text-xs transition-all">تفعيل الدخول الفوري 🚀</button>
-                  <button onClick={() => setAuthMode("menu")} type="button" className="bg-slate-950 hover:bg-slate-900 text-slate-400 px-4 py-2.5 rounded-xl text-xs font-bold border border-purple-500/10">رجوع</button>
+                  <button onClick={() => setAuthMode("menu")} type="button" className="bg-slate-950 text-slate-400 px-4 py-2.5 rounded-xl text-xs font-bold border border-purple-500/10">رجوع</button>
                 </div>
               </form>
             )}
 
-            {/* واجهة الطوارئ للدخول اليدوي بالاسم */}
             {authMode === "manual_login" && (
               <form onSubmit={handleManualLogin} className="space-y-4 py-2">
                 <div className="text-center mb-3">
-                  <h4 className="text-base font-black text-yellow-500">👑 دخول الطوارئ للمسجلين مسبقاً</h4>
-                  <p className="text-[11px] text-slate-400">اكتب اسمك الذي سجلت به أول مرة ليستعيد النظام حسابك</p>
+                  <h4 className="text-base font-black text-yellow-500">👑 دخول الطوارئ بالاسم للمسجلين</h4>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم الكامل المطابق للحساب</label>
-                  <input type="text" required placeholder="ادخل اسمك المسجل بدقة" value={manualName} onChange={(e) => setManualName(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
+                  <input type="text" required placeholder="ادخل اسمك المسجل بدقة" value={manualName} onChange={(e) => setManualName(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none text-slate-100" />
                 </div>
                 <div className="flex gap-2 pt-2">
                   <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-black py-2.5 rounded-xl text-xs transition-all">استعادة الجلسة والولوج 🔓</button>
-                  <button onClick={() => setAuthMode("menu")} type="button" className="bg-slate-950 hover:bg-slate-900 text-slate-400 px-4 py-2.5 rounded-xl text-xs font-bold border border-purple-500/10">رجوع</button>
+                  <button onClick={() => setAuthMode("menu")} type="button" className="bg-slate-950 text-slate-400 px-4 py-2.5 rounded-xl text-xs font-bold border border-purple-500/10">رجوع</button>
                 </div>
               </form>
             )}
