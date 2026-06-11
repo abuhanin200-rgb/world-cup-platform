@@ -62,11 +62,12 @@ export default function HomePage() {
     status: "بانتظار ركلة البداية", score: "0 - 0"
   });
 
-  // تشغيل ميزة حفظ الجلسة التلقائية
+  // فحص حالة تسجيل الدخول من التخزين المحلي فوراً عند فتح الموقع
   useEffect(() => {
     const savedUser = localStorage.getItem("worldCupUser");
     if (savedUser) { 
-      setUser(JSON.parse(savedUser)); 
+      const parsed = JSON.parse(savedUser);
+      setUser(parsed); 
       setIsLoggedIn(true); 
     }
   }, []);
@@ -102,7 +103,7 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // العداد التنازلي
+  // العداد التنازلي للمباراة
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().getTime();
@@ -118,7 +119,7 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [currentMatch.kickoff]);
 
-  // الاستماع لقاعدة البيانات حياً
+  // الاستماع الحقيقي للفايربيز
   useEffect(() => {
     const qChat = query(collection(db, "chats"), orderBy("createdAt", "desc"));
     const unsubChat = onSnapshot(qChat, (snap) => { setChatList(snap.docs.map(doc => doc.data())); });
@@ -145,28 +146,32 @@ export default function HomePage() {
     return () => { unsubChat(); unsubPred(); unsubUsers(); };
   }, []);
 
-  // 🔥 دالة التسجيل بنظام التحديث الآمن الفوري وعلاج تعليق المودال جذرياً
+  // 🔥 الحل الجذري النهائي: دالة التسجيل الفورية المنفصلة لإغلاق المودال بدون أي تعليق
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // 1. إعداد البيانات فوراً في المتصفح لقفل المودال دون انتظار السيرفر
+    const finalPhone = user.countryCode + user.phone;
+    const userData = {
+      fullName: user.fullName,
+      phone: finalPhone,
+      residence: user.residence,
+      favoriteTeam: user.favoriteTeam,
+      points: 0, total: 0, correct: 0, wrong: 0,
+      createdAt: new Date().toISOString()
+    };
+
+    // 2. تحديث واجهة الجوال فوراً وإخفاء المودال بلمحة بصر لمنع التعليق
+    localStorage.setItem("worldCupUser", JSON.stringify(userData));
+    setUser(userData);
+    setIsLoggedIn(true);
+    setIsAuthModalOpen(false);
+
+    // 3. إرسال البيانات للفايربيز في الخلفية بشكل صامت دون تعطيل زوار الجوال
     try {
-      const finalPhone = user.countryCode + user.phone;
-      const userData = {
-        fullName: user.fullName, phone: finalPhone, residence: user.residence, favoriteTeam: user.favoriteTeam,
-        points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString()
-      };
-      
       await addDoc(collection(db, "users"), userData);
-      localStorage.setItem("worldCupUser", JSON.stringify(userData)); 
-      
-      // التحديث الداخلي الفوري للحالة دون الحاجة لعمل ريفريش للصفحة نهائياً
-      setUser(userData);
-      setIsLoggedIn(true); 
-      setIsAuthModalOpen(false); 
-      
-      alert("تم تفعيل حسابك بنجاح وبدأت رحلة التحدي! 🚀🏆");
-    } catch (err) { 
-      console.error(err);
-      alert("حدث خطأ أثناء التسجيل، يرجى إعادة المحاولة."); 
+    } catch (err) {
+      console.error("Firebase background save error: ", err);
     }
   };
 
@@ -220,7 +225,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Header - تم استدعاء لوجو كأس العالم 2026 مع أنيميشن النبض الاحترافي */}
+        {/* Header */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm transition-all">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -268,7 +273,7 @@ export default function HomePage() {
             </form>
           </section>
 
-          {/* لوحة الصدارة ورأينا اسمك منور فيها بالصورة */}
+          {/* لوحة الصدارة */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 overflow-hidden flex flex-col justify-between">
               <div>
@@ -330,7 +335,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* الشات السريع */}
             <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 h-[450px] flex flex-col justify-between">
               <div className="overflow-hidden flex flex-col h-full">
                 <h3 className="font-bold text-sm md:text-base text-slate-900 border-b border-slate-50 pb-3 mb-3"><span>💬</span> دردشة زوار المنصة الفورية (لايف حقيقي)</h3>
@@ -360,7 +364,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
             <p className="font-bold text-slate-300">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-500">© جميع الحقوق محفوظة • النسخة المحدثة AI V2.2</p>
+            <p className="text-slate-500">© جميع الحقوق محفوظة • النسخة المحدثة AI V2.5</p>
           </div>
           <div className="flex items-center gap-3 bg-slate-800/50 border border-slate-800 px-4 py-2 rounded-xl order-1 sm:order-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">ع</div>
@@ -372,7 +376,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* مودال التسجيل الاحترافي الجديد */}
+      {/* مودال التسجيل الجديد الفوري والسريع للغاية */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
