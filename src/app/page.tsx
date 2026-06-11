@@ -1,158 +1,362 @@
 "use client";
-import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useAuth } from "@/context/AuthContext";
-import { Match, Prediction } from "@/types";
-import LiveMatches from "@/components/LiveMatches";
-import GlobalStats from "@/components/GlobalStats";
-import Leaderboard from "@/components/ui/Leaderboard";
-import PublicPredictions from "@/components/ui/PublicPredictions";
-import MatchCard from "@/components/ui/MatchCard";
-import { Trophy, LogIn } from "lucide-react";
+
+import { useState } from "react";
+
+// قائمة المنتخبات المشاركة بكأس العالم 2026 مع الأعلام
+const WORLD_CUP_TEAMS = [
+  { code: "SA", name: "السعودية", emoji: "🇸🇦" },
+  { code: "MA", name: "المغرب", emoji: "🇲🇦" },
+  { code: "EG", name: "مصر", emoji: "🇪🇬" },
+  { code: "AE", name: "الإمارات", emoji: "🇦🇪" },
+  { code: "QA", name: "قطر", emoji: "🇶🇦" },
+  { code: "US", name: "الولايات المتحدة", emoji: "🇺🇸" },
+  { code: "MX", name: "المكسيك", emoji: "🇲🇽" },
+  { code: "CA", name: "كندا", emoji: "🇨🇦" },
+  { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" },
+  { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
+  { code: "FR", name: "فرنسا", emoji: "🇫🇷" },
+  { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
+];
+
+// قائمة مفاتيح الاتصال والدول
+const COUNTRIES = [
+  { code: "SA", name: "المملكة العربية السعودية", dialCode: "+966", flag: "🇸🇦" },
+  { code: "KW", name: "الكويت", dialCode: "+965", flag: "🇰🇼" },
+  { code: "AE", name: "الإمارات العربية المتحدة", dialCode: "+971", flag: "🇦🇪" },
+  { code: "QA", name: "قطر", dialCode: "+974", flag: "🇶🇦" },
+  { code: "BH", name: "البحرين", dialCode: "+973", flag: "🇧🇭" },
+  { code: "OM", name: "عُمان", dialCode: "+968", flag: "🇴🇲" },
+  { code: "EG", name: "مصر", dialCode: "+20", flag: "🇪🇬" },
+  { code: "MA", name: "المغرب", dialCode: "+212", flag: "🇲🇦" },
+];
 
 export default function HomePage() {
-  const { profile, loginWithPhone } = useAuth();
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [userPredictions, setUserPredictions] = useState<Record<string, Prediction>>({});
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    fullName: "",
+    countryCode: "+966",
+    phone: "",
+    residence: "المملكة العربية السعودية",
+    favoriteTeam: "",
+  });
 
-  // حقول نموذج تسجيل الدخول السريع للمشترك الجديد
-  const [phone, setPhone] = useState("");
-  const [name, setName] = useState("");
-  const [country, setCountry] = useState("المملكة العربية السعودية");
-  const [favTeam, setFavTeam] = useState("🇸🇦 السعودية");
+  const [chatMessage, setChatMessage] = useState("");
+  const [chatList, setChatList] = useState([
+    { user: "أحمد العتيبي", text: "توقعي الأرجنتين بتكتسح اليوم 💥" },
+    { user: "سلطان الشمري", text: "يا شباب صقورنا قدها إن شاء الله 🇸🇦⚽" },
+  ]);
 
-  useEffect(() => {
-    // 1. جلب جميع مباريات البطولة مجدولة زمنيًا بتحديث حي
-    const qMatches = query(collection(db, "Matches"), orderBy("timestamp", "asc"));
-    const unsubMatches = onSnapshot(qMatches, (snapshot) => {
-      const data: Match[] = [];
-      snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() } as Match));
-      setMatches(data);
-    });
-
-    return () => unsubMatches();
-  }, []);
-
-  useEffect(() => {
-    if (!profile?.id) {
-      setUserPredictions({});
-      return;
-    }
-    // 2. مزامنة توقعات المستخدم الحالي لعرضها داخل الكروت تلقائيًا
-    const qPreds = query(collection(db, "Predictions"));
-    const unsubPreds = onSnapshot(qPreds, (snapshot) => {
-      const preds: Record<string, Prediction> = {};
-      snapshot.forEach((doc) => {
-        const p = doc.data() as Prediction;
-        if (p.userId === profile.id) {
-          preds[p.matchId] = p;
-        }
-      });
-      setUserPredictions(preds);
-    });
-
-    return () => unsubPreds();
-  }, [profile?.id]);
-
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || !name) return;
-    loginWithPhone(phone, name, country, favTeam);
+    if (!chatMessage.trim()) return;
+    setChatList([...chatList, { user: formData.fullName || "زائر", text: chatMessage }]);
+    setChatMessage("");
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* البانر الترحيبي الرئيسي الأعلى */}
-      <div className="text-center md:text-right flex flex-col md:flex-row justify-between items-center bg-gradient-to-br from-slate-900 via-purple-950 to-slate-900 p-8 rounded-3xl text-white shadow-xl gap-4 border border-slate-800 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-brand-pink/10 rounded-full blur-3xl" />
-        <div className="z-10">
-          <h1 className="text-2xl md:text-4xl font-black mb-2 flex items-center justify-center md:justify-start gap-2">
-            <span>مرحباً بك في تحدي التوقعات الأكبر!</span>
-            <Trophy className="w-8 h-8 text-brand-gold hidden md:inline-block" />
-          </h1>
-          <p className="text-slate-300 text-sm font-bold">سجل توقعاتك الدقيقة للمباريات، اجمع النقاط، ونافس على صدارة المجموعات الكبرى لعام 2026!</p>
-        </div>
-        {profile && (
-          <div className="bg-white/5 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 text-center min-w-[160px] z-10">
-            <span className="text-xs text-brand-gold font-black block mb-1">🎯 رصيدك الحالي</span>
-            <span className="text-3xl font-black text-white">{profile.points}</span>
-            <span className="text-xs block text-slate-400 mt-1">نقطة كليّة</span>
-          </div>
-        )}
-      </div>
-
-      {/* لوحة المؤشرات السريعة والإحصائيات الكلية */}
-      <GlobalStats />
-
-      {/* شاشة أحداث البث المباشر والأهداف اللحظية للمباريات الجارية الآن */}
-      <LiveMatches />
-
-      {/* التقسيم الهيكلي المتوازن لواجهة المستخدم */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* المقطع الأيمن والأوسط: قائمة المباريات أو بوابة الدخول */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
-          {!profile ? (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800 transition-all">
-              <div className="flex items-center gap-2 mb-6 text-brand-purple dark:text-brand-gold">
-                <LogIn className="w-5 h-5" />
-                <h2 className="text-lg font-black text-slate-900 dark:text-white">إنشاء حساب أو تسجيل الدخول السريع</h2>
+    <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased selection:bg-purple-200 text-right flex flex-col justify-between">
+      
+      <div>
+        {/* 1. الهيدر المشترك المتجاوب (زي سلة) */}
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            
+            {/* اليمين: الشعار والاسم */}
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="relative w-8 h-8 md:w-9 md:h-9 flex-shrink-0">
+                <img 
+                  src="/wc2026-logo.png" 
+                  alt="شعار كأس العالم 2026" 
+                  className="object-contain w-full h-full" 
+                  onError={(e) => { e.currentTarget.src = "🏆"; }} 
+                />
               </div>
-              
-              <form onSubmit={handleLoginSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-black text-slate-400">الاسم الكريم (يظهر للعامة ولوحة الصدارة)</label>
-                  <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-brand-purple outline-none font-bold text-sm text-slate-900 dark:text-white" placeholder="مثال: عبدالمحسن العنزي" />
+              <h1 className="text-sm md:text-lg font-bold bg-gradient-to-r from-purple-800 to-indigo-600 bg-clip-text text-transparent truncate max-w-[180px] sm:max-w-none">
+                تحدي توقعات كأس العالم 2026
+              </h1>
+            </div>
+
+            {/* اليسار: الحساب / تسجيل الدخول */}
+            <div>
+              {isLoggedIn ? (
+                <div className="bg-purple-50 text-purple-700 px-3 py-1.5 md:px-4 md:py-2 rounded-xl font-medium text-xs md:text-sm">
+                  أهلاً، {formData.fullName || "المستخدم"}
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-black text-slate-400">رقم الجوال (المعرف السري والوحيد لحسابك)</label>
-                  <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-brand-purple outline-none font-mono text-sm text-slate-900 dark:text-white" placeholder="05xxxxxxxx" />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-black text-slate-400">الدولة أو مقر الإقامة الحالي</label>
-                  <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-brand-purple outline-none font-bold text-sm text-slate-900 dark:text-white" />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-black text-slate-400">المنتخب المفضل أو المتوقع فوزه بالبطولة</label>
-                  <input type="text" value={favTeam} onChange={(e) => setFavTeam(e.target.value)} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-brand-purple outline-none font-bold text-sm text-slate-900 dark:text-white" />
-                </div>
-                <button type="submit" className="sm:col-span-2 py-3.5 bg-brand-purple text-white font-black rounded-xl hover:bg-brand-deep transition-all mt-2 shadow-lg shadow-brand-purple/20 text-sm">
-                  دخول المنصة وبدء حفظ التوقعات الحالية 🚀
+              ) : (
+                <button 
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs md:text-sm font-semibold px-3 py-2 md:px-5 md:py-2.5 rounded-xl transition-all shadow-sm shadow-purple-200"
+                >
+                  الدخول / التسجيل
                 </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* المحتوى العام للمنصة */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-10">
+          
+          {/* البانر الرئيسي المحمس */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-purple-900 via-indigo-950 to-slate-950 text-white rounded-2xl md:rounded-3xl p-5 sm:p-8 md:p-12 shadow-xl mb-6 md:mb-10 text-center flex flex-col items-center justify-center">
+            <div className="absolute top-0 left-0 w-48 h-48 bg-purple-600/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <span className="bg-purple-500/20 text-purple-300 text-[10px] md:text-xs uppercase font-bold tracking-wider px-3 py-1 rounded-full border border-purple-500/30 mb-3 inline-block">
+              🏆 أضخم منصة توقعات جماهيرية لعام 2026
+            </span>
+            <h2 className="text-lg sm:text-2xl md:text-4xl font-extrabold mb-3 leading-snug max-w-2xl">
+              سجل توقعاتك الدقيقة للمباريات، اجمع النقاط، ونافس على صدارة المجموعات الكبرى!
+            </h2>
+            <p className="text-slate-300 text-xs md:text-base max-w-xl mb-5 md:mb-6">
+              شاهد البث المباشر، تفاعل مع الجمهور في الشات الفوري، وكن أنت ملك التوقعات القادم.
+            </p>
+            {!isLoggedIn && (
+              <button 
+                onClick={() => setIsAuthModalOpen(true)}
+                className="bg-white text-purple-950 hover:bg-purple-50 font-bold px-5 py-2.5 md:px-7 md:py-3 rounded-xl transition-all shadow-lg text-xs md:text-sm"
+              >
+                شارك التحدي وابدأ التوقع الآن 🔥
+              </button>
+            )}
+          </div>
+
+          {/* تقسيم شبكة العرض (Grid) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
+            
+            {/* الجانب الأيمن: المباريات والإحصاءات */}
+            <div className="lg:col-span-2 space-y-6 md:space-y-8">
+              
+              {/* قسم البث والمباريات الحية */}
+              <section className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-4 border-b border-slate-50 pb-3">
+                  <h3 className="font-bold text-sm md:text-lg text-slate-900 flex items-center gap-2">
+                    <span>📺</span> مباريات اليوم والبث المباشر
+                  </h3>
+                  <span className="flex items-center gap-1.5 bg-red-50 text-red-600 px-2 py-0.5 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold animate-pulse">
+                    <span className="w-1.5 h-1.5 bg-red-600 rounded-full"></span> مباشر الآن
+                  </span>
+                </div>
+                
+                <div className="aspect-video bg-slate-900 rounded-xl mb-4 relative flex items-center justify-center text-slate-400 text-xs md:text-sm p-4 text-center border border-slate-800">
+                  <p>شاشة البث المباشر ستظهر هنا عند بدء المباراة ⚽📺</p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="bg-slate-50 hover:bg-slate-100/70 p-3 md:p-4 rounded-xl border border-slate-100 flex items-center justify-between text-center text-xs md:text-sm font-bold transition-all">
+                    <div className="flex-1 flex items-center justify-center gap-1">🇸🇦 السعودية</div>
+                    <div className="px-3 py-1 bg-purple-100 text-purple-800 text-[10px] md:text-xs rounded-lg">20:00</div>
+                    <div className="flex-1 flex items-center justify-center gap-1">🇦🇷 الأرجنتين</div>
+                  </div>
+                </div>
+              </section>
+
+              {/* صف فرعي: لوحة الصدارة وتوقعات البطل */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* لوحة الصدارة */}
+                <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
+                  <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 border-b border-slate-50 pb-2">
+                    🥇 لوحة الصدارة المؤقتة
+                  </h3>
+                  <div className="space-y-2 text-xs md:text-sm">
+                    <div className="flex justify-between items-center bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100">
+                      <span className="font-bold">🥇 1. عبدالسلام العنزي</span>
+                      <span className="font-mono bg-yellow-100 px-2 py-0.5 rounded text-[10px] font-bold text-yellow-800">145 نقطة</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2.5 rounded-xl border border-slate-100">
+                      <span className="font-medium">🥈 2. فيصل الحربي</span>
+                      <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-[10px] text-slate-600">130 نقطة</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* توقعات الجماهير */}
+                <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100">
+                  <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 border-b border-slate-50 pb-2">
+                    📊 أعلى توقعات الجماهير للبطل
+                  </h3>
+                  <div className="space-y-3 text-xs md:text-sm">
+                    <div>
+                      <div className="flex justify-between mb-1 text-[10px] text-slate-500">
+                        <span>🇸🇦 السعودية</span>
+                        <span>42%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-purple-600 h-full rounded-full" style={{ width: "42%" }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1 text-[10px] text-slate-500">
+                        <span>🇦🇷 الأرجنتين</span>
+                        <span>28%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-indigo-500 h-full rounded-full" style={{ width: "28%" }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            {/* الجانب الأيسر: دردشة الجمهور الحية */}
+            <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 lg:sticky lg:top-24 h-[450px] md:h-[520px] flex flex-col justify-between">
+              <div className="overflow-hidden flex flex-col h-full">
+                <h3 className="font-bold text-sm md:text-lg text-slate-900 flex items-center gap-2 border-b border-slate-50 pb-3 mb-3 flex-shrink-0">
+                  <span>💬</span> دردشة الجمهور الحية
+                </h3>
+                
+                <div className="space-y-2.5 overflow-y-auto flex-1 pl-1 text-xs md:text-sm">
+                  {chatList.map((msg, i) => (
+                    <div key={i} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="block font-bold text-[10px] text-purple-700 mb-0.5">{msg.user}</span>
+                      <p className="text-slate-700 leading-relaxed">{msg.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <form onSubmit={handleSendMessage} className="mt-3 flex gap-2 border-t border-slate-100 pt-3 flex-shrink-0">
+                <button type="submit" className="bg-purple-600 text-white font-bold px-3.5 py-2 rounded-xl text-xs md:text-sm hover:bg-purple-700 transition-colors">
+                  إرسال
+                </button>
+                <input 
+                  type="text" 
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  placeholder="اكتب رسالتك هنا للجمهور..."
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                />
               </form>
             </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">📅 جدول مباريات التحدي القائمة</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {matches.map((match) => (
-                  <MatchCard 
-                    key={match.id} 
-                    match={match} 
-                    currentUserId={profile.id}
-                    userName={profile.name}
-                    userFavoriteTeam={profile.favoriteTeam}
-                    existingPrediction={userPredictions[match.id]}
-                  />
-                ))}
-                {matches.length === 0 && (
-                  <p className="text-sm font-bold text-slate-400 text-center py-12 col-span-2 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
-                    لا توجد مباريات مضافة في جدول البطولة حالياً.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* المقطع الأيسر: لوحات المراقبة، الصدارة الحية، وتوقعات الجماهير */}
-        <div className="flex flex-col gap-8">
-          <Leaderboard />
-          <PublicPredictions />
-        </div>
-
+          </div>
+        </main>
       </div>
+
+      {/* 🏁 4. الفوتر السفلي الاحترافي - مع تعديل اسم عبدالسلام العنزي باللون الأبيض الكامل ⚪ */}
+      <footer className="bg-slate-900 text-slate-400 py-6 mt-12 border-t border-slate-800 flex-shrink-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-right">
+          
+          {/* اليمين: الحقوق والنسخة */}
+          <div className="text-xs space-y-1 order-2 sm:order-1">
+            <p className="font-bold text-slate-300">تحدي توقعات كأس العالم 2026</p>
+            <p className="text-slate-500">© جميع الحقوق محفوظة • النسخة التجريبية V1.0</p>
+          </div>
+
+          {/* اليسار: بطاقة هوية المطور بلون أبيض نقي كامل وموحد */}
+          <div className="order-1 sm:order-2 flex items-center gap-3 bg-slate-800/60 border border-slate-800 px-4 py-2 rounded-2xl shadow-sm">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm shadow-md">
+              ع
+            </div>
+            <div className="text-xs text-right">
+              <span className="block text-[10px] text-slate-500">فكرة وتطوير</span>
+              <span className="block font-bold text-white mt-0.5 tracking-wide">عبدالسلام العنزي</span>
+            </div>
+          </div>
+
+        </div>
+      </footer>
+
+      {/* 🔐 مودال التسجيل المنبثق */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl p-5 md:p-7 shadow-2xl border border-slate-100 relative max-h-[90vh] overflow-y-auto">
+            
+            <button 
+              onClick={() => setIsAuthModalOpen(false)}
+              className="absolute top-4 left-4 text-slate-400 hover:text-slate-600 bg-slate-50 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+            >
+              ✕
+            </button>
+
+            <div className="text-center mb-5">
+              <h4 className="text-lg md:text-xl font-bold text-slate-900 mb-1">إنشاء حساب جديد</h4>
+              <p className="text-[11px] md:text-xs text-slate-500">املأ الحقول التالية للانضمام وتفعيل جدول التوقعات</p>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); setIsAuthModalOpen(false); setIsLoggedIn(true); }} className="space-y-4">
+              
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">الاسم (يظهر للعامة ولوحة الصدارة)</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="مثال: عبدالسلام العنزي"
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 md:py-2.5 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">رقم الجوال (المعرف السري لحسابك)</label>
+                <div className="flex gap-2" style={{ direction: "ltr" }}>
+                  <select 
+                    value={formData.countryCode}
+                    onChange={(e) => setFormData({...formData, countryCode: e.target.value})}
+                    className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-left"
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.dialCode}>{c.flag} {c.dialCode}</option>
+                    ))}
+                  </select>
+                  <input 
+                    type="tel" 
+                    required
+                    placeholder="رقم الهاتف"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-left focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">الدولة أو مقر الإقامة الحالي</label>
+                <select 
+                  value={formData.residence}
+                  onChange={(e) => setFormData({...formData, residence: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 md:py-2.5 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.name}>{c.flag} {c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">المنتخب المفضل أو المتوقع فوزه بالبطولة</label>
+                <select 
+                  required
+                  value={formData.favoriteTeam}
+                  onChange={(e) => setFormData({...formData, favoriteTeam: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 md:py-2.5 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white transition-all"
+                >
+                  <option value="" disabled>اختر المنتخب المفضل...</option>
+                  {WORLD_CUP_TEAMS.map((team) => (
+                    <option key={team.code} value={team.name}>
+                      {team.emoji} {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 md:py-3 rounded-xl text-xs md:text-sm transition-colors mt-2 shadow-md shadow-purple-100"
+              >
+                دخول المنصة وبدء حفظ التوقعات الحالية 🚀
+              </button>
+
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
