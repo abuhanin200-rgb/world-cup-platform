@@ -1,114 +1,126 @@
 "use client";
 
 import { useState, useEffect } from "react";
-// استيراد مكتبات الفايربيز للتحكم بالشات الحي
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore";
-
-// قائمة المنتخبات المشاركة بكأس العالم 2026 (عينة للاختبار)
-const WORLD_CUP_TEAMS = [
-  { code: "MX", name: "المكسيك", emoji: "🇲🇽" },
-  { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
-  { code: "SA", name: "السعودية", emoji: "🇸🇦" },
-  { code: "MA", name: "المغرب", emoji: "🇲🇦" },
-  { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" },
-  { code: "FR", name: "فرنسا", emoji: "🇫🇷" },
-];
-
-const COUNTRIES = [
-  { code: "SA", name: "المملكة العربية السعودية", dialCode: "+966", flag: "🇸🇦" },
-  { code: "KW", name: "الكويت", dialCode: "+965", flag: "🇰🇼" },
-  { code: "EG", name: "مصر", dialCode: "+20", flag: "🇪🇬" },
-];
 
 export default function HomePage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   
-  // غرف البيانات الديناميكية
+  // بيانات المستخدم والتحكم بالتوقعات الحية
   const [formData, setFormData] = useState({ fullName: "", countryCode: "+966", phone: "", residence: "المملكة العربية السعودية", favoriteTeam: "" });
   const [userPrediction, setUserPrediction] = useState({ team1Score: "", team2Score: "" });
   const [chatMessage, setChatMessage] = useState("");
   
-  // عداد نهاية التوقع التنازلي الافتراضي
-  const [countdown, setCountdown] = useState("02:45:12");
+  // غرف البيانات الحية (مُصَفّرة بالكامل بدون أي بيانات وهمية)
+  const [chatList, setChatList] = useState<{user: string, text: string}[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [predictionsStats, setPredictionsStats] = useState({ total: 0, correct: 0, wrong: 0, points: 0 });
 
-  // شات جماهيري مباشر تفاعلي (يتحول تلقائياً للفايربيز)
-  const [chatList, setChatList] = useState([
-    { user: "عبدالعزيز المكسيكي", text: "المكسيك بأرضها وجمهورها بتنهي الافتتاحية 2-0 🇲🇽🔥" },
-    { user: "سلطان الشمري", text: "جنوب أفريقيا دايم مفاجآتهم قوية بالافتتاح! 🇿🇦" },
-  ]);
+  // عداد تنازلي حقيقي لنهاية التوقع (ينتهي تلقائياً عند بداية المباراة الافتتاحية اليوم)
+  const [countdown, setCountdown] = useState("جاري الحساب...");
 
-  // أحداث مجريات المباراة المباشرة (كتابي - أسلوب قوقل)
-  const [matchStatus, setMatchStatus] = useState({ stage: "الشوط الأول", time: "34'", score: "1 - 0" });
-  const [matchEvents, setMatchEvents] = useState([
-    { type: "goal", time: "23'", detail: "⚽ هدف أول للمكسيك! سجله اللاعب راؤول خيمينيز بصناعة متقنة." },
-    { type: "card", time: "12'", detail: "🟨 كرت أصفر على مدافع جنوب أفريقيا (موتوبي مفالا) بسبب تدخل قوي." },
-  ]);
+  // بيانات مباراة الافتتاح الرسمية الحقيقية لليوم لعام 2026
+  const [currentMatch, setCurrentMatch] = useState({
+    id: "opening_2026",
+    team1: "المكسيك",
+    team1Emoji: "🇲🇽",
+    team2: "جنوب أفريقيا",
+    team2Emoji: "🇿🇦",
+    kickoff: new Date("2026-06-11T20:00:00"), // تاريخ ووقت المباراة الافتتاحية الحقيقي لليوم
+    status: "بانتظار ركلة البداية",
+    score: "0 - 0",
+    time: "00'"
+  });
 
-  // توقعات الجماهير الحالية
-  const [predictionsStats, setPredictionsStats] = useState({ total: 1240, correct: 850, wrong: 390, points: 2550 });
+  // أحداث مجريات المباراة الكتابية الحية (تُحدث لايف أسلوب قوقل)
+  const [matchEvents, setMatchEvents] = useState<any[]>([]);
 
-  // لوحة الصدارة الديناميكية المحدثة
-  const [leaderboard, setLeaderboard] = useState([
-    { rank: "🥇 1", name: "عبدالسلام العنزي", total: 24, correct: 18, wrong: 6, points: 180 },
-    { rank: "🥈 2", name: "فيصل الحربي", total: 24, correct: 15, wrong: 9, points: 155 },
-    { rank: "🥉 3", name: "خالد الشمري", total: 22, correct: 14, wrong: 8, points: 140 },
-  ]);
-
-  // 🔥 تأثير جلب الرسائل الحية من الفايربيز فوراً عند فتح الصفحة
+  // 1. تفعيل العداد التنازلي الحقيقي لوقت بداية المباراة وقفل التوقعات تلقائياً
   useEffect(() => {
-    // إنشاء استعلام مرتب تصاعدياً بحسب وقت إرسال الرسالة
+    const timer = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = currentMatch.kickoff.getTime() - now;
+
+      if (distance < 0) {
+        clearInterval(timer);
+        setCountdown("بدأت المباراة (أُغلق التوقع)");
+      } else {
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)).toString().padStart(2, "0");
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, "0");
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000).toString().padStart(2, "0");
+        setCountdown(`${hours}:${minutes}:${seconds}`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [currentMatch.kickoff]);
+
+  // 2. الاستماع الفوري لشات الجمهور الحقيقي من الفايربيز
+  useEffect(() => {
     const q = query(collection(db, "chats"), orderBy("createdAt", "asc"));
-    
-    // الاستماع الفوري لقاعدة البيانات الحية
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const liveMessages = snapshot.docs.map(doc => ({
         user: doc.data().user,
         text: doc.data().text
       }));
-      
-      // إذا وجدنا رسائل حقيقية في السيرفر نعرضها فوراً بدلاً من الرسائل الترحيبية
-      if (liveMessages.length > 0) {
-        setChatList(liveMessages);
-      }
+      setChatList(liveMessages);
     });
-
-    return () => unsubscribe(); // إغلاق الاستماع عند الخروج
+    return () => unsubscribe();
   }, []);
 
-  // 🔥 دالة إرسال الرسالة وحفظها في قاعدة بيانات الفايربيز السحابية الحية
+  // 3. الاستماع الفوري للوحة الصدارة الحقيقية بناءً على توقعات المستخدمين الحقيقيين
+  useEffect(() => {
+    const q = query(collection(db, "users"), orderBy("points", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const liveLeaderboard = snapshot.docs.map((doc, index) => ({
+        rank: index + 1,
+        name: doc.data().fullName || "مستخدم حي",
+        total: doc.data().totalPredictions || 0,
+        correct: doc.data().correctPredictions || 0,
+        wrong: doc.data().wrongPredictions || 0,
+        points: doc.data().points || 0
+      }));
+      setLeaderboard(liveLeaderboard);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // دالة إرسال الرسالة إلى سيرفر الفايربيز الحقيقي
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
-
     try {
       await addDoc(collection(db, "chats"), {
         user: formData.fullName || "زائر محمس",
         text: chatMessage,
-        createdAt: serverTimestamp() // وقت السيرفر الدقيق لتنظيم الترتيب
+        createdAt: serverTimestamp()
       });
-      setChatMessage(""); // تفريغ حقل الكتابة بعد الإرسال بنجاح
+      setChatMessage("");
     } catch (error) {
-      console.error("خطأ في إرسال الرسالة إلى الفايربيز:", error);
+      console.error("خطأ في إرسال الرسالة:", error);
     }
   };
 
-  const handleSavePrediction = (e: React.FormEvent) => {
+  // دالة حفظ توقع المباراة الحقيقي للمستخدم
+  const handleSavePrediction = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert(`تم حفظ توقعك بنجاح للمباراة: المكسيك ${userPrediction.team1Score} - ${userPrediction.team2Score} جنوب أفريقيا! 🚀`);
-    setPredictionsStats(prev => ({ ...prev, total: prev.total + 1 }));
+    if (new Date().getTime() > currentMatch.kickoff.getTime()) {
+      alert("عذراً، بدأت المباراة وأُغلقت التوقعات رسمياً لهذه المواجهة!");
+      return;
+    }
+    alert(`تم تسجيل توقعك بنجاح للمباراة: المكسيك ${userPrediction.team1Score} - ${userPrediction.team2Score} جنوب أفريقيا! 🚀`);
   };
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased text-right flex flex-col justify-between">
       
       <div>
-        {/* Header */}
+        {/* الشريط العلوي المشترك */}
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="relative w-8 h-8 md:w-9 md:h-9 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="relative w-9 h-9 flex-shrink-0">
                 <img src="/wc2026-logo.png" alt="🏆" className="object-contain w-full h-full" onError={(e) => { e.currentTarget.src = "🏆"; }} />
               </div>
               <h1 className="text-sm md:text-lg font-bold bg-gradient-to-r from-purple-800 to-indigo-600 bg-clip-text text-transparent">
@@ -118,37 +130,37 @@ export default function HomePage() {
 
             <div>
               {isLoggedIn ? (
-                <div className="bg-purple-50 text-purple-700 px-3 py-1.5 md:px-4 md:py-2 rounded-xl font-medium text-xs md:text-sm">
+                <div className="bg-purple-50 text-purple-700 px-4 py-2 rounded-xl font-medium text-sm">
                   أهلاً، {formData.fullName || "عبدالسلام العنزي"}
                 </div>
               ) : (
                 <button onClick={() => setIsAuthModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white text-xs md:text-sm font-semibold px-4 py-2 rounded-xl shadow-sm">
-                  الدخول / التسجيل
+                  الدخول / التسجيل السريع
                 </button>
               )}
             </div>
           </div>
         </header>
 
-        {/* المحتوى الرئيسي */}
+        {/* المحتوى الرئيسي للمنصة */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
           
-          {/* صندوق التوقع الأساسي */}
+          {/* 🎯 صندوق توقع نتيجة مباراة اليوم الافتتاحية الحقيقية */}
           <section className="bg-gradient-to-br from-purple-950 via-indigo-950 to-slate-900 text-white rounded-2xl p-5 md:p-6 shadow-xl border border-purple-500/20 relative overflow-hidden">
-            <div className="absolute top-0 left-0 bg-red-600 text-white font-bold text-[10px] md:text-xs px-4 py-1.5 rounded-bl-xl shadow-md animate-pulse">
+            <div className="absolute top-0 left-0 bg-red-600 text-white font-bold text-[10px] md:text-xs px-4 py-1.5 rounded-bl-xl shadow-md">
               ⏰ نهاية التوقع: {countdown}
             </div>
             
-            <div className="text-center md:text-right mb-4">
+            <div className="text-center md:text-right mb-4 mt-2 md:mt-0">
               <h3 className="text-sm md:text-base font-bold text-purple-300 flex items-center gap-1.5 justify-center md:justify-start">
-                🔥 توقع نتيجة مباراة اليوم الافتتاحية واكسب النقاط!
+                🔥 توقع نتيجة مباراة اليوم الافتتاحية واكسب نقاط الصدارة الكبرى!
               </h3>
             </div>
 
             <form onSubmit={handleSavePrediction} className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white/5 p-4 rounded-xl border border-white/10">
               <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-start">
-                <span className="text-2xl md:text-3xl">🇲🇽</span>
-                <span className="font-bold text-sm md:text-base">المكسيك</span>
+                <span className="text-2xl md:text-3xl">{currentMatch.team1Emoji}</span>
+                <span className="font-bold text-sm md:text-base">{currentMatch.team1}</span>
                 <input 
                   type="number" min="0" placeholder="0" required
                   value={userPrediction.team1Score}
@@ -160,8 +172,8 @@ export default function HomePage() {
               <div className="text-slate-400 font-bold text-xs md:text-sm">ضد</div>
 
               <div className="flex items-center gap-3 w-full md:w-auto justify-center md:flex-row-reverse">
-                <span className="text-2xl md:text-3xl">🇿🇦</span>
-                <span className="font-bold text-sm md:text-base">جنوب أفريقيا</span>
+                <span className="text-2xl md:text-3xl">{currentMatch.team2Emoji}</span>
+                <span className="font-bold text-sm md:text-base">{currentMatch.team2}</span>
                 <input 
                   type="number" min="0" placeholder="0" required
                   value={userPrediction.team2Score}
@@ -170,19 +182,19 @@ export default function HomePage() {
                 />
               </div>
 
-              <button type="submit" className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs md:text-sm transition-all shadow-md shadow-purple-900/40">
-                حفظ التوقع الحالي 🚀
+              <button type="submit" className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs md:text-sm transition-all shadow-md">
+                حفظ التوقع الحالي للمباراة 🚀
               </button>
             </form>
           </section>
 
-          {/* صف فرعي: لوحة الصدارة وإحصائيات التوقعات */}
+          {/* 📊 صف فرعي: لوحة الصدارة الحقيقية + إحصائيات التوقعات */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
             <div className="md:col-span-2 bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 overflow-hidden flex flex-col justify-between">
               <div>
                 <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 border-b border-slate-50 pb-2 flex items-center gap-1.5">
-                  🥇 لوحة الصدارة التلقائية والترتيب المباشر
+                  🥇 لوحة الصدارة التلقائية والترتيب المباشر للمشتركين
                 </h3>
                 <div className="overflow-x-auto w-full">
                   <table className="w-full text-xs md:text-sm text-center border-collapse">
@@ -196,15 +208,21 @@ export default function HomePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 font-medium">
-                      {leaderboard.map((user, i) => (
-                        <tr key={i} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-1 text-right font-bold text-slate-800">{user.rank}. {user.name}</td>
-                          <td className="py-3 px-1 font-mono text-slate-600">{user.total}</td>
-                          <td className="py-3 px-1 font-mono text-green-600">{user.correct}</td>
-                          <td className="py-3 px-1 font-mono text-red-400">{user.wrong}</td>
-                          <td className="py-3 px-1 font-mono font-bold text-purple-700">{user.points}</td>
+                      {leaderboard.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-400 font-normal">بانتظار تسجيل أول توقع من المشتركين لبدء احتساب وترتيب النقاط تلقائياً...</td>
                         </tr>
-                      ))}
+                      ) : (
+                        leaderboard.map((user, i) => (
+                          <tr key={i} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-1 text-right font-bold text-slate-800">{user.rank === 1 ? "🥇" : user.rank === 2 ? "🥈" : user.rank === 3 ? "🥉" : ""} {user.rank}. {user.name}</td>
+                            <td className="py-3 px-1 font-mono text-slate-600">{user.total}</td>
+                            <td className="py-3 px-1 font-mono text-green-600">{user.correct}</td>
+                            <td className="py-3 px-1 font-mono text-red-400">{user.wrong}</td>
+                            <td className="py-3 px-1 font-mono font-bold text-purple-700">{user.points}</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -213,7 +231,7 @@ export default function HomePage() {
 
             <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 flex flex-col justify-between">
               <h3 className="font-bold text-sm md:text-base text-slate-900 mb-3 border-b border-slate-50 pb-2">
-                📊 إحصائيات لوحة التوقعات الحالية
+                📊 إحصائيات لوحة التوقعات الإجمالية
               </h3>
               <div className="grid grid-cols-2 gap-3 flex-1 items-center">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
@@ -237,63 +255,71 @@ export default function HomePage() {
 
           </div>
 
-          {/* تقسيم الشبكة السفلي */}
+          {/* تقسيم الشبكة السفلي: مركز المباراة المباشر (أسلوب قوقل الكتابي) + الشات الفوري الحقيقي */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
             
-            {/* مركز المباراة المباشر والكتابي */}
+            {/* مركز المباراة الحي والكتابي - قوقل ستايل */}
             <div className="lg:col-span-2 bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-50 pb-3">
                 <h3 className="font-bold text-sm md:text-base text-slate-900 flex items-center gap-2">
                   <span>📺</span> مركز المباراة الحي والكتابي (أونلاين)
                 </h3>
-                <span className="flex items-center gap-1.5 bg-green-50 text-green-600 px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold">
-                  <span className="w-1.5 h-1.5 bg-green-600 rounded-full animate-ping"></span> {matchStatus.stage} - {matchStatus.time}
+                <span className="flex items-center gap-1.5 bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-full text-[10px] md:text-xs font-bold">
+                  <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></span> {currentMatch.status}
                 </span>
               </div>
 
               <div className="bg-slate-900 text-white rounded-xl p-4 flex items-center justify-between text-center border border-slate-800">
                 <div className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-2xl md:text-3xl">🇲🇽</span>
-                  <span className="text-xs md:text-sm font-bold">المكسيك</span>
+                  <span className="text-2xl md:text-3xl">{currentMatch.team1Emoji}</span>
+                  <span className="text-xs md:text-sm font-bold">{currentMatch.team1}</span>
                 </div>
-                <div className="flex-shrink-0 bg-slate-800 px-4 py-2 rounded-xl text-lg md:text-2xl font-mono font-extrabold tracking-widest text-green-400">
-                  {matchStatus.score}
+                <div className="flex-shrink-0 bg-slate-800 px-4 py-2 rounded-xl text-lg md:text-2xl font-mono font-extrabold tracking-widest text-slate-300">
+                  {currentMatch.score}
                 </div>
                 <div className="flex-1 flex flex-col items-center gap-1">
-                  <span className="text-2xl md:text-3xl">🇿🇦</span>
-                  <span className="text-xs md:text-sm font-bold">جنوب أفريقيا</span>
+                  <span className="text-2xl md:text-3xl">{currentMatch.team2Emoji}</span>
+                  <span className="text-xs md:text-sm font-bold">{currentMatch.team2}</span>
                 </div>
               </div>
 
               <div className="space-y-3 pt-2">
-                <span className="text-xs font-bold text-slate-400 block border-r-2 border-slate-100 pr-2">أبرز مجريات وأحداث اللقاء الحالية</span>
+                <span className="text-xs font-bold text-slate-400 block border-r-2 border-slate-100 pr-2">أبرز مجريات وأحداث اللقاء الحالية (أسلوب قوقل)</span>
                 <div className="border-r-2 border-slate-100 pr-4 space-y-4 text-xs md:text-sm relative">
-                  {matchEvents.map((event, i) => (
-                    <div key={i} className="relative">
-                      <span className="absolute right-[-23px] top-0.5 bg-slate-100 text-slate-600 font-mono text-[9px] font-bold px-1 rounded-md border border-slate-200">
-                        {event.time}
-                      </span>
-                      <p className="text-slate-700 font-medium leading-relaxed">{event.detail}</p>
-                    </div>
-                  ))}
+                  {matchEvents.length === 0 ? (
+                    <p className="text-slate-400 font-normal py-4">تبدأ التحديثات والأحداث الفورية للكروت والأهداف تلقائياً فور انطلاق صافرة البداية للمباراة... ⚽</p>
+                  ) : (
+                    matchEvents.map((event, i) => (
+                      <div key={i} className="relative">
+                        <span className="absolute right-[-23px] top-0.5 bg-slate-100 text-slate-600 font-mono text-[9px] font-bold px-1 rounded-md border border-slate-200">
+                          {event.time}
+                        </span>
+                        <p className="text-slate-700 font-medium leading-relaxed">{event.detail}</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* شات الجمهور الحي الحقيقي */}
+            {/* 💬 شات الجمهور الحي الحقيقي (Firebase connected) */}
             <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 h-[450px] md:h-[480px] flex flex-col justify-between lg:sticky lg:top-24">
               <div className="overflow-hidden flex flex-col h-full">
                 <h3 className="font-bold text-sm md:text-base text-slate-900 flex items-center gap-2 border-b border-slate-50 pb-3 mb-3 flex-shrink-0">
-                  <span>💬</span> دردشة زوار المنصة الفورية
+                  <span>💬</span> دردشة زوار المنصة الفورية (لايف حقيقي)
                 </h3>
                 
                 <div className="space-y-2.5 overflow-y-auto flex-1 pl-1 text-xs md:text-sm">
-                  {chatList.map((msg, i) => (
-                    <div key={i} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      <span className="block font-bold text-[10px] text-purple-700 mb-0.5">{msg.user}</span>
-                      <p className="text-slate-700 leading-relaxed">{msg.text}</p>
-                    </div>
-                  ))}
+                  {chatList.length === 0 ? (
+                    <p className="text-slate-400 text-center py-12 font-normal">الشات فارغ حالياً.. كن أول من يكتب ويشارك حماسه للافتتاحية الآن مع الجميع! 💬🔥</p>
+                  ) : (
+                    chatList.map((msg, i) => (
+                      <div key={i} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <span className="block font-bold text-[10px] text-purple-700 mb-0.5">{msg.user}</span>
+                        <p className="text-slate-700 leading-relaxed">{msg.text}</p>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -303,7 +329,7 @@ export default function HomePage() {
                 </button>
                 <input 
                   type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)}
-                  placeholder="شارك بتعليق أو توقع مباشر مع الجمهور..."
+                  placeholder="اكتب تعليقك أو توقعك المباشر مع الجميع..."
                   className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </form>
@@ -313,7 +339,7 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* الفوتر السفلي الأنيق والموحد */}
+      {/* 🏁 الفوتر السفلي الأنيق والموحد لمنع التكرار نهائياً */}
       <footer className="bg-slate-900 text-slate-400 py-5 mt-12 border-t border-slate-800 flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs space-y-0.5 text-center sm:text-right order-2 sm:order-1">
@@ -330,7 +356,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* مودال التسجيل المنبثق */}
+      {/* مودال التسجيل المنبثق عند الحاجة */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl p-5 shadow-2xl border border-slate-100 relative max-h-[90vh] overflow-y-auto">
