@@ -4,16 +4,6 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
-// قاعدة بيانات حية مجدولة لمباريات المونديال القادمة بتوقيت مكة المكرمة (GMT +3) بهوية 365
-const FIXTURES_365_DATABASE = [
-  { day: "اليوم — الخميس 11 يونيو", group: "كأس العالم - المجموعة أ", team1: "المكسيك", team1Emoji: "🇲🇽", team2: "جنوب أفريقيا", team2Emoji: "🇿🇦", time: "10:00 م", note: "المباراة الإفتتاحية لكأس العالم 2026" },
-  { day: "غداً — الجمعة 12 يونيو", group: "كأس العالم - المجموعة أ", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "جمهورية التشيك", team2Emoji: "🇨🇿", time: "05:00 ص", note: "" },
-  { day: "غداً — الجمعة 12 يونيو", group: "كأس العالم - المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "10:00 م", note: "" },
-  { day: "السبت، 13 يونيو", group: "كأس العالم - المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", note: "" },
-  { day: "السبت، 13 يونيو", group: "كأس العالم - المجموعة ب", team1: "قطر", team1Emoji: "🇶🇦", team2: "سويسرا", team2Emoji: "🇨🇭", time: "10:00 م", note: "" },
-  { day: "الأحد، 14 يونيو", group: "كأس العالم - المجموعة ج", team1: "السعودية", team1Emoji: "🇸🇦", team2: "فرنسا", team2Emoji: "🇫🇷", time: "09:00 م", note: "قمة جماهيرية مرتقبة للأخضر 🔥" }
-];
-
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
   { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
@@ -49,7 +39,6 @@ export default function HomePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false); 
   const [authMode, setAuthMode] = useState<"menu" | "guest" | "manual_login">("menu");
   
-  // الـ State مرنة ومفتوحة لقبول جميع الحقول الجديدة بدون قيود
   const [user, setUser] = useState<any>({ id: "", fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", phone: "", residence: "السعودية" });
   const [editProfileFields, setEditProfileFields] = useState({ fullName: "", password: "", favoriteTeam: "", phone: "" });
   
@@ -65,6 +54,10 @@ export default function HomePage() {
   const [predictionsStats, setPredictionsStats] = useState({ total: 0, correct: 0, wrong: 0, points: 0 });
   const [countdown, setCountdown] = useState("00:00:00");
 
+  // 📡 State جلب جدول مباريات كأس العالم بالكامل من الـ API الرياضي تلقائياً
+  const [apiFixtures, setApiFixtures] = useState<any[]>([]);
+  const [isLoadingFixtures, setIsLoadingFixtures] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -78,16 +71,65 @@ export default function HomePage() {
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser) as any;
       setUser(parsedUser);
-      setEditProfileFields({ 
-        fullName: parsedUser.fullName, 
-        password: parsedUser.password, 
-        favoriteTeam: parsedUser.favoriteTeam, 
-        phone: parsedUser.phone || "" 
-      });
+      setEditProfileFields({ fullName: parsedUser.fullName, password: parsedUser.password, favoriteTeam: parsedUser.favoriteTeam, phone: parsedUser.phone || "" });
       setIsLoggedIn(true);
       if (localStorage.getItem(`hasPredicted_${parsedUser.fullName}`)) setHasPredicted(true);
     }
   }, []);
+
+  // 📡 دالة الذكاء الاصطناعي لجلب كافة مباريات كأس العالم 2026 من السيرفر الرياضي لايف وتحويلها لتوقيت مكة
+  useEffect(() => {
+    if (activeTab !== "match_fixtures") return;
+
+    const fetchAllWorldCupFixtures = async () => {
+      setIsLoadingFixtures(true);
+      try {
+        const apiKey = process.env.NEXT_PUBLIC_FOOTBALL_API_KEY;
+        if (!apiKey) return;
+
+        // طلب جلب مباريات كأس العالم (league 1 تعني كأس العالم في نظام الأي بي آي) لموسم 2026
+        const res = await fetch("https://v3.football.api-sports.io/fixtures?league=1&season=2026", {
+          method: "GET",
+          headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": "v3.football.api-sports.io" }
+        });
+        const data = await res.json();
+
+        if (data.response && data.response.length > 0) {
+          // ترتيب المباريات تصاعدياً حسب وقت ركلة البداية
+          const sorted = data.response.sort((a: any, b: any) => new Date(a.fixture.date).getTime() - new Date(b.fixture.date).getTime());
+          
+          const formatted = sorted.map((f: any) => {
+            const matchDate = new Date(f.fixture.date);
+            // تحويل التاريخ إلى صيغة عربية مبسطة متوافقة مع توقيت مكة المكرمة
+            const options: any = { weekday: 'long', day: 'numeric', month: 'long' };
+            const dayArabic = matchDate.toLocaleDateString('ar-SA', options);
+            const timeArabic = matchDate.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+            // مطابقة الأعلام تلقائياً بناءً على مصفوفة الفرق المتوفرة لدينا
+            const t1Obj = WORLD_CUP_2026_TEAMS.find(t => f.teams.home.name.toLowerCase().includes(t.name.toLowerCase()) || t.code === f.teams.home.code);
+            const t2Obj = WORLD_CUP_2026_TEAMS.find(t => f.teams.away.name.toLowerCase().includes(t.name.toLowerCase()) || t.code === f.teams.away.code);
+
+            return {
+              day: dayArabic,
+              group: f.league.round || "كأس العالم 2026",
+              team1: f.teams.home.name,
+              team1Emoji: t1Obj ? t1Obj.emoji : "🏳️",
+              team2: f.teams.away.name,
+              team2Emoji: t2Obj ? t2Obj.emoji : "🏳️",
+              time: timeArabic,
+              score: f.fixture.status.short === "NS" ? "" : `${f.goals.home} - ${f.goals.away}`,
+              status: f.fixture.status.long,
+              note: f.fixture.status.short === "LIVE" ? "🔥 مباشر الآن" : ""
+            };
+          });
+          setApiFixtures(formatted);
+        }
+      } catch (err) { console.error(err); }
+      setIsLoadingFixtures(false);
+    };
+
+    fetchAllWorldCupFixtures();
+  }, [activeTab]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -155,14 +197,9 @@ export default function HomePage() {
       const chosenEmoji = matchedTeam ? matchedTeam.emoji : "🏆";
 
       const userData = {
-        fullName: targetName,
-        favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦",
-        teamEmoji: chosenEmoji,
-        password: user.password, 
-        phone: user.phone || "",
-        residence: user.residence,
-        points: 0, total: 0, correct: 0, wrong: 0,
-        createdAt: new Date().toISOString()
+        fullName: targetName, favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦", teamEmoji: chosenEmoji,
+        password: user.password, phone: user.phone || "", residence: user.residence,
+        points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString()
       };
 
       const docRef = await addDoc(collection(db, "users"), userData);
@@ -181,15 +218,10 @@ export default function HomePage() {
     if (!manualName.trim() || !manualPassword) return;
 
     try {
-      const q = query(
-        collection(db, "users"), 
-        where("fullName", "==", manualName.trim()),
-        where("password", "==", manualPassword)
-      );
+      const q = query(collection(db, "users"), where("fullName", "==", manualName.trim()), where("password", "==", manualPassword));
       const snap = await getDocs(q);
 
       if (!snap.empty) {
-        // ⚡ تم تطبيق الـ (as any) هنا لإنهاء آخر مشكلة متبقية مية بالمية ومنع تعليق الـ Build
         const loggedUser = snap.docs[0].data() as any;
         localStorage.setItem("worldCupUser", JSON.stringify(loggedUser));
         setUser(loggedUser); 
@@ -197,9 +229,7 @@ export default function HomePage() {
         setIsLoggedIn(true); setIsAuthModalOpen(false);
         if (localStorage.getItem(`hasPredicted_${manualName.trim()}`)) setHasPredicted(true);
         alert(`مرحباً بعودتك يا ${manualName}! 👑🏆`);
-      } else {
-        alert("❌ عذراً! الاسم أو الرقم السري غير صحيح، يرجى التأكد وإعادة الإدخال.");
-      }
+      } else { alert("❌ عذراً! الاسم أو الرقم السري غير صحيح، يرجى التأكد وإعادة الإدخال."); }
     } catch (err) { console.error(err); }
   };
 
@@ -253,12 +283,7 @@ export default function HomePage() {
     e.preventDefault();
     if (!chatMessage.trim()) return;
     try {
-      await addDoc(collection(db, "chats"), { 
-        user: user.fullName || "زائر", 
-        teamEmoji: user.teamEmoji || "🏆",
-        text: chatMessage, 
-        createdAt: new Date().toISOString() 
-      });
+      await addDoc(collection(db, "chats"), { user: user.fullName || "زائر", teamEmoji: user.teamEmoji || "🏆", text: chatMessage, createdAt: new Date().toISOString() });
       setChatMessage("");
     } catch (err) { console.error(err); }
   };
@@ -271,18 +296,26 @@ export default function HomePage() {
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 text-slate-100 font-sans antialiased text-right flex flex-col justify-between">
       
+      {/* ⚡ حركة التيكر تم برمجتها لتبدأ وتتحرك تلقائياً من اليسار لليمين مية بالمية */}
       <style>{`
-        @keyframes marqueeScroll { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-        .forced-marquee { display: flex; white-space: nowrap; animation: marqueeScroll 25s linear infinite; }
-        .forced-marquee:hover { animation-play-state: paused; }
+        @keyframes marqueeScrollRight { 
+          0% { transform: translateX(-100%); } 
+          100% { transform: translateX(100%); } 
+        }
+        .forced-marquee-right { 
+          display: flex; 
+          white-space: nowrap; 
+          animation: marqueeScrollRight 25s linear infinite; 
+        }
+        .forced-marquee-right:hover { animation-play-state: paused; }
       `}</style>
 
       <div>
-        {/* 📺 شريط البث الحي لقنوات فيفا العالمية */}
+        {/* 📺 شريط البث الحي */}
         <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-900 text-white h-9 flex items-center overflow-hidden text-xs font-bold shadow-2xl border-b border-purple-500/30">
           <div className="bg-red-600 px-3 h-full flex items-center z-10 shadow-xl flex-shrink-0 animate-pulse text-white font-black text-[10px] tracking-tight">🔥 لايف:</div>
           <div className="w-full relative overflow-hidden flex items-center">
-            <div className="forced-marquee gap-10 items-center">
+            <div className="forced-marquee-right gap-10 items-center">
               {livePredictions.length === 0 ? (
                 <span className="text-purple-200 text-[11px] px-4">بانتظار انطلاق توقعات الجماهير الأولى لتشتعل اللوحة التفاعلية... ⚽🏆</span>
               ) : (
@@ -329,14 +362,14 @@ export default function HomePage() {
           {/* ☰ القائمة المنسدلة */}
           {isMenuOpen && (
             <div className="absolute top-16 right-0 w-64 bg-slate-900 border-l border-b border-purple-900/40 shadow-2xl animate-fade-in p-4 space-y-4 z-50 rounded-bl-xl">
-              <button onClick={() => { setActiveTab("main_screen"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 border-b border-white/5 font-black text-xs transition-colors ${activeTab === 'main_screen' ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}>🏠 الرئيسية</button>
-              <button onClick={() => { setActiveTab("match_fixtures"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 border-b border-white/5 font-black text-xs transition-colors ${activeTab === 'match_fixtures' ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}>📅 جدول المباريات</button>
-              <button onClick={() => { setActiveTab("points_rules"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 font-black text-xs transition-colors ${activeTab === 'points_rules' ? 'text-amber-400' : 'text-slate-300 hover:text-amber-400'}`}>📊 احتساب النقاط</button>
+              <button onClick={() => { setActiveTab("main_screen"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 border-b border-white/5 font-black text-xs transition-colors ${activeTab === 'main_screen' ? 'text-amber-400' : 'text-slate-300'}`}>🏠 الرئيسية</button>
+              <button onClick={() => { setActiveTab("match_fixtures"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 border-b border-white/5 font-black text-xs transition-colors ${activeTab === 'match_fixtures' ? 'text-amber-400' : 'text-slate-300'}`}>📅 جدول المباريات</button>
+              <button onClick={() => { setActiveTab("points_rules"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 font-black text-xs transition-colors ${activeTab === 'points_rules' ? 'text-amber-400' : 'text-slate-300'}`}>📊 احتساب النقاط</button>
             </div>
           )}
         </header>
 
-        {/* 📋 عرض التبويبات الفعالة */}
+        {/* 📋 محتوى التبويبات الفعالة */}
         {activeTab === "main_screen" && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
             <section className="bg-slate-900/60 backdrop-blur-xl rounded-2xl p-5 md:p-6 shadow-2xl border border-purple-500/20 relative overflow-hidden">
@@ -388,7 +421,7 @@ export default function HomePage() {
                       <tbody className="divide-y divide-purple-950/20 font-bold text-slate-300">
                         {slicedLeaderboard.map((u, i) => (
                           <tr key={i} className="hover:bg-purple-950/20 transition-all">
-                            <td className="py-3 px-2 text-right font-black text-white">{u.rank}. {u.name} {u.teamEmoji}</td>
+                            <td className="py-3 px-2 text-right font-black text-white">{u.rank}. {u.name}</td>
                             <td className="py-3 px-2 font-mono text-slate-400">{u.total}</td>
                             <td className="py-3 px-2 font-mono text-green-400">{u.correct}</td>
                             <td className="py-3 px-2 font-mono text-red-400">{u.wrong}</td>
@@ -427,27 +460,40 @@ export default function HomePage() {
           </main>
         )}
 
-        {/* التبويب 2: مواعيد المباريات 365 */}
+        {/* 📅 التبويب 2: جدول مباريات كأس العالم 2026 المربوط بالـ API لايف تلقائياً */}
         {activeTab === "match_fixtures" && (
           <main className="max-w-4xl mx-auto px-4 py-6 space-y-6 animate-fade-in">
             <div className="bg-slate-900/60 p-4 rounded-2xl border border-purple-500/20 shadow-2xl">
-              <h3 className="font-black text-sm text-amber-400 mb-4 border-b border-purple-900/20 pb-2 flex items-center gap-2">📅 جدول مواعيد مباريات كأس العالم 2026 (توقيت مكة)</h3>
-              <div className="space-y-6">
-                {FIXTURES_365_DATABASE.map((fixture, idx) => (
-                  <div key={idx} className="space-y-2 text-right">
-                    <div className="text-[11px] font-black text-purple-400 bg-purple-950/30 px-3 py-1 rounded-lg inline-block">{fixture.day}</div>
-                    <div className="bg-slate-950 border border-purple-900/20 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between text-center gap-3">
-                      <div className="text-[10px] text-slate-500 font-bold">{fixture.group}</div>
-                      <div className="flex items-center gap-8 justify-center">
-                        <div className="flex items-center gap-2 font-black text-xs md:text-sm"><span>{fixture.team1}</span><span className="text-xl">{fixture.team1Emoji}</span></div>
-                        <div className="bg-purple-900/40 border border-purple-500/30 text-green-400 font-mono font-black text-xs md:text-sm px-4 py-1.5 rounded-xl shadow-inner">{fixture.time}</div>
-                        <div className="flex items-center gap-2 font-black text-xs md:text-sm"><span className="text-xl">{fixture.team2Emoji}</span><span>{fixture.team2}</span></div>
+              <h3 className="font-black text-sm text-amber-400 mb-4 border-b border-purple-900/20 pb-2 flex items-center gap-2">📅 جدول ومواعيد بطولة كأس العالم 2026 كاملة (لايف تلقائي)</h3>
+              
+              {isLoadingFixtures ? (
+                <p className="text-center py-12 text-purple-300 font-bold text-xs animate-pulse">📡 جاري الاتصال بالسيرفر الرياضي وسحب الـ 104 مباراة لايف...</p>
+              ) : (
+                <div className="space-y-6 max-h-[70vh] overflow-y-auto hidden-scrollbar">
+                  {apiFixtures.length === 0 ? (
+                    <p className="text-center text-slate-500 py-12">لا توجد مباريات متاحة بالسيرفر حالياً...</p>
+                  ) : (
+                    apiFixtures.map((fixture, idx) => (
+                      <div key={idx} className="space-y-2 text-right px-1">
+                        <div className="text-[11px] font-black text-purple-400 bg-purple-950/30 px-3 py-1 rounded-lg inline-block">{fixture.day}</div>
+                        <div className="bg-slate-950 border border-purple-900/20 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between text-center gap-3">
+                          <div className="text-[10px] text-slate-500 font-bold md:w-32 text-right">{fixture.group}</div>
+                          <div className="flex items-center gap-6 justify-center flex-1">
+                            <div className="flex items-center gap-2 font-black text-xs md:text-sm justify-end w-28 md:w-40"><span>{fixture.team1}</span><span className="text-xl">{fixture.team1Emoji}</span></div>
+                            <div className="bg-purple-900/40 border border-purple-500/30 text-green-400 font-mono font-black text-xs md:text-sm px-4 py-1.5 rounded-xl shadow-inner min-w-[90px]">
+                              {fixture.score ? fixture.score : fixture.time}
+                            </div>
+                            <div className="flex items-center gap-2 font-black text-xs md:text-sm justify-start w-28 md:w-40"><span className="text-xl">{fixture.team2Emoji}</span><span>{fixture.team2}</span></div>
+                          </div>
+                          <div className="text-[10px] font-bold w-24 text-left">
+                            <span className={fixture.note ? "text-red-500 animate-pulse" : "text-amber-400"}>{fixture.note || fixture.status}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-amber-400 font-bold">{fixture.note || "—"}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </main>
         )}
@@ -466,7 +512,7 @@ export default function HomePage() {
                 <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/20 text-center space-y-1">
                   <div className="text-2xl">⚽</div>
                   <h4 className="font-black text-blue-400 text-xs">توقع المنتخب الفائز</h4>
-                  <p className="text-[11px] text-slate-300 font-semibold leading-relaxed">تضاف لك <span className="text-blue-400 font-bold">1 نقطة</span> واحدة لو توقعت الفائز أو التعادل دون إصابة عدد الأهداف.</p>
+                  <p className="text-[11px] text-slate-300 font-semibold leading-relaxed">Tضاف لك <span className="text-blue-400 font-bold">1 نقطة</span> واحدة لو توقعت الفائز أو التعادل دون إصابة عدد الأهداف.</p>
                 </div>
                 <div className="bg-slate-950 p-4 rounded-xl border border-red-500/20 text-center space-y-1">
                   <div className="text-2xl">❌</div>
@@ -479,29 +525,11 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* الفوتر */}
-      <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="text-xs text-center sm:text-right order-2 sm:order-1">
-            <p className="font-bold text-slate-400">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-600">© جميع الحقوق محفوظة • اطلاق تجريبي V5.1</p>
-          </div>
-          <div className="flex items-center gap-3 bg-slate-900/50 border border-purple-500/10 px-4 py-2 rounded-xl order-1 sm:order-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">ع</div>
-            <div className="text-xs text-right">
-              <span className="block text-[10px] text-purple-500 font-black">فكرة وتطوير</span>
-              <span className="block font-black text-white mt-0.5">عبدالسلام العنزي</span>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* مودال التحكم الذكي */}
+      {/* مودال التحكم والتسجيل السريع */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-purple-500/30 w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-slate-100">
-            <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black">✕</button>
-            
+            <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border border-purple-500/20">✕</button>
             {authMode === "menu" && (
               <div className="space-y-6 py-4 text-center">
                 <div>
@@ -544,7 +572,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 👤 مودال تحرير الملف الشخصي الفوري للأعضاء */}
+      {/* 👤 مودال تحرير الملف الشخصي */}
       {isProfileModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-amber-500/30 w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative text-slate-100 text-right">
