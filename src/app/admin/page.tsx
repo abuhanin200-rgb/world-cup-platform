@@ -22,6 +22,23 @@ export default function AdminDashboard() {
     kickoff: "2026-06-11T22:00:00", status: "بانتظار ركلة البداية", score: "0 - 0"
   });
 
+  // قائمة المنتخبات مع أعلامها لسهولة التعديل يدوياً
+  const worldCupTeams = [
+    { name: "السعودية", emoji: "🇸🇦" },
+    { name: "المكسيك", emoji: "🇲🇽" },
+    { name: "كندا", emoji: "🇨🇦" },
+    { name: "أمريكا", emoji: "🇺🇸" },
+    { name: "الأرجنتين", emoji: "🇦🇷" },
+    { name: "البرازيل", emoji: "🇧🇷" },
+    { name: "فرنسا", emoji: "🇫🇷" },
+    { name: "إسبانيا", emoji: "🇪🇸" },
+    { name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+    { name: "ألمانيا", emoji: "🇩🇪" },
+    { name: "البرتغال", emoji: "🇵🇹" },
+    { name: "المغرب", emoji: "🇲🇦" },
+    { name: "مصر", emoji: "🇪🇬" }
+  ];
+
   useEffect(() => {
     if (!isAdminAuthenticated) return;
 
@@ -60,7 +77,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // 1. دالة تعديل الاسم يدوياً
   const adminUpdateUsername = async (id: string, currentName: string) => {
     const newName = prompt("ادخل الاسم الجديد للعضو:", currentName);
     if (newName && newName.trim() !== "") {
@@ -69,7 +85,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // 2. دالة تعديل الرقم السري يدوياً
   const adminUpdateUserPassword = async (id: string, currentPass: string) => {
     const newPass = prompt("ادخل الرقم السري الجديد للعضو:", currentPass || "");
     if (newPass && newPass.trim() !== "") {
@@ -78,7 +93,23 @@ export default function AdminDashboard() {
     }
   };
 
-  // 3. دالة تعديل النقاط
+  // 🏆 دالة تعديل المنتخب المرشح يدوياً مع العلم تلقائياً
+  const adminUpdateUserFavoriteTeam = async (id: string, currentTeam: string) => {
+    const teamName = prompt("اكتب اسم المنتخب الجديد (مثال: السعودية، البرازيل، الأرجنتين):", currentTeam || "");
+    if (teamName && teamName.trim() !== "") {
+      const trimmedTeam = teamName.trim();
+      // البحث عن إيموجي العلم المتوافق مع الاسم المدخل
+      const foundTeam = worldCupTeams.find(t => t.name === trimmedTeam);
+      const teamEmoji = foundTeam ? foundTeam.emoji : "🏆";
+
+      await updateDoc(doc(db, "users", id), { 
+        favoriteTeam: trimmedTeam,
+        teamEmoji: teamEmoji 
+      });
+      alert(`✅ تم تغيير المنتخب المرشح إلى: ${trimmedTeam} ${teamEmoji}`);
+    }
+  };
+
   const updateUserPoints = async (id: string, currentPoints: number) => {
     const points = prompt("ادخل عدد النقاط الجديد للعضو المختار:", currentPoints.toString());
     if (points !== null) await updateDoc(doc(db, "users", id), { points: parseInt(points) || 0 });
@@ -134,15 +165,16 @@ export default function AdminDashboard() {
           </form>
         </div>
 
-        {/* 👥 جدول الأعضاء المحدث بالصفحات والتعديل الكامل للاسم والرمز */}
+        {/* 👥 جدول الأعضاء المحدث بالصفحات والعلم والمنتخب المرشح والتعديل الكامل */}
         <div className="lg:col-span-2 bg-slate-900 p-4 rounded-xl border border-purple-500/10 h-[435px] flex flex-col justify-between shadow-md">
           <div>
             <h3 className="font-black text-amber-400 border-b border-white/5 pb-2 text-xs md:text-sm mb-2">👥 التحكم والمصادقة الكاملة بالأعضاء والزوار ومعرفة الأرقام السرية</h3>
             <div className="overflow-y-auto max-h-[300px] text-xs hidden-scrollbar overflow-x-auto">
-              <table className="w-full text-center border-collapse min-w-[650px]">
+              <table className="w-full text-center border-collapse min-w-[750px]">
                 <thead>
                   <tr className="bg-slate-950/50 text-slate-400 font-bold border-b border-white/5">
-                    <th className="py-2 text-right">الاسم المسجل / الزائر</th>
+                    <th className="py-2 text-right">الاسم المسجل</th>
+                    <th>المرشح 🏆</th>
                     <th>الرقم السري</th>
                     <th>النقاط</th>
                     <th>خيارات التحكم والتحرير المطلق</th>
@@ -150,20 +182,26 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-white/5 text-slate-300 font-semibold">
                   {slicedAdminUsers.length === 0 ? (
-                    <tr><td colSpan={4} className="py-8 text-slate-500 font-normal">لا يوجد أي مستخدمين في هذه الصفحة...</td></tr>
+                    <tr><td colSpan={5} className="py-8 text-slate-500 font-normal">لا يوجد أي مستخدمين في هذه الصفحة...</td></tr>
                   ) : (
                     slicedAdminUsers.map((u, i) => (
                       <tr key={i} className="hover:bg-white/5 transition-colors">
-                        <td className="py-2 text-right text-white font-black">{u.fullName} {u.teamEmoji}</td>
+                        <td className="py-2 text-right text-white font-black">{u.fullName}</td>
+                        {/* 📊 إظهار علم واسم المنتخب المرشح للمستخدم */}
+                        <td className="text-center font-bold text-slate-200">
+                          <span className="text-base ml-1">{u.teamEmoji || "🏆"}</span> 
+                          <span className="text-[11px]">{u.favoriteTeam || "لم يحدد"}</span>
+                        </td>
                         <td className="font-mono text-purple-400 font-bold bg-purple-950/20 px-2 py-0.5 rounded-lg border border-purple-500/10 inline-block mt-1">
-                          {u.password ? u.password : <span className="text-red-400 font-sans text-[10px]">حساب قديم - بدون رمز</span>}
+                          {u.password ? u.password : <span className="text-red-400 font-sans text-[10px]">حساب قديم</span>}
                         </td>
                         <td className="font-mono text-yellow-400 font-black text-sm">{u.points || 0}</td>
                         <td className="space-x-1 space-x-reverse">
-                          <button onClick={()=>adminUpdateUsername(u.id, u.fullName)} className="bg-emerald-950 text-emerald-400 border border-emerald-900/30 px-2 py-1 rounded-lg font-bold text-[11px]">الاسم ✏️</button>
-                          <button onClick={()=>adminUpdateUserPassword(u.id, u.password)} className="bg-purple-950 text-purple-400 border border-purple-900/30 px-2 py-1 rounded-lg font-bold text-[11px]">الرمز 🔐</button>
-                          <button onClick={()=>updateUserPoints(u.id, u.points || 0)} className="bg-blue-900/40 text-blue-300 border border-blue-500/20 px-2 py-1 rounded-lg font-bold text-[11px]">النقاط 📊</button>
-                          <button onClick={()=>deleteItem("users", u.id)} className="bg-red-900/40 text-red-300 border border-red-500/20 px-2 py-1 rounded-lg font-bold text-[11px]">طرد 🗑️</button>
+                          <button onClick={()=>adminUpdateUsername(u.id, u.fullName)} className="bg-emerald-950 text-emerald-400 border border-emerald-900/30 px-2 py-1 rounded-lg font-bold text-[10px]">الاسم ✏️</button>
+                          <button onClick={()=>adminUpdateUserFavoriteTeam(u.id, u.favoriteTeam)} className="bg-amber-950 text-amber-400 border border-amber-900/30 px-2 py-1 rounded-lg font-bold text-[10px]">المنتخب 🏆</button>
+                          <button onClick={()=>adminUpdateUserPassword(u.id, u.password)} className="bg-purple-950 text-purple-400 border border-purple-900/30 px-2 py-1 rounded-lg font-bold text-[10px]">الرمز 🔐</button>
+                          <button onClick={()=>updateUserPoints(u.id, u.points || 0)} className="bg-blue-900/40 text-blue-300 border border-blue-500/20 px-2 py-1 rounded-lg font-bold text-[10px]">النقاط 📊</button>
+                          <button onClick={()=>deleteItem("users", u.id)} className="bg-red-900/40 text-red-300 border border-red-500/20 px-2 py-1 rounded-lg font-bold text-[10px]">طرد 🗑️</button>
                         </td>
                       </tr>
                     ))
@@ -193,7 +231,7 @@ export default function AdminDashboard() {
             ) : (
               predictions.map((p, i) => (
                 <div key={i} className="bg-slate-950 p-2.5 rounded-xl flex justify-between items-center border border-white/5 shadow-inner">
-                  <div className="font-semibold"><span className="text-yellow-400 font-black">{p.user}</span> متوقع: {p.t1E} {p.score1} - {p.score2} {p.t2E}</div>
+                  <div className="font-semibold"><span className="text-yellow-400 font-bold">{p.user}</span> متوقع: {p.t1E} {p.score1} - {p.score2} {p.t2E}</div>
                   <button onClick={()=>deleteItem("predictions", p.id)} className="text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/20 px-3 py-1 rounded-lg font-bold text-[10px]">حذف وإزالة 🗑️</button>
                 </div>
               ))
