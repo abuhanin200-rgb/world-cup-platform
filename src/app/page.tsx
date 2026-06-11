@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db, auth } from "@/lib/firebase"; 
+import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where } from "firebase/firestore";
 
 const WORLD_CUP_2026_TEAMS = [
@@ -37,7 +37,7 @@ export default function HomePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false); 
   const [authMode, setAuthMode] = useState<"menu" | "guest" | "manual_login">("menu");
   
-  const [user, setUser] = useState<any>({ fullName: "", favoriteTeam: "", password: "", residence: "السعودية" });
+  const [user, setUser] = useState<any>({ fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", residence: "السعودية" });
   const [manualName, setManualName] = useState("");
   const [manualPassword, setManualPassword] = useState(""); 
   const [userPrediction, setUserPrediction] = useState({ team1Score: "", team2Score: "" });
@@ -50,11 +50,16 @@ export default function HomePage() {
   const [predictionsStats, setPredictionsStats] = useState({ total: 0, correct: 0, wrong: 0, points: 0 });
   const [countdown, setCountdown] = useState("00:00:00");
 
+  // الترقيم والصفحات للوحة الصدارة
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // إعداد وقت وتوقيت ركلة البداية بالتوقيت الصحيح لمكة المكرمة (الساعة 10:00 مساءً)
   const [currentMatch, setCurrentMatch] = useState({
     id: "opening_2026",
     team1: "المكسيك", team1Emoji: "🇲🇽",
     team2: "جنوب أفريقيا", team2Emoji: "🇿🇦",
-    kickoff: new Date("2026-06-11T20:00:00"),
+    kickoff: "2026-06-11T22:00:00", 
     status: "بانتظار ركلة البداية", score: "0 - 0"
   });
 
@@ -102,8 +107,7 @@ export default function HomePage() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      const now = new Date().getTime();
-      const distance = currentMatch.kickoff.getTime() - now;
+      const distance = new Date(currentMatch.kickoff).getTime() - new Date().getTime();
       if (distance < 0) {
         clearInterval(timer);
         setCountdown("بدأت المباراة (أُغلق التوقع)");
@@ -133,6 +137,7 @@ export default function HomePage() {
       setLeaderboard(snap.docs.map((doc, idx) => ({
         rank: idx + 1,
         name: doc.data().fullName,
+        teamEmoji: doc.data().teamEmoji || "🏆",
         total: doc.data().total || 0,
         correct: doc.data().correct || 0,
         wrong: doc.data().wrong || 0,
@@ -140,27 +145,53 @@ export default function HomePage() {
       })));
     });
 
-    return () => { unsubChat(); unsubPred(); unsubUsers(); };
+    const unsubMatchSettings = onSnapshot(collection(db, "match_settings"), (snap) => {
+      if (!snap.empty) setCurrentMatch(snap.docs[0].data() as any);
+    });
+
+    return () => { unsubChat(); unsubPred(); unsubUsers(); unsubMatchSettings(); };
   }, []);
 
-  // دالة تسجيل المشتركين بنظام منع تكرار وحجز الأسماء + حماية الرقم السري لقفل العيوب
+  // دالة الذكاء الاصطناعي لفحص الـ IP وتعيين لقب زائر تسلسلي فريد
+  const fetchVisitorIdentityByIP = async () => {
+    try {
+      const res = await fetch("https://api.ipify.org?format=json");
+      const data = await res.json();
+      const numString = data.ip.replace(/\./g, "");
+      const cleanId = parseInt(numString.slice(-3)) || Math.floor(Math.random() * 89) + 10;
+      return `زائر ${cleanId}`;
+    } catch {
+      return `زائر ${Math.floor(Math.random() * 800) + 100}`;
+    }
+  };
+
   const handleGuestLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetName = user.fullName.trim();
-    if (!targetName || !user.password) return;
+    let targetName = user.fullName.trim();
+    
+    // تفعيل ذكاء الـ IP إذا ترك حقل الاسم فارغاً
+    if (!targetName) {
+      targetName = await fetchVisitorIdentityByIP();
+    }
+    if (!user.password) return;
 
     try {
       const q = query(collection(db, "users"), where("fullName", "==", targetName));
       const snap = await getDocs(q);
 
       if (!snap.empty) {
-        alert("❌ عذراً! هذا الاسم مسجل مسبقاً في لوحة الصدارة، يرجى كتابة اسم فريد خاص بك، أو الولوج من خلال خيار (تسجيل بحساب سابق).");
+        alert("❌ عذراً! هذا الاسم مسجل مسبقاً في لوحة الصدارة، يرجى كتابة اسم فريد خاص بك، أو الولوج من خلال خيار (تسجيل دخول بحساب سابق).");
         return;
       }
+
+      // البحث عن علم الفريق المختار لربطه بالشات لايف
+      const matchedTeam = WORLD_CUP_2026_TEAMS.find(t => t.name === user.favoriteTeam);
+      const chosenEmoji = matchedTeam ? matchedTeam.emoji : "🏆";
 
       const userData = {
         fullName: targetName,
         favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦",
+        teamEmoji: chosenEmoji,
         password: user.password, 
         residence: user.residence,
         points: 0, total: 0, correct: 0, wrong: 0,
@@ -174,7 +205,7 @@ export default function HomePage() {
 
       await addDoc(collection(db, "users"), userData);
       if (localStorage.getItem(`hasPredicted_${targetName}`)) setHasPredicted(true);
-      alert(`🎉 تم اعتماد اسمك الحصري "${targetName}" بنجاح وانطلقت رحلة التحدي!`);
+      alert(`🎉 تم اعتماد حسابك باسم "${targetName}" ${chosenEmoji} بنجاح وانطلقت رحلة التحدي!`);
     } catch (err) {
       console.error(err);
     }
@@ -210,7 +241,7 @@ export default function HomePage() {
 
   const handleLogout = () => {
     localStorage.removeItem("worldCupUser");
-    setUser({ fullName: "", favoriteTeam: "", password: "", residence: "السعودية" });
+    setUser({ fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", residence: "السعودية" });
     setIsLoggedIn(false);
     setHasPredicted(false);
   };
@@ -218,7 +249,7 @@ export default function HomePage() {
   const handleSavePrediction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) { setIsAuthModalOpen(true); return; }
-    if (new Date().getTime() > currentMatch.kickoff.getTime()) { alert("أُغلقت التوقعات لبدء المباراة!"); return; }
+    if (new Date().getTime() > new Date(currentMatch.kickoff).getTime()) { alert("أُغلقت التوقعات لبدء المباراة!"); return; }
     
     try {
       await addDoc(collection(db, "predictions"), {
@@ -238,16 +269,27 @@ export default function HomePage() {
     e.preventDefault();
     if (!chatMessage.trim()) return;
     try {
-      await addDoc(collection(db, "chats"), { user: user.fullName || "زائر", text: chatMessage, createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "chats"), { 
+        user: user.fullName || "زائر", 
+        teamEmoji: user.teamEmoji || "🏆",
+        text: chatMessage, 
+        createdAt: new Date().toISOString() 
+      });
       setChatMessage("");
     } catch (err) { console.error(err); }
   };
+
+  // ميزان بيانات الترقيم للجدول
+  const lastIndex = currentPage * itemsPerPage;
+  const firstIndex = lastIndex - itemsPerPage;
+  const slicedLeaderboard = leaderboard.slice(firstIndex, lastIndex);
+  const maxPages = Math.ceil(leaderboard.length / itemsPerPage);
 
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 text-slate-100 font-sans antialiased text-right flex flex-col justify-between">
       <div>
         
-        {/* 📺 شريط البث الحي لقنوات فيفا العالمية - تصغير الحجم لإعطاء مساحة كبرى للأسماء المارة */}
+        {/* 📺 شريط البث الحي المطور */}
         <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-900 text-white h-9 flex items-center overflow-hidden text-xs font-bold shadow-2xl border-b border-purple-500/30">
           <div className="bg-red-600 px-3 h-full flex items-center z-10 shadow-xl flex-shrink-0 animate-pulse text-white font-black text-[10px] tracking-tight">🔥 لايف:</div>
           <div className="w-full relative overflow-hidden flex items-center">
@@ -265,16 +307,13 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Header يحتوي على القائمة المنسدلة يمين الشعار كالمتاجر الكبرى */}
+        {/* Header */}
         <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-purple-900/30 shadow-2xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              
-              {/* زر القائمة المنسدلة (Hamburger Menu) */}
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-white text-xl p-1 focus:outline-none">
                 <i className={`fa-solid ${isMenuOpen ? 'fa-xmark' : 'fa-bars'}`}></i>
               </button>
-
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-xl animate-pulse">
                   <img src="/wc2026-logo.png" alt="FIFA 2026" className="object-contain max-w-full max-h-full drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
@@ -289,7 +328,7 @@ export default function HomePage() {
             <div>
               {isLoggedIn ? (
                 <div className="flex items-center gap-2 md:gap-3">
-                  <span className="bg-purple-900/50 text-purple-300 border border-purple-500/30 px-3.5 py-1.5 rounded-xl font-black text-xs md:text-sm shadow-inner">👑 {user.fullName}</span>
+                  <span className="bg-purple-900/50 text-purple-300 border border-purple-500/30 px-3.5 py-1.5 rounded-xl font-black text-xs md:text-sm shadow-inner">👑 {user.fullName} {user.teamEmoji}</span>
                   <button onClick={handleLogout} className="text-xs font-bold text-red-400 hover:text-red-300 bg-red-950/40 border border-red-500/30 px-3 py-1.5 rounded-xl transition-all">خروج</button>
                 </div>
               ) : (
@@ -298,7 +337,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* القائمة الجانبية المنسدلة الجانبية الفخمة */}
+          {/* القائمة المنسدلة الجانبية */}
           {isMenuOpen && (
             <div className="absolute top-16 right-0 w-64 bg-slate-900 border-l border-b border-purple-900/40 shadow-2xl animate-fade-in p-4 space-y-4 z-50 rounded-bl-xl">
               <button onClick={() => setIsMenuOpen(false)} className="block w-full text-right py-2.5 border-b border-white/5 hover:text-amber-400 font-bold text-xs">🏟️ المباريات</button>
@@ -344,7 +383,7 @@ export default function HomePage() {
             )}
           </section>
 
-          {/* لوحة الصدارة */}
+          {/* لوحة الصدارة المحدثة بنظام الصفحات */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 overflow-hidden flex flex-col justify-between">
               <div>
@@ -361,12 +400,12 @@ export default function HomePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-purple-950/20 font-bold text-slate-300">
-                      {leaderboard.length === 0 ? (
+                      {slicedLeaderboard.length === 0 ? (
                         <tr><td colSpan={5} className="py-8 text-center text-slate-500 font-normal">بانتظار تسجيل التوقعات لبدء لوحة الشرف...</td></tr>
                       ) : (
-                        leaderboard.map((u, i) => (
+                        slicedLeaderboard.map((u, i) => (
                           <tr key={i} className="hover:bg-purple-950/20 transition-all">
-                            <td className="py-3 px-2 text-right font-black text-white">{u.rank === 1 ? "🥇 " : u.rank === 2 ? "🥈 " : u.rank === 3 ? "🥉 " : ""}{u.rank}. {u.name}</td>
+                            <td className="py-3 px-2 text-right font-black text-white">{u.rank}. {u.name}</td>
                             <td className="py-3 px-2 font-mono text-slate-400">{u.total}</td>
                             <td className="py-3 px-2 font-mono text-green-400">{u.correct}</td>
                             <td className="py-3 px-2 font-mono text-red-400">{u.wrong}</td>
@@ -378,6 +417,15 @@ export default function HomePage() {
                   </table>
                 </div>
               </div>
+
+              {/* أزرار التنقل بين الصفحات في لوحة الصدارة */}
+              {maxPages > 1 && (
+                <div className="flex justify-center items-center gap-4 pt-4 border-t border-purple-900/20 mt-4 text-xs">
+                  <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} className="bg-purple-950 border border-purple-500/20 px-3 py-1 rounded-lg text-purple-300 disabled:opacity-40">السابق ◀</button>
+                  <span className="font-bold text-slate-400">صفحة {currentPage} من {maxPages}</span>
+                  <button onClick={() => setCurrentPage(p => Math.min(p + 1, maxPages))} disabled={currentPage === maxPages} className="bg-purple-950 border border-purple-500/20 px-3 py-1 rounded-lg text-purple-300 disabled:opacity-40">التالي ▶</button>
+                </div>
+              )}
             </div>
 
             <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 flex flex-col justify-between">
@@ -395,7 +443,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* مركز المباراة والشات لايف */}
+          {/* مركز المباراة والشات لايف المطور بالأعلام */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <div className="lg:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 space-y-4">
               <div className="flex items-center justify-between border-b border-purple-900/20 pb-3">
@@ -409,7 +457,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* الشات */}
+            {/* الشات بالأعلام الحية للمنتخبات المفضلة */}
             <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 h-[450px] flex flex-col justify-between">
               <div className="overflow-hidden flex flex-col h-full">
                 <h3 className="font-black text-xs md:text-base text-purple-300 border-b border-purple-900/20 pb-3 mb-3"><span>💬</span> دردشة زوار المنصة الفورية</h3>
@@ -419,7 +467,7 @@ export default function HomePage() {
                   ) : (
                     chatList.map((msg, i) => (
                       <div key={i} className="bg-slate-950/60 p-3 rounded-xl border border-purple-500/10 shadow-md">
-                        <span className="block font-black text-[10px] text-purple-400 mb-1">👤 {msg.user}</span>
+                        <span className="block font-black text-[10px] text-purple-400 mb-1">👤 {msg.user} {msg.teamEmoji || "🏆"}</span>
                         <p className="text-slate-200 leading-relaxed font-medium">{msg.text}</p>
                       </div>
                     ))
@@ -453,9 +501,9 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* مودال التحكم الذكي والأمن الفري المطور بعد التحديث الجذري */}
+      {/* مودال التحكم الذكي */}
       {isAuthModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-purple-500/30 w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-slate-100">
             <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border border-purple-500/20">✕</button>
             
@@ -471,7 +519,7 @@ export default function HomePage() {
                   </button>
                   <div className="border-t border-purple-950/50 my-4 pt-3">
                     <button onClick={() => setAuthMode("manual_login")} type="button" className="text-xs text-purple-400 hover:text-purple-300 font-bold underline">
-                      👉 تسجيل بحساب سابق
+                      👉 تسجيل دخول بحساب سابق
                     </button>
                   </div>
                 </div>
@@ -484,17 +532,16 @@ export default function HomePage() {
                   <h4 className="text-base font-black text-white">🟢 التسجيل السريع الحصري</h4>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم الكامل (سيظهر للجميع في لوحة الصدارة ولا يمكن تكراره)</label>
-                  <input type="text" required placeholder="اكتب اسمك الفريد (مثال: عبدالله الرويلي)" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
+                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم (اتركه فارغاً للحصول على لقب زائر تلقائي)</label>
+                  <input type="text" placeholder="اكتب اسمك (مثال: عبدالسلام أبو راكان)" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري الخاص بحسابك (لحمايته من الاستخدام من شخص آخر)</label>
                   <input type="password" required placeholder="ادخل رقماً سرياً خاصاً بك" onChange={(e) => setUser({...user, password: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المرشح للقب كأس العالم 2026 🏆</label>
+                  <label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المرشح لللقب كأس العالم 2026 🏆</label>
                   <select required value={user.favoriteTeam} onChange={(e) => setUser({...user, favoriteTeam: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-3 py-2.5 text-xs md:text-sm focus:outline-none text-slate-100">
-                    <option value="" disabled>اختر مرشحك للقب...</option>
                     {WORLD_CUP_2026_TEAMS.map((t, i) => ( <option key={i} value={t.name}>{t.emoji} {t.name}</option> ))}
                   </select>
                 </div>
@@ -508,10 +555,10 @@ export default function HomePage() {
             {authMode === "manual_login" && (
               <form onSubmit={handleManualLogin} className="space-y-4 py-2 text-right">
                 <div className="text-center mb-3">
-                  <h4 className="text-base font-black text-yellow-500">📝 تسجيل بحساب سابق</h4>
+                  <h4 className="text-base font-black text-yellow-500">📝 تسجيل دخول بحساب سابق</h4>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم الكامل المطابق للحساب</label>
+                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم المطابق للحساب</label>
                   <input type="text" required placeholder="ادخل اسمك المسجل بدقة" value={manualName} onChange={(e) => setManualName(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none text-slate-100" />
                 </div>
                 <div>
