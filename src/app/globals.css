@@ -54,4 +54,20 @@ html, body {
 .hidden-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-marquee {
+  animation: marquee 25s linear infinite;
+}
+
+/* إخفاء أشرطة التمرير الجانبية لمنظر زجاجي ناعم ومتناسق */
+.hidden-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hidden-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
