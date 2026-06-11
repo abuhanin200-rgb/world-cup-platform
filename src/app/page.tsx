@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 
-// القائمة الرسمية الكاملة لمنتخبات كأس العالم 2026 المعتمدة (48 منتخب) مع الأعلام
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
   { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
@@ -17,7 +16,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥لنكولنشاير" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
+  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
   { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
   { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
   { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
@@ -63,6 +62,7 @@ export default function HomePage() {
     status: "بانتظار ركلة البداية", score: "0 - 0"
   });
 
+  // تشغيل ميزة حفظ الجلسة التلقائية
   useEffect(() => {
     const savedUser = localStorage.getItem("worldCupUser");
     if (savedUser) { 
@@ -71,7 +71,7 @@ export default function HomePage() {
     }
   }, []);
 
-  // 🤖 استدعاء نتائج مباريات الفيفا الحية تلقائياً
+  // جلب نتائج الـ API لايف
   useEffect(() => {
     const fetchLiveScores = async () => {
       try {
@@ -102,6 +102,7 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
+  // العداد التنازلي
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().getTime();
@@ -117,6 +118,7 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [currentMatch.kickoff]);
 
+  // الاستماع لقاعدة البيانات حياً
   useEffect(() => {
     const qChat = query(collection(db, "chats"), orderBy("createdAt", "desc"));
     const unsubChat = onSnapshot(qChat, (snap) => { setChatList(snap.docs.map(doc => doc.data())); });
@@ -143,30 +145,35 @@ export default function HomePage() {
     return () => { unsubChat(); unsubPred(); unsubUsers(); };
   }, []);
 
-  // ✨ تحديث دالة التسجيل لحل مشكلة قفل المودال وتحديث الحالة فوراً
+  // 🔥 دالة التسجيل بنظام التحديث الآمن الفوري وعلاج تعليق المودال جذرياً
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const finalPhone = user.countryCode + user.phone;
       const userData = {
-        fullName: user.fullName, phone: user.countryCode + user.phone, residence: user.residence, favoriteTeam: user.favoriteTeam,
+        fullName: user.fullName, phone: finalPhone, residence: user.residence, favoriteTeam: user.favoriteTeam,
         points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString()
       };
+      
       await addDoc(collection(db, "users"), userData);
       localStorage.setItem("worldCupUser", JSON.stringify(userData)); 
       
-      // إغلاق النافذة المنبثقة فوراً وحفظ الحالة البرمجية
+      // التحديث الداخلي الفوري للحالة دون الحاجة لعمل ريفريش للصفحة نهائياً
+      setUser(userData);
       setIsLoggedIn(true); 
-      setIsAuthModalOpen(false);
+      setIsAuthModalOpen(false); 
+      
       alert("تم تفعيل حسابك بنجاح وبدأت رحلة التحدي! 🚀🏆");
-      window.location.reload(); // تنشيط سريع لإنعاش هيدر المشترك كملك للتوقعات
-    } catch (err) { alert("حدث خطأ أثناء التسجيل، يرجى المحاولة مرة أخرى."); }
+    } catch (err) { 
+      console.error(err);
+      alert("حدث خطأ أثناء التسجيل، يرجى إعادة المحاولة."); 
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem("worldCupUser");
     setUser({ fullName: "", countryCode: "+966", phone: "", residence: "السعودية", favoriteTeam: "" });
     setIsLoggedIn(false);
-    window.location.reload();
   };
 
   const handleSavePrediction = async (e: React.FormEvent) => {
@@ -213,11 +220,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Header - الهيدر المطور مع دمج لوجو كاس العالم الحقيقي wc2026-logo */}
+        {/* Header - تم استدعاء لوجو كأس العالم 2026 مع أنيميشن النبض الاحترافي */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm transition-all">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* استدعاء الشعار الأصلي بدقة متناهية مع ميزة الأنيميشن */}
               <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-lg animate-pulse" style={{ animationDuration: '2.5s' }}>
                 <img src="/wc2026-logo.png" alt="FIFA World Cup 2026" className="object-contain max-w-full max-h-full drop-shadow-md" />
               </div>
@@ -262,7 +268,7 @@ export default function HomePage() {
             </form>
           </section>
 
-          {/* لوحة الصدارة */}
+          {/* لوحة الصدارة ورأينا اسمك منور فيها بالصورة */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 overflow-hidden flex flex-col justify-between">
               <div>
@@ -310,7 +316,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* مركز المباراة والشات المباشر */}
+          {/* مركز المباراة */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
             <div className="lg:col-span-2 bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-50 pb-3">
@@ -324,6 +330,7 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* الشات السريع */}
             <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 h-[450px] flex flex-col justify-between">
               <div className="overflow-hidden flex flex-col h-full">
                 <h3 className="font-bold text-sm md:text-base text-slate-900 border-b border-slate-50 pb-3 mb-3"><span>💬</span> دردشة زوار المنصة الفورية (لايف حقيقي)</h3>
@@ -353,7 +360,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
             <p className="font-bold text-slate-300">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-500">© جميع الحقوق محفوظة • النسخة المحدثة AI V2.0</p>
+            <p className="text-slate-500">© جميع الحقوق محفوظة • النسخة المحدثة AI V2.2</p>
           </div>
           <div className="flex items-center gap-3 bg-slate-800/50 border border-slate-800 px-4 py-2 rounded-xl order-1 sm:order-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">ع</div>
@@ -365,7 +372,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* مودال التسجيل */}
+      {/* مودال التسجيل الاحترافي الجديد */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
