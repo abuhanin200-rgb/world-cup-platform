@@ -17,7 +17,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥لنكولنشاير" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
+  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
   { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
   { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
   { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
@@ -48,7 +48,7 @@ export default function HomePage() {
   const [user, setUser] = useState<any>({ fullName: "", favoriteTeam: "", residence: "السعودية" });
   const [manualName, setManualName] = useState("");
   const [userPrediction, setUserPrediction] = useState({ team1Score: "", team2Score: "" });
-  const [hasPredicted, setHasPredicted] = useState(false); // إخفاء الصندوق بعد التوقع
+  const [hasPredicted, setHasPredicted] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
   
   const [chatList, setChatList] = useState<any[]>([]);
@@ -65,7 +65,6 @@ export default function HomePage() {
     status: "بانتظار ركلة البداية", score: "0 - 0"
   });
 
-  // فحص الجلسة والتوقع المحفوظ
   useEffect(() => {
     const savedUser = localStorage.getItem("worldCupUser");
     if (savedUser) {
@@ -73,13 +72,11 @@ export default function HomePage() {
       setUser(parsedUser);
       setIsLoggedIn(true);
       
-      // تفقد إذا كان هذا الاسم قد توقع مسبقاً في الـ LocalStorage لحجب الصندوق فوراً عنده
       const savedPred = localStorage.getItem(`hasPredicted_${parsedUser.fullName}`);
       if (savedPred) setHasPredicted(true);
     }
   }, []);
 
-  // 🤖 الذكاء الاصطناعي وجلب نتائج الفيفا لايف تلقائياً كل دقيقة
   useEffect(() => {
     const fetchLiveScores = async () => {
       try {
@@ -110,7 +107,6 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // العداد التنازلي للمباراة
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().getTime();
@@ -128,7 +124,6 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [currentMatch.kickoff]);
 
-  // الاستماع للفايربيز حياً لايف عند الجميع بنفس الثانية
   useEffect(() => {
     const qChat = query(collection(db, "chats"), orderBy("createdAt", "desc"));
     const unsubChat = onSnapshot(qChat, (snap) => { setChatList(snap.docs.map(doc => doc.data())); });
@@ -155,7 +150,6 @@ export default function HomePage() {
     return () => { unsubChat(); unsubPred(); unsubUsers(); };
   }, []);
 
-  // 🔵 1. الدخول الرسمي والسلس بحساب قوقل الجيميل (تم حل الدومين)
   const handleGoogleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
@@ -177,8 +171,6 @@ export default function HomePage() {
         setIsAuthModalOpen(false);
 
         await addDoc(collection(db, "users"), userData);
-        
-        // تفحص إذا كان قد توقع سابقاً لإخفاء الصندوق فور الدخول
         if (localStorage.getItem(`hasPredicted_${googleUser.displayName}`)) setHasPredicted(true);
         alert(`أهلاً بك يا ${googleUser.displayName}، تم تفعيل حسابك بنجاح! 🚀🏆`);
       }
@@ -188,7 +180,6 @@ export default function HomePage() {
     }
   };
 
-  // 🟢 2. الدخول السريع كزائر / ضيف
   const handleGuestLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user.fullName.trim()) return;
@@ -211,7 +202,6 @@ export default function HomePage() {
     alert("تم تفعيل حساب الضيف بنجاح! 🚀");
   };
 
-  // 🟡 3. دخول الطوارئ بالاسم للمسجلين مسبقاً
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualName.trim()) return;
@@ -239,14 +229,12 @@ export default function HomePage() {
     setHasPredicted(false);
   };
 
-  // 🔥 4. إرسال التوقع الصارم (يظهر فوراً في الشريط + يخفي الصندوق ويعرض كرت الشكر الفخم)
   const handleSavePrediction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) { setIsAuthModalOpen(true); return; }
     if (new Date().getTime() > currentMatch.kickoff.getTime()) { alert("أُغلقت التوقعات لبدء المباراة!"); return; }
     
     try {
-      // الحفظ في الفايربيز بحقول واضحة ومطابقة 100% ليقرأها شريط البث الحي
       await addDoc(collection(db, "predictions"), {
         user: user.fullName,
         t1: currentMatch.team1, t1E: currentMatch.team1Emoji,
@@ -255,7 +243,6 @@ export default function HomePage() {
         createdAt: new Date().toISOString()
       });
 
-      // إخفاء صندوق التوقع وحفظ الحالة في متصفح المستخدم فوراً لعدم التكرار
       setHasPredicted(true);
       localStorage.setItem(`hasPredicted_${user.fullName}`, "true");
     } catch (err) { console.error(err); }
@@ -274,7 +261,7 @@ export default function HomePage() {
     <div dir="rtl" className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 text-slate-100 font-sans antialiased text-right flex flex-col justify-between">
       <div>
         
-        {/* 📺 شريط البث الحي لقنوات فيفا العالمية (Real-time Custom Ticker) */}
+        {/* 📺 شريط البث الحي لقنوات فيفا العالمية */}
         <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-900 text-white h-11 flex items-center overflow-hidden text-xs font-bold shadow-2xl border-b border-purple-500/30">
           <div className="bg-red-600 px-4 h-full flex items-center z-10 shadow-xl flex-shrink-0 animate-pulse text-white font-black tracking-wider">🔥 آخر التوقعات المباشرة:</div>
           <div className="w-full relative overflow-hidden flex items-center">
@@ -320,16 +307,16 @@ export default function HomePage() {
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
           
-          {/* صندوق التوقع الفخم والمحدث بتجربة مستخدم خرافية */}
+          {/* صندوق التوقع */}
           <section className="bg-slate-900/60 backdrop-blur-xl rounded-2xl p-5 md:p-6 shadow-2xl border border-purple-500/20 relative overflow-hidden">
             <div className="absolute top-0 left-0 bg-gradient-to-r from-red-600 to-pink-600 text-white font-black text-[10px] md:text-xs px-4 py-1.5 rounded-bl-xl shadow-md border-b border-r border-purple-500/20">⏰ نهاية التوقع: {countdown}</div>
             
-            {/* ✨ إذا توقع الزائر ينبثق له كرت الشكر الفخم والقلب فوراً ويختفي صندوق الإدخال */}
+            {/* التعديل الجديد: بطاقة الشكر والعبارة الاحترافية المطلوبة */}
             {hasPredicted ? (
               <div className="text-center py-8 space-y-3 animate-fade-in">
-                <div className="text-4xl md:text-5xl animate-bounce">❤️🏆⚽</div>
-                <h3 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300">تم تسجيل توقعك الرسمي في قاعدة البيانات لايف!</h3>
-                <p className="text-xs text-purple-300 font-bold">تابع اسمك الآن وهو يتحرك في شريط البث الحي بالأعلى أمام جميع الجماهير! 🎉</p>
+                <div className="text-4xl md:text-5xl animate-bounce">🎯❤️🔥</div>
+                <h3 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-300">توقعك وصل واعتمدناه 🎯</h3>
+                <p className="text-xs md:text-sm text-purple-200 font-bold mt-1">لا تنسى ترجع لنا بعد المباراة وتشوف هل توقّعك صح ولا لا 😄</p>
               </div>
             ) : (
               <>
@@ -354,7 +341,7 @@ export default function HomePage() {
             )}
           </section>
 
-          {/* لوحة الصدارة والشات */}
+          {/* لوحة الصدارة */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 overflow-hidden flex flex-col justify-between">
               <div>
@@ -372,7 +359,7 @@ export default function HomePage() {
                     </thead>
                     <tbody className="divide-y divide-purple-950/20 font-bold text-slate-300">
                       {leaderboard.length === 0 ? (
-                        <tr><td colSpan={5} className="py-8 text-center text-slate-500 font-normal">بانتظار تسجيل التوقعات لبء لوحة الشرف...</td></tr>
+                        <tr><td colSpan={5} className="py-8 text-center text-slate-500 font-normal">بانتظار تسجيل التوقعات لبدء لوحة الشرف...</td></tr>
                       ) : (
                         leaderboard.map((u, i) => (
                           <tr key={i} className="hover:bg-purple-950/20 transition-all">
@@ -446,14 +433,14 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* الفوتر */}
+      {/* الفوتر - تم تحديث العبارة إلى إطلاق تجريبي V5.1 */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
             <p className="font-bold text-slate-400">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-600">© جميع الحقوق محفوظة • النسخة التلقائية المحدثة V5.1</p>
+            <p className="text-slate-600">© جميع الحقوق محفوظة • اطلاق تجريبي V5.1</p>
           </div>
-          <div className="flex items-center gap-3 bg-slate-800/50 border border-purple-500/10 px-4 py-2 rounded-xl order-1 sm:order-2">
+          <div className="flex items-center gap-3 bg-slate-900/50 border border-purple-500/10 px-4 py-2 rounded-xl order-1 sm:order-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">ع</div>
             <div className="text-xs text-right">
               <span className="block text-[10px] text-purple-500 font-black">فكرة وتطوير</span>
@@ -463,11 +450,11 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* مودال الدخول السريع المعاد هندسته */}
+      {/* مودال الدخول السريع */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-purple-500/30 w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-slate-100">
-            <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-950 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border border-purple-500/20">✕</button>
+            <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border border-purple-500/20">✕</button>
             
             {authMode === "menu" && (
               <div className="space-y-6 py-4 text-center">
