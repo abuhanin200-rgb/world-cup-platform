@@ -26,7 +26,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "GH", name: "غانا", emoji: "🇬🇭" }, { code: "NG", name: "نيجيريا", emoji: "🇳🇬" },
   { code: "CI", name: "ساحل العاج", emoji: "🇨🇮" }, { code: "JP", name: "اليابان", emoji: "🇯🇵" },
   { code: "KR", name: "كوريا الجنوبية", emoji: "🇰🇷" }, { code: "AU", name: "أستراليا", emoji: "🇦🇺" },
-  { code: "IR", name: "إران", emoji: "🇮🇷" }, { code: "CR", name: "كوستاريكا", emoji: "🇨🇷" },
+  { code: "IR", name: "إيران", emoji: "🇮🇷" }, { code: "CR", name: "كوستاريكا", emoji: "🇨🇷" },
   { code: "JM", name: "جامايكا", emoji: "🇯🇲" }, { code: "PA", name: "بنما", emoji: "🇵🇦" },
   { code: "NZ", name: "نيوزيلندا", emoji: "🇳🇿" }, { code: "CH", name: "سويسرا", emoji: "🇨🇭" },
   { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" }
@@ -51,7 +51,7 @@ const ALL_COUNTRY_DIAL_CODES = [
   { code: "YE", name: "اليمن", dialCode: "+967", flag: "🇾🇪" },
   { code: "TR", name: "تركيا", dialCode: "+90", flag: "🇹🇷" },
   { code: "US", name: "أمريكا", dialCode: "+1", flag: "🇺🇸" },
-  { code: "GB", name: "بريطانيا", dialCode: "+44", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }
+  { code: "GB", name: "بريطانيا", dialCode: "+44", flag: "🏴󠁧󠁢󠁥لنكولنشاير" }
 ];
 
 export default function HomePage() {
@@ -70,7 +70,8 @@ export default function HomePage() {
   const [predictionsStats, setPredictionsStats] = useState({ total: 0, correct: 0, wrong: 0, points: 0 });
   const [countdown, setCountdown] = useState("00:00:00");
 
-  const [currentMatch] = useState({
+  // جعل حالة المباراة تقرأ وتتحدث ديناميكياً
+  const [currentMatch, setCurrentMatch] = useState({
     id: "opening_2026",
     team1: "المكسيك", team1Emoji: "🇲🇽",
     team2: "جنوب أفريقيا", team2Emoji: "🇿🇦",
@@ -103,9 +104,9 @@ export default function HomePage() {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [currentMatch.kickoff]);
 
-  // ✨ 3. الاستماع الحي للشات والتوقعات ولوحة الصدارة من الفايربيز
+  // ✨ 3. الاستماع الحي للشات والتوقعات ولوحة الصدارة والنتيجة لايف من الفايربيز
   useEffect(() => {
     const qChat = query(collection(db, "chats"), orderBy("createdAt", "desc"));
     const unsubChat = onSnapshot(qChat, (snap) => {
@@ -131,7 +132,20 @@ export default function HomePage() {
       })));
     });
 
-    return () => { unsubChat(); unsubPred(); unsubUsers(); };
+    // 📺 الاستماع المباشر لتحديثات النتيجة والمجريات الحية من لوحة الآدمن
+    const qMatch = query(collection(db, "match_status"), orderBy("updatedAt", "desc"));
+    const unsubMatch = onSnapshot(qMatch, (snap) => {
+      if (!snap.empty) {
+        const liveData = snap.docs[0].data();
+        setCurrentMatch(prev => ({
+          ...prev,
+          score: liveData.score,
+          status: liveData.status
+        }));
+      }
+    });
+
+    return () => { unsubChat(); unsubPred(); unsubUsers(); unsubMatch(); };
   }, []);
 
   // ✨ 4. دالة التسجيل المحدثة والمضمونة لحفظ الحساب فوراً وبدون تعليق
