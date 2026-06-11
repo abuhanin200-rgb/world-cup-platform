@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
-import { collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
+// القائمة الرسمية الكاملة لمنتخبات كأس العالم 2026 المعتمدة (48 منتخب) مع الأعلام
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
   { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
@@ -62,17 +63,16 @@ export default function HomePage() {
     status: "بانتظار ركلة البداية", score: "0 - 0"
   });
 
-  // فحص حالة تسجيل الدخول من التخزين المحلي فوراً عند فتح الموقع
+  // 1. فحص وتثبيت الجلسة الصارمة فور فتح الموقع عند أي مستخدم بالكون
   useEffect(() => {
     const savedUser = localStorage.getItem("worldCupUser");
     if (savedUser) { 
-      const parsed = JSON.parse(savedUser);
-      setUser(parsed); 
+      setUser(JSON.parse(savedUser)); 
       setIsLoggedIn(true); 
     }
   }, []);
 
-  // جلب نتائج الـ API لايف
+  // 2. 🤖 تحديث ذكي آلي متصل بالسيرفر الرياضي العالمي الموثوق لجلب النتيجة الحية كل دقيقة تلقائياً
   useEffect(() => {
     const fetchLiveScores = async () => {
       try {
@@ -86,6 +86,7 @@ export default function HomePage() {
         const data = await res.json();
         
         if (data.response && data.response.length > 0) {
+          // جلب المباراة التي تتضمن المكسيك (الافتتاحية الحية)
           const match = data.response.find((f: any) => f.teams.home.name.includes("Mexico") || f.teams.away.name.includes("Mexico"));
           if (match) {
             setCurrentMatch(prev => ({
@@ -95,7 +96,7 @@ export default function HomePage() {
             }));
           }
         }
-      } catch (err) { console.error(err); }
+      } catch (err) { console.error("سيرفر النتائج الحية معطل أو ينتظر البداية:", err); }
     };
 
     fetchLiveScores();
@@ -103,13 +104,15 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // العداد التنازلي للمباراة
+  // 3. العداد التنازلي الحقيقي لوقت ركلة البداية
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date().getTime();
       const distance = currentMatch.kickoff.getTime() - now;
-      if (distance < 0) { clearInterval(timer); setCountdown("بدأت المباراة (أُغلق التوقع)"); }
-      else {
+      if (distance < 0) { 
+        clearInterval(timer); 
+        setCountdown("بدأت المباراة (أُغلق التوقع)"); 
+      } else {
         const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)).toString().padStart(2, "0");
         const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, "0");
         const seconds = Math.floor((distance % (1000 * 60)) / 1000).toString().padStart(2, "0");
@@ -119,10 +122,12 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [currentMatch.kickoff]);
 
-  // الاستماع الحقيقي للفايربيز
+  // 4. 🔗 التوصيل السحابي الحي والربط التلقائي بين جميع المستخدمين في نفس اللحظة عبر الفايربيز
   useEffect(() => {
     const qChat = query(collection(db, "chats"), orderBy("createdAt", "desc"));
-    const unsubChat = onSnapshot(qChat, (snap) => { setChatList(snap.docs.map(doc => doc.data())); });
+    const unsubChat = onSnapshot(qChat, (snap) => { 
+      setChatList(snap.docs.map(doc => doc.data())); 
+    });
 
     const qPred = query(collection(db, "predictions"), orderBy("createdAt", "desc"));
     const unsubPred = onSnapshot(qPred, (snap) => {
@@ -146,32 +151,28 @@ export default function HomePage() {
     return () => { unsubChat(); unsubPred(); unsubUsers(); };
   }, []);
 
-  // 🔥 الحل الجذري النهائي: دالة التسجيل الفورية المنفصلة لإغلاق المودال بدون أي تعليق
+  // 5. دالة تفعيل وتثبيت الحساب الفوري لجميع المتصفحات بدون أي تعليق
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 1. إعداد البيانات فوراً في المتصفح لقفل المودال دون انتظار السيرفر
-    const finalPhone = user.countryCode + user.phone;
-    const userData = {
-      fullName: user.fullName,
-      phone: finalPhone,
-      residence: user.residence,
-      favoriteTeam: user.favoriteTeam,
-      points: 0, total: 0, correct: 0, wrong: 0,
-      createdAt: new Date().toISOString()
-    };
-
-    // 2. تحديث واجهة الجوال فوراً وإخفاء المودال بلمحة بصر لمنع التعليق
-    localStorage.setItem("worldCupUser", JSON.stringify(userData));
-    setUser(userData);
-    setIsLoggedIn(true);
-    setIsAuthModalOpen(false);
-
-    // 3. إرسال البيانات للفايربيز في الخلفية بشكل صامت دون تعطيل زوار الجوال
     try {
+      let cleanPhone = user.phone.trim();
+      if (cleanPhone.startsWith("0")) cleanPhone = cleanPhone.substring(1);
+
+      const finalPhone = user.countryCode + cleanPhone;
+      const userData = {
+        fullName: user.fullName.trim(), phone: finalPhone, residence: user.residence, favoriteTeam: user.favoriteTeam,
+        points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString()
+      };
+      
       await addDoc(collection(db, "users"), userData);
-    } catch (err) {
-      console.error("Firebase background save error: ", err);
+      localStorage.setItem("worldCupUser", JSON.stringify(userData)); 
+      
+      setUser(userData);
+      setIsLoggedIn(true); 
+      setIsAuthModalOpen(false); 
+      alert("تم تفعيل حسابك بنجاح وبدأت رحلة التحدي! 🚀🏆");
+    } catch (err) { 
+      alert("حدث خطأ أثناء التسجيل، يرجى إعادة المحاولة."); 
     }
   };
 
@@ -181,17 +182,50 @@ export default function HomePage() {
     setIsLoggedIn(false);
   };
 
+  // 6. 🔥 الفحص الصارم والتحديث الذكي لمنع التوقعات الوهمية وحساب المكرر نهائياً
   const handleSavePrediction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) { setIsAuthModalOpen(true); return; }
     if (new Date().getTime() > currentMatch.kickoff.getTime()) { alert("أُغلقت التوقعات لبدء المباراة!"); return; }
+    
     try {
-      await addDoc(collection(db, "predictions"), {
-        user: user.fullName, t1: currentMatch.team1, t1E: currentMatch.team1Emoji, t2: currentMatch.team2, t2E: currentMatch.team2Emoji,
-        s1: userPrediction.team1Score, s2: userPrediction.team2Score, createdAt: new Date().toISOString()
-      });
-      alert("تم تسجيل توقعك بنظام التيكر الحي بنجاح! 🔥");
-    } catch (err) { console.error(err); }
+      const predRef = collection(db, "predictions");
+      // البحث في الفايربيز إذا كان المستخدم أرسل توقعاً لهذه المباراة مسبقاً لمنع التكرار
+      const q = query(predRef, where("user", "==", user.fullName), where("matchId", "==", currentMatch.id));
+      const querySnapshot = await getDocs(q);
+
+      const predictionData = {
+        user: user.fullName,
+        matchId: currentMatch.id,
+        t1: currentMatch.team1, t1E: currentMatch.team1Emoji,
+        t2: currentMatch.team2, t2E: currentMatch.team2Emoji,
+        s1: userPrediction.team1Score, 
+        s2: userPrediction.team2Score,
+        createdAt: new Date().toISOString()
+      };
+
+      if (!querySnapshot.empty) {
+        // تحديث التوقع القديم نفسه بدون إضافة حقل جديد لتفادي زحام العداد
+        const docId = querySnapshot.docs[0].id;
+        await updateDoc(doc(db, "predictions", docId), predictionData);
+        alert("تم تحديث توقعك السابق بنجاح على شريط البث الحي! 🔄🔥");
+      } else {
+        // إضافة توقع جديد لأول مرة وزيادة المجموع في حقول المستخدم بدقة
+        await addDoc(predRef, predictionData);
+        
+        // جلب حساب المستخدم في جدول الـ users لزيادة الـ total الفعلي
+        const userQuery = query(collection(db, "users"), where("fullName", "==", user.fullName));
+        const userSnapshot = await getDocs(userQuery);
+        if (!userSnapshot.empty) {
+          const uDocId = userSnapshot.docs[0].id;
+          const currentTotal = userSnapshot.docs[0].data().total || 0;
+          await updateDoc(doc(db, "users", uDocId), { total: currentTotal + 1 });
+        }
+        alert("تم تسجيل توقعك الأول بنجاح على شريط البث الحي! 🚀🏆");
+      }
+    } catch (err) { 
+      console.error(err); 
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -207,7 +241,7 @@ export default function HomePage() {
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased text-right flex flex-col justify-between">
       <div>
         
-        {/* شريط التوقعات المتحرك */}
+        {/* شريط التوقعات المتحرك المباشر والمطابق لقاعدة البيانات بدقة (Real-time Live Ticker) */}
         <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white h-10 flex items-center overflow-hidden text-xs font-bold shadow-inner border-b border-purple-900/50">
           <div className="bg-red-600 px-3 h-full flex items-center z-10 shadow-md flex-shrink-0 animate-pulse">🔥 توقعات حية الآن:</div>
           <div className="w-full relative overflow-hidden flex items-center">
@@ -273,7 +307,7 @@ export default function HomePage() {
             </form>
           </section>
 
-          {/* لوحة الصدارة */}
+          {/* لوحة الصدارة التلقائية الصارمة والمشتركة بين الجميع */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 overflow-hidden flex flex-col justify-between">
               <div>
@@ -321,7 +355,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* مركز المباراة */}
+          {/* مركز المباراة والشات لايف */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
             <div className="lg:col-span-2 bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-50 pb-3">
@@ -364,7 +398,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
             <p className="font-bold text-slate-300">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-500">© جميع الحقوق محفوظة • النسخة المحدثة AI V2.5</p>
+            <p className="text-slate-500">© جميع الحقوق محفوظة • النسخة المحدثة AI V3.0</p>
           </div>
           <div className="flex items-center gap-3 bg-slate-800/50 border border-slate-800 px-4 py-2 rounded-xl order-1 sm:order-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm">ع</div>
@@ -376,7 +410,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* مودال التسجيل الجديد الفوري والسريع للغاية */}
+      {/* مودال التسجيل الجديد الفوري والذكي */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -396,7 +430,7 @@ export default function HomePage() {
                   <select value={user.countryCode} onChange={(e) => setUser({...user, countryCode: e.target.value})} className="bg-slate-50 border border-slate-200 rounded-xl px-2 text-xs font-mono max-w-[100px] focus:outline-none">
                     {ALL_COUNTRY_DIAL_CODES.map((c, i) => ( <option key={i} value={c.dialCode}>{c.flag} {c.dialCode}</option> ))}
                   </select>
-                  <input type="tel" required placeholder="رقم الهاتف" value={user.phone} onChange={(e) => setUser({...user, phone: e.target.value})} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-left focus:outline-none" />
+                  <input type="tel" required placeholder="54XXXXXXXX (بدون صفر)" value={user.phone} onChange={(e) => setUser({...user, phone: e.target.value})} className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs md:text-sm text-left focus:outline-none" />
                 </div>
               </div>
               <div>
