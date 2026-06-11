@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy } from "firebase/firestore";
 
+// القائمة الرسمية الكاملة لمنتخبات كأس العالم 2026 المعتمدة (48 منتخب) مع الأعلام
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
   { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
@@ -16,7 +17,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
+  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥لنكولنشاير" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
   { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
   { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
   { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
@@ -39,8 +40,7 @@ const ALL_COUNTRY_DIAL_CODES = [
   { code: "BH", name: "البحرين", dialCode: "+973", flag: "🇧🇭" },
   { code: "OM", name: "عُمان", dialCode: "+968", flag: "🇴🇲" },
   { code: "EG", name: "مصر", dialCode: "+20", flag: "🇪🇬" },
-  { code: "MA", name: "المغرب", dialCode: "+212", flag: "🇲🇦" },
-  { code: "TR", name: "تركيا", dialCode: "+90", flag: "🇹🇷" }
+  { code: "MA", name: "المغرب", dialCode: "+212", flag: "🇲🇦" }
 ];
 
 export default function HomePage() {
@@ -65,17 +65,19 @@ export default function HomePage() {
 
   useEffect(() => {
     const savedUser = localStorage.getItem("worldCupUser");
-    if (savedUser) { setUser(JSON.parse(savedUser)); setIsLoggedIn(true); }
+    if (savedUser) { 
+      setUser(JSON.parse(savedUser)); 
+      setIsLoggedIn(true); 
+    }
   }, []);
 
-  // 🤖 الذكاء الاصطناعي وجلب نتائج الفيفا لايف تلقائياً من الـ API العالمي كل دقيقة
+  // 🤖 استدعاء نتائج مباريات الفيفا الحية تلقائياً
   useEffect(() => {
     const fetchLiveScores = async () => {
       try {
         const apiKey = process.env.NEXT_PUBLIC_FOOTBALL_API_KEY;
         if (!apiKey) return;
 
-        // الاتصال المباشر بقاعدة بيانات المباريات العالمية لايف بكأس العالم
         const res = await fetch("https://v3.football.api-sports.io/fixtures?live=all&league=1", {
           method: "GET",
           headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": "v3.football.api-sports.io" }
@@ -83,7 +85,6 @@ export default function HomePage() {
         const data = await res.json();
         
         if (data.response && data.response.length > 0) {
-          // البحث عن مباراة المكسيك الافتتاحية
           const match = data.response.find((f: any) => f.teams.home.name.includes("Mexico") || f.teams.away.name.includes("Mexico"));
           if (match) {
             setCurrentMatch(prev => ({
@@ -93,11 +94,11 @@ export default function HomePage() {
             }));
           }
         }
-      } catch (err) { console.error("API Fetch Error: ", err); }
+      } catch (err) { console.error(err); }
     };
 
     fetchLiveScores();
-    const interval = setInterval(fetchLiveScores, 60000); // تحديث آلي ذكي صامت كل دقيقة
+    const interval = setInterval(fetchLiveScores, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -139,17 +140,10 @@ export default function HomePage() {
       })));
     });
 
-    const qMatch = query(collection(db, "match_status"), orderBy("updatedAt", "desc"));
-    const unsubMatch = onSnapshot(qMatch, (snap) => {
-      if (!snap.empty) {
-        const liveData = snap.docs[0].data();
-        setCurrentMatch(prev => ({ ...prev, score: liveData.score, status: liveData.status }));
-      }
-    });
-
-    return () => { unsubChat(); unsubPred(); unsubUsers(); unsubMatch(); };
+    return () => { unsubChat(); unsubPred(); unsubUsers(); };
   }, []);
 
+  // ✨ تحديث دالة التسجيل لحل مشكلة قفل المودال وتحديث الحالة فوراً
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -159,8 +153,12 @@ export default function HomePage() {
       };
       await addDoc(collection(db, "users"), userData);
       localStorage.setItem("worldCupUser", JSON.stringify(userData)); 
-      setIsLoggedIn(true); setIsAuthModalOpen(false);
+      
+      // إغلاق النافذة المنبثقة فوراً وحفظ الحالة البرمجية
+      setIsLoggedIn(true); 
+      setIsAuthModalOpen(false);
       alert("تم تفعيل حسابك بنجاح وبدأت رحلة التحدي! 🚀🏆");
+      window.location.reload(); // تنشيط سريع لإنعاش هيدر المشترك كملك للتوقعات
     } catch (err) { alert("حدث خطأ أثناء التسجيل، يرجى المحاولة مرة أخرى."); }
   };
 
@@ -168,6 +166,7 @@ export default function HomePage() {
     localStorage.removeItem("worldCupUser");
     setUser({ fullName: "", countryCode: "+966", phone: "", residence: "السعودية", favoriteTeam: "" });
     setIsLoggedIn(false);
+    window.location.reload();
   };
 
   const handleSavePrediction = async (e: React.FormEvent) => {
@@ -196,7 +195,7 @@ export default function HomePage() {
     <div dir="rtl" className="min-h-screen bg-slate-50 text-slate-800 font-sans antialiased text-right flex flex-col justify-between">
       <div>
         
-        {/* شريط التوقعات المتحرك (Live Ticker) */}
+        {/* شريط التوقعات المتحرك */}
         <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white h-10 flex items-center overflow-hidden text-xs font-bold shadow-inner border-b border-purple-900/50">
           <div className="bg-red-600 px-3 h-full flex items-center z-10 shadow-md flex-shrink-0 animate-pulse">🔥 توقعات حية الآن:</div>
           <div className="w-full relative overflow-hidden flex items-center">
@@ -214,22 +213,23 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Header */}
+        {/* Header - الهيدر المطور مع دمج لوجو كاس العالم الحقيقي wc2026-logo */}
         <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-sm transition-all">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-600 flex items-center justify-center shadow-md shadow-amber-500/20 animate-bounce" style={{ animationDuration: '3s' }}>
-                <span className="text-xl drop-shadow">🏆</span>
+              {/* استدعاء الشعار الأصلي بدقة متناهية مع ميزة الأنيميشن */}
+              <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-lg animate-pulse" style={{ animationDuration: '2.5s' }}>
+                <img src="/wc2026-logo.png" alt="FIFA World Cup 2026" className="object-contain max-w-full max-h-full drop-shadow-md" />
               </div>
               <div className="flex flex-col">
-                <h1 className="text-sm md:text-base font-black bg-gradient-to-r from-purple-950 via-purple-800 to-indigo-700 bg-clip-text text-transparent">منصة توقعات كأس العالم 2026</h1>
-                <span className="text-[10px] text-slate-400 font-bold -mt-0.5 tracking-wider">OFFICIAL FAN PLATFORM</span>
+                <h1 className="text-xs md:text-base font-black bg-gradient-to-r from-purple-950 via-purple-800 to-indigo-700 bg-clip-text text-transparent">منصة توقعات كأس العالم 2026</h1>
+                <span className="text-[9px] text-slate-400 font-bold -mt-0.5 tracking-wider">OFFICIAL FAN PLATFORM</span>
               </div>
             </div>
             <div>
               {isLoggedIn ? (
-                <div className="flex items-center gap-3">
-                  <span className="bg-purple-50 text-purple-700 px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm border border-purple-100 shadow-sm">👑 {user.fullName}</span>
+                <div className="flex items-center gap-2 md:gap-3">
+                  <span className="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-xl font-bold text-xs md:text-sm border border-purple-100 shadow-sm">👑 {user.fullName}</span>
                   <button onClick={handleLogout} className="text-xs font-bold text-red-500 hover:text-red-600 bg-red-50/50 px-2.5 py-1.5 rounded-xl transition-all border border-red-100/50">خروج</button>
                 </div>
               ) : (
