@@ -422,7 +422,7 @@ export default function HomePage() {
             </div>
 
             <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 flex flex-col justify-between">
-              <h3 className="font-black text-xs md:text-base text-slate-900 mb-3 border-b border-slate-50 pb-2">📊 إحصائيات لوحة التحكم</h3>
+              <h3 className="font-black text-xs md:text-base text-slate-900 mb-3 border-b border-slate-50 pb-2">📊 إحصائيات </h3>
               <div className="grid grid-cols-2 gap-3 flex-1 items-center">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
                   <span className="block text-[10px] text-slate-500 font-bold">إجمالي التوقعات</span>
@@ -526,7 +526,7 @@ export default function HomePage() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم أو اللقب الحصري (سيظهر في الصدارة)</label>
-                  <input type="text" required placeholder="مثال: صالح الرويلي" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
+                  <input type="text" required placeholder="مثال: عبدالسلام العنزي" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري الخاص بحسابك (لحماية اسمك من التكرار)</label>
