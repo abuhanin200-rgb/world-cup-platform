@@ -4,8 +4,7 @@ import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  // ⚡ تم التثبيت بناءً على السيرفر الموثق بالصورة لإنهاء التعليق تماماً
-  authDomain: "worldcup2026i.firebaseapp.com",
+  authDomain: "worldcup2026i.firebaseapp.com", // الدومين الرسمي الموثق في قوقل وفايربيز
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
