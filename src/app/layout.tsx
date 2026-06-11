@@ -1,8 +1,9 @@
+import type { Metadata } from "next";
 import "./globals.css";
 
-export const metadata = {
-  title: "تحدي توقعات كأس العالم 2026",
-  description: "أضخم منصة توقعات جماهيرية لعام 2026",
+export const metadata: Metadata = {
+  title: "منصة توقعات كأس العالم 2026",
+  description: "المنصة الرسمية التفاعلية للجماهير - إطلاق تجريبي",
 };
 
 export default function RootLayout({
@@ -12,10 +13,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl">
-      <body className="antialiased">
-        {/* هنا يعرض محتوى الصفحات تلقائياً بدون أي فوتر مكرر بالأسفل */}
-        {children}
-      </body>
+      <head>
+        <link 
+          rel="stylesheet" 
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" 
+        />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }
