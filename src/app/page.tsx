@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { db, auth } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where } from "firebase/firestore";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
@@ -13,7 +12,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "QA", name: "قطر", emoji: "🇶🇦" }, { code: "IQ", name: "العراق", emoji: "🇮🇶" },
   { code: "JO", name: "الأردن", emoji: "🇯🇴" }, { code: "OM", name: "عُمان", emoji: "🇴🇲" },
   { code: "BH", name: "البحرين", emoji: "🇧🇭" }, { code: "KW", name: "الكويت", emoji: "🇰🇼" },
-  { code: "US", name: "الولايات المتحدة", emoji: "🇺🇸" }, { code: "CA", name: "คندا", emoji: "🇨🇦" },
+  { code: "US", name: "الولايات المتحدة", emoji: "🇺🇸" }, { code: "CA", name: "كندا", emoji: "🇨🇦" },
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
@@ -32,23 +31,15 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" }
 ];
 
-const ALL_COUNTRY_DIAL_CODES = [
-  { code: "SA", name: "السعودية", dialCode: "+966", flag: "🇸🇦" },
-  { code: "KW", name: "الكويت", dialCode: "+965", flag: "🇰🇼" },
-  { code: "AE", name: "الإمارات", dialCode: "+971", flag: "🇦🇪" },
-  { code: "QA", name: "قطر", dialCode: "+974", flag: "🇶🇦" },
-  { code: "EG", name: "مصر", dialCode: "+20", flag: "🇪🇬" }
-];
-
 export default function HomePage() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // القائمة المنسدلة الجانبية
+  const [isMenuOpen, setIsMenuOpen] = useState(false); 
   const [authMode, setAuthMode] = useState<"menu" | "guest" | "manual_login">("menu");
   
   const [user, setUser] = useState<any>({ fullName: "", favoriteTeam: "", password: "", residence: "السعودية" });
   const [manualName, setManualName] = useState("");
-  const [manualPassword, setManualPassword] = useState(""); // كلمة المرور للتحقق
+  const [manualPassword, setManualPassword] = useState(""); 
   const [userPrediction, setUserPrediction] = useState({ team1Score: "", team2Score: "" });
   const [hasPredicted, setHasPredicted] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
@@ -152,44 +143,13 @@ export default function HomePage() {
     return () => { unsubChat(); unsubPred(); unsubUsers(); };
   }, []);
 
-  const handleGoogleLogin = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const googleUser = result.user;
-
-      if (googleUser && googleUser.displayName) {
-        const userData = {
-          fullName: googleUser.displayName,
-          favoriteTeam: "لم يحدد بعد 🏆",
-          password: "google_secure_account", // تمييز حساب قوقل لمنع التداخل
-          residence: "السعودية",
-          points: 0, total: 0, correct: 0, wrong: 0,
-          createdAt: new Date().toISOString()
-        };
-
-        localStorage.setItem("worldCupUser", JSON.stringify(userData));
-        setUser(userData);
-        setIsLoggedIn(true);
-        setIsAuthModalOpen(false);
-
-        await addDoc(collection(db, "users"), userData);
-        if (localStorage.getItem(`hasPredicted_${googleUser.displayName}`)) setHasPredicted(true);
-        alert(`أهلاً بك يا ${googleUser.displayName}، تم تفعيل حسابك بنجاح! 🚀🏆`);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("حدث تعليق مؤقت في دومين قوقل، يرجى استخدام خيار الضيف السريع لتفعيل الحساب فوراً.");
-    }
-  };
-
+  // دالة تسجيل المشتركين بنظام منع تكرار وحجز الأسماء + حماية الرقم السري لقفل العيوب
   const handleGuestLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const targetName = user.fullName.trim();
     if (!targetName || !user.password) return;
 
     try {
-      // فحص أمان لوحة الصدارة لمنع حجز نفس الاسم من شخص آخر
       const q = query(collection(db, "users"), where("fullName", "==", targetName));
       const snap = await getDocs(q);
 
@@ -201,7 +161,7 @@ export default function HomePage() {
       const userData = {
         fullName: targetName,
         favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦",
-        password: user.password, // الرقم السري المعتمد لحماية الضيف
+        password: user.password, 
         residence: user.residence,
         points: 0, total: 0, correct: 0, wrong: 0,
         createdAt: new Date().toISOString()
@@ -225,7 +185,6 @@ export default function HomePage() {
     if (!manualName.trim() || !manualPassword) return;
 
     try {
-      // المطابقة المزدوجة لحماية الاسم والرقم السري معاً عند العودة
       const q = query(
         collection(db, "users"), 
         where("fullName", "==", manualName.trim()),
@@ -339,7 +298,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* الكود البرمجي للقائمة المنسدلة الجانبية الفخمة */}
+          {/* القائمة الجانبية المنسدلة الجانبية الفخمة */}
           {isMenuOpen && (
             <div className="absolute top-16 right-0 w-64 bg-slate-900 border-l border-b border-purple-900/40 shadow-2xl animate-fade-in p-4 space-y-4 z-50 rounded-bl-xl">
               <button onClick={() => setIsMenuOpen(false)} className="block w-full text-right py-2.5 border-b border-white/5 hover:text-amber-400 font-bold text-xs">🏟️ المباريات</button>
@@ -421,14 +380,17 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-100 flex flex-col justify-between">
-              <h3 className="font-black text-xs md:text-base text-slate-900 mb-3 border-b border-slate-50 pb-2">📊 إحصائيات </h3>
-              <div className="grid grid-cols-2 gap-3 flex-1 items-center">
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
-                  <span className="block text-[10px] text-slate-500 font-bold">إجمالي التوقعات</span>
-                  <span className="text-base md:text-lg font-mono font-bold text-slate-800">{predictionsStats.total}</span>
+            <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 md:p-5 shadow-2xl border border-purple-900/20 flex flex-col justify-between">
+              <h3 className="font-black text-xs md:text-base text-purple-300 mb-3 border-b border-purple-900/30 pb-2">📊 إحصائيات لوحة التحكم</h3>
+              <div className="grid grid-cols-2 gap-4 flex-1 items-center">
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-purple-500/10 text-center shadow-inner">
+                  <span className="block text-[10px] text-purple-400 font-black mb-1">إجمالي التوقعات</span>
+                  <span className="text-xl font-mono font-black text-white">{predictionsStats.total}</span>
                 </div>
-                <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 text-center"><span className="block text-[10px] text-purple-600 font-bold">إجمالي نقاط المنصة</span><span className="text-base md:text-lg font-mono font-bold text-purple-700">{predictionsStats.points}</span></div>
+                <div className="bg-slate-950/60 p-4 rounded-xl border border-purple-500/10 text-center shadow-inner">
+                  <span className="block text-[10px] text-amber-400 font-black mb-1">نقاط المنصة</span>
+                  <span className="text-xl font-mono font-black text-amber-400">{predictionsStats.points}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -474,7 +436,7 @@ export default function HomePage() {
         </main>
       </div>
 
-      {/* الفوتر - إطلاق تجريبي V5.1 */}
+      {/* الفوتر */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
@@ -491,9 +453,9 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* مودال الدخول السريع والأمن الفري المطور */}
+      {/* مودال التحكم الذكي والأمن الفري المطور بعد التحديث الجذري */}
       {isAuthModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-purple-500/30 w-full max-w-md rounded-2xl p-5 md:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-slate-100">
             <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border border-purple-500/20">✕</button>
             
@@ -501,14 +463,11 @@ export default function HomePage() {
               <div className="space-y-6 py-4 text-center">
                 <div>
                   <h4 className="text-base md:text-lg font-black text-white mb-1">🔐 اختر طريقة الدخول</h4>
-                  <p className="text-xs text-slate-400">ادخل بضغطة زر واحدة لحفظ نقاطك وتوقعاتك</p>
+                  <p className="text-xs text-slate-400">احفظ نقاطك وتوقعاتك فوراً في لوحة الصدارة</p>
                 </div>
                 <div className="space-y-3 pt-2">
-                  <button onClick={handleGoogleLogin} type="button" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-3 rounded-xl text-xs md:text-sm transition-all shadow-lg flex items-center justify-center gap-2">
-                    <span>🔵</span> الدخول بواسطة Google
-                  </button>
                   <button onClick={() => setAuthMode("guest")} type="button" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl text-xs md:text-sm transition-all shadow-lg flex items-center justify-center gap-2">
-                    <span>🟢</span> الدخول كـ زائر / ضيف سريع
+                    <span>🟢</span> التسجيل السريع
                   </button>
                   <div className="border-t border-purple-950/50 my-4 pt-3">
                     <button onClick={() => setAuthMode("manual_login")} type="button" className="text-xs text-purple-400 hover:text-purple-300 font-bold underline">
@@ -522,18 +481,18 @@ export default function HomePage() {
             {authMode === "guest" && (
               <form onSubmit={handleGuestLogin} className="space-y-4 py-2 text-right">
                 <div className="text-center mb-3">
-                  <h4 className="text-base font-black text-white">🟢 الدخول كـ زائر / ضيف سريع</h4>
+                  <h4 className="text-base font-black text-white">🟢 التسجيل السريع الحصري</h4>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم أو اللقب الحصري (سيظهر في الصدارة)</label>
-                  <input type="text" required placeholder="مثال: عبدالسلام العنزي" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
+                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم الكامل (سيظهر للجميع في لوحة الصدارة ولا يمكن تكراره)</label>
+                  <input type="text" required placeholder="اكتب اسمك الفريد (مثال: عبدالله الرويلي)" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري الخاص بحسابك (لحماية اسمك من التكرار)</label>
+                  <label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري الخاص بحسابك (لحمايته من الاستخدام من شخص آخر)</label>
                   <input type="password" required placeholder="ادخل رقماً سرياً خاصاً بك" onChange={(e) => setUser({...user, password: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm focus:outline-none focus:border-purple-500 text-slate-100" />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المرشح للقب 🏆</label>
+                  <label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المرشح للقب كأس العالم 2026 🏆</label>
                   <select required value={user.favoriteTeam} onChange={(e) => setUser({...user, favoriteTeam: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-3 py-2.5 text-xs md:text-sm focus:outline-none text-slate-100">
                     <option value="" disabled>اختر مرشحك للقب...</option>
                     {WORLD_CUP_2026_TEAMS.map((t, i) => ( <option key={i} value={t.name}>{t.emoji} {t.name}</option> ))}
