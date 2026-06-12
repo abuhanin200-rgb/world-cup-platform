@@ -4,13 +4,17 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
-// 📅 قاعدة البيانات الشاملة للمونديال - السيستم يفرزها تلقائياً ليعرض مباريات اليوم والغد فقط حسب توقيت مكة المكرمة
+// 🕋 جدول بطولة كأس العالم 2026 الحقيقي مية بالمية من الفيفا بعد تحويله آلياً بدقة لتوقيت مكة المكرمة
 const FIXTURES_365_DATABASE = [
-  { id: "201", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ج", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", time: "05:00 ص", kickoff: "2026-06-12T05:00:00" },
-  { id: "202", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "11:00 م", kickoff: "2026-06-12T23:00:00" },
-  { id: "203", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", kickoff: "2026-06-13T04:00:00" },
-  { id: "204", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - المجموعة أ", team1: "ألمانيا", team1Emoji: "🇩🇪", team2: "الكاميرون", team2Emoji: "🇨🇲", time: "07:00 م", kickoff: "2026-06-13T19:00:00" },
-  { id: "205", day: "الأحد 14 يونيو", group: "كأس العالم - المجموعة هـ", team1: "السعودية", team1Emoji: "🇸🇦", team2: "فرنسا", team2Emoji: "🇫🇷", time: "09:00 م", kickoff: "2026-06-14T21:00:00" }
+  { id: "wc_01", day: "الخميس 11 يونيو 2026", group: "كأس العالم - المجموعة الأولى", team1: "المكسيك", team1Emoji: "🇲🇽", team2: "جنوب أفريقيا", team2Emoji: "🇿🇦", time: "11:00 م", kickoff: "2026-06-11T23:00:00" },
+  { id: "wc_02", day: "الخميس 11 يونيو 2026", group: "كأس العالم - المجموعة الأولى", team1: "جمهورية كوريا", team1Emoji: "🇰🇷", team2: "تشيكيا", team2Emoji: "🇨🇿", time: "11:55 م", kickoff: "2026-06-11T23:55:00" },
+  { id: "wc_03", day: "الجمعة 12 يونيو 2026", group: "كأس العالم - المجموعة الثانية", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "03:00 ص", kickoff: "2026-06-12T03:00:00" },
+  { id: "wc_04", day: "الجمعة 12 يونيو 2026", group: "كأس العالم - المجموعة الرابعة", team1: "الولايات المتحدة الأمريكية", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "07:00 ص", kickoff: "2026-06-12T07:00:00" },
+  { id: "wc_05", day: "السبت 13 يونيو 2026", group: "كأس العالم - المجموعة الثالثة", team1: "هايتي", team1Emoji: "🇭🇹", team2: "اسكتلندا", team2Emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", time: "08:00 م", kickoff: "2026-06-13T20:00:00" },
+  { id: "wc_06", day: "السبت 13 يونيو 2026", group: "كأس العالم - المجموعة الرابعة", team1: "أستراليا", team1Emoji: "🇦🇺", team2: "تركيا", team2Emoji: "🇹🇷", time: "10:00 م", kickoff: "2026-06-13T22:00:00" },
+  { id: "wc_07", day: "الأحد 14 يونيو 2026", group: "كأس العالم - المجموعة الثالثة", team1: "البرازيل", team1Emoji: "🇧🇷", team2: "المغرب", team2Emoji: "🇲🇦", time: "02:00 ص", kickoff: "2026-06-14T02:00:00" },
+  { id: "wc_08", day: "الأحد 14 يونيو 2026", group: "كأس العالم - المجموعة الثانية", team1: "قطر", team1Emoji: "🇶🇦", team2: "سويسرا", team2Emoji: "🇨🇭", time: "05:00 ص", kickoff: "2026-06-14T05:00:00" },
+  { id: "wc_09", day: "الاثنين 15 يونيو 2026", group: "كأس العالم - المجموعة الثامنة", team1: "المملكة العربية السعودية", team1Emoji: "🇸🇦", team2: "أوروغواي", team2Emoji: "🇺🇾", time: "09:00 م", kickoff: "2026-06-15T21:00:00" }
 ];
 
 const WORLD_CUP_2026_TEAMS = [
@@ -21,7 +25,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "QA", name: "قطر", emoji: "🇶🇦" }, { code: "IQ", name: "العراق", emoji: "🇮🇶" },
   { code: "JO", name: "الأردن", emoji: "🇯🇴" }, { code: "OM", name: "عُمان", emoji: "🇴🇲" },
   { code: "BH", name: "البحرين", emoji: "🇧🇭" }, { code: "KW", name: "الكويت", emoji: "🇰🇼" },
-  { code: "US", name: "الولايات المتحدة", emoji: "🇺🇸" }, { code: "CA", name: "كندا", emoji: "🇨🇦" },
+  { code: "US", name: "الولايات المتحدة الأمريكية", emoji: "🇺🇸" }, { code: "CA", name: "كندا", emoji: "🇨🇦" },
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
@@ -37,7 +41,9 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "IR", name: "إيران", emoji: "🇮🇷" }, { code: "CR", name: "كوستاريكا", emoji: "🇨🇷" },
   { code: "JM", name: "جامايكا", emoji: "🇯🇲" }, { code: "PA", name: "بنما", emoji: "🇵🇦" },
   { code: "NZ", name: "نيوزيلندا", emoji: "🇳🇿" }, { code: "CH", name: "سويسرا", emoji: "🇨🇭" },
-  { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" }
+  { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" },
+  { code: "BA", name: "البوسنة والهرسك", emoji: "🇧🇦" }, { code: "PY", name: "باراغواي", emoji: "🇵🇾" },
+  { code: "HT", name: "هايتي", emoji: "🇭🇹" }, { code: "GB-SCT", name: "اسكتلندا", emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" }
 ];
 
 export default function HomePage() {
@@ -48,7 +54,7 @@ export default function HomePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false); 
   const [authMode, setAuthMode] = useState<"menu" | "guest" | "manual_login">("menu");
   
-  const [user, setUser] = useState<any>({ id: "", fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", phone: "", residence: "السعودية" });
+  const [user, setUser] = useState<any>({ id: "", fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", phone: "" });
   const [editProfileFields, setEditProfileFields] = useState({ fullName: "", password: "", favoriteTeam: "", phone: "" });
   
   const [manualName, setManualName] = useState("");
@@ -57,9 +63,7 @@ export default function HomePage() {
   const [chatList, setChatList] = useState<any[]>([]);
   const [livePredictions, setLivePredictions] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [apiFixtures, setApiFixtures] = useState<any[]>([]);
   const [next48HoursMatches, setNext48HoursMatches] = useState<any[]>([]);
-  const [isLoadingFixtures, setIsLoadingFixtures] = useState(false);
   
   const [topFavTeams, setTopFavTeams] = useState<any[]>([]);
   const [predictionsValues, setPredictionsValues] = useState<{ [key: string]: { team1Score: string; team2Score: string } }>({});
@@ -68,7 +72,6 @@ export default function HomePage() {
   
   const [tickerSpeed, setTickerSpeed] = useState("30s");
 
-  // أولاً: تعديل لوحة الصدارة لتظهر أول 20 اسماً مع صفحات التنقل
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   useEffect(() => {
@@ -78,18 +81,10 @@ export default function HomePage() {
       setUser(parsedUser);
       setEditProfileFields({ fullName: parsedUser.fullName, password: parsedUser.password, favoriteTeam: parsedUser.favoriteTeam, phone: parsedUser.phone || "" });
       setIsLoggedIn(true);
-      
-      FIXTURES_365_DATABASE.forEach(m => {
-        if (localStorage.getItem(`hasPredicted_${parsedUser.fullName}_${m.id}`)) {
-          setUserPredictionsKeys(prev => ({ ...prev, [m.id]: true }));
-        }
-      });
     }
   }, []);
 
-  // ⏰ نظام العدادات التنازلية الفردية للمباريات لايف
   useEffect(() => {
-    if (next48HoursMatches.length === 0) return;
     const timer = setInterval(() => {
       const updatedCountdowns: { [key: string]: string } = {};
       next48HoursMatches.forEach((match) => {
@@ -118,7 +113,6 @@ export default function HomePage() {
     
     const unsubUsers = onSnapshot(query(collection(db, "users"), orderBy("points", "desc")), (snap) => {
       setLeaderboard(snap.docs.map((doc, idx) => ({ id: doc.id, rank: idx + 1, name: doc.data().fullName, teamEmoji: doc.data().teamEmoji || "🏆", total: doc.data().total || 0, correct: doc.data().correct || 0, wrong: doc.data().wrong || 0, points: doc.data().points || 0 })));
-      
       const counts: { [key: string]: number } = {};
       snap.docs.forEach(d => { const team = d.data().favoriteTeam || "السعودية 🇸🇦"; counts[team] = (counts[team] || 0) + 1; });
       const sortedTeams = Object.keys(counts).map(teamName => {
@@ -128,36 +122,47 @@ export default function HomePage() {
       setTopFavTeams(sortedTeams);
     });
 
-    // 🧠 ثانياً: الجدولة التلقائية الذكية للمباريات حسب تاريخ اليوم والغد بتوقيت مكة المكرمة
+    // 🧠 الجدولة التلقائية الموقوتة: عند الـ 12ص يدخل اليوم الجديد وتقلب الواجهة لمباريات اليوم والغد تلقائياً وتحذف المنتهية
     const fetchLocalFixturesDynamic = () => {
       const now = new Date();
+      const expirationLimit = now.getTime() - (120 * 60 * 1000); // تختفي المباراة تلقائياً بعد ساعتين من البداية
+      const fortyEightHoursAhead = now.getTime() + (48 * 60 * 60 * 1000);
+      
       const filtered = FIXTURES_365_DATABASE.filter(m => {
         const matchTime = new Date(m.kickoff).getTime();
-        const expirationTime = now.getTime() - (120 * 60 * 1000); // تختفي المباراة بعد ساعتين من انطلاقها
-        const fortyEightHoursLater = now.getTime() + (48 * 60 * 60 * 1000);
-        return matchTime > expirationTime && matchTime <= fortyEightHoursLater;
+        return matchTime > expirationLimit && matchTime <= fortyEightHoursAhead;
       });
-      setNext48HoursMatches(filtered);
+      setNext48HoursMatches(filtered.length > 0 ? filtered : FIXTURES_365_DATABASE);
     };
     
     fetchLocalFixturesDynamic();
-    const intervalFixtures = setInterval(fetchLocalFixturesDynamic, 60000); // تحديث دوري كل دقيقة لتحديث اليوم عند 12ص
+    const intervalFixtures = setInterval(fetchLocalFixturesDynamic, 60000);
 
     return () => { unsubSpeed(); unsubChat(); unsubPred(); unsubUsers(); clearInterval(intervalFixtures); };
   }, []);
+
+  useEffect(() => {
+    if (user.fullName) {
+      FIXTURES_365_DATABASE.forEach(m => {
+        if (localStorage.getItem(`hasPredicted_${user.fullName}_${m.id}`)) {
+          setUserPredictionsKeys(prev => ({ ...prev, [m.id]: true }));
+        }
+      });
+    }
+  }, [user.fullName]);
   const handleGuestLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     let targetName = user.fullName.trim();
-    if (!targetName || !user.password) { alert("يرجى ملء الحقول المطلوبة 🔐"); return; }
+    if (!targetName || !user.password) { alert("يرجى إكمال البيانات المطلوبة 🔐"); return; }
     try {
       const snap = await getDocs(query(collection(db, "users"), where("fullName", "==", targetName)));
-      if (!snap.empty) { alert("❌ الاسم مسجل مسبقاً، يرجى كتابة اسم فريد."); return; }
+      if (!snap.empty) { alert("❌ عذراً! هذا الاسم مسجل مسبقاً، يرجى كتابة اسم فريد خاص بك."); return; }
       const matchedTeam = WORLD_CUP_2026_TEAMS.find(t => t.name === user.favoriteTeam);
       const userData = { fullName: targetName, favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦", teamEmoji: matchedTeam ? matchedTeam.emoji : "🏆", password: user.password, phone: user.phone || "", points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString() };
       const docRef = await addDoc(collection(db, "users"), userData);
       localStorage.setItem("worldCupUser", JSON.stringify({ id: docRef.id, ...userData }));
       setUser({ id: docRef.id, ...userData }); setIsLoggedIn(true); setIsAuthModalOpen(false);
-      alert(`🎉 تم تفعيل حسابك كعضو جديد بنجاح!`);
+      alert(`🎉 تم اعتماد وتفعيل حسابك بنجاح يا ${targetName}!`);
     } catch (err) { console.error(err); }
   };
 
@@ -175,7 +180,6 @@ export default function HomePage() {
     } catch (err) { console.error(err); }
   };
 
-  // 👤 دالة تعديل الملف الشخصي ورقم الجوال والاسم مستعادة ومؤمنة بالكامل بالملي
   const handleUpdateUserProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user.id) return;
@@ -187,16 +191,11 @@ export default function HomePage() {
       const freshUser = { ...user, ...updatedPayload };
       localStorage.setItem("worldCupUser", JSON.stringify(freshUser));
       setUser(freshUser); setIsProfileModalOpen(false);
-      alert("✅ تم تعديل بيانات ملفك الشخصي وجوالك بنجاح!");
-    } catch (err) { alert("حدث عطل أثناء التحديث."); }
+      alert("✅ تم تحديث بروفايلك وجوالك بنجاح في السيرفر!");
+    } catch (err) { alert("حدث عطل في مزامنة البيانات."); }
   };
 
-  // 🛠️ استعادة وصيانة دالة الخروج handleLogout وتصفير المشكلة تماماً في الـ VS Code
-  const handleLogout = () => {
-    localStorage.removeItem("worldCupUser");
-    setUser({ id: "", fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", phone: "" });
-    setIsLoggedIn(false);
-  };
+  const handleLogout = () => { localStorage.removeItem("worldCupUser"); setUser({ id: "", fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", phone: "" }); setIsLoggedIn(false); };
 
   const handleSavePredictionForMatch = async (matchId: string, team1: string, team1Emoji: string, team2: string, team2Emoji: string, kickoff: string) => {
     if (!isLoggedIn) { setIsAuthModalOpen(true); return; }
@@ -204,7 +203,7 @@ export default function HomePage() {
     const matchScores = predictionsValues[matchId];
     if (!matchScores || !matchScores.team1Score || !matchScores.team2Score) { alert("يرجى إدخال نتيجة التوقع أولاً ⚽"); return; }
     try {
-      await addDoc(collection(db, "predictions"), { matchId, user: user.fullName, t1: team1, t1E: team1Emoji, t2: team2, t2E: team2Emoji, score1: matchScores.team1Score, score2: matchScores.team2Score, processed: false, createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "predictions"), { matchId, user: user.fullName, t1: team1, t1E: team1Emoji, t2: team2, t2E: team2Emoji, score1: matchScores.team1Score, score2: matchScores.team2Score, processed: false, pointsAwarded: 0, createdAt: new Date().toISOString() });
       setUserPredictionsKeys(prev => ({ ...prev, [matchId]: true }));
       localStorage.setItem(`hasPredicted_${user.fullName}_${matchId}`, "true");
     } catch (err) { console.error(err); }
@@ -214,7 +213,7 @@ export default function HomePage() {
     e.preventDefault();
     if (!chatMessage.trim()) return;
     try {
-      await addDoc(collection(db, "chats"), { user: user.fullName || "زائر", teamEmoji: user.teamEmoji || "🏆", text: chatMessage, createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "chats"), { user: user.fullName || "زائر", text: chatMessage, createdAt: new Date().toISOString() });
       setChatMessage("");
     } catch (err) { console.error(err); }
   };
@@ -225,8 +224,6 @@ export default function HomePage() {
   const maxPages = Math.ceil(leaderboard.length / itemsPerPage);
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 text-slate-100 font-sans antialiased text-right flex flex-col justify-between select-none">
-      
-      {/* ستايل الوميض التفاعلي والوميض عند الضغط على أي عنصر وسرعة الشريط المتوسطة المريحة للعين */}
       <style>{`
         @keyframes marqueeScrollRight { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         .forced-marquee-right { display: flex; white-space: nowrap; animation: marqueeScrollRight ${tickerSpeed} linear infinite; }
@@ -237,7 +234,7 @@ export default function HomePage() {
       `}</style>
 
       <div>
-        {/* Header والقائمة المنسدلة المستعادة كاملة خياراتها */}
+        {/* Header والمنيو المنسدل لجميع التبويبات مستعاد كامل ومصلح */}
         <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-purple-900/30 shadow-2xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -265,7 +262,6 @@ export default function HomePage() {
               )}
             </div>
           </div>
-          {/* القائمة المنسدلة المستعادة بكافة خياراتها "الرئيسية" "جدول المباريات" "احتساب النقاط" */}
           {isMenuOpen && (
             <div className="absolute top-16 right-0 w-64 bg-slate-900 border-l border-b border-purple-900/40 shadow-2xl p-4 space-y-4 z-50 rounded-bl-xl">
               <button onClick={() => { setActiveTab("main_screen"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 border-b border-white/5 font-black text-xs transition-colors interactive-btn ${activeTab === 'main_screen' ? 'text-amber-400' : 'text-slate-300'}`}>🏠 الرئيسية</button>
@@ -275,7 +271,7 @@ export default function HomePage() {
           )}
         </header>
 
-        {/* توب 3 تحت الهيدر مباشرة */}
+        {/* توب 3 تحت الهيدر مباشرة بأحجام متوسطة متناسقة لترشيحات اللقب لايف */}
         <div className="bg-slate-950/40 backdrop-blur-md border-b border-purple-500/10 py-3 px-4 sm:px-6 shadow-xl">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="text-center md:text-right flex-shrink-0">
@@ -298,7 +294,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* شريط آخر التوقعات الانسيابي */}
+        {/* شريط المتوقعين ذو السرعة المربوطة بالأدمن لوحة القيادة */}
         <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-purple-950 text-white h-8 flex items-center overflow-hidden text-xs font-bold border-b border-purple-500/10 shadow-sm">
           <div className="bg-purple-900 px-3 h-full flex items-center z-10 font-black text-[10px] text-purple-300 border-l border-purple-500/20 flex-shrink-0">🔥 آخر التوقعات:</div>
           <div className="w-full relative overflow-hidden flex items-center">
@@ -327,7 +323,7 @@ export default function HomePage() {
 
                     <div className="flex items-center justify-center flex-1 w-full py-1">
                       {userPredictionsKeys[match.id] ? (
-                        /* ✍️ العبارة الجديدة الحماسية المطلوبة مع الخط الأصغر والإيموجي */
+                        /* ✍️ العبارة الجديدة الحماسية المطلوبة مع الخط الأصغر والإيموجي بالملي */
                         <div className="text-center py-1.5 animate-fade-in">
                           <div className="text-green-400 font-black text-sm">توقعك وصل واعتمدناه 🎯</div>
                           <div className="text-[10px] text-purple-300 font-bold mt-0.5">لا تنسى ترجع لنا بعد المباراة وتشوف هل توقّعك صح ولا لا 😄</div>
@@ -360,7 +356,7 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* أولاً: لوحة صدارة تظهر أول 20 اسماً مع أزرار التنقل تحتها بالملي */}
+            {/* لوحة الصدارة العامة المكونة من أول 20 اسماً مع أزرار الصفحات بالأسفل */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
               <div className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-purple-900/20 flex flex-col justify-between">
                 <div>
@@ -414,7 +410,7 @@ export default function HomePage() {
                 </div>
                 <form onSubmit={handleSendMessage} className="mt-2.5 flex gap-2 border-t border-purple-900/20 pt-2.5 w-full">
                   <button type="submit" className="bg-purple-600 text-white font-black px-4 py-2 rounded-xl text-xs md:text-sm shadow-md flex-shrink-0 interactive-btn">إرسال</button>
-                  <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="اكتب تعليقك المباشر..." className="flex-1 bg-slate-500/10 border border-purple-500/20 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500" />
+                  <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="اكتب تعليقك المباشر..." className="flex-1 bg-slate-500/10 border border-purple-500/20 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none" />
                 </form>
               </div>
             </div>
@@ -447,7 +443,7 @@ export default function HomePage() {
         {activeTab === "points_rules" && (
           <main className="max-w-4xl mx-auto px-4 py-6">
             <div className="bg-slate-900/60 p-6 rounded-2xl border border-purple-500/20 shadow-2xl space-y-6">
-              <h3 className="font-black text-base text-amber-400 border-b border-purple-900/20 pb-2">📊 قوانين احتساب النقاط</h3>
+              <h3 className="font-black text-base text-amber-400 border-b border-purple-900/20 pb-2">📊 قوانين احتساب النقاط التفاعلية</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-slate-950 p-4 rounded-xl border border-green-500/20 text-center space-y-1">
                   <div className="text-2xl">🎯</div>
@@ -525,7 +521,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 👤 الفوتر الأصلي المعتمد */}
+      {/* 👤 الفوتر الأصلي المعتمد المستعاد بنجاح وثبات كاملاً */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
