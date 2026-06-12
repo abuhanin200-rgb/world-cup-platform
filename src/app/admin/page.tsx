@@ -4,6 +4,37 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, onSnapshot, query, orderBy, getDocs, doc, updateDoc, deleteDoc, where, addDoc } from "firebase/firestore";
 
+// المنتخبات الـ 48 المعتمدة كاملة أعلامها وأسمائها للمطابقة في القائمة المنسدلة للأدمن
+const WORLD_CUP_2026_TEAMS = [
+  { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
+  { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
+  { code: "EG", name: "مصر", emoji: "🇪🇬" }, { code: "DZ", name: "الجزائر", emoji: "🇩🇿" },
+  { code: "TN", name: "تونس", emoji: "🇹🇳" }, { code: "AE", name: "الإمارات", emoji: "🇦🇪" },
+  { code: "QA", name: "قطر", emoji: "🇶🇦" }, { code: "IQ", name: "العراق", emoji: "🇮🇶" },
+  { code: "JO", name: "الأردن", emoji: "🇯🇴" }, { code: "OM", name: "عُمان", emoji: "🇴🇲" },
+  { code: "BH", name: "البحرين", emoji: "🇧🇭" }, { code: "KW", name: "الكويت", emoji: "🇰🇼" },
+  { code: "US", name: "الولايات المتحدة الأمريكية", emoji: "🇺🇸" }, { code: "CA", name: "كندا", emoji: "🇨🇦" },
+  { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
+  { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
+  { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
+  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥لن󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
+  { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
+  { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
+  { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
+  { code: "EC", name: "الإكوادور", emoji: "🇪🇨" }, { code: "PE", name: "بيرو", emoji: "🇵🇪" },
+  { code: "SN", name: "السنغال", emoji: "🇸🇳" }, { code: "CM", name: "الكاميرون", emoji: "🇨🇲" },
+  { code: "GH", name: "غانا", emoji: "🇬🇭" }, { code: "NG", name: "نيجيريا", emoji: "🇳🇬" },
+  { code: "CI", name: "ساحل العاج", emoji: "🇨🇮" }, { code: "JP", name: "اليابان", emoji: "🇯🇵" },
+  { code: "KR", name: "كوريا الجنوبية", emoji: "🇰🇷" }, { code: "AU", name: "أستراليا", emoji: "🇦🇺" },
+  { code: "IR", name: "إيران", emoji: "🇮🇷" }, { code: "CR", name: "كوستاريكا", emoji: "🇨РУ" },
+  { code: "JM", name: "جامايكا", emoji: "🇯🇲" }, { code: "PA", name: "بنما", emoji: "🇵🇦" },
+  { code: "NZ", name: "نيوزيلندا", emoji: "🇳🇿" }, { code: "CH", name: "سويسرا", emoji: "🇨🇭" },
+  { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" },
+  { code: "BA", name: "البوسنة والهرسك", emoji: "🇧🇦" }, { code: "PY", name: "باراغواي", emoji: "🇵🇾" },
+  { code: "HT", name: "هايتي", emoji: "🇭🇹" }, { code: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", name: "اسكتلندا", emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
+  { code: "CW", name: "كوراساو", emoji: "🇨🇼" }
+];
+
 export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [predictions, setPredictions] = useState<any[]>([]);
@@ -15,9 +46,6 @@ export default function AdminDashboard() {
   const [editName, setEditName] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editTeam, setEditTeam] = useState("");
-  
-  // ⚡ تعديل: إضافة الـ State الخاص بوضع علم ايموجي جديد للعضو في لوحة التحكم
-  const [editTeamEmoji, setEditTeamEmoji] = useState("🏆");
 
   const [scoreEditUserId, setScoreEditUserId] = useState("");
   const [editPoints, setEditPoints] = useState(0);
@@ -25,7 +53,6 @@ export default function AdminDashboard() {
   const [editCorrect, setEditCorrect] = useState(0);
   const [editWrong, setEditWrong] = useState(0);
 
-  // صفحات مستقلة لكل الجداول لـ 20 عنصراً بنظام (السابق/التالي)
   const [userPage, setUserPage] = useState(1);
   const [leaderboardPage, setLeaderboardPage] = useState(1);
   const [predPage, setPredPage] = useState(1);
@@ -41,10 +68,13 @@ export default function AdminDashboard() {
       if (!snap.empty) { setTickerSpeed(snap.docs[0].data().speed || "30s"); setTickerSpeedId(snap.docs[0].id); }
     });
   }, []);
-  // ⚡ تعديل: دمج حقل تعديل علم ايموجي العضو في دالة التحديث لايف بصفحة الجمهور
+
+  // ✍️ تعديل حاسم: دمج جلب المنتخب المرشح ومطابقة الأعلام آلياً من القائمة المنسدلة وتخزينها بالفايربيز
   const handleUpdateUser = async (userId: string) => {
-    await updateDoc(doc(db, "users", userId), { fullName: editName, password: editPassword, favoriteTeam: editTeam, teamEmoji: editTeamEmoji });
-    setEditingUserId(""); alert("✅ تم تعديل بيانات الحساب والعلم المختار بصفحة الجمهور لايف!");
+    const matched = WORLD_CUP_2026_TEAMS.find(t => t.name === editTeam);
+    const chosenEmoji = matched ? matched.emoji : "🏆";
+    await updateDoc(doc(db, "users", userId), { fullName: editName, password: editPassword, favoriteTeam: editTeam, teamEmoji: chosenEmoji });
+    setEditingUserId(""); alert("✅ تم التعديل بصفحة الجمهور وتثبيت العلم المختار لايف!");
   };
 
   const handleUpdateUserScoresManual = async (userId: string) => {
@@ -102,7 +132,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // 🛠️ تأمين وإصلاح دالة السطر 110 الحالية للـ Build الناجح
+  // 🛠️ مصلحة ومثبتة: دالة تحديث سرعة شريط التوقعات الساقطة بالسطر 110 لمنع الخطأ البرمي
   const handleUpdateTickerSpeed = async () => {
     try {
       if (tickerId) { await updateDoc(doc(db, "ticker_settings", tickerId), { speed: tickerSpeed }); }
@@ -115,6 +145,7 @@ export default function AdminDashboard() {
   const maxLeaderboardPages = Math.ceil(users.length / itemsPerPage);
   const maxPredPages = Math.ceil(predictions.length / itemsPerPage);
   const maxChatPages = Math.ceil(chats.length / itemsPerPage);
+
   return (
     <div dir="rtl" className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-8 font-sans text-right select-none">
       <style>{`.interactive-btn:active { transform: scale(0.95); filter: brightness(1.2); } .hidden-scrollbar::-webkit-scrollbar { display: none; }`}</style>
@@ -129,32 +160,32 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* 👥 التحكم بالأعضاء مع إضافة حقل الـ Emoji للأعلام يدوياً */}
+      {/* إدارة الأعضاء */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 shadow-xl">
-        <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">👤 القسم الأول: التحكم الكامل بالأعضاء (يعرض 20 اسماً)</h3>
+        <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">👤 القسم الأول: التحكم الكامل بالأعضاء وبينات الحسابات (يعرض 20 اسماً)</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
-            <thead>
-              <tr className="bg-slate-900 text-slate-400 border-b border-slate-800">
-                <th className="p-2 text-right">الاسم</th>
-                <th className="p-2">الرمز</th>
-                <th className="p-2">الترشيح</th>
-                {/* ⚡ تعديل: إضافة عمود ايموجي العلم للتحكم اليدوي للعضو */}
-                <th className="p-2 w-20">ايموجي العلم</th>
-                <th className="p-2">الإجراء</th>
-              </tr>
-            </thead>
+            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">الاسم</th><th className="p-2">الرمز السري</th><th className="p-2">المنتخب المرشح (قائمة منسدلة بأعلام الفيفا 🏆)</th><th className="p-2">الإجراء</th></tr></thead>
             <tbody className="divide-y divide-slate-900">
               {users.slice((userPage - 1) * itemsPerPage, userPage * itemsPerPage).map((u) => (
                 <tr key={u.id} className="hover:bg-slate-900/40">
                   <td className="p-2 text-right">{editingUserId === u.id ? <input type="text" className="bg-slate-900 border px-2 py-0.5 rounded text-white" value={editName} onChange={(e)=>setEditName(e.target.value)} /> : u.fullName}</td>
                   <td className="p-2">{editingUserId === u.id ? <input type="text" className="bg-slate-900 border px-2 py-0.5 rounded text-center text-white" value={editPassword} onChange={(e)=>setEditPassword(e.target.value)} /> : u.password}</td>
-                  <td className="p-2">{editingUserId === u.id ? <input type="text" className="bg-slate-900 border px-2 py-0.5 rounded text-center text-white" value={editTeam} onChange={(e)=>setEditTeam(e.target.value)} /> : u.favoriteTeam}</td>
-                  {/* ⚡ حقل تعديل ايموجي علم المنتخب المختار */}
-                  <td className="p-2 text-lg">{editingUserId === u.id ? <input type="text" className="w-12 bg-slate-900 border text-center text-white rounded" value={editTeamEmoji} onChange={(e)=>setEditTeamEmoji(e.target.value)} /> : u.teamEmoji || "🏆"}</td>
+                  {/* ✍️ الحل الجذري المطلوب: عند التعديل يتحول حقل الترشيح يدوياً إلى قائمة منسدلة بالأعلام والمنتخبات الـ 48 كاملة من الداتابيز */}
+                  <td className="p-2 font-bold text-sm text-purple-300">
+                    {editingUserId === u.id ? (
+                      <select value={editTeam} onChange={(e)=>setEditTeam(e.target.value)} className="bg-slate-900 text-white border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none">
+                        {WORLD_CUP_2026_TEAMS.map((t, idx) => (
+                          <option key={idx} value={t.name}>{t.emoji} {t.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span>{u.teamEmoji} {u.favoriteTeam}</span>
+                    )}
+                  </td>
                   <td className="p-2 flex gap-1 justify-center">
-                    {editingUserId === u.id ? <button onClick={()=>handleUpdateUser(u.id)} className="bg-green-600 px-2 py-1 rounded text-[10px] interactive-btn">حفظ 💾</button> : <button onClick={()=>{setEditingUserId(u.id); setEditName(u.fullName); setEditPassword(u.password); setEditTeam(u.favoriteTeam); setEditTeamEmoji(u.teamEmoji || "🏆");}} className="bg-blue-600 px-2 py-1 rounded text-[10px] interactive-btn">تعديل ⚙️</button>}
-                    <button onClick={async ()=>{if(confirm("حذف؟")) await deleteDoc(doc(db,"users",u.id))}} className="bg-red-600 px-2 py-1 rounded text-[10px] interactive-btn">حذف 🗑️</button>
+                    {editingUserId === u.id ? <button onClick={()=>handleUpdateUser(u.id)} className="bg-green-600 px-2 py-1 rounded text-[10px] font-black interactive-btn">حفظ 💾</button> : <button onClick={()=>{setEditingUserId(u.id); setEditName(u.fullName); setEditPassword(u.password); setEditTeam(u.favoriteTeam);}} className="bg-blue-600 px-2 py-1 rounded text-[10px] font-black interactive-btn">تعديل ⚙️</button>}
+                    <button onClick={async ()=>{if(confirm("حذف؟")) await deleteDoc(doc(db,"users",u.id))}} className="bg-red-600 px-2 py-1 rounded text-[10px] font-black interactive-btn">حذف 🗑️</button>
                   </td>
                 </tr>
               ))}
@@ -163,16 +194,16 @@ export default function AdminDashboard() {
         </div>
         {maxUserPages > 1 && (
           <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setUserPage(p=>Math.max(p-1,1))} disabled={userPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
+            <button onClick={()=>setUserPage(p=>Math.max(p-1,1))} disabled={userPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30">◀ السابق</button>
             <span className="text-slate-400">صفحة {userPage} من {maxUserPages}</span>
-            <button onClick={()=>setUserPage(p=>Math.min(p+1,maxUserPages))} disabled={userPage === maxUserPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
+            <button onClick={()=>setUserPage(p=>Math.min(p+1,maxUserPages))} disabled={userPage === maxUserPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30">التالي ▶</button>
           </div>
         )}
       </section>
 
-      {/* 📊 تعديل يدوي لإحصائيات لوحة الصدارة لـ 20 عضواً بنظام الصفحات */}
+      {/* تعديل يدوي لإحصائيات لوحة الصدارة */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 border border-amber-500/20 shadow-xl">
-        <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">📊 قسم تعديل وإجبار إحصائيات الصدارة يدوياً (يعرض 20 اسماً)</h3>
+        <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">📊 قسم تعديل وإجبار إحصائيات الصدارة يدوياً (النقاط - التوقعات - الصح - الخطأ)</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
             <thead>
@@ -194,7 +225,7 @@ export default function AdminDashboard() {
                   <td className="p-2 text-red-400">{scoreEditUserId === u.id ? <input type="number" className="w-14 bg-slate-900 border text-center text-red-400" value={editWrong} onChange={(e)=>setEditWrong(Number(e.target.value))} /> : u.wrong || 0}</td>
                   <td className="p-2 text-amber-400 font-black">{scoreEditUserId === u.id ? <input type="number" className="w-14 bg-slate-900 border text-center text-amber-400" value={editPoints} onChange={(e)=>setEditPoints(Number(e.target.value))} /> : u.points || 0}</td>
                   <td className="p-2 flex gap-1 justify-center">
-                    {scoreEditUserId === u.id ? <button onClick={()=>handleUpdateUserScoresManual(u.id)} className="bg-emerald-600 px-3 py-1 rounded text-[10px] font-black interactive-btn">تحديث 💾</button> : <button onClick={()=>{setScoreEditUserId(u.id); setEditTotal(u.total || 0); setEditCorrect(u.correct || 0); setEditWrong(u.wrong || 0); setEditPoints(u.points || 0);}} className="bg-amber-600 text-slate-950 font-black px-3 py-1 rounded text-[10px] interactive-btn">تعديل 📊</button>}
+                    {scoreEditUserId === u.id ? <button onClick={()=>handleUpdateUserScoresManual(u.id)} className="bg-emerald-600 px-3 py-1 rounded text-[10px] font-black interactive-btn">تحديث 💾</button> : <button onClick={()=>{setScoreEditUserId(u.id); setEditTotal(u.total || 0); setEditCorrect(u.correct || 0); setEditWrong(u.wrong || 0); setEditPoints(u.points || 0);}} className="bg-amber-600 text-slate-950 font-black px-3 py-1 rounded text-[10px] interactive-btn">تعديل الإحصائيات 📊</button>}
                   </td>
                 </tr>
               ))}
@@ -203,16 +234,16 @@ export default function AdminDashboard() {
         </div>
         {maxLeaderboardPages > 1 && (
           <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setLeaderboardPage(p=>Math.max(p-1,1))} disabled={leaderboardPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
+            <button onClick={()=>setLeaderboardPage(p=>Math.max(p-1,1))} disabled={leaderboardPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30">◀ السابق</button>
             <span className="text-slate-400">صفحة {leaderboardPage} من {maxLeaderboardPages}</span>
-            <button onClick={()=>setLeaderboardPage(p=>Math.min(p+1,maxLeaderboardPages))} disabled={leaderboardPage === maxLeaderboardPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
+            <button onClick={()=>setLeaderboardPage(p=>Math.min(p+1,maxLeaderboardPages))} disabled={leaderboardPage === maxLeaderboardPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30">التالي ▶</button>
           </div>
         )}
       </section>
 
-      {/* فرز التوقعات لـ 20 عنصراً بنظام الصفحات */}
+      {/* توزيع النقاط والتراجع اليدوي */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 shadow-xl">
-        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 القسم الثاني والثالث: فرز وتوزيع نقاط التوقعات اليدوي (يعرض 20 توقعاً)</h3>
+        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 القسم الثاني والثالث: فرز التوقعات وتوزيع النقاط والتراجع اليدوي</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
             <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">العضو</th><th className="p-2">المباراة</th><th className="p-2">التوقع</th><th className="p-2">الحالة</th><th className="p-2">إجراءات الفرز والكبس اليدوي المضمون</th></tr></thead>
@@ -242,16 +273,16 @@ export default function AdminDashboard() {
         </div>
         {maxPredPages > 1 && (
           <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setPredPage(p=>Math.max(p-1,1))} disabled={predPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
+            <button onClick={()=>setPredPage(p=>Math.max(p-1,1))} disabled={predPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30">◀ السابق</button>
             <span className="text-slate-400">صفحة {predPage} من {maxPredPages}</span>
-            <button onClick={()=>setPredPage(p=>Math.min(p+1,maxPredPages))} disabled={predPage === maxPredPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
+            <button onClick={()=>setPredPage(p=>Math.min(p+1,maxPredPages))} disabled={predPage === maxPredPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30">التالي ▶</button>
           </div>
         )}
       </section>
 
-      {/* الرقابة على الشات لـ 20 عنصراً بنظام الصفحات */}
-      <section className="bg-slate-950 p-4 rounded-xl shadow-xl border border-white/5">
-        <h3 className="font-black text-xs text-red-400 mb-2 border-b border-slate-800 pb-1">💬 القسم الرابع: الرقابة والتحكم بـ شات صفحة الجمهور (يعرض 20 رسالة)</h3>
+      {/* الرقابة على الشات */}
+      <section className="bg-slate-950 p-4 rounded-xl shadow-xl">
+        <h3 className="font-black text-xs text-red-400 mb-2 border-b border-slate-800 pb-1">💬 القسم الرابع: الرقابة والتحكم بـ شات صفحة الجمهور</h3>
         <div className="space-y-2 mb-3">
           {chats.slice((chatPage - 1) * itemsPerPage, chatPage * itemsPerPage).map((c) => (
             <div key={c.id} className="bg-slate-900 p-2 rounded-lg flex items-center justify-between text-xs">
@@ -262,9 +293,9 @@ export default function AdminDashboard() {
         </div>
         {maxChatPages > 1 && (
           <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setChatPage(p=>Math.max(p-1,1))} disabled={chatPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
+            <button onClick={()=>setChatPage(p=>Math.max(p-1,1))} disabled={chatPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30">◀ السابق</button>
             <span className="text-slate-400">صفحة {chatPage} من {maxChatPages}</span>
-            <button onClick={()=>setChatPage(p=>Math.min(p+1,maxChatPages))} disabled={chatPage === maxChatPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
+            <button onClick={()=>setChatPage(p=>Math.min(p+1,maxChatPages))} disabled={chatPage === maxChatPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30">التالي ▶</button>
           </div>
         )}
       </section>
