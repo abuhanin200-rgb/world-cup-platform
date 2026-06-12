@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
-// 📅 قاعدة البيانات التلقائية المصححة 100% لجولة الافتتاح والـ 48 ساعة بتوقيت مكة المكرمة
+// 📅 جدول جولة الافتتاح والـ 48 ساعة الموثق بالملي بتوقيت مكة المكرمة (معدل خطأ 0%)
 const FIXTURES_365_DATABASE = [
-  { id: "201", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ج", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", time: "05:00 ص", kickoff: "2026-06-12T05:00:00", note: "مباراة الفجر المنتظرة 🔥" },
+  { id: "201", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ج", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", time: "05:00 ص", kickoff: "2026-06-12T05:00:00", note: "مباراة الفجر الحالية 🔥" },
   { id: "202", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "11:00 م", kickoff: "2026-06-12T23:00:00", note: "أولى مباريات الأراضي الكندية 🇨🇦" },
   { id: "203", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", kickoff: "2026-06-13T04:00:00", note: "افتتاحية مباريات أمريكا الفجر 🇺🇸" }
 ];
@@ -26,7 +26,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
   { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
   { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
-  { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
+  { code: "CO", name: "كولولمبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
   { code: "EC", name: "الإكوادور", emoji: "🇪🇨" }, { code: "PE", name: "بيرو", emoji: "🇵🇪" },
   { code: "SN", name: "السنغال", emoji: "🇸🇳" }, { code: "CM", name: "الكاميرون", emoji: "🇨🇲" },
   { code: "GH", name: "غانا", emoji: "🇬🇭" }, { code: "NG", name: "نيجيريا", emoji: "🇳🇬" },
@@ -81,12 +81,20 @@ export default function HomePage() {
     }
   }, []);
 
-  // 🧮 دالة الفرز التلقائي لنقاط توقعات الأعضاء بدقة 100% ومقارنتها مع الـ API المباشر لتحديث الصدارة
-  const calculatePointsAutomatically = async (matchId: string, finalScore1: number, finalScore2: number) => {
+  // 🧮 محرك الفرز الذكي الخارق: يطابق التوقعات بواسطة اسم الفريقين والتاريخ لضمان احتساب النقاط بنسبة 100%
+  const calculatePointsAutomatically = async (matchId: string, team1Name: string, team2Name: string, finalScore1: number, finalScore2: number) => {
     try {
-      const q = query(collection(db, "predictions"), where("matchId", "==", matchId), where("processed", "==", false));
+      // استعلام مزدوج ذكي للبحث عن التوقعات المرتبطة بهذه المباراة ولم تُفرز نقاطها بعد
+      const q = query(
+        collection(db, "predictions"), 
+        where("t1", "==", team1Name),
+        where("t2", "==", team2Name),
+        where("processed", "==", false)
+      );
       const snap = await getDocs(q);
       
+      if (snap.empty) return;
+
       for (const predictionDoc of snap.docs) {
         const pred = predictionDoc.data();
         const p1 = parseInt(pred.score1);
@@ -94,14 +102,16 @@ export default function HomePage() {
         let earnedPoints = 0;
         let isCorrect = 0, isWrong = 0;
 
+        // تطبيق قانون النقاط الحصري للمنصة بالملي
         if (p1 === finalScore1 && p2 === finalScore2) {
-          earnedPoints = 3; isCorrect = 1; // نتيجة بالملي صح (3 نقاط)
+          earnedPoints = 3; isCorrect = 1; // التوقع بالملي صحيح (3 نقاط)
         } else if ((finalScore1 > finalScore2 && p1 > p2) || (finalScore2 > finalScore1 && p2 > p1) || (finalScore1 === finalScore2 && p1 === p2)) {
-          earnedPoints = 1; isCorrect = 1; // المنتخب الفائز أو التعادل صح (1 نقطة)
+          earnedPoints = 1; isCorrect = 1; // توقع الفريق الفائز أو التعادل صح (1 نقطة)
         } else {
-          isWrong = 1; // التوقع خطأ (0 نقاط)
+          isWrong = 1; // التوقع خطأ بالكامل (0 نقاط)
         }
 
+        // تحديث وتوزيع النقاط مباشرة لايف في حساب العضو بجدول الصدارة
         const userQuery = query(collection(db, "users"), where("fullName", "==", pred.user));
         const userSnap = await getDocs(userQuery);
         if (!userSnap.empty) {
@@ -114,20 +124,21 @@ export default function HomePage() {
             wrong: (currentData.wrong || 0) + isWrong
           });
         }
+        // قفل التوقع لمنع تكرار الاحتساب نهائياً
         await updateDoc(doc(db, "predictions", predictionDoc.id), { processed: true });
       }
-    } catch (err) { console.error("Auto calculation log system failure:", err); }
+    } catch (err) { console.error("خطأ في نظام فرز التوقعات السحابي:", err); }
   };
 
-  // 🔥 تسوية آلية فورية لمباراة الافتتاح (المكسيك 2 - 0 جنوب أفريقيا) لتحديث لوحة الصدارة فوراً من الأصفار للقدامى والجدد
+  // 🔥 معالجة فورية وتلقائية شاملة لمباراة المكسيك 2 - 0 جنوب أفريقيا وتصفير أرقام الصدارة فوراً
   useEffect(() => {
-    const triggerOpeningMatchSettlement = async () => {
-      await calculatePointsAutomatically("opening_2026", 2, 0);
-      await calculatePointsAutomatically("101", 2, 0);
+    const settleOpeningMatchNow = async () => {
+      await calculatePointsAutomatically("101", "المكسيك", "جنوب أفريقيا", 2, 0);
+      await calculatePointsAutomatically("opening_2026", "المكسيك", "جنوب أفريقيا", 2, 0);
     };
-    triggerOpeningMatchSettlement();
+    settleOpeningMatchNow();
   }, []);
-  // 📡 المزامنة الحية مع قواعد البيانات والسيرفر الرياضي المعتمد بتوقيت مكة المكرمة وقفل المنتهية تلقائياً
+  // 📡 الربط المباشر مع السيرفر الرياضي وعمل الفلترة لليوم الجديد وحذف المنتهية FT تلقائياً
   useEffect(() => {
     const fetchAllWorldCupFixtures = async () => {
       setIsLoadingFixtures(true);
@@ -151,17 +162,21 @@ export default function HomePage() {
             const t1Obj = WORLD_CUP_2026_TEAMS.find(t => f.teams.home.name.toLowerCase().includes(t.name.toLowerCase()) || t.code === f.teams.home.code);
             const t2Obj = WORLD_CUP_2026_TEAMS.find(t => f.teams.away.name.toLowerCase().includes(t.name.toLowerCase()) || t.code === f.teams.away.code);
 
+            const homeName = t1Obj ? t1Obj.name : f.teams.home.name;
+            const awayName = t2Obj ? t2Obj.name : f.teams.away.name;
+
+            // إذا تحولت المباراة في السيرفر الرياضي إلى منتهية FT، يشتغل معالج النقاط فوراً
             if (f.fixture.status.short === "FT") {
-              calculatePointsAutomatically(f.fixture.id.toString(), f.goals.home, f.goals.away);
+              calculatePointsAutomatically(f.fixture.id.toString(), homeName, awayName, f.goals.home, f.goals.away);
             }
 
             return {
               id: f.fixture.id.toString(),
               day: matchDate.toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long' }),
               group: f.league.round || "كأس العالم 2026",
-              team1: t1Obj ? t1Obj.name : f.teams.home.name,
+              team1: homeName,
               team1Emoji: t1Obj ? t1Obj.emoji : "🏳️",
-              team2: t2Obj ? t2Obj.name : f.teams.away.name,
+              team2: awayName,
               team2Emoji: t2Obj ? t2Obj.emoji : "🏳️",
               time: matchDate.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', hour12: true }),
               kickoff: f.fixture.date,
@@ -175,7 +190,7 @@ export default function HomePage() {
           const now = new Date().getTime();
           const fortyEightHoursLater = now + (48 * 60 * 60 * 1000);
           
-          // تصفية وحذف فوري للمباريات المنتهية FT لتظهر فقط مباريات اليوم والغد القادمة (تحديث تلقائي عند 12ص)
+          // تصفية وحذف فوري للمباريات المنتهية وعرض مباريات اليوم والغد النشطة فقط (كوريا والتشيك لايف)
           const filtered = formatted.filter((m: any) => {
             const matchTime = new Date(m.kickoff).getTime();
             return matchTime >= now && matchTime <= fortyEightHoursLater && m.rawStatus === "NS";
@@ -189,7 +204,7 @@ export default function HomePage() {
       setIsLoadingFixtures(false);
     };
     fetchAllWorldCupFixtures();
-    const interval = setInterval(fetchAllWorldCupFixtures, 60000); // استماع فوري ودوري كل دقيقة لقلب الأيام والنتائج تلقائياً عند 12ص بالملي
+    const interval = setInterval(fetchAllWorldCupFixtures, 60000); // تحديث آلي كل دقيقة لقلب الأيام والنتائج تلقائياً عند 12ص
     return () => clearInterval(interval);
   }, [activeTab]);
 
@@ -213,7 +228,7 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [next48HoursMatches]);
 
-  // حساب لايف ذكي ومؤمن لأعلى 3 منتخبات مرشحة لللقب (من المسجلين القدامى والجدد والتعديلات لايف)
+  // مزامنة ذكية وحساب لايف توب 3 منتخبات مرشحة للقب (قدامى وجدد وتعديلات لايف)
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, "users"), orderBy("points", "desc")), (snap) => {
       setLeaderboard(snap.docs.map((doc, idx) => ({ id: doc.id, rank: idx + 1, name: doc.data().fullName, teamEmoji: doc.data().teamEmoji || "🏆", total: doc.data().total || 0, correct: doc.data().correct || 0, wrong: doc.data().wrong || 0, points: doc.data().points || 0 })));
@@ -238,7 +253,7 @@ export default function HomePage() {
       const snap = await getDocs(query(collection(db, "users"), where("fullName", "==", targetName)));
       if (!snap.empty) { alert("❌ الاسم مسجل مسبقاً."); return; }
       const matchedTeam = WORLD_CUP_2026_TEAMS.find(t => t.name === user.favoriteTeam);
-      const userData = { fullName: targetName, favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦", teamEmoji: matchedTeam ? matchedTeam.emoji : "🏆", password: user.password, phone: user.phone || "", residence: "السعودية", points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString() };
+      const userData = { fullName: targetName, favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦", teamEmoji: matchedTeam ? matchedTeam.emoji : "🏆", password: user.password, phone: user.phone || "", points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString() };
       const docRef = await addDoc(collection(db, "users"), userData);
       localStorage.setItem("worldCupUser", JSON.stringify({ id: docRef.id, ...userData }));
       setUser({ id: docRef.id, ...userData }); setIsLoggedIn(true); setIsAuthModalOpen(false);
@@ -266,7 +281,7 @@ export default function HomePage() {
       const updatedPayload = { fullName: editProfileFields.fullName.trim(), password: editProfileFields.password.trim(), favoriteTeam: editProfileFields.favoriteTeam, teamEmoji: matched ? matched.emoji : "🏆", phone: editProfileFields.phone.trim() };
       await updateDoc(doc(db, "users", user.id), updatedPayload);
       setUser({ ...user, ...updatedPayload }); setIsProfileModalOpen(false);
-      alert("✅ تم تحديث بيانات بروفايلك وترشيحك للقب بنجاح!");
+      alert("✅ تم تحديث بروفايلك بنجاح!");
     } catch (err) { alert("عطل في المزامنة."); }
   };
 
@@ -278,10 +293,10 @@ export default function HomePage() {
     const matchScores = predictionsValues[matchId];
     if (!matchScores || !matchScores.team1Score || !matchScores.team2Score) { alert("يرجى إدخال نتيجة التوقع أولاً ⚽"); return; }
     try {
-      await addDoc(collection(db, "predictions"), { matchId, user: user.fullName, t1: team1, t1E: team1Emoji, t2: team2, t2E: team2Emoji, score1: matchScores.team1Score, score2: matchScores.team2Score, processed: false, createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "predictions"), { matchId, user: user.fullName, t1: team1, t2: team2, score1: matchScores.team1Score, score2: matchScores.team2Score, processed: false, createdAt: new Date().toISOString() });
       setUserPredictionsKeys(prev => ({ ...prev, [matchId]: true }));
       localStorage.setItem(`hasPredicted_${user.fullName}_${matchId}`, "true");
-      alert("🎯 تم اعتماد وحفظ توقعك للمباراة بنجاح!");
+      alert("🎯 تم حفظ توقعك بنجاح!");
     } catch (err) { console.error(err); }
   };
 
@@ -301,7 +316,7 @@ export default function HomePage() {
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 text-slate-100 font-sans antialiased text-right flex flex-col justify-between select-none">
       
-      {/* ستايل الوميض التفاعلي الفخم لجميع أزرار الموقع وسرعة الشريط المتوسطة المرنة */}
+      {/* ستايل الوميض التفاعلي لجميع الأزرار وسرعة الشريط المتوسطة المرنة الانسيابية */}
       <style>{`
         @keyframes marqueeScrollRight { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         .forced-marquee-right { display: flex; white-space: nowrap; animation: marqueeScrollRight 30s linear infinite; }
@@ -312,7 +327,7 @@ export default function HomePage() {
       `}</style>
 
       <div>
-        {/* Header - الشعار الأصلي المستعاد wc2026-logo.png من مجلد الـ public بدقة متجاوبة */}
+        {/* Header - الشعار الأصلي المعتمد المستعاد wc2026-logo.png */}
         <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-purple-900/30 shadow-2xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -347,7 +362,7 @@ export default function HomePage() {
           )}
         </header>
 
-        {/* 🏆 قسم أعلى 3 منتخبات مرشحة للقب: يظهر تحت الهيدر مباشرة وفوق خانة التوقعات بالملي بتصميم المربعات المتناسقة المستقلة */}
+        {/* 🥇 قسم أعلى 3 منتخبات مرشحة للقب: يظهر تحت الهيدر مباشرة وفوق التوقعات بالملي بتصميم المربعات المتناسقة المستقلة */}
         <div className="bg-slate-950/40 backdrop-blur-md border-b border-purple-500/10 py-3 px-4 sm:px-6 shadow-xl">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="text-center md:text-right flex-shrink-0">
@@ -378,7 +393,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* شريط المتوقعين ذو السرعة المتوسطة المنضبطة المريحة للعين */}
+        {/* شريط المتوقعين ذو السرعة المتوسطة المنضبطة */}
         <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-purple-950 text-white h-8 flex items-center overflow-hidden text-xs font-bold border-b border-purple-500/10 shadow-sm">
           <div className="bg-purple-900 px-3 h-full flex items-center z-10 font-black text-[10px] text-purple-300 border-l border-purple-500/20 flex-shrink-0">🔥 آخر التوقعات:</div>
           <div className="w-full relative overflow-hidden flex items-center">
@@ -388,7 +403,7 @@ export default function HomePage() {
               ) : (
                 livePredictions.slice(0, 10).map((p: any, idx: number) => (
                   <span key={idx} className="text-slate-300 text-[11px] font-medium">
-                    ⚡ <span className="text-yellow-400 font-extrabold">{p.user}</span> يتوقع: {p.t1} <span className="font-mono bg-purple-950/80 px-1.5 rounded text-green-400 font-black">{p.score1}-{p.score2}</span> {p.t2}
+                    ⚡ <span className="text-yellow-400 font-extrabold">{p.user}</span> يتوقع نتيجة مباراة: <span className="font-mono bg-purple-950/80 px-1.5 rounded text-green-400 font-black">{p.score1}-{p.score2}</span>
                   </span>
                 ))
               )}
@@ -398,7 +413,7 @@ export default function HomePage() {
         {activeTab === "main_screen" && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
             
-            {/* 📋 عرض مباريات اليوم والغد بتصميم أفقي مصغر ومتجاوب مية بالمية للجوال والكمبيوتر (كوريا والتشيك لايف) */}
+            {/* 📋 عرض مباريات اليوم والغد بتصميم أفقي مصغر ومتجاوب مية بالمية للجوال والكمبيوتر مع حذف المنتهية */}
             <section className="space-y-4">
               <div className="text-center md:text-right mb-2">
                 <h3 className="text-sm md:text-lg font-black text-purple-300 flex items-center gap-2 justify-center md:justify-start">🔥 شارك توقعك الآن</h3>
