@@ -34,6 +34,7 @@ export default function AdminDashboard() {
     setEditingUserId(""); alert("✅ تم التعديل بصفحة الجمهور لايف!");
   };
 
+  // 🧮 فرز واحتساب النقاط وحفظ قيمة النقاط الموزعة بداخل التوقع للقدرة على خصمها لاحقاً بالتراجع
   const handleGrantPointsManual = async (pred: any, type: "full" | "win" | "wrong") => {
     let pointsToAdd = 0, isCorrect = 0, isWrong = 0;
     if (type === "full") { pointsToAdd = 3; isCorrect = 1; }
@@ -50,8 +51,37 @@ export default function AdminDashboard() {
         correct: (cur.correct || 0) + isCorrect,
         wrong: (cur.wrong || 0) + isWrong
       });
-      await updateDoc(doc(db, "predictions", pred.id), { processed: true });
-      alert(`🏆 حُسبت النقاط للعضو ${pred.user} وتحدثت الصدارة للجمهور!`);
+      // نقوم بتخزين كم نقطة عطيناه ووش الحالة عشان نقدر نتراجع
+      await updateDoc(doc(db, "predictions", pred.id), { processed: true, pointsAwarded: pointsToAdd, matchTypeAwarded: type });
+      alert(`🏆 تم فرز النقاط بنجاح للعضو ${pred.user}`);
+    }
+  };
+
+  // 🛠️ ميزة التراجع الجذري الحصري: يخصم النقاط ويرجع حالة التوقع لـ "انتظار"
+  const handleUndoPointsManual = async (pred: any) => {
+    if (!pred.processed) return;
+    const pointsToSubtract = pred.pointsAwarded || 0;
+    const type = pred.matchTypeAwarded;
+
+    let isCorrect = type === "full" || type === "win" ? 1 : 0;
+    let isWrong = type === "wrong" ? 1 : 0;
+
+    const uSnap = await getDocs(query(collection(db, "users"), where("fullName", "==", pred.user)));
+    if (!uSnap.empty) {
+      const uDoc = uSnap.docs[0];
+      const cur = uDoc.data();
+      
+      // خصم النقاط المسجلة بالخطأ وإعادة الصدارة
+      await updateDoc(doc(db, "users", uDoc.id), {
+        points: Math.max((cur.points || 0) - pointsToSubtract, 0),
+        total: Math.max((cur.total || 0) - 1, 0),
+        correct: Math.max((cur.correct || 0) - isCorrect, 0),
+        wrong: Math.max((cur.wrong || 0) - isWrong, 0)
+      });
+
+      // إرجاع حالة التوقع لـ "غير معالج" ليظهر لك في لوحة الإدارة مجدداً للفرز الصحيح
+      await updateDoc(doc(db, "predictions", pred.id), { processed: false, pointsAwarded: 0, matchTypeAwarded: "" });
+      alert(`↩️ تم التراجع بنجاح! تم خصم ${pointsToSubtract} نقاط من حساب ${pred.user} وإعادة التوقع لجدول الفرز.`);
     }
   };
 
@@ -71,7 +101,7 @@ export default function AdminDashboard() {
         <div><h3 className="font-black text-xs text-purple-300">⚙️ التحكم بسرعة شريط التوقعات بصفحة الجمهور</h3></div>
         <div className="flex gap-2">
           <select value={tickerSpeed} onChange={(e) => setTickerSpeed(e.target.value)} className="bg-slate-900 border p-2 rounded-lg text-xs text-white focus:outline-none"><option value="15s">سريع (15ث)</option><option value="30s">متوسط (30ث)</option><option value="50s">بطيء (50ث)</option></select>
-          <button onClick={handleUpdateTickerSpeed} className="bg-purple-600 px-4 py-2 rounded-lg text-xs font-black interactive-btn">تحديث ⚡</button>
+          <button onClick={handleUpdateTickerSpeed} className="bg-purple-600 px-4 py-2 rounded-lg text-xs font-black interactive-btn">تحديث السرعة ⚡</button>
         </div>
       </section>
 
@@ -99,23 +129,29 @@ export default function AdminDashboard() {
         <div className="flex justify-center gap-4 mt-3 text-xs font-bold"><button onClick={()=>setUserPage(p=>Math.max(p-1,1))} className="bg-slate-800 px-3 py-1 rounded">السابق</button><span>{userPage}</span><button onClick={()=>setUserPage(p=>p+1)} className="bg-slate-800 px-3 py-1 rounded">التالي</button></div>
       </section>
 
-      {/* توزيع النقاط */}
+      {/* توزيع النقاط والتراجع المستحدث */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6">
-        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 القسم الثاني والثالث: فرز التوقعات وتوزيع النقاط اليدوي المباشر لوحة الصدارة</h3>
+        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 القسم الثاني والثالث: فرز التوقعات وتوزيع النقاط والتراجع اليدوي</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
-            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">العضو</th><th className="p-2">المباراة</th><th className="p-2">التوقع</th><th className="p-2">الحالة</th><th className="p-2">توزيع النقاط كبسة زر واحدة</th></tr></thead>
+            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">العضو</th><th className="p-2">المباراة</th><th className="p-2">التوقع</th><th className="p-2">الحالة</th><th className="p-2">إجراءات الفرز والكبس اليدوي المضمون</th></tr></thead>
             <tbody className="divide-y divide-slate-900">
               {predictions.slice((predPage - 1) * itemsPerPage, predPage * itemsPerPage).map((p) => (
                 <tr key={p.id} className="hover:bg-slate-900/40">
                   <td className="p-2 text-right">👤 {p.user}</td>
                   <td className="p-2">{p.t1} vs {p.t2}</td>
                   <td className="p-2 text-green-400 font-mono">{p.score1} - {p.score2}</td>
-                  <td className="p-2">{p.processed ? <span className="text-green-500">حُسبت</span> : <span className="text-amber-500">انتظار</span>}</td>
+                  <td className="p-2">{p.processed ? <span className="text-green-500 font-bold">حُسبت (+{p.pointsAwarded || 0})</span> : <span className="text-amber-500 font-bold">انتظار الفرز</span>}</td>
                   <td className="p-2 flex gap-1 justify-center">
-                    <button onClick={()=>handleGrantPointsManual(p, "full")} className="bg-emerald-600 px-2 py-0.5 rounded text-[10px] interactive-btn">بالملي (+3)</button>
-                    <button onClick={()=>handleGrantPointsManual(p, "win")} className="bg-blue-600 px-2 py-0.5 rounded text-[10px] interactive-btn">الفائز (+1)</button>
-                    <button onClick={()=>handleGrantPointsManual(p, "wrong")} className="bg-slate-700 px-2 py-0.5 rounded text-[10px] interactive-btn">خطأ (0)</button>
+                    {!p.processed ? (
+                      <>
+                        <button onClick={()=>handleGrantPointsManual(p, "full")} className="bg-emerald-600 px-2 py-0.5 rounded text-[10px] interactive-btn">بالملي (+3)</button>
+                        <button onClick={()=>handleGrantPointsManual(p, "win")} className="bg-blue-600 px-2 py-0.5 rounded text-[10px] interactive-btn">الفائز (+1)</button>
+                        <button onClick={()=>handleGrantPointsManual(p, "wrong")} className="bg-slate-700 px-2 py-0.5 rounded text-[10px] interactive-btn">خطأ (0)</button>
+                      </>
+                    ) : (
+                      <button onClick={()=>handleUndoPointsManual(p)} className="bg-orange-600 text-white font-black px-3 py-0.5 rounded text-[10px] interactive-btn shadow-md">↩️ تراجع عن الحسبة</button>
+                    )}
                     <button onClick={async ()=>{if(confirm("حذف؟")) await deleteDoc(doc(db,"predictions",p.id))}} className="bg-red-950 text-red-400 px-2 py-0.5 rounded text-[10px] interactive-btn">حذف</button>
                   </td>
                 </tr>

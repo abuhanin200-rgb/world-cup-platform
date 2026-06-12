@@ -5,9 +5,9 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
 const FIXTURES_365_DATABASE = [
-  { id: "201", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ج", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", time: "05:00 ص", kickoff: "2026-06-12T05:00:00", note: "مباراة الفجر الحالية 🔥" },
-  { id: "202", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "11:00 م", kickoff: "2026-06-12T23:00:00", note: "أولى مباريات الأراضي الكندية 🇨🇦" },
-  { id: "203", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", kickoff: "2026-06-13T04:00:00", note: "افتتاحية مباريات أمريكا الفجر 🇺🇸" }
+  { id: "201", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ج", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", time: "05:00 ص", kickoff: "2026-06-12T05:00:00" },
+  { id: "202", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "11:00 م", kickoff: "2026-06-12T23:00:00" },
+  { id: "203", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", kickoff: "2026-06-13T04:00:00" }
 ];
 
 const WORLD_CUP_2026_TEAMS = [
@@ -22,7 +22,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
+  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥لن󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
   { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
   { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
   { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
@@ -45,7 +45,7 @@ export default function HomePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false); 
   const [authMode, setAuthMode] = useState<"menu" | "guest" | "manual_login">("menu");
   
-  const [user, setUser] = useState<any>({ id: "", fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", phone: "", residence: "السعودية" });
+  const [user, setUser] = useState<any>({ id: "", fullName: "", favoriteTeam: "السعودية 🇸🇦", teamEmoji: "🇸🇦", password: "", phone: "" });
   const [editProfileFields, setEditProfileFields] = useState({ fullName: "", password: "", favoriteTeam: "", phone: "" });
   
   const [manualName, setManualName] = useState("");
@@ -54,16 +54,13 @@ export default function HomePage() {
   const [chatList, setChatList] = useState<any[]>([]);
   const [livePredictions, setLivePredictions] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [apiFixtures, setApiFixtures] = useState<any[]>([]);
   const [next48HoursMatches, setNext48HoursMatches] = useState<any[]>([]);
-  const [isLoadingFixtures, setIsLoadingFixtures] = useState(false);
   
   const [topFavTeams, setTopFavTeams] = useState<any[]>([]);
   const [predictionsValues, setPredictionsValues] = useState<{ [key: string]: { team1Score: string; team2Score: string } }>({});
   const [userPredictionsKeys, setUserPredictionsKeys] = useState<{ [key: string]: boolean }>({});
   const [globalCountdowns, setGlobalCountdowns] = useState<{ [key: string]: string }>({});
   
-  // سرعة الشريط المربوطة بالـ Admin لايف
   const [tickerSpeed, setTickerSpeed] = useState("30s");
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,11 +72,6 @@ export default function HomePage() {
       setUser(parsedUser);
       setEditProfileFields({ fullName: parsedUser.fullName, password: parsedUser.password, favoriteTeam: parsedUser.favoriteTeam, phone: parsedUser.phone || "" });
       setIsLoggedIn(true);
-      WORLD_CUP_2026_TEAMS.forEach(t => {
-        if(localStorage.getItem(`hasPredicted_${parsedUser.fullName}_${t.code}`)) {
-          setUserPredictionsKeys(prev => ({ ...prev, [t.code]: true }));
-        }
-      });
     }
   }, []);
 
@@ -103,7 +95,6 @@ export default function HomePage() {
   }, [next48HoursMatches]);
 
   useEffect(() => {
-    // الاستماع لسرعة الشريط المحدثة من الإدارة يدويًا فورًا
     const unsubSpeed = onSnapshot(collection(db, "ticker_settings"), (snap) => {
       if (!snap.empty) setTickerSpeed(snap.docs[0].data().speed || "30s");
     });
@@ -122,7 +113,6 @@ export default function HomePage() {
       setTopFavTeams(sortedTeams);
     });
 
-    // جلب مباريات الـ 48 ساعة وحذف المنتهية يدوياً/آلياً
     const fetchLocalFixtures = () => {
       const now = new Date().getTime();
       const filtered = FIXTURES_365_DATABASE.filter(m => new Date(m.kickoff).getTime() > now);
@@ -141,7 +131,7 @@ export default function HomePage() {
       const snap = await getDocs(query(collection(db, "users"), where("fullName", "==", targetName)));
       if (!snap.empty) { alert("❌ الاسم مسجل مسبقاً."); return; }
       const matchedTeam = WORLD_CUP_2026_TEAMS.find(t => t.name === user.favoriteTeam);
-      const userData = { fullName: targetName, favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦", teamEmoji: matchedTeam ? matchedTeam.emoji : "🏆", password: user.password, phone: user.phone || "", residence: "السعودية", points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString() };
+      const userData = { fullName: targetName, favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦", teamEmoji: matchedTeam ? matchedTeam.emoji : "🏆", password: user.password, phone: user.phone || "", points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString() };
       const docRef = await addDoc(collection(db, "users"), userData);
       localStorage.setItem("worldCupUser", JSON.stringify({ id: docRef.id, ...userData }));
       setUser({ id: docRef.id, ...userData }); setIsLoggedIn(true); setIsAuthModalOpen(false);
@@ -181,7 +171,7 @@ export default function HomePage() {
     const matchScores = predictionsValues[matchId];
     if (!matchScores || !matchScores.team1Score || !matchScores.team2Score) { alert("يرجى إدخال نتيجة التوقع أولاً ⚽"); return; }
     try {
-      await addDoc(collection(db, "predictions"), { matchId, user: user.fullName, t1: team1, t1E: team1Emoji, t2: team2, t2E: team2Emoji, score1: matchScores.team1Score, score2: matchScores.team2Score, processed: false, createdAt: new Date().toISOString() });
+      await addDoc(collection(db, "predictions"), { matchId, user: user.fullName, t1: team1, t1E: team1Emoji, t2: team2, t2E: team2Emoji, score1: matchScores.team1Score, score2: matchScores.team2Score, processed: false, pointsAwarded: 0, createdAt: new Date().toISOString() });
       setUserPredictionsKeys(prev => ({ ...prev, [matchId]: true }));
       localStorage.setItem(`hasPredicted_${user.fullName}_${matchId}`, "true");
       alert("🎯 تم حفظ توقعك بنجاح في السيرفر!");
@@ -216,7 +206,7 @@ export default function HomePage() {
         <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-purple-900/30 shadow-2xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-white text-xl p-1 focus:outline-none interactive-btn"><i className={`fa-solid ${isMenuOpen ? 'fa-xmark' : 'fa-bars'}`}></i></button>
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-white text-xl p-1 focus:outline-none interactive-btn"><i className="fa-solid fa-bars"></i></button>
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 flex items-center justify-center overflow-hidden rounded-xl animate-pulse">
                   <img src="/wc2026-logo.png" alt="FIFA 2026" className="object-contain max-w-full max-h-full drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
@@ -263,7 +253,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* شريط المتوقعين ذو السرعة المربوطة بالأدمن لوحة القيادة */}
+        {/* شريط المتوقعين */}
         <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-purple-950 text-white h-8 flex items-center overflow-hidden text-xs font-bold border-b border-purple-500/10 shadow-sm">
           <div className="bg-purple-900 px-3 h-full flex items-center z-10 font-black text-[10px] text-purple-300 border-l border-purple-500/20 flex-shrink-0">🔥 آخر التوقعات:</div>
           <div className="w-full relative overflow-hidden flex items-center">
@@ -276,13 +266,11 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
         {activeTab === "main_screen" && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
             <section className="space-y-4">
-              <div className="text-center md:text-right mb-2">
-                <h3 className="text-sm md:text-lg font-black text-purple-300 flex items-center gap-2 justify-center md:justify-start">🔥 شارك توقعك الآن</h3>
-              </div>
-
+              <div className="text-center md:text-right mb-2"><h3 className="text-sm md:text-lg font-black text-purple-300">🔥 شارك توقعك الآن</h3></div>
               <div className="space-y-2.5">
                 {next48HoursMatches.map((match: any) => (
                   <div key={match.id} className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-3 shadow-lg border border-purple-500/10 flex flex-col md:flex-row items-center justify-between gap-3 text-center">
@@ -290,43 +278,34 @@ export default function HomePage() {
                       <span className="text-[10px] font-black text-purple-400">{match.day}</span>
                       <span className="text-[9px] font-bold text-slate-500 mt-0.5">{match.group}</span>
                     </div>
-
                     <div className="flex items-center justify-center flex-1 w-full py-1">
                       {userPredictionsKeys[match.id] ? (
                         <div className="text-green-400 font-black text-xs bg-green-950/30 border border-green-500/20 px-5 py-1.5 rounded-xl">🎯 تم حفظ وتثبيت توقعك في السيرفر بنجاح</div>
                       ) : (
                         <div className="flex items-center gap-2 md:gap-4 justify-center w-full">
-                          <div className="flex items-center gap-1.5 font-bold text-xs justify-end w-24 md:w-36 truncate">
-                            <span className="truncate">{match.team1}</span><span className="text-lg flex-shrink-0">{match.team1Emoji}</span>
-                          </div>
+                          <div className="flex items-center gap-1.5 font-bold text-xs justify-end w-24 md:w-36 truncate"><span>{match.team1}</span><span className="text-lg flex-shrink-0">{match.team1Emoji}</span></div>
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <input type="number" min="0" placeholder="0" required value={predictionsValues[match.id]?.team1Score || ""} onChange={(e) => setPredictionsValues({ ...predictionsValues, [match.id]: { ...(predictionsValues[match.id] || { team2Score: "" }), team1Score: e.target.value } })} className="w-9 h-7 bg-slate-950 text-green-400 border border-purple-500/20 rounded-md text-center font-black text-xs" />
+                            <input type="number" min="0" placeholder="0" required value={predictionsValues[match.id]?.team1Score || ""} onChange={(e) => setPredictionsValues({ ...predictionsValues, [match.id]: { ...(predictionsValues[match.id] || { team2Score: "" }), team1Score: e.target.value } })} className="w-9 h-7 bg-slate-950 text-green-400 border border-purple-500/20 rounded-md text-center font-black text-xs focus:outline-none" />
                             <span className="text-[9px] text-purple-500 font-black px-0.5">VS</span>
-                            <input type="number" min="0" placeholder="0" required value={predictionsValues[match.id]?.team2Score || ""} onChange={(e) => setPredictionsValues({ ...predictionsValues, [match.id]: { ...(predictionsValues[match.id] || { team1Score: "" }), team2Score: e.target.value } })} className="w-9 h-7 bg-slate-950 text-green-400 border border-purple-500/20 rounded-md text-center font-black text-xs" />
+                            <input type="number" min="0" placeholder="0" required value={predictionsValues[match.id]?.team2Score || ""} onChange={(e) => setPredictionsValues({ ...predictionsValues, [match.id]: { ...(predictionsValues[match.id] || { team1Score: "" }), team2Score: e.target.value } })} className="w-9 h-7 bg-slate-950 text-green-400 border border-purple-500/20 rounded-md text-center font-black text-xs focus:outline-none" />
                           </div>
-                          <div className="flex items-center gap-1.5 font-bold text-xs justify-start w-24 md:w-36 truncate">
-                            <span className="text-lg flex-shrink-0">{match.team2Emoji}</span><span className="truncate">{match.team2}</span>
-                          </div>
+                          <div className="flex items-center gap-1.5 font-bold text-xs justify-start w-24 md:w-36 truncate"><span className="text-lg flex-shrink-0">{match.team2Emoji}</span><span>{match.team2}</span></div>
                         </div>
                       )}
                     </div>
-
                     <div className="flex flex-row md:flex-col items-center justify-between md:justify-center md:w-48 w-full border-t md:border-t-0 md:border-r border-white/5 pt-2 md:pt-0 gap-2 flex-shrink-0">
                       <div className="text-[9px] font-black bg-purple-950/50 border border-purple-500/20 px-2 py-1 rounded-md text-red-400 tracking-tight">⏰ ينتهي: {globalCountdowns[match.id] || "00:00:00"}</div>
-                      {!userPredictionsKeys[match.id] && (
-                        <button onClick={() => handleSavePredictionForMatch(match.id, match.team1, match.team1Emoji, match.team2, match.team2Emoji, match.kickoff)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black px-3 py-1.5 rounded-lg text-[10px] shadow-md transition-all interactive-btn">إرسال التوقع 🚀</button>
-                      )}
+                      {!userPredictionsKeys[match.id] && <button onClick={() => handleSavePredictionForMatch(match.id, match.team1, match.team1Emoji, match.team2, match.team2Emoji, match.kickoff)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black px-3 py-1.5 rounded-lg text-[10px] shadow-md transition-all interactive-btn">إرسال التوقع 🚀</button>}
                     </div>
                   </div>
                 ))}
               </div>
             </section>
 
-            {/* الصدارة والشات المقفل الأبعاد */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
               <div className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-purple-900/20 overflow-hidden flex flex-col justify-between">
                 <div>
-                  <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2">🏆 لوحة الصدارة العامة المباشرة</h3>
+                  <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2">🏆 لوحة الصدارة العامة</h3>
                   <div className="overflow-x-auto w-full">
                     <table className="w-full text-xs text-center border-collapse">
                       <thead>
@@ -341,7 +320,7 @@ export default function HomePage() {
                       <tbody className="divide-y divide-purple-950/20 font-bold text-slate-300">
                         {slicedLeaderboard.map((u: any, i: number) => (
                           <tr key={i} className="hover:bg-purple-950/20 transition-all">
-                            <td className="py-3 px-2 text-right font-black text-white">{(currentPage - 1) * itemsPerPage + i + 1}. {u.name} {u.teamEmoji}</td>
+                            <td className="py-3 px-2 text-right font-black text-white">{(currentPage - 1) * itemsPerPage + i + 1}. {u.name}</td>
                             <td className="py-3 px-2 font-mono text-slate-400">{u.total}</td>
                             <td className="py-3 px-2 font-mono text-green-400">{u.correct}</td>
                             <td className="py-3 px-2 font-mono text-red-400">{u.wrong}</td>
@@ -354,10 +333,9 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* صندوق الشات الفوري المؤمن هندسياً ضد أي انهيار بالأبعاد */}
-              <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-purple-900/20 h-[450px] flex flex-col justify-between overflow-hidden w-full">
+              <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 border border-purple-900/20 h-[450px] flex flex-col justify-between overflow-hidden w-full">
                 <div className="overflow-hidden flex flex-col h-full flex-1 w-full">
-                  <h3 className="font-black text-xs md:text-base text-purple-300 border-b border-purple-900/20 pb-2.5 mb-2.5">💬 دردشة زوار المنصة الفورية</h3>
+                  <h3 className="font-black text-xs text-purple-300 border-b border-purple-900/20 pb-2 mb-2">💬 دردشة زوار المنصة الفورية</h3>
                   <div className="space-y-2.5 overflow-y-auto flex-1 text-xs hidden-scrollbar flex flex-col-reverse pr-0.5 w-full">
                     {chatList.map((msg: any, i: number) => (
                       <div key={i} className="bg-slate-950/60 p-2.5 rounded-xl border border-purple-500/10 shadow-sm flex flex-col text-right w-full">
@@ -368,7 +346,7 @@ export default function HomePage() {
                   </div>
                 </div>
                 <form onSubmit={handleSendMessage} className="mt-2.5 flex gap-2 border-t border-purple-900/20 pt-2.5 w-full">
-                  <button type="submit" className="bg-purple-600 text-white font-black px-4 py-2 rounded-xl text-xs md:text-sm shadow-md transition-colors flex-shrink-0 interactive-btn">إرسال</button>
+                  <button type="submit" className="bg-purple-600 text-white font-black px-4 py-2 rounded-xl text-xs md:text-sm shadow-md flex-shrink-0 interactive-btn">إرسال</button>
                   <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="اكتب تعليقك المباشر..." className="flex-1 bg-slate-500/10 border border-purple-500/20 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-purple-500" />
                 </form>
               </div>
@@ -377,11 +355,19 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* 👤 الفوتر الأصلي المعتمد المستعاد بنجاح */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="text-xs text-center sm:text-right">
+          <div className="text-xs text-center sm:text-right order-2 sm:order-1">
             <p className="font-bold text-slate-400">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-600">© جميع الحقوق محفوظة • فكرة وتطوير عبدالسلام العنزي</p>
+            <p className="text-slate-600">© جميع الحقوق محفوظة • اطلاق تجريبي V5.1</p>
+          </div>
+          <div className="flex items-center gap-3 bg-slate-900/50 border border-purple-500/10 px-4 py-2 rounded-xl order-1 sm:order-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm shadow-[0_0_10px_rgba(147,51,234,0.3)]">ع</div>
+            <div className="text-xs text-right">
+              <span className="block text-[10px] text-purple-500 font-black">فكرة وتطوير</span>
+              <span className="block font-black text-white mt-0.5">عبدالسلام العنزي</span>
+            </div>
           </div>
         </div>
       </footer>
