@@ -496,7 +496,7 @@ export default function HomePage() {
             {authMode === "guest" && (
               <form onSubmit={handleGuestLogin} className="space-y-4 py-2 text-right">
                 <div className="text-center mb-3"><h4 className="text-base font-black text-white"> 🟢  التسجيل السريع الحصري</h4></div>
-                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم</label><input type="text" required placeholder="اكتب اسمك الثلاثي" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم</label><input type="text" required placeholder="مثال: عبدالسلام العنزي" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none" /></div>
                 <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري الخاص بحسابك</label><input type="password" required placeholder="ادخل رقماً سرياً" onChange={(e) => setUser({...user, password: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none" /></div>
                 <div><label className="block text-[11px] font-bold text-purple-300 mb-1">رقم الجوال لتثبيت الهوية 📱</label><input type="tel" required placeholder="مثال: 050XXXXXXX" onChange={(e) => setUser({...user, phone: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-left text-slate-100 focus:outline-none" dir="ltr" /></div>
                 <div><label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المرشح لللقب 🏆</label><select required value={user.favoriteTeam} onChange={(e) => setUser({...user, favoriteTeam: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-3 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none">{WORLD_CUP_2026_TEAMS.map((t: any, i: number) => ( <option key={i} value={t.name}>{t.emoji} {t.name}</option> ))}</select></div>
@@ -531,15 +531,21 @@ export default function HomePage() {
           </div>
         </div>
       )}
-
+      {/* بداية كود الفوترة القديم المستعاد والمطابق تماماً */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
             <p className="font-bold text-slate-400">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-600">© جميع الحقوق محفوظة • اطلاق تجريبي V5.1 • فكرة وتطوير عبدالسلام العنزي</p>
+            <p className="text-slate-600">© جميع الحقوق محفوظة • اطلاق تجريبي V5.1</p>
+            <p className="text-purple-500 font-black mt-0.5">فكرة وتطوير عبدالسلام العنزي</p>
+          </div>
+          <div className="flex items-center gap-3 bg-slate-900/50 border border-purple-500/10 px-4 py-2 rounded-xl order-1 sm:order-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-bold text-white text-sm shadow-[0_0_10px_rgba(147,51,234,0.3)]">ع</div>
           </div>
         </div>
       </footer>
+      {/* نهاية كود الفوترة القديم المستعاد */}
+
     </div>
   );
 }
