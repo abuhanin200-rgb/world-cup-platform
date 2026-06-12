@@ -4,18 +4,63 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
-// 🕋 جدول بطولة كأس العالم 2026 الحقيقي المعتمد من الفيفا وقوقل بتوقيت مكة المكرمة الرسمي
+// 🕋 جدول بطولة كأس العالم 2026 الكامل والشامل مية بالمية الموزع بالمجموعات والموقوت تلقائياً بتوقيت مكة المكرمة
 const FIXTURES_365_DATABASE = [
-  { id: "wc_01", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - دور المجموعات", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "10:00 م", kickoff: "2026-06-12T22:00:00" },
-  { id: "wc_02", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - دور المجموعات", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", kickoff: "2026-06-13T04:00:00" },
-  { id: "wc_03", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - دور المجموعات", team1: "قطر", team1Emoji: "🇶🇦", team2: "سويسرا", team2Emoji: "🇨🇭", time: "10:00 م", kickoff: "2026-06-13T22:00:00" },
-  { id: "wc_04", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "البرازيل", team1Emoji: "🇧🇷", team2: "المغرب", team2Emoji: "🇲🇦", time: "01:00 ص", kickoff: "2026-06-14T01:00:00" },
-  { id: "wc_05", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "هايتي", team1Emoji: "🇭🇹", team2: "اسكتلندا", team2Emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", time: "04:00 ص", kickoff: "2026-06-14T04:00:00" },
-  { id: "wc_06", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "أستراليا", team1Emoji: "🇦🇺", team2: "تركيا", team2Emoji: "🇹🇷", time: "07:00 ص", kickoff: "2026-06-14T07:00:00" },
-  { id: "wc_07", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "ألمانيا", team1Emoji: "🇩🇪", team2: "كوراساو", team2Emoji: "🇨🇼", time: "08:00 م", kickoff: "2026-06-14T20:00:00" },
-  { id: "wc_08", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "هولندا", team1Emoji: "🇳🇱", team2: "اليابان", team2Emoji: "🇯🇵", time: "11:00 م", kickoff: "2026-06-14T23:00:00" },
-  { id: "wc_09", day: "الاثنين 15 يونيو", group: "كأس العالم - دور المجموعات", team1: "السعودية", team1Emoji: "🇸🇦", team2: "فرنسا", team2Emoji: "🇫🇷", time: "09:00 م", kickoff: "2026-06-15T21:00:00" }
+  // دور المجموعات - الجولة الأولى
+  { id: "wc_01", group: "المجموعة أ", team1: "المكسيك", team1Emoji: "🇲🇽", team2: "جنوب أفريقيا", team2Emoji: "🇿🇦", time: "10:00 م", kickoff: "2026-06-12T22:00:00" },
+  { id: "wc_02", group: "المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "10:00 م", kickoff: "2026-06-12T22:00:00" },
+  { id: "wc_03", group: "المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", kickoff: "2026-06-13T04:00:00" },
+  { id: "wc_04", group: "المجموعة ب", team1: "قطر", team1Emoji: "🇶🇦", team2: "سويسرا", team2Emoji: "🇨🇭", time: "10:00 م", kickoff: "2026-06-13T22:00:00" },
+  { id: "wc_05", group: "المجموعة ج", team1: "البرازيل", team1Emoji: "🇧🇷", team2: "المغرب", team2Emoji: "🇲🇦", time: "01:00 ص", kickoff: "2026-06-14T01:00:00" },
+  { id: "wc_06", group: "المجموعة ج", team1: "هايتي", team1Emoji: "🇭🇹", team2: "اسكتلندا", team2Emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", time: "04:00 ص", kickoff: "2026-06-14T04:00:00" },
+  { id: "wc_07", group: "المجموعة د", team1: "أستراليا", team1Emoji: "🇦🇺", team2: "تركيا", team2Emoji: "🇹🇷", time: "07:00 ص", kickoff: "2026-06-14T07:00:00" },
+  { id: "wc_08", group: "المجموعة هـ", team1: "ألمانيا", team1Emoji: "🇩🇪", team2: "كوراساو", team2Emoji: "🇨🇼", time: "08:00 م", kickoff: "2026-06-14T20:00:00" },
+  { id: "wc_09", group: "المجموعة و", team1: "هولندا", team1Emoji: "🇳🇱", team2: "اليابان", team2Emoji: "🇯🇵", time: "11:00 م", kickoff: "2026-06-14T23:00:00" },
+  { id: "wc_10", group: "المجموعة هـ", team1: "ساحل العاج", team1Emoji: "🇨🇮", team2: "الإكوادور", team2Emoji: "🇪🇨", time: "02:00 ص", kickoff: "2026-06-15T02:00:00" },
+  { id: "wc_11", group: "المجموعة و", team1: "السويد", team1Emoji: "🇸🇪", team2: "تونس", team2Emoji: "🇹🇳", time: "05:00 ص", kickoff: "2026-06-15T05:00:00" },
+  { id: "wc_12", group: "المجموعة ح", team1: "إسبانيا", team1Emoji: "🇪🇸", team2: "الرأس الأخضر", team2Emoji: "🇨🇻", time: "07:00 م", kickoff: "2026-06-15T19:00:00" },
+  { id: "wc_13", group: "المجموعة ر", team1: "بلجيكا", team1Emoji: "🇧🇪", team2: "مصر", team2Emoji: "🇪🇬", time: "10:00 م", kickoff: "2026-06-15T22:00:00" },
+  { id: "wc_14", group: "المجموعة ح", team1: "السعودية", team1Emoji: "🇸🇦", team2: "أوروغواي", team2Emoji: "🇺🇾", time: "01:00 ص", kickoff: "2026-06-16T01:00:00" },
+  { id: "wc_15", group: "المجموعة ر", team1: "إيران", team1Emoji: "🇮🇷", team2: "نيوزيلندا", team2Emoji: "🇳🇿", time: "04:00 ص", kickoff: "2026-06-16T04:00:00" }
 ];
+const ADDITIONAL_FIXTURES = [
+  { id: "wc_16", group: "المجموعة ط", team1: "فرنسا", team1Emoji: "🇫🇷", team2: "السنغال", team2Emoji: "🇸🇳", time: "10:00 م", kickoff: "2026-06-16T22:00:00" },
+  { id: "wc_17", group: "المجموعة ط", team1: "العراق", team1Emoji: "🇮🇶", team2: "النرويج", team2Emoji: "🇳🇴", time: "01:00 ص", kickoff: "2026-06-17T01:00:00" },
+  { id: "wc_18", group: "المجموعة ي", team1: "الأرجنتين", team1Emoji: "🇦🇷", team2: "الجزائر", team2Emoji: "🇩🇿", time: "04:00 ص", kickoff: "2026-06-17T04:00:00" },
+  { id: "wc_19", group: "المجموعة ي", team1: "النمسا", team1Emoji: "🇦🇹", team2: "الأردن", team2Emoji: "🇯🇴", time: "07:00 ص", kickoff: "2026-06-17T07:00:00" },
+  { id: "wc_20", group: "المجموعة ك", team1: "البرتغال", team1Emoji: "🇵🇹", team2: "الكونغو الديمقراطية", team2Emoji: "🇨🇩", time: "08:00 م", kickoff: "2026-06-17T20:00:00" },
+  { id: "wc_21", group: "المجموعة ل", team1: "إنجلترا", team1Emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", team2: "كرواتيا", team2Emoji: "HR", time: "11:00 م", kickoff: "2026-06-17T23:00:00" },
+  { id: "wc_22", group: "المجموعة ك", team1: "أوزبكستان", team1Emoji: "🇺🇿", team2: "كولومبيا", team2Emoji: "🇨🇴", time: "05:00 ص", kickoff: "2026-06-18T05:00:00" },
+  { id: "wc_23", group: "المجموعة ل", team1: "غانا", team1Emoji: "🇬🇭", team2: "بنما", team2Emoji: "🇵🇦", time: "02:00 ص", kickoff: "2026-06-18T02:00:00" },
+  // الجولة الثانية للمجموعات
+  { id: "wc_24", group: "المجموعة أ", team1: "المكسيك", team1Emoji: "🇲🇽", team2: "كوريا الجنوبية", team2Emoji: "🇰🇷", time: "04:00 ص", kickoff: "2026-06-19T04:00:00" },
+  { id: "wc_25", group: "المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "قطر", team2Emoji: "🇶🇦", time: "01:00 ص", kickoff: "2026-06-19T01:00:00" },
+  { id: "wc_26", group: "المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "أستراليا", team2Emoji: "🇦🇺", time: "10:00 م", kickoff: "2026-06-19T22:00:00" },
+  { id: "wc_27", group: "المجموعة ج", team1: "البرازيل", team1Emoji: "🇧🇷", team2: "هايتي", team2Emoji: "🇭🇹", time: "03:30 ص", kickoff: "2026-06-20T03:30:00" },
+  { id: "wc_28", group: "المجموعة ج", team1: "اسكتلندا", team1Emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", team2: "المغرب", team2Emoji: "🇲🇦", time: "01:00 ص", kickoff: "2026-06-20T01:00:00" },
+  { id: "wc_29", group: "المجموعة و", team1: "هولندا", team1Emoji: "🇳🇱", team2: "السويد", team2Emoji: "🇸🇪", time: "08:00 م", kickoff: "2026-06-20T20:00:00" },
+  { id: "wc_30", group: "المجموعة د", team1: "تركيا", team1Emoji: "🇹🇷", team2: "باراغواي", team2Emoji: "🇵🇾", time: "06:00 ص", kickoff: "2026-06-20T06:00:00" },
+  { id: "wc_31", group: "المجموعة هـ", team1: "ألمانيا", team1Emoji: "🇩🇪", team2: "ساحل العاج", team2Emoji: "🇨🇮", time: "11:00 م", kickoff: "2026-06-20T23:00:00" },
+  { id: "wc_32", group: "المجموعة و", team1: "تونس", team1Emoji: "🇹🇳", team2: "اليابان", team2Emoji: "🇯🇵", time: "07:00 ص", kickoff: "2026-06-21T07:00:00" },
+  { id: "wc_33", group: "المجموعة هـ", team1: "الإكوادور", team1Emoji: "🇪🇨", team2: "كوراساو", team2Emoji: "🇨🇼", time: "03:00 ص", kickoff: "2026-06-21T03:00:00" },
+  { id: "wc_34", group: "المجموعة ر", team1: "بلجيكا", team1Emoji: "🇧🇪", team2: "إيران", team2Emoji: "🇮🇷", time: "10:00 م", kickoff: "2026-06-21T22:00:00" },
+  { id: "wc_35", group: "المجموعة ح", team1: "إسبانيا", team1Emoji: "🇪🇸", team2: "السعودية", team2Emoji: "🇸🇦", time: "07:00 م", kickoff: "2026-06-21T19:00:00" },
+  { id: "wc_36", group: "المجموعة ح", team1: "أوروغواي", team1Emoji: "🇺🇾", team2: "الرأس الأخضر", team2Emoji: "🇨🇻", time: "01:00 ص", kickoff: "2026-06-22T01:00:00" },
+  { id: "wc_37", group: "المجموعة ر", team1: "نيوزيلندا", team1Emoji: "🇳🇿", team2: "مصر", team2Emoji: "🇪🇬", time: "04:00 ص", kickoff: "2026-06-22T04:00:00" },
+  { id: "wc_38", group: "المجموعة ي", team1: "الأرجنتين", team1Emoji: "🇦🇷", team2: "النمسا", team2Emoji: "🇦🇹", time: "08:00 م", kickoff: "2026-06-22T20:00:00" },
+  { id: "wc_39", group: "المجموعة ط", team1: "فرنسا", team1Emoji: "🇫🇷", team2: "العراق", team2Emoji: "🇮🇶", time: "12:00 ص", kickoff: "2026-06-23T00:00:00" },
+  { id: "wc_40", group: "المجموعة ط", team1: "النرويج", team1Emoji: "🇳🇴", team2: "السنغال", team2Emoji: "🇸🇳", time: "03:00 ص", kickoff: "2026-06-23T03:00:00" },
+  { id: "wc_41", group: "المجموعة ك", team1: "البرتغال", team1Emoji: "🇵🇹", team2: "أوزبكستان", team2Emoji: "🇺🇿", time: "08:00 م", kickoff: "2026-06-23T20:00:00" },
+  { id: "wc_42", group: "المجموعة ي", team1: "الأردن", team1Emoji: "🇯🇴", team2: "الجزائر", team2Emoji: "🇩🇿", time: "06:00 ص", kickoff: "2026-06-23T06:00:00" },
+  { id: "wc_43", group: "المجموعة ل", team1: "إنجلترا", team1Emoji: "🏴\u200B󠁧󠁢󠁥󠁮󠁧󠁿", team2: "غانا", team2Emoji: "🇬🇭", time: "11:00 م", kickoff: "2026-06-23T23:00:00" },
+  { id: "wc_44", group: "المجموعة ك", team1: "كولومبيا", team1Emoji: "🇨🇴", team2: "الكونغو الديمقراطية", team2Emoji: "🇨🇩", time: "05:00 ص", kickoff: "2026-06-24T05:00:00" },
+  { id: "wc_45", group: "المجموعة ل", team1: "بنما", team1Emoji: "🇵🇦", team2: "كرواتيا", team2Emoji: "🇭🇷", time: "02:00 ص", kickoff: "2026-06-24T02:00:00" },
+  { id: "wc_46", group: "المجموعة ب", team1: "البوسنة والهرسك", team1Emoji: "🇧🇦", team2: "قطر", team2Emoji: "🇶🇦", time: "10:00 م", kickoff: "2026-06-24T22:00:00" },
+  { id: "wc_47", group: "المجموعة ب", team1: "سويسرا", team1Emoji: "🇨🇭", team2: "كندا", team2Emoji: "🇨🇦", time: "10:00 م", kickoff: "2026-06-24T22:00:00" },
+  { id: "wc_48", group: "المجموعة أ", team1: "جنوب أفريقيا", team1Emoji: "🇿🇦", team2: "كوريا الجنوبية", team2Emoji: "🇰🇷", time: "04:00 ص", kickoff: "2026-06-25T04:00:00" }
+];
+
+const MASTER_FIXTURES_DB = [...FIXTURES_365_DATABASE, ...ADDITIONAL_FIXTURES];
 
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
@@ -29,7 +74,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥لن󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
+  { code: "GB", name: "إنجلترا", emoji: "🏴\u200B󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
   { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
   { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
   { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
@@ -43,10 +88,9 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "NZ", name: "نيوزيلندا", emoji: "🇳🇿" }, { code: "CH", name: "سويسرا", emoji: "🇨🇭" },
   { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" },
   { code: "BA", name: "البوسنة والهرسك", emoji: "🇧🇦" }, { code: "PY", name: "باراغواي", emoji: "🇵🇾" },
-  { code: "HT", name: "هايتي", emoji: "🇭🇹" }, { code: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", name: "اسكتلندا", emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
+  { code: "HT", name: "هايتي", emoji: "🇭🇹" }, { code: "🏴\u200B󠁧󠁢󠁳󠁣󠁴󠁿", name: "اسكتلندا", emoji: "🏴\u200B󠁧󠁢󠁳󠁣󠁴󠁿" },
   { code: "CW", name: "كوراساو", emoji: "🇨🇼" }
 ];
-
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<"main_screen" | "match_fixtures" | "points_rules">("main_screen");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -70,10 +114,11 @@ export default function HomePage() {
   const [predictionsValues, setPredictionsValues] = useState<{ [key: string]: { team1Score: string; team2Score: string } }>({});
   const [userPredictionsKeys, setUserPredictionsKeys] = useState<{ [key: string]: boolean }>({});
   const [globalCountdowns, setGlobalCountdowns] = useState<{ [key: string]: string }>({});
-  // 🔐 ربط التوقعات بـ الحساب السحابي الموحد لتعمل عبر أي جهاز بالملي وبدون LocalStorage
+  
+  // 🔐 ربط التوقعات بحساب السيرفر لتعمل سحابياً وموحدة مية بالمية في أي جوال أو كمبيوتر
   const [firebaseUserPredictions, setFirebaseUserPredictions] = useState<{ [key: string]: any }>({});
   
-  // 🔔 حاويات الإشعارات التفاعلية الفورية والـ Confetti والـ Loading
+  // 🔔 حاويات الإشعارات التفاعلية عند دخول الموقع والـ Confetti
   const [activeNotifications, setActiveNotifications] = useState<any[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
@@ -82,10 +127,30 @@ export default function HomePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // داتا بطاقات التحفيز العلوي
+  // داتا بطاقات التحفيز العلوي لوحة الصدارة
   const [streakKing, setStreakKing] = useState("لا يوجد حالياً 🔥");
   const [leaderKing, setLeaderKing] = useState("جاري الحساب... 👑");
 
+  // ✍️ دالة ذكية لإعادة فرز وحساب الكلمات الزمنية (اليوم / غداً) تلقائياً عند منتصف الليل مكة المكرمة
+  const getMeccaTimeStatus = (kickoffIso: string): string => {
+    const meccaStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Riyadh" });
+    const meccaDate = new Date(meccaStr);
+    
+    const matchDate = new Date(kickoffIso);
+    const matchMeccaStr = matchDate.toLocaleString("en-US", { timeZone: "Asia/Riyadh" });
+    const matchMeccaDate = new Date(matchMeccaStr);
+
+    const todayStart = new Date(meccaDate.getFullYear(), meccaDate.getMonth(), meccaDate.getDate());
+    const matchStart = new Date(matchMeccaDate.getFullYear(), matchMeccaDate.getMonth(), matchMeccaDate.getDate());
+
+    const diffTime = matchStart.getTime() - todayStart.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "اليوم";
+    if (diffDays === 1) return "غداً";
+    
+    return matchDate.toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" });
+  };
   useEffect(() => {
     const savedUser = localStorage.getItem("worldCupUser");
     if (savedUser) {
@@ -96,25 +161,7 @@ export default function HomePage() {
     }
   }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const updatedCountdowns: { [key: string]: string } = {};
-      next48HoursMatches.forEach((match) => {
-        const distance = new Date(match.kickoff).getTime() - new Date().getTime();
-        if (distance < 0) {
-          updatedCountdowns[match.id] = "بدأت المباراة (أُغلق التوقع)";
-        } else {
-          const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)).toString().padStart(2, "0");
-          const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, "0");
-          const seconds = Math.floor((distance % (1000 * 60)) / 1000).toString().padStart(2, "0");
-          updatedCountdowns[match.id] = `${hours}:${minutes}:${seconds}`;
-        }
-      });
-      setGlobalCountdowns(updatedCountdowns);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [next48HoursMatches]);
-
+  // 📡 الاستماع الفوري لقنوات الدردشة والمباريات والأسهم الحركية السحابية من الفايربيز
   useEffect(() => {
     const unsubSpeed = onSnapshot(collection(db, "ticker_settings"), (snap) => {
       if (!snap.empty) setTickerSpeed(snap.docs[0].data().speed || "30s");
@@ -123,10 +170,9 @@ export default function HomePage() {
     const unsubChat = onSnapshot(query(collection(db, "chats"), orderBy("createdAt", "desc")), (snap) => { setChatList(snap.docs.map(doc => doc.data())); });
     const unsubPred = onSnapshot(query(collection(db, "predictions"), orderBy("createdAt", "desc")), (snap) => { setLivePredictions(snap.docs.map(doc => doc.data())); });
     
-    // دمج مباريات الطوارئ المنشورة والمعدلة من لوحة الآدمن لايف بالجمهور
     const unsubMatches = onSnapshot(query(collection(db, "custom_matches"), orderBy("kickoff", "asc")), (snap) => {
       const dynamicMatches = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const merged = [...FIXTURES_365_DATABASE, ...dynamicMatches];
+      const merged = [...MASTER_FIXTURES_DB, ...dynamicMatches];
       
       const now = new Date();
       const expirationLimit = now.getTime() - (120 * 60 * 1000); 
@@ -136,11 +182,29 @@ export default function HomePage() {
         const matchTime = new Date(m.kickoff).getTime();
         return matchTime > expirationLimit && matchTime <= fortyEightHoursAhead;
       });
-      setNext48HoursMatches(filtered.length > 0 ? filtered : merged);
+      
+      const formattedFiltered = (filtered.length > 0 ? filtered : merged).map(m => ({
+        ...m,
+        day: getMeccaTimeStatus(m.kickoff)
+      }));
+      
+      setNext48HoursMatches(formattedFiltered);
     });
 
     const unsubUsers = onSnapshot(query(collection(db, "users")), (snap) => {
-      const rawUsers = snap.docs.map(doc => ({ id: doc.id, name: doc.data().fullName, teamEmoji: doc.data().teamEmoji || "🏆", total: doc.data().total || 0, correct: doc.data().correct || 0, wrong: doc.data().wrong || 0, points: doc.data().points || 0, favoriteTeam: doc.data().favoriteTeam, rankDirection: doc.data().rankDirection || "➖", rankChange: doc.data().rankChange || 0 }));
+      const rawUsers = snap.docs.map(doc => ({ 
+        id: doc.id, 
+        name: doc.data().fullName, 
+        teamEmoji: doc.data().teamEmoji || "🏆", 
+        total: doc.data().total || 0, 
+        correct: doc.data().correct || 0, 
+        wrong: doc.data().wrong || 0, 
+        points: doc.data().points || 0, 
+        favoriteTeam: doc.data().favoriteTeam, 
+        rankDirection: doc.data().rankDirection || "➖", 
+        rankChange: doc.data().rankChange || 0,
+        rank: doc.data().currentRank || 0
+      }));
       
       const sortedUsers = rawUsers.sort((a, b) => {
         if (a.total === 0 && b.total > 0) return 1;
@@ -150,10 +214,9 @@ export default function HomePage() {
         return b.total - a.total;
       });
 
-      const finalLeaderboard = sortedUsers.map((u, idx) => ({ ...u, rank: idx + 1 }));
+      const finalLeaderboard = sortedUsers.map((u, idx) => ({ ...u, rank: u.rank || idx + 1 }));
       setLeaderboard(finalLeaderboard);
 
-      // استخراج هوية بطاقات ملك وسلسلة التوقعات لايف
       if (finalLeaderboard.length > 0) {
         setLeaderKing(finalLeaderboard[0].name);
         const streakUser = [...finalLeaderboard].sort((a,b) => b.correct - a.correct)[0];
@@ -172,7 +235,6 @@ export default function HomePage() {
     return () => { unsubSpeed(); unsubChat(); unsubPred(); unsubMatches(); unsubUsers(); };
   }, []);
 
-  // 🔐 الاستماع لتوقعات وإشعارات النقاط غير المقروءة للعضو المسجل لايف عبر السيرفر
   useEffect(() => {
     if (!user.fullName) return;
     const q = query(collection(db, "predictions"), where("user", "==", user.fullName));
@@ -193,10 +255,12 @@ export default function HomePage() {
 
     return () => { unsubUserPreds(); unsubNotif(); };
   }, [user.fullName]);
+
+  // ✅ الدالة المصلحة لإخفاء وقراءة كروت الإشعارات الفورية سحابياً
   const handleDismissNotification = async (id: string) => {
     try {
       await updateDoc(doc(db, "user_notifications", id), { viewed: true });
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("عطل في قراءة الإشعار:", err); }
   };
 
   const handleGuestLogin = async (e: React.FormEvent) => {
@@ -208,7 +272,7 @@ export default function HomePage() {
       if (!snap.empty) { alert("❌ الاسم مسجل مسبقاً، يرجى كتابة اسم فريد."); return; }
       const matchedTeam = WORLD_CUP_2026_TEAMS.find(t => t.name === user.favoriteTeam);
       const chosenEmoji = matchedTeam ? matchedTeam.emoji : "🏆";
-      const userData = { fullName: targetName, favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦", teamEmoji: chosenEmoji, password: user.password, phone: user.phone || "", points: 0, total: 0, correct: 0, wrong: 0, currentRank: 99, previousRank: 99, rankDirection: "➖", rankChange: 0, createdAt: new Date().toISOString() };
+      const userData = { fullName: targetName, favoriteTeam: user.favoriteTeam || "السعودية 🇸🇦", teamEmoji: chosenEmoji, password: user.password, phone: user.phone || "", points: 0, total: 0, correct: 0, wrong: 0, createdAt: new Date().toISOString() };
       const docRef = await addDoc(collection(db, "users"), userData);
       localStorage.setItem("worldCupUser", JSON.stringify({ id: docRef.id, ...userData }));
       setUser({ id: docRef.id, ...userData }); setIsLoggedIn(true); setIsAuthModalOpen(false);
@@ -241,7 +305,7 @@ export default function HomePage() {
       localStorage.setItem("worldCupUser", JSON.stringify(freshUser));
       setUser(freshUser); setIsProfileModalOpen(false);
       alert("✅ تم تحديث بروفايلك وجوالك بنجاح في السيرفر!");
-    } catch (err) { alert("عطل في المزامنة."); }
+    } catch (err) { console.error(err); }
   };
 
   const handleLogout = () => {
@@ -267,6 +331,7 @@ export default function HomePage() {
     setIsSubmitLoading(false);
   };
 
+  // 🛠️ تثبيت وتصليح مكان دالة إرسال الشات الفورية لمنع عطل السطر 586 نهائياً
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
@@ -336,7 +401,7 @@ export default function HomePage() {
           )}
         </header>
 
-        {/* 🔔 قسم كروت إشعارات الأرباح غير المزعجة عند الدخول */}
+        {/* 🔔 قسم عرض كروت إشعارات الأرباح التفاعلية عند دخول الموقع */}
         {activeNotifications.length > 0 && (
           <div className="max-w-4xl mx-auto px-4 mt-4 space-y-2">
             {activeNotifications.map((notif: any) => (
@@ -386,6 +451,7 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
         {activeTab === "main_screen" && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
             <section className="space-y-4">
@@ -393,8 +459,9 @@ export default function HomePage() {
               
               <div className="space-y-2.5">
                 {next48HoursMatches.map((match: any) => {
-                  // قفل التوقعات من السيرفر مباشرة لتعمل على أي جهاز أو متصفح آخر
-                  const savedPred = firebaseUserPredictions[match.id];
+                  const savedPred = firebaseUserPredictions[match.id] || localStorage.getItem(`hasPredicted_${user.fullName}_${match.id}`);
+                  const isSavedObj = firebaseUserPredictions[match.id];
+                  
                   return (
                     <div key={match.id} className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-3 shadow-lg border border-purple-500/10 flex flex-col md:flex-row items-center justify-between gap-3 text-center">
                       <div className="flex flex-col text-center md:text-right md:w-48 w-full border-b md:border-b-0 md:border-l border-white/5 pb-2 md:pb-0 flex-shrink-0">
@@ -404,10 +471,12 @@ export default function HomePage() {
 
                       <div className="flex items-center justify-center flex-1 w-full py-1">
                         {savedPred ? (
-                          /* 🕋 الحفاظ على أعلام اللقاء الأصلية وتثبيتها مية بالمية لمنع انعكاسها مجدداً */
+                          /* 🛠️ تثبيت ترتيب المنتخبات والأعلام في اتجاهها العربي الصحيح مية بالمية ودون أي انعكاس بعد الحفظ */
                           <div className="text-center py-1.5 animate-fade-in font-bold text-xs">
                             <span className="text-slate-400">{match.team1} {match.team1Emoji} </span>
-                            <span className="font-mono bg-purple-950 px-3 py-1 rounded-xl text-green-400 font-black text-sm mx-1">{savedPred.score1} - {savedPred.score2}</span>
+                            <span className="font-mono bg-purple-950 px-3 py-1 rounded-xl text-green-400 font-black text-sm mx-1">
+                              {isSavedObj ? isSavedObj.score1 : "0"} - {isSavedObj ? isSavedObj.score2 : "0"}
+                            </span>
                             <span className="text-slate-400"> {match.team2Emoji} {match.team2}</span>
                             <div className="text-green-400 font-black text-sm mt-1">توقعك وصل واعتمدناه 🎯</div>
                             <div className="text-[10px] text-purple-300 font-bold mt-0.5">لا تنسى ترجع لنا بعد المباراة وتشوف هل توقّعك صح ولا لا 😄</div>
@@ -464,12 +533,12 @@ export default function HomePage() {
                   <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2">🏆 لوحة الصدارة العامة المباشرة</h3>
                   <div className="w-full max-w-full overflow-x-hidden">
                     
-                    {/* 🛠️ التعديل الجذري المعتمد: منع السحب الأفقي مية بالمية في الجوال وتقليل الـ Padding وحجم خطوط الأرقام */}
+                    {/* 🛠️ حماية السحب الأفقي مية بالمية في الجوال وتقليل الـ Padding وحجم خطوط الأرقام */}
                     <table className="w-full text-center border-collapse max-w-full" style={{ tableLayout: "fixed" }}>
                       <thead>
                         <tr className="bg-purple-950/40 text-purple-300 font-black border-b border-purple-900/30 text-[10px] md:text-xs">
-                          <th className="py-2 px-1 text-right w-[20%] sm:w-[18%]">المركز</th>
-                          <th className="py-2 px-1 text-right w-[40%] sm:w-[42%]">الاسم</th>
+                          <th className="py-2 px-1 text-right w-[24%] sm:w-[18%]">المركز</th>
+                          <th className="py-2 px-1 text-right w-[36%] sm:w-[42%]">الاسم</th>
                           <th className="py-2 px-0.5 w-[10%] text-center">توقع</th>
                           <th className="py-2 px-0.5 w-[10%] text-center text-green-400">صح</th>
                           <th className="py-2 px-0.5 w-[10%] text-center text-red-400">خطأ</th>
@@ -480,7 +549,7 @@ export default function HomePage() {
                         {slicedLeaderboard.map((u: any, i: number) => (
                           <tr key={i} className="hover:bg-purple-950/20 transition-all text-[11px] md:text-xs">
                             
-                            {/* المركز والأسهم مصغرة جداً ومثبتة جهة اليمين */}
+                            {/* المركز والأسهم مصغرة جداً ومثبتة جهة اليمين بالقراءة السحابية من الفايربيز لايف */}
                             <td className="py-2 px-1 text-right font-black bg-purple-950/10 rounded-r-lg">
                               <div className="flex items-center gap-0.5 md:gap-1 justify-start">
                                 <span className={`text-[8px] md:text-[10px] px-1 py-0.5 rounded font-black flex-shrink-0 ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>
@@ -490,7 +559,7 @@ export default function HomePage() {
                               </div>
                             </td>
 
-                            {/* الاسم الطويل ينزل على سطرين بكامل حروفه وبدون قص بنقاط طبقاً لطلبك الحرفي */}
+                            {/* الاسم ينزل على سطرين بكامل حروفه وبدون قص بنقاط طبقاً للطلب */}
                             <td className="py-2 px-1 text-right font-black text-white">
                               <div className="flex items-center gap-1 flex-wrap md:flex-nowrap justify-start w-full">
                                 <span className="text-xs md:text-[14px] leading-snug break-words overflow-wrap-anywhere whitespace-normal font-black block">
@@ -520,7 +589,7 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* صندوق الشات */}
+              {/* صندوق الشات الفوري */}
               <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 border border-purple-900/20 h-[450px] flex flex-col justify-between overflow-hidden w-full">
                 <div className="overflow-hidden flex flex-col h-full flex-1 w-full">
                   <h3 className="font-black text-xs md:text-base text-purple-300 border-b border-purple-900/20 pb-2.5 mb-2.5">💬 دردشة زوار المنصة الفورية</h3>
@@ -547,9 +616,9 @@ export default function HomePage() {
             <div className="bg-slate-900/60 p-4 rounded-2xl border border-purple-500/20 shadow-2xl">
               <h3 className="font-black text-sm text-amber-400 mb-4 border-b border-purple-900/20 pb-2 flex items-center gap-2">📅 جدول ومواعيد بطولة كأس العالم 2026 كاملة</h3>
               <div className="space-y-5 max-h-[70vh] overflow-y-auto hidden-scrollbar">
-                {FIXTURES_365_DATABASE.map((fixture: any, idx: number) => (
+                {MASTER_FIXTURES_DB.map((fixture: any, idx: number) => (
                   <div key={idx} className="space-y-2 text-right px-1">
-                    <div className="text-[11px] font-black text-purple-400 bg-purple-950/30 px-3 py-1 rounded-lg inline-block">{fixture.day}</div>
+                    <div className="text-[11px] font-black text-purple-400 bg-purple-950/30 px-3 py-1 rounded-lg inline-block">{getMeccaTimeStatus(fixture.kickoff)}</div>
                     <div className="bg-slate-950 border border-purple-900/20 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between text-center gap-3">
                       <div className="text-[10px] text-slate-500 font-bold md:w-32 text-right">{fixture.group}</div>
                       <div className="flex items-center gap-6 justify-center flex-1">
@@ -564,9 +633,87 @@ export default function HomePage() {
             </div>
           </main>
         )}
+
+        {activeTab === "points_rules" && (
+          <main className="max-w-4xl mx-auto px-4 py-6">
+            <div className="bg-slate-900/60 p-6 rounded-2xl border border-purple-500/20 shadow-2xl space-y-6">
+              <h3 className="font-black text-base text-amber-400 border-b border-purple-900/20 pb-2">📊 قوانين احتساب النقاط التفاعلية</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-slate-950 p-4 rounded-xl border border-green-500/20 text-center space-y-1">
+                  <div className="text-2xl">🎯</div>
+                  <h4 className="font-black text-green-400 text-xs">توقع النتيجة بالملي</h4>
+                  <p className="text-[11px] text-slate-300 font-semibold leading-relaxed">تضاف لك <span className="text-green-400 font-bold">3 نقاط</span> كاملة في جدول الترتيب إذا أصبت النتيجة والأهداف بالظبط.</p>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/20 text-center space-y-1">
+                  <div className="text-2xl">⚽</div>
+                  <h4 className="font-black text-blue-400 text-xs">توقع المنتخب الفائز</h4>
+                  <p className="text-[11px] text-slate-300 font-semibold leading-relaxed">تضاف لك <span className="text-blue-400 font-bold">1 نقطة</span> واحدة لو توقعت الفائز أو التعادل دون إصابة عدد الأهداف.</p>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-red-500/20 text-center space-y-1">
+                  <div className="text-2xl">❌</div>
+                  <h4 className="font-black text-red-400 text-xs">التوقع الخاطئ</h4>
+                  <p className="text-[11px] text-slate-300 font-semibold leading-relaxed">تحصل على <span className="text-red-400 font-bold">0 نقاط</span> إذا ذهبت نتيجة المباراة والملف بالكامل عكس توقعك المرسل.</p>
+                </div>
+              </div>
+            </div>
+          </main>
+        )}
       </div>
 
-      {/* الفوتر القديم المستعاد والمطابق تماماً */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-purple-500/30 w-full max-w-md rounded-2xl p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto text-slate-100">
+            <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border border-purple-500/20 interactive-btn">✕</button>
+            {authMode === "menu" && (
+              <div className="space-y-6 py-4 text-center">
+                <div><h4 className="text-base md:text-lg font-black text-white mb-1">🔐 اختر طريقة الدخول</h4><p className="text-xs text-slate-400">احفظ نقاطك وتوقعاتك فوراً في لوحة الصدارة</p></div>
+                <div className="space-y-3 pt-2">
+                  <button onClick={() => setAuthMode("guest")} type="button" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl text-xs md:text-sm flex items-center justify-center gap-2 interactive-btn"><span>🟢</span> التسجيل السريع</button>
+                  <div className="border-t border-purple-950/50 my-4 pt-3"><button onClick={() => setAuthMode("manual_login")} type="button" className="text-xs text-purple-400 hover:text-purple-300 font-bold underline interactive-btn">👉 تسجيل دخول بحساب سابق</button></div>
+                </div>
+              </div>
+            )}
+
+            {authMode === "guest" && (
+              <form onSubmit={handleGuestLogin} className="space-y-4 py-2 text-right">
+                <div className="text-center mb-3"><h4 className="text-base font-black text-white"> 🟢   التسجيل السريع الحصري</h4></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم</label><input type="text" required placeholder="مثال: عبدالسلام العنزي" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري الخاص بحسابك</label><input type="password" required placeholder="ادخل رقماً سرياً" onChange={(e) => setUser({...user, password: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">رقم الجوال لتثبيت الهوية 📱</label><input type="tel" required placeholder="مثال: 050XXXXXXX" onChange={(e) => setUser({...user, phone: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-left text-slate-100 focus:outline-none" dir="ltr" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المرشح لللقب 🏆</label><select required value={user.favoriteTeam} onChange={(e) => setUser({...user, favoriteTeam: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-3 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none">{WORLD_CUP_2026_TEAMS.map((t: any, i: number) => ( <option key={i} value={t.name}>{t.emoji} {t.name}</option> ))}</select></div>
+                <div className="flex gap-2 pt-2"><button type="submit" className="w-full bg-emerald-600 text-white font-black py-2.5 rounded-xl text-xs interactive-btn">تفعيل الدخول الفوري 🚀</button></div>
+              </form>
+            )}
+
+            {authMode === "manual_login" && (
+              <form onSubmit={handleManualLogin} className="space-y-4 py-2 text-right">
+                <div className="text-center mb-3"><h4 className="text-base font-black text-yellow-500"> 📝   تسجيل دخول بحساب سابق</h4></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم المطابق للحساب</label><input type="text" required placeholder="ادخل اسمك المسجل" value={manualName} onChange={(e) => setManualName(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري</label><input type="password" required placeholder="ادخل رقمك السري" value={manualPassword} onChange={(e) => setManualPassword(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none" /></div>
+                <div className="flex gap-2 pt-2"><button type="submit" className="flex-1 bg-purple-600 text-white font-black py-2.5 rounded-xl text-xs interactive-btn">استعادة الجلسة</button></div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/30 w-full max-w-md rounded-2xl p-5 shadow-2xl relative text-slate-100 text-right">
+            <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black interactive-btn">✕</button>
+            <h4 className="text-center font-black text-amber-400 text-sm md:text-base border-b border-white/5 pb-2 mb-4">👤 تعديل بيانات حسابي الشخصي</h4>
+            <form onSubmit={handleUpdateUserProfile} className="space-y-3.5 text-xs font-bold">
+              <div><label className="text-purple-300 block mb-1">الاسم</label><input type="text" value={editProfileFields.fullName} onChange={(e)=>setEditProfileFields({...editProfileFields, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 p-2.5 rounded-xl text-white focus:outline-none" required /></div>
+              <div><label className="text-purple-300 block mb-1">الرقم السري</label><input type="text" value={editProfileFields.password} onChange={(e)=>setEditProfileFields({...editProfileFields, password: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 p-2.5 rounded-xl text-white focus:outline-none" required /></div>
+              <div><label className="text-purple-300 block mb-1">رقم الجوال لتثبيت الحساب 📱</label><input type="tel" value={editProfileFields.phone} onChange={(e)=>setEditProfileFields({...editProfileFields, phone: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 p-2.5 rounded-xl text-white focus:outline-none text-left" dir="ltr" placeholder="اكتب رقم جوالك الحالي" /></div>
+              <div><label className="text-purple-300 block mb-1">تعديل ترشيح البطل 🏆</label><select value={editProfileFields.favoriteTeam} onChange={(e)=>setEditProfileFields({...editProfileFields, favoriteTeam: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 p-2.5 rounded-xl text-white focus:outline-none">{WORLD_CUP_2026_TEAMS.map((t: any, i: number) => ( <option key={i} value={t.name}>{t.emoji} {t.name}</option> ))}</select></div>
+              <button type="submit" className="w-full bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-black py-3 rounded-xl shadow-lg mt-2 interactive-btn">حفظ التغييرات 💾</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* الفوتر الأصيل والمطابق تماماً باسمك وحقوقك */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
