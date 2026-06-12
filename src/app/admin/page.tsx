@@ -4,7 +4,19 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, onSnapshot, query, orderBy, getDocs, doc, updateDoc, deleteDoc, where, addDoc } from "firebase/firestore";
 
-// قائمة المنتخبات الكاملة وأعلامها الموقوتة بالفيفا للمطابقة التلقائية في القائمة المنسدلة للأدمن
+// قائمة المباريات الرسمية المعتمدة للمطابقة والفرز الجماعي بداخل الصندوق المستقل للأدمن
+const SETTLEMENT_MATCHES_LIST = [
+  { id: "wc_01", title: "🇨🇦 كندا ضد البوسنة والهرسك 🇧🇦" },
+  { id: "wc_02", title: "🇺🇸 الولايات المتحدة ضد باراغواي 🇵🇾" },
+  { id: "wc_03", title: "🇶🇦 قطر ضد سويسرا 🇨🇭" },
+  { id: "wc_04", title: "🇧🇷 البرازيل ضد المغرب 🇲🇦" },
+  { id: "wc_05", title: "🇭🇹 هايتي ضد اسكتلندا 🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
+  { id: "wc_06", title: "🇦🇺 أستراليا ضد تركيا 🇹🇷" },
+  { id: "wc_07", title: "🇩🇪 ألمانيا ضد كوراساو 🇨🇼" },
+  { id: "wc_08", title: "🇳🇱 هولندا ضد اليابان 🇯🇵" },
+  { id: "wc_09", title: "🇸🇦 السعودية ضد فرنسا 🇫🇷" }
+];
+
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
   { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
@@ -53,10 +65,11 @@ export default function AdminDashboard() {
   const [editCorrect, setEditCorrect] = useState(0);
   const [editWrong, setEditWrong] = useState(0);
 
-  // 📝 حقل استقبال أهداف الفرز الجماعي التلقائي للمباراة كبسة واحدة
-  const [matchResultsInput, setMatchResultsInput] = useState<{ [key: string]: { s1: string; s2: string } }>({});
+  // 📝 الـ States الخاصة بالصندوق المستقل الجديد للفرز الجماعي الفوري بضغطة زر واحدة
+  const [selectedBulkMatchId, setSelectedMatchId] = useState("");
+  const [bulkScore1, setBulkScore1] = useState("");
+  const [bulkScore2, setBulkScore2] = useState("");
 
-  // عدادات الصفحات المستقلة لـ 20 اسماً وعنصراً لكل جدول
   const [userPage, setUserPage] = useState(1);
   const [leaderboardPage, setLeaderboardPage] = useState(1);
   const [predPage, setPredPage] = useState(1);
@@ -72,22 +85,37 @@ export default function AdminDashboard() {
       if (!snap.empty) { setTickerSpeed(snap.docs[0].data().speed || "30s"); setTickerSpeedId(snap.docs[0].id); }
     });
   }, []);
-  // 🧮 محرك الاحتساب الجماعي الفوري المطلوب: تدخل النتيجة الحقيقية ويقوم السيستم تلقائياً بفرز وتوزيع نقاط كل من شارك في ثانية واحدة!
-  const handleSettleMatchPredictionsBulk = async (matchId: string, team1Name: string, team2Name: string, finalScore1: number, finalScore2: number) => {
-    if (isNaN(finalScore1) || isNaN(finalScore2) || finalScore1 < 0 || finalScore2 < 0) { 
-      alert("⚠️ يرجى إدخال نتيجة أهداف صحيحة للفريقين أولاً قبل الضغط على الفرز الجماعي!"); 
-      return; 
-    }
+  // 🚀 محرك الاحتساب الجماعي الخارق والمستقل: تدخل النتيجة مرة واحدة في الصندوق العلوي، ويحسب لجميع الأعضاء لايف بضغطة زر واحدة!
+  const handleSettleMatchPredictionsBulk = async () => {
+    if (!selectedBulkMatchId) { alert("⚠️ يرجى اختيار المباراة المراد فرزها من القائمة أولاً!"); return; }
     
-    if (!confirm(`هل أنت متأكد من اعتماد نتيجة مباراة ${team1Name} ضد ${team2Name} كـ (${finalScore1} - ${finalScore2})؟ سيتم توزيع النقاط على الجميع فوراً لايف.`)) return;
+    const score1 = parseInt(bulkScore1);
+    const score2 = parseInt(bulkScore2);
+    
+    if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0) {
+      alert("⚠️ يرجى إدخال نتيجة أهداف صحيحة في الصندوق أولاً!");
+      return;
+    }
+
+    const matchedMatchObj = SETTLEMENT_MATCHES_LIST.find(m => m.id === selectedBulkMatchId);
+    if (!confirm(`هل أنت متأكد من اعتماد نتيجة مباراة: (${matchedMatchObj?.title}) كـ [ ${score1} - ${score2} ] وتوزيع النقاط على جميع الجماهير فوراً؟`)) return;
 
     try {
-      const q = query(collection(db, "predictions"), where("matchId", "==", matchId), where("processed", "==", false));
+      // جلب جميع توقعات الجماهير المرتبطة بالـ matchId المختار والتي لم تُفرز بعد
+      const q = query(
+        collection(db, "predictions"), 
+        where("matchId", "==", selectedBulkMatchId),
+        where("processed", "==", false)
+      );
       const snap = await getDocs(q);
       
-      if (snap.empty) { alert("⚠️ لا توجد توقعات غير مفروزة لهذه المباراة حالياً في السيرفر."); return; }
+      if (snap.empty) { 
+        alert("⚠️ تم فرز هذه المباراة مسبقاً أو لا توجد توقعات مرسلة لها حالياً في قاعدة البيانات."); 
+        return; 
+      }
 
-      let count = 0;
+      let processedCount = 0;
+
       for (const predictionDoc of snap.docs) {
         const pred = predictionDoc.data();
         const p1 = parseInt(pred.score1);
@@ -95,15 +123,16 @@ export default function AdminDashboard() {
         let earnedPoints = 0;
         let isCorrect = 0, isWrong = 0;
 
-        // مطابقة قانون النقاط الحصري بالملي
-        if (p1 === finalScore1 && p2 === finalScore2) {
-          earnedPoints = 3; isCorrect = 1; // بالملي صح (+3)
-        } else if ((finalScore1 > finalScore2 && p1 > p2) || (finalScore2 > finalScore1 && p2 > p1) || (finalScore1 === finalScore2 && p1 === p2)) {
-          earnedPoints = 1; isCorrect = 1; // الفائز أو التعادل صح (+1)
+        // مطابقة قوانين النقاط بالملي
+        if (p1 === score1 && p2 === score2) {
+          earnedPoints = 3; isCorrect = 1; // النتيجة بالملي صح (+3 نقاط)
+        } else if ((score1 > score2 && p1 > p2) || (score2 > score1 && p2 > p1) || (score1 === score2 && p1 === p2)) {
+          earnedPoints = 1; isCorrect = 1; // توقع المنتخب الفائز أو التعادل صح (+1 نقطة)
         } else {
-          isWrong = 1; // خطأ (0)
+          isWrong = 1; // التوقع خطأ (0 نقاط)
         }
 
+        // جلب حساب العضو وتحديث نقاطه ومشاركته الكلية الكلية لايف لمنع الأصفار
         const userQuery = query(collection(db, "users"), where("fullName", "==", pred.user));
         const userSnap = await getDocs(userQuery);
         if (!userSnap.empty) {
@@ -111,16 +140,25 @@ export default function AdminDashboard() {
           const cur = userDoc.data();
           await updateDoc(doc(db, "users", userDoc.id), {
             points: (cur.points || 0) + earnedPoints,
-            total: (cur.total || 0) + 1, // إجمالي التوقعات الكلية (صح وخطأ) لمنع الأصفار
+            total: (cur.total || 0) + 1, // إجمالي التوقعات (صح وخطأ معاً)
             correct: (cur.correct || 0) + isCorrect,
             wrong: (cur.wrong || 0) + isWrong
           });
         }
-        await updateDoc(doc(db, "predictions", predictionDoc.id), { processed: true, pointsAwarded: earnedPoints, matchTypeAwarded: p1 === finalScore1 && p2 === finalScore2 ? "full" : (earnedPoints === 1 ? "win" : "wrong") });
-        count++;
+        
+        // قفل التوقع لمنع تكرار الاحتساب نهائياً وحفظ نوع الحسبة للتراجع
+        await updateDoc(doc(db, "predictions", predictionDoc.id), { 
+          processed: true, 
+          pointsAwarded: earnedPoints, 
+          matchTypeAwarded: p1 === score1 && p2 === score2 ? "full" : (earnedPoints === 1 ? "win" : "wrong") 
+        });
+        processedCount++;
       }
-      alert(`🎉 نجاح باهر! تم احتساب وتوزيع النقاط وتحديث صدارة الجمهور تلقائياً لـ (${count}) عضو!`);
-    } catch (err) { console.error(err); }
+
+      // تصفير الصندوق العلوي بعد النجاح
+      setBulkScore1(""); setBulkScore2(""); setSelectedMatchId("");
+      alert(`🎉 نجاح خارق ومضمون مية بالمية! تم فرز المباراة وتوزيع النقاط على (${processedCount}) عضو في ثانية واحدة!`);
+    } catch (err) { console.error("عطل في الفرز الجماعي المستقل:", err); }
   };
 
   const handleUpdateUser = async (userId: string) => {
@@ -174,9 +212,43 @@ export default function AdminDashboard() {
   return (
     <div dir="rtl" className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-8 font-sans text-right select-none">
       <style>{`.interactive-btn:active { transform: scale(0.95); filter: brightness(1.2); } .hidden-scrollbar::-webkit-scrollbar { display: none; }`}</style>
-      <h1 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-slate-700 pb-2">⚙️ لوحة تحكم الإدارة الاحترافية الكاملة (المطورة)</h1>
+      <h1 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-slate-700 pb-2">⚙️ لوحة تحكم الإدارة الاحترافية الكاملة</h1>
 
-      {/* شريط السرعة للأدمن */}
+      {/* 🚀 بداية الصندوق الذكي المستقل الجديد للفرز الجماعي السريع بضغطة زر واحدة */}
+      <section className="bg-gradient-to-r from-purple-950 to-indigo-950 p-5 rounded-2xl border border-purple-500/30 mb-8 shadow-2xl">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xl">⚡</span>
+          <div>
+            <h2 className="font-black text-sm md:text-base text-white">الصندوق الذكي المستقل للاحتساب الفوري الجماعي للمباراة</h2>
+            <p className="text-[11px] text-purple-300 mt-0.5">ادخل نتيجة أي مباراة هنا مرة واحدة، وسيقوم النظام فوراً بحساب وتوزيع النقاط على جميع الأعضاء تلقائياً</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-slate-950/50 p-4 rounded-xl border border-white/5">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-purple-300 font-bold">1. اختر المباراة المراد فرزها:</label>
+            <select value={selectedBulkMatchId} onChange={(e) => setSelectedMatchId(e.target.value)} className="bg-slate-900 text-white border border-purple-500/20 p-2.5 rounded-xl text-xs font-black focus:outline-none focus:border-purple-400">
+              <option value="">-- اضغط لاختيار المباراة --</option>
+              {SETTLEMENT_MATCHES_LIST.map((m) => (
+                <option key={m.id} value={m.id}>{m.title}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5 text-center">
+            <label className="text-[11px] text-purple-300 font-bold">أهداف الفريق الأول (الأرض):</label>
+            <input type="number" min="0" placeholder="0" className="bg-slate-900 text-green-400 text-center font-black p-2 rounded-xl border border-purple-500/20 text-sm focus:outline-none" value={bulkScore1} onChange={(e) => setBulkScore1(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5 text-center">
+            <label className="text-[11px] text-purple-300 font-bold">أهداف الفريق الثاني (الضيف):</label>
+            <input type="number" min="0" placeholder="0" className="bg-slate-900 text-green-400 text-center font-black p-2 rounded-xl border border-purple-500/20 text-sm focus:outline-none" value={bulkScore2} onChange={(e) => setBulkScore2(e.target.value)} />
+          </div>
+          <button onClick={handleSettleMatchPredictionsBulk} className="bg-gradient-to-r from-emerald-600 to-green-600 text-white font-black py-2.5 px-4 rounded-xl text-xs shadow-lg shadow-green-900/20 tracking-wide hover:brightness-110 transition-all interactive-btn w-full">
+            🚀 احتساب وتوزيع نقاط المباراة فوراً
+          </button>
+        </div>
+      </section>
+      {/* 🚀 نهاية الصندوق الذكي المستقل الجديد للفرز الجماعي */}
+
+      {/* شريط السرعة */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
         <div><h3 className="font-black text-xs text-purple-300">⚙️ التحكم بسرعة شريط التوقعات بصفحة الجمهور</h3></div>
         <div className="flex gap-2">
@@ -185,12 +257,12 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* 👥 القسم الأول: التحكم بالأعضاء (20 اسماً في الصفحة مع أزرار مستقلة) */}
+      {/* 👥 القسم الأول: التحكم بالأعضاء (قائمة أعلام منسدلة ذكية وصفحات الـ 20) */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 shadow-xl">
         <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">👤 القسم الأول: التحكم الكامل بالأعضاء وبينات الحسابات ({users.length} عضو)</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
-            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">الاسم</th><th className="p-2">الرمز السري</th><th className="p-2">المنتخب المرشح</th><th className="p-2">الإجراء</th></tr></thead>
+            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">الاسم</th><th className="p-2">الرمز السري</th><th className="p-2">المنتخب المرشح (قائمة الأعلام الذكية 🏆)</th><th className="p-2">الإجراء</th></tr></thead>
             <tbody className="divide-y divide-slate-900">
               {users.slice((userPage - 1) * itemsPerPage, userPage * itemsPerPage).map((u) => (
                 <tr key={u.id} className="hover:bg-slate-900/40">
@@ -198,7 +270,6 @@ export default function AdminDashboard() {
                   <td className="p-2 font-mono">{editingUserId === u.id ? <input type="text" className="bg-slate-900 border px-2 py-0.5 rounded text-center text-white" value={editPassword} onChange={(e)=>setEditPassword(e.target.value)} /> : u.password}</td>
                   <td className="p-2">
                     {editingUserId === u.id ? (
-                      /* قائمة منسدلة بالأعلام والمنتخبات الـ 48 كاملة من الداتابيز لتسهيل الاختيار ومطابقته */
                       <select value={editTeam} onChange={(e)=>setEditTeam(e.target.value)} className="bg-slate-900 text-white border border-slate-700 rounded px-2 py-1 text-xs focus:outline-none">
                         {WORLD_CUP_2026_TEAMS.map((t, idx) => (
                           <option key={idx} value={t.name}>{t.emoji} {t.name}</option>
@@ -210,7 +281,7 @@ export default function AdminDashboard() {
                   </td>
                   <td className="p-2 flex gap-1 justify-center">
                     {editingUserId === u.id ? <button onClick={()=>handleUpdateUser(u.id)} className="bg-green-600 px-2 py-1 rounded text-[10px] font-black interactive-btn">حفظ 💾</button> : <button onClick={()=>{setEditingUserId(u.id); setEditName(u.fullName); setEditPassword(u.password); setEditTeam(u.favoriteTeam);}} className="bg-blue-600 px-2 py-1 rounded text-[10px] font-black interactive-btn">تعديل ⚙️</button>}
-                    <button onClick={async ()=>{if(confirm("حذف العضو نهائياً؟")) await deleteDoc(doc(db,"users",u.id))}} className="bg-red-600 px-2 py-1 rounded text-[10px] font-black interactive-btn">حذف 🗑️</button>
+                    <button onClick={async ()=>{if(confirm("حذف؟")) await deleteDoc(doc(db,"users",u.id))}} className="bg-red-600 px-2 py-1 rounded text-[10px] font-black interactive-btn">حذف 🗑️</button>
                   </td>
                 </tr>
               ))}
@@ -226,7 +297,7 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      {/* 📊 تعديل يدوي مباشر لأرقام الصدارة (20 اسماً في الصفحة مع أزرار مستقلة) */}
+      {/* 📊 تعديل يدوي مباشر لإحصائيات الصدارة */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 border border-amber-500/20 shadow-xl">
         <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">📊 قسم تعديل وإجبار إحصائيات الصدارة يدوياً (يعرض 20 اسماً)</h3>
         <div className="overflow-x-auto">
@@ -234,7 +305,7 @@ export default function AdminDashboard() {
             <thead>
               <tr className="bg-slate-900 text-slate-400 border-b border-slate-800">
                 <th className="p-2 text-right">العضو</th>
-                <th className="p-2">إجمالي T التوقعات</th>
+                <th className="p-2">إجمالي التوقعات</th>
                 <th className="p-2 text-green-400">الصح</th>
                 <th className="p-2 text-red-400">الخطأ</th>
                 <th className="p-2 text-yellow-400">النقاط الكلية</th>
@@ -266,44 +337,27 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      {/* 🧮 فرز التوقعات وصندوق إدخال النتائج الجماعية الذكي الفوري (20 توقعاً في الصفحة مع أزرار مستقلة) */}
+      {/* جدول عرض قائمة التوقعات مع توفير أزرار التراجع والتصفح لـ 20 توقعاً */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 shadow-xl">
-        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 القسم الثاني والثالث: فرز وصندوق إدخال النتائج الجماعي للتوقعات (يعرض 20 توقعاً)</h3>
+        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 قائمة وجدول توقعات الجماهير الحالية (يعرض 20 توقعاً)</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
-            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">العضو</th><th className="p-2">المباراة</th><th className="p-2">التوقع المرسل</th><th className="p-2">الحالة والفرز</th><th className="p-2">صندوق إدخال النتيجة الحقيقية والفرز الجماعي الفوري</th></tr></thead>
+            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">العضو</th><th className="p-2">المباراة</th><th className="p-2">التوقع</th><th className="p-2">الحالة</th><th className="p-2">التحكم والتراجع</th></tr></thead>
             <tbody className="divide-y divide-slate-900 font-bold">
-              {predictions.slice((predPage - 1) * itemsPerPage, predPage * itemsPerPage).map((p) => {
-                const matchId = p.matchId || "default";
-                const currentInput = matchResultsInput[matchId] || { s1: "", s2: "" };
-
-                return (
-                  <tr key={p.id} className="hover:bg-slate-900/40">
-                    <td className="p-2 text-right">👤 {p.user}</td>
-                    <td className="p-2 text-purple-300">{p.t1E} {p.t1} vs {p.t2} {p.t2E}</td>
-                    <td className="p-2 text-green-400 font-mono text-sm bg-slate-900/30 px-2 py-1 rounded-md">{p.score1} - {p.score2}</td>
-                    <td className="p-2">{p.processed ? <span className="text-green-500 font-black">حُسبت تلقائياً (+{p.pointsAwarded})</span> : <span className="text-amber-500 font-black">انتظار الفرز</span>}</td>
-                    <td className="p-2 flex gap-1 justify-center items-center">
-                      {!p.processed ? (
-                        <div className="flex items-center gap-2 bg-slate-900/80 p-1 rounded-lg border border-white/5">
-                          {/* ⚽ حقول إدخال النتيجة للمباراة جماعياً */}
-                          <input type="number" min="0" placeholder="0" className="w-8 h-6 bg-slate-950 text-white rounded text-center text-xs focus:outline-none" value={currentInput.s1} onChange={(e) => setMatchResultsInput({ ...matchResultsInput, [matchId]: { ...currentInput, s1: e.target.value } })} />
-                          <span className="text-slate-500 text-xs">-</span>
-                          <input type="number" min="0" placeholder="0" className="w-8 h-6 bg-slate-950 text-white rounded text-center text-xs focus:outline-none" value={currentInput.s2} onChange={(e) => setMatchResultsInput({ ...matchResultsInput, [matchId]: { ...currentInput, s2: e.target.value } })} />
-                          
-                          {/* 🚀 زر الفرز الجماعي الذكي كبسة واحدة */}
-                          <button onClick={() => handleSettleMatchPredictionsBulk(matchId, p.t1, p.t2, parseInt(currentInput.s1), parseInt(currentInput.s2))} className="bg-gradient-to-r from-emerald-600 to-green-600 text-white px-2.5 py-0.5 rounded text-[9px] font-black interactive-btn shadow-md">
-                            🚀 فرز نقاط المباراة بالكامل
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => handleUndoPointsManual(p)} className="bg-orange-600 text-white font-black px-3 py-0.5 rounded text-[10px] interactive-btn shadow-md">↩️ تراجع عن الحسبة</button>
-                      )}
-                      <button onClick={async ()=>{if(confirm("حذف؟")) await deleteDoc(doc(db,"predictions",p.id))}} className="bg-red-950 text-red-400 px-2 py-0.5 rounded text-[10px] interactive-btn">حذف</button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {predictions.slice((predPage - 1) * itemsPerPage, predPage * itemsPerPage).map((p) => (
+                <tr key={p.id} className="hover:bg-slate-900/40">
+                  <td className="p-2 text-right">👤 {p.user}</td>
+                  <td className="p-2 text-purple-300">{p.t1} vs {p.t2}</td>
+                  <td className="p-2 text-green-400 font-mono">{p.score1} - {p.score2}</td>
+                  <td className="p-2">{p.processed ? <span className="text-green-500 font-black">حُسبت بالصندوق (+{p.pointsAwarded})</span> : <span className="text-amber-500 font-black">انتظار الفرز بالصندوق العلوي ⏰</span>}</td>
+                  <td className="p-2 flex gap-1 justify-center">
+                    {p.processed && (
+                      <button onClick={() => handleUndoPointsManual(p)} className="bg-orange-600 text-white font-black px-3 py-0.5 rounded text-[10px] interactive-btn shadow-md">↩️ تراجع عن الحسبة</button>
+                    )}
+                    <button onClick={async ()=>{if(confirm("حذف؟")) await deleteDoc(doc(db,"predictions",p.id))}} className="bg-red-950 text-red-400 px-2 py-0.5 rounded text-[10px] interactive-btn">حذف</button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -316,13 +370,13 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      {/* الرقابة على الشات (20 رسالة في الصفحة مع أزرار مستقلة) */}
-      <section className="bg-slate-950 p-4 rounded-xl shadow-xl border border-white/5">
+      {/* الرقابة على الشات */}
+      <section className="bg-slate-950 p-4 rounded-xl shadow-xl">
         <h3 className="font-black text-xs text-red-400 mb-2 border-b border-slate-800 pb-1">💬 القسم الرابع: الرقابة والتحكم بـ شات صفحة الجمهور (يعرض 20 رسالة)</h3>
         <div className="space-y-2 mb-3">
           {chats.slice((chatPage - 1) * itemsPerPage, chatPage * itemsPerPage).map((c) => (
             <div key={c.id} className="bg-slate-900 p-2 rounded-lg flex items-center justify-between text-xs">
-              <div><span className="font-black text-purple-400">👤 {c.user} {c.teamEmoji}:</span> <span className="text-slate-200 font-medium">{c.text}</span></div>
+              <div><span className="font-black text-purple-400">👤 {c.user}:</span> <span className="text-slate-200 font-medium">{c.text}</span></div>
               <button onClick={async()=>await deleteDoc(doc(db,"chats",c.id))} className="bg-red-900/50 text-red-300 px-2 py-0.5 rounded font-bold interactive-btn">حذف رسالة ✕</button>
             </div>
           ))}
