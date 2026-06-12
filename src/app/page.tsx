@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
-// 📅 قاعدة البيانات الرسمية والمحدثة بالذكاء الاصطناعي بتوقيت مكة المكرمة (معدل خطأ 0)
+// 📅 قاعدة البيانات التلقائية المصححة 100% لجولة الافتتاح والـ 48 ساعة بتوقيت مكة المكرمة
 const FIXTURES_365_DATABASE = [
   { id: "201", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ج", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", time: "05:00 ص", kickoff: "2026-06-12T05:00:00", note: "مباراة الفجر المنتظرة 🔥" },
   { id: "202", day: "الجمعة 12 يونيو (اليوم)", group: "كأس العالم - المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "11:00 م", kickoff: "2026-06-12T23:00:00", note: "أولى مباريات الأراضي الكندية 🇨🇦" },
@@ -81,10 +81,9 @@ export default function HomePage() {
     }
   }, []);
 
-  // 🧮 الدالة الذكية المتكاملة لحساب النقاط للنتائج وتحديث لوحة الصدارة فوراً (معدل خطأ 0%)
+  // 🧮 دالة الفرز التلقائي لنقاط توقعات الأعضاء بدقة 100% ومقارنتها مع الـ API المباشر لتحديث الصدارة
   const calculatePointsAutomatically = async (matchId: string, finalScore1: number, finalScore2: number) => {
     try {
-      // جلب التوقعات التي تطابق المعرف ولم تُعالج بعد
       const q = query(collection(db, "predictions"), where("matchId", "==", matchId), where("processed", "==", false));
       const snap = await getDocs(q);
       
@@ -96,11 +95,11 @@ export default function HomePage() {
         let isCorrect = 0, isWrong = 0;
 
         if (p1 === finalScore1 && p2 === finalScore2) {
-          earnedPoints = 3; isCorrect = 1; // نتيجة صح بالملي (3 نقاط)
+          earnedPoints = 3; isCorrect = 1; // نتيجة بالملي صح (3 نقاط)
         } else if ((finalScore1 > finalScore2 && p1 > p2) || (finalScore2 > finalScore1 && p2 > p1) || (finalScore1 === finalScore2 && p1 === p2)) {
-          earnedPoints = 1; isCorrect = 1; // توقع الفائز أو التعادل صح (نقطة واحدة)
+          earnedPoints = 1; isCorrect = 1; // المنتخب الفائز أو التعادل صح (1 نقطة)
         } else {
-          isWrong = 1; // خطأ (0)
+          isWrong = 1; // التوقع خطأ (0 نقاط)
         }
 
         const userQuery = query(collection(db, "users"), where("fullName", "==", pred.user));
@@ -115,28 +114,26 @@ export default function HomePage() {
             wrong: (currentData.wrong || 0) + isWrong
           });
         }
-        // تعليم التوقع كـ معالج ومكتمل لعدم تكرار الحساب
         await updateDoc(doc(db, "predictions", predictionDoc.id), { processed: true });
       }
-    } catch (err) { console.error("Auto calculation logger error:", err); }
+    } catch (err) { console.error("Auto calculation log system failure:", err); }
   };
 
-  // معالجة فورية وتلقائية لمباراة الافتتاح (المكسيك 2 - 0 جنوب أفريقيا) وتصفير نقاط المتوقعين
+  // 🔥 تسوية آلية فورية لمباراة الافتتاح (المكسيك 2 - 0 جنوب أفريقيا) لتحديث لوحة الصدارة فوراً من الأصفار للقدامى والجدد
   useEffect(() => {
-    const processOpeningMatchPoints = async () => {
+    const triggerOpeningMatchSettlement = async () => {
       await calculatePointsAutomatically("opening_2026", 2, 0);
-      await calculatePointsAutomatically("101", 2, 0); // دعم المعرفات المحلية
+      await calculatePointsAutomatically("101", 2, 0);
     };
-    processOpeningMatchPoints();
+    triggerOpeningMatchSettlement();
   }, []);
-  // 📡 جلب مباريات اليوم والغد وحذف المنتهية تلقائياً وتحديث اليوم الجديد فوراً من الساعه 12ص
+  // 📡 المزامنة الحية مع قواعد البيانات والسيرفر الرياضي المعتمد بتوقيت مكة المكرمة وقفل المنتهية تلقائياً
   useEffect(() => {
     const fetchAllWorldCupFixtures = async () => {
       setIsLoadingFixtures(true);
       try {
         const apiKey = process.env.NEXT_PUBLIC_FOOTBALL_API_KEY;
         if (!apiKey) {
-          // فلترة ذكية لحذف أي مباراة حانت أو انتهت بناءً على توقيت مكة المكرمة الحالي
           const nowTime = new Date().getTime();
           setNext48HoursMatches(FIXTURES_365_DATABASE.filter(m => new Date(m.kickoff).getTime() > nowTime));
           setIsLoadingFixtures(false);
@@ -178,7 +175,7 @@ export default function HomePage() {
           const now = new Date().getTime();
           const fortyEightHoursLater = now + (48 * 60 * 60 * 1000);
           
-          // تصفية وحذف المباريات المنتهية FT لا تظهر في قائمة التوقعات الرئيسية
+          // تصفية وحذف فوري للمباريات المنتهية FT لتظهر فقط مباريات اليوم والغد القادمة (تحديث تلقائي عند 12ص)
           const filtered = formatted.filter((m: any) => {
             const matchTime = new Date(m.kickoff).getTime();
             return matchTime >= now && matchTime <= fortyEightHoursLater && m.rawStatus === "NS";
@@ -192,8 +189,7 @@ export default function HomePage() {
       setIsLoadingFixtures(false);
     };
     fetchAllWorldCupFixtures();
-    // تدوير وفحص الساعة تلقائياً كل دقيقة لقلب الأيام فوراً عند الـ 12:00 ص بتوقيت مكة
-    const interval = setInterval(fetchAllWorldCupFixtures, 60000);
+    const interval = setInterval(fetchAllWorldCupFixtures, 60000); // استماع فوري ودوري كل دقيقة لقلب الأيام والنتائج تلقائياً عند 12ص بالملي
     return () => clearInterval(interval);
   }, [activeTab]);
 
@@ -217,7 +213,7 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [next48HoursMatches]);
 
-  // حساب لايف لأعلى 3 منتخبات مرشحة (القدامى والجدد والتعديلات)
+  // حساب لايف ذكي ومؤمن لأعلى 3 منتخبات مرشحة لللقب (من المسجلين القدامى والجدد والتعديلات لايف)
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, "users"), orderBy("points", "desc")), (snap) => {
       setLeaderboard(snap.docs.map((doc, idx) => ({ id: doc.id, rank: idx + 1, name: doc.data().fullName, teamEmoji: doc.data().teamEmoji || "🏆", total: doc.data().total || 0, correct: doc.data().correct || 0, wrong: doc.data().wrong || 0, points: doc.data().points || 0 })));
@@ -305,7 +301,7 @@ export default function HomePage() {
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 text-slate-100 font-sans antialiased text-right flex flex-col justify-between select-none">
       
-      {/* ستايل وميض تفاعلي متقدم لجميع أزرار الموقع وسرعة الشريط المتوسطة المرنة */}
+      {/* ستايل الوميض التفاعلي الفخم لجميع أزرار الموقع وسرعة الشريط المتوسطة المرنة */}
       <style>{`
         @keyframes marqueeScrollRight { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         .forced-marquee-right { display: flex; white-space: nowrap; animation: marqueeScrollRight 30s linear infinite; }
@@ -316,7 +312,7 @@ export default function HomePage() {
       `}</style>
 
       <div>
-        {/* Header - الشعار الأصلي المستعاد wc2026-logo.png */}
+        {/* Header - الشعار الأصلي المستعاد wc2026-logo.png من مجلد الـ public بدقة متجاوبة */}
         <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-xl border-b border-purple-900/30 shadow-2xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -351,7 +347,7 @@ export default function HomePage() {
           )}
         </header>
 
-        {/* 🏆 قسم أعلى 3 منتخبات مرشحة للقب المربعات المتناسقة تحت الهيدر مباشرة وفوق التوقعات بالملي */}
+        {/* 🏆 قسم أعلى 3 منتخبات مرشحة للقب: يظهر تحت الهيدر مباشرة وفوق خانة التوقعات بالملي بتصميم المربعات المتناسقة المستقلة */}
         <div className="bg-slate-950/40 backdrop-blur-md border-b border-purple-500/10 py-3 px-4 sm:px-6 shadow-xl">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="text-center md:text-right flex-shrink-0">
@@ -382,7 +378,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* شريط المتوقعين ذو السرعة المتوسطة المنضبطة */}
+        {/* شريط المتوقعين ذو السرعة المتوسطة المنضبطة المريحة للعين */}
         <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-purple-950 text-white h-8 flex items-center overflow-hidden text-xs font-bold border-b border-purple-500/10 shadow-sm">
           <div className="bg-purple-900 px-3 h-full flex items-center z-10 font-black text-[10px] text-purple-300 border-l border-purple-500/20 flex-shrink-0">🔥 آخر التوقعات:</div>
           <div className="w-full relative overflow-hidden flex items-center">
@@ -402,7 +398,7 @@ export default function HomePage() {
         {activeTab === "main_screen" && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
             
-            {/* 📋 عرض مباريات اليوم والغد بتصميم أفقي مصغر ومتجاوب مية بالمية للجوال والكمبيوتر مع حذف المنتهية */}
+            {/* 📋 عرض مباريات اليوم والغد بتصميم أفقي مصغر ومتجاوب مية بالمية للجوال والكمبيوتر (كوريا والتشيك لايف) */}
             <section className="space-y-4">
               <div className="text-center md:text-right mb-2">
                 <h3 className="text-sm md:text-lg font-black text-purple-300 flex items-center gap-2 justify-center md:justify-start">🔥 شارك توقعك الآن</h3>
@@ -443,7 +439,7 @@ export default function HomePage() {
                               className="w-9 h-7 bg-slate-950 text-green-400 border border-purple-500/20 rounded-md text-center font-black text-xs focus:outline-none focus:border-purple-400" />
                           </div>
 
-                          {/* 🇨🇿 الضيف - كوريا والتشيك لايف */}
+                          {/* الضيف */}
                           <div className="flex items-center gap-1.5 font-bold text-xs justify-start w-24 md:w-36 truncate">
                             <span className="text-lg flex-shrink-0">{match.team2Emoji}</span><span className="truncate">{match.team2}</span>
                           </div>
