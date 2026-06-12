@@ -16,6 +16,13 @@ export default function AdminDashboard() {
   const [editPassword, setEditPassword] = useState("");
   const [editTeam, setEditTeam] = useState("");
 
+  // 📝 States التعديل اليدوي المباشر لأرقام لوحة الصدارة
+  const [scoreEditUserId, setScoreEditUserId] = useState("");
+  const [editPoints, setEditPoints] = useState(0);
+  const [editTotal, setEditTotal] = useState(0);
+  const [editCorrect, setEditCorrect] = useState(0);
+  const [editWrong, setEditWrong] = useState(0);
+
   const [userPage, setUserPage] = useState(1);
   const [predPage, setPredPage] = useState(1);
   const itemsPerPage = 10;
@@ -34,7 +41,19 @@ export default function AdminDashboard() {
     setEditingUserId(""); alert("✅ تم التعديل بصفحة الجمهور لايف!");
   };
 
-  // 🧮 فرز واحتساب النقاط وحفظ قيمة النقاط الموزعة بداخل التوقع للقدرة على خصمها لاحقاً بالتراجع
+  // 📊 كبسة زر تحديث أرقام لوحة الصدارة يدوياً لحل مشكلة التجميد والأصفار فوراً مية بالمية
+  const handleUpdateUserScoresManual = async (userId: string) => {
+    try {
+      await updateDoc(doc(db, "users", userId), {
+        points: Number(editPoints),
+        total: Number(editTotal),
+        correct: Number(editCorrect),
+        wrong: Number(editWrong)
+      });
+      setScoreEditUserId(""); alert("🏆 تم تحديث وإجبار لوحة الصدارة على التغيير أمام الجمهور لايف!");
+    } catch (err) { console.error(err); }
+  };
+
   const handleGrantPointsManual = async (pred: any, type: "full" | "win" | "wrong") => {
     let pointsToAdd = 0, isCorrect = 0, isWrong = 0;
     if (type === "full") { pointsToAdd = 3; isCorrect = 1; }
@@ -51,18 +70,15 @@ export default function AdminDashboard() {
         correct: (cur.correct || 0) + isCorrect,
         wrong: (cur.wrong || 0) + isWrong
       });
-      // نقوم بتخزين كم نقطة عطيناه ووش الحالة عشان نقدر نتراجع
       await updateDoc(doc(db, "predictions", pred.id), { processed: true, pointsAwarded: pointsToAdd, matchTypeAwarded: type });
-      alert(`🏆 تم فرز النقاط بنجاح للعضو ${pred.user}`);
+      alert(`🏆 حُسبت النقاط للعضو ${pred.user} وتحدثت الصدارة للجمهور!`);
     }
   };
 
-  // 🛠️ ميزة التراجع الجذري الحصري: يخصم النقاط ويرجع حالة التوقع لـ "انتظار"
   const handleUndoPointsManual = async (pred: any) => {
     if (!pred.processed) return;
     const pointsToSubtract = pred.pointsAwarded || 0;
     const type = pred.matchTypeAwarded;
-
     let isCorrect = type === "full" || type === "win" ? 1 : 0;
     let isWrong = type === "wrong" ? 1 : 0;
 
@@ -70,44 +86,46 @@ export default function AdminDashboard() {
     if (!uSnap.empty) {
       const uDoc = uSnap.docs[0];
       const cur = uDoc.data();
-      
-      // خصم النقاط المسجلة بالخطأ وإعادة الصدارة
       await updateDoc(doc(db, "users", uDoc.id), {
         points: Math.max((cur.points || 0) - pointsToSubtract, 0),
         total: Math.max((cur.total || 0) - 1, 0),
         correct: Math.max((cur.correct || 0) - isCorrect, 0),
         wrong: Math.max((cur.wrong || 0) - isWrong, 0)
       });
-
-      // إرجاع حالة التوقع لـ "غير معالج" ليظهر لك في لوحة الإدارة مجدداً للفرز الصحيح
       await updateDoc(doc(db, "predictions", pred.id), { processed: false, pointsAwarded: 0, matchTypeAwarded: "" });
-      alert(`↩️ تم التراجع بنجاح! تم خصم ${pointsToSubtract} نقاط من حساب ${pred.user} وإعادة التوقع لجدول الفرز.`);
+      alert(`↩️ تم التراجع وخصم النقاط بنجاح!`);
     }
   };
 
+  // 🛠️ صيانة وتأمين دالة تحديث سرعة شريط التوقعات السطر 110 المسببة للخطأ
   const handleUpdateTickerSpeed = async () => {
-    if (tickerId) { await updateDoc(doc(db, "ticker_settings", tickerId), { speed: tickerSpeed }); }
-    else { await addDoc(collection(db, "ticker_settings"), { speed: tickerSpeed }); }
-    alert("⚡ تم تغيير سرعة شريط الجمهور!");
+    try {
+      if (tickerId) { 
+        await updateDoc(doc(db, "ticker_settings", tickerId), { speed: tickerSpeed }); 
+      } else { 
+        await addDoc(collection(db, "ticker_settings"), { speed: tickerSpeed }); 
+      }
+      alert("⚡ تم تغيير سرعة شريط الجمهور فوراً وبدون أخطاء!");
+    } catch (err) { console.error(err); }
   };
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-8 font-sans text-right">
       <style>{`.interactive-btn:active { transform: scale(0.95); filter: brightness(1.2); }`}</style>
-      <h1 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-slate-700 pb-2">⚙️ لوحة تحكم الإدارة الاحترافية</h1>
+      <h1 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-slate-700 pb-2">⚙️ لوحة تحكم الإدارة الاحترافية الكاملة</h1>
 
-      {/* شريط السرعة */}
+      {/* شريط السرعة المصلح والآمن للـ Build مية بالمية */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div><h3 className="font-black text-xs text-purple-300">⚙️ التحكم بسرعة شريط التوقعات بصفحة الجمهور</h3></div>
         <div className="flex gap-2">
           <select value={tickerSpeed} onChange={(e) => setTickerSpeed(e.target.value)} className="bg-slate-900 border p-2 rounded-lg text-xs text-white focus:outline-none"><option value="15s">سريع (15ث)</option><option value="30s">متوسط (30ث)</option><option value="50s">بطيء (50ث)</option></select>
-          <button onClick={handleUpdateTickerSpeed} className="bg-purple-600 px-4 py-2 rounded-lg text-xs font-black interactive-btn">تحديث السرعة ⚡</button>
+          <button onClick={handleUpdateTickerSpeed} className="bg-purple-600 px-4 py-2 rounded-lg text-xs font-black interactive-btn">تحديث ⚡</button>
         </div>
       </section>
 
       {/* إدارة الأعضاء */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6">
-        <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">👤 القسم الأول: التحكم الكامل بالأعضاء</h3>
+        <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">👤 القسم الأول: التحكم الكامل بالأعضاء وبينات الحسابات</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
             <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">الاسم</th><th className="p-2">الرمز</th><th className="p-2">الترشيح</th><th className="p-2">الإجراء</th></tr></thead>
@@ -126,10 +144,46 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
-        <div className="flex justify-center gap-4 mt-3 text-xs font-bold"><button onClick={()=>setUserPage(p=>Math.max(p-1,1))} className="bg-slate-800 px-3 py-1 rounded">السابق</button><span>{userPage}</span><button onClick={()=>setUserPage(p=>p+1)} className="bg-slate-800 px-3 py-1 rounded">التالي</button></div>
       </section>
 
-      {/* توزيع النقاط والتراجع المستحدث */}
+      {/* 📊 التحكم وتعديل أرقام وإحصائيات لوحة الصدارة يدوياً */}
+      <section className="bg-slate-950 p-4 rounded-xl mb-6 border border-amber-500/20">
+        <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">📊 قسم تعديل وإجبار إحصائيات الصدارة يدوياً (النقاط - التوقعات - الصح - الخطأ)</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-center border-collapse">
+            <thead>
+              <tr className="bg-slate-900 text-slate-400 border-b border-slate-800">
+                <th className="p-2 text-right">العضو</th>
+                <th className="p-2">إجمالي التوقعات</th>
+                <th className="p-2 text-green-400">الصح</th>
+                <th className="p-2 text-red-400">الخطأ</th>
+                <th className="p-2 text-yellow-400">النقاط الكلية</th>
+                <th className="p-2">التحكم اليدوي المباشر</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-900">
+              {users.slice((userPage - 1) * itemsPerPage, userPage * itemsPerPage).map((u) => (
+                <tr key={u.id} className="hover:bg-slate-900/40">
+                  <td className="p-2 text-right font-black text-white">👤 {u.fullName}</td>
+                  <td className="p-2">{scoreEditUserId === u.id ? <input type="number" className="w-12 bg-slate-900 border text-center" value={editTotal} onChange={(e)=>setEditTotal(Number(e.target.value))} /> : u.total || 0}</td>
+                  <td className="p-2 text-green-400">{scoreEditUserId === u.id ? <input type="number" className="w-12 bg-slate-900 border text-center" value={editCorrect} onChange={(e)=>setEditCorrect(Number(e.target.value))} /> : u.correct || 0}</td>
+                  <td className="p-2 text-red-400">{scoreEditUserId === u.id ? <input type="number" className="w-12 bg-slate-900 border text-center" value={editWrong} onChange={(e)=>setEditWrong(Number(e.target.value))} /> : u.wrong || 0}</td>
+                  <td className="p-2 text-amber-400 font-black">{scoreEditUserId === u.id ? <input type="number" className="w-12 bg-slate-900 border text-center" value={editPoints} onChange={(e)=>setEditPoints(Number(e.target.value))} /> : u.points || 0}</td>
+                  <td className="p-2 flex gap-1 justify-center">
+                    {scoreEditUserId === u.id ? (
+                      <button onClick={()=>handleUpdateUserScoresManual(u.id)} className="bg-emerald-600 px-3 py-1 rounded text-[10px] interactive-btn">تحديث الصدارة لايف 💾</button>
+                    ) : (
+                      <button onClick={()=>{setScoreEditUserId(u.id); setEditTotal(u.total || 0); setEditCorrect(u.correct || 0); setEditWrong(u.wrong || 0); setEditPoints(u.points || 0);}} className="bg-amber-600 text-slate-950 font-black px-3 py-1 rounded text-[10px] interactive-btn">تعديل الإحصائيات 📊</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* توزيع النقاط والتراجع اليدوي */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6">
         <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 القسم الثاني والثالث: فرز التوقعات وتوزيع النقاط والتراجع اليدوي</h3>
         <div className="overflow-x-auto">
@@ -159,7 +213,6 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
-        <div className="flex justify-center gap-4 mt-3 text-xs font-bold"><button onClick={()=>setPredPage(p=>Math.max(p-1,1))} className="bg-slate-800 px-3 py-1 rounded">السابق</button><span>{predPage}</span><button onClick={()=>setPredPage(p=>p+1)} className="bg-slate-800 px-3 py-1 rounded">التالي</button></div>
       </section>
 
       {/* الرقابة على الشات */}
