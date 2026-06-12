@@ -1,197 +1,143 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { collection, onSnapshot, orderBy, query, doc, deleteDoc, updateDoc, getDocs, addDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase"; 
+import { collection, onSnapshot, query, orderBy, getDocs, doc, updateDoc, deleteDoc, where, addDoc } from "firebase/firestore";
 
 export default function AdminDashboard() {
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [adminUsername, setAdminUsername] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
-
   const [users, setUsers] = useState<any[]>([]);
   const [predictions, setPredictions] = useState<any[]>([]);
   const [chats, setChats] = useState<any[]>([]);
-  
-  const [userCurrentPage, setUserCurrentPage] = useState(1);
-  const usersPerPage = 10;
+  const [tickerSpeed, setTickerSpeed] = useState("30s");
+  const [tickerId, setTickerSpeedId] = useState("");
 
-  const [matchSettings, setMatchSettings] = useState({
-    id: "opening_2026", team1: "المكسيك", team1Emoji: "🇲🇽", team2: "جنوب أفريقيا", team2Emoji: "🇿🇦",
-    kickoff: "2026-06-11T22:00:00", status: "بانتظار ركلة البداية", score: "0 - 0"
-  });
+  const [editingUserId, setEditingUserId] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editTeam, setEditTeam] = useState("");
+
+  const [userPage, setUserPage] = useState(1);
+  const [predPage, setPredPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
-    if (!isAdminAuthenticated) return;
-
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-      setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    onSnapshot(query(collection(db, "users"), orderBy("fullName", "asc")), (snap) => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    onSnapshot(query(collection(db, "predictions"), orderBy("createdAt", "desc")), (snap) => setPredictions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    onSnapshot(query(collection(db, "chats"), orderBy("createdAt", "desc")), (snap) => setChats(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    onSnapshot(collection(db, "ticker_settings"), (snap) => {
+      if (!snap.empty) { setTickerSpeed(snap.docs[0].data().speed || "30s"); setTickerSpeedId(snap.docs[0].id); }
     });
+  }, []);
 
-    const unsubPreds = onSnapshot(query(collection(db, "predictions"), orderBy("createdAt", "desc")), (snap) => {
-      setPredictions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+  const handleUpdateUser = async (userId: string) => {
+    await updateDoc(doc(db, "users", userId), { fullName: editName, password: editPassword, favoriteTeam: editTeam });
+    setEditingUserId(""); alert("✅ تم التعديل بصفحة الجمهور لايف!");
+  };
 
-    const unsubChats = onSnapshot(query(collection(db, "chats"), orderBy("createdAt", "desc")), (snap) => {
-      setChats(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+  const handleGrantPointsManual = async (pred: any, type: "full" | "win" | "wrong") => {
+    let pointsToAdd = 0, isCorrect = 0, isWrong = 0;
+    if (type === "full") { pointsToAdd = 3; isCorrect = 1; }
+    else if (type === "win") { pointsToAdd = 1; isCorrect = 1; }
+    else { isWrong = 1; }
 
-    const unsubMatch = onSnapshot(collection(db, "match_settings"), (snap) => {
-      if (!snap.empty) setMatchSettings({ id: snap.docs[0].id, ...snap.docs[0].data() } as any);
-    });
-
-    return () => { unsubUsers(); unsubPreds(); unsubChats(); unsubMatch(); };
-  }, [isAdminAuthenticated]);
-
-  const handleAdminVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminUsername === "عبدالسلام العنزي" && adminPassword === "96650") {
-      setIsAdminAuthenticated(true);
-    } else {
-      alert("❌ خطأ: الرمز السري غير صحيح.");
+    const uSnap = await getDocs(query(collection(db, "users"), where("fullName", "==", pred.user)));
+    if (!uSnap.empty) {
+      const uDoc = uSnap.docs[0];
+      const cur = uDoc.data();
+      await updateDoc(doc(db, "users", uDoc.id), {
+        points: (cur.points || 0) + pointsToAdd,
+        total: (cur.total || 0) + 1,
+        correct: (cur.correct || 0) + isCorrect,
+        wrong: (cur.wrong || 0) + isWrong
+      });
+      await updateDoc(doc(db, "predictions", pred.id), { processed: true });
+      alert(`🏆 حُسبت النقاط للعضو ${pred.user} وتحدثت الصدارة للجمهور!`);
     }
   };
 
-  const deleteItem = async (col: string, id: string) => {
-    if (confirm("هل أنت متأكد من الحذف النهائي الفوري من قاعدة البيانات؟")) {
-      await deleteDoc(doc(db, col, id));
-    }
+  const handleUpdateTickerSpeed = async () => {
+    if (tickerId) { await updateDoc(doc(db, "ticker_settings", tickerId), { speed: tickerSpeed }); }
+    else { await addDoc(collection(db, "ticker_settings"), { speed: tickerSpeed }); }
+    alert("⚡ تم تغيير سرعة شريط الجمهور!");
   };
-
-  const adminUpdateUsername = async (id: string, currentName: string) => {
-    const newName = prompt("ادخل الاسم الجديد للعضو:", currentName);
-    if (newName && newName.trim() !== "") {
-      await updateDoc(doc(db, "users", id), { fullName: newName.trim() });
-    }
-  };
-
-  const adminUpdateUserPassword = async (id: string, currentPass: string) => {
-    const newPass = prompt("ادخل الرقم السري الجديد للعضو:", currentPass || "");
-    if (newPass && newPass.trim() !== "") {
-      await updateDoc(doc(db, "users", id), { password: newPass.trim() });
-    }
-  };
-
-  // ميزة إضافية للأدمن: تعديل رقم الجوال يدوياً لو أخطأ العضو
-  const adminUpdateUserPhone = async (id: string, currentPhone: string) => {
-    const newPhone = prompt("ادخل رقم الجوال الجديد للعضو:", currentPhone || "");
-    if (newPhone !== null) {
-      await updateDoc(doc(db, "users", id), { phone: newPhone.trim() });
-    }
-  };
-
-  const updateUserPoints = async (id: string, currentPoints: number) => {
-    const points = prompt("ادخل عدد النقاط الجديد للعضو المختار:", currentPoints.toString());
-    if (points !== null) await updateDoc(doc(db, "users", id), { points: parseInt(points) || 0 });
-  };
-
-  const updateMatchOnServer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = await getDocs(collection(db, "match_settings"));
-    if (!q.empty) {
-      await updateDoc(doc(db, "match_settings", q.docs[0].id), matchSettings);
-    } else {
-      await addDoc(collection(db, "match_settings"), matchSettings);
-    }
-    alert("🚀 تم التحديث اللحظي بنجاح!");
-  };
-
-  const adminLastUserIndex = userCurrentPage * usersPerPage;
-  const adminFirstUserIndex = adminLastUserIndex - usersPerPage;
-  const slicedAdminUsers = users.slice(adminFirstUserIndex, adminLastUserIndex);
-  const maxAdminUserPages = Math.ceil(users.length / usersPerPage);
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-950 p-4 md:p-6 text-slate-100 font-sans text-right space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-900 p-4 rounded-xl border border-amber-500/20 shadow-xl gap-4">
-        <div><h1 className="text-sm md:text-lg font-black text-amber-400">🛠️ لوحة القيادة العليا والتحكم المطلق | عبدالسلام العنزي</h1></div>
-        <button onClick={()=>window.location.href="/"} className="bg-purple-950 hover:bg-purple-900 border border-purple-500/30 text-purple-300 px-4 py-2 rounded-xl font-bold text-xs">👁️ عرض الموقع</button>
-      </div>
+    <div dir="rtl" className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-8 font-sans text-right">
+      <style>{`.interactive-btn:active { transform: scale(0.95); filter: brightness(1.2); }`}</style>
+      <h1 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-slate-700 pb-2">⚙️ لوحة تحكم الإدارة الاحترافية</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-slate-900 p-4 rounded-xl border border-purple-500/10 space-y-3 shadow-md">
-          <h3 className="font-black text-amber-400 border-b border-white/5 pb-2 text-xs md:text-sm">🏟️ التحكم بالمباراة والصفحة الرئيسية</h3>
-          <form onSubmit={updateMatchOnServer} className="space-y-3 text-xs">
-            <div><label className="text-[10px] text-slate-400">اسم المنتخب الأول</label><input type="text" value={matchSettings.team1} onChange={(e)=>setMatchSettings({...matchSettings, team1: e.target.value})} className="w-full bg-slate-950 p-2 rounded text-white mt-1 border border-white/5 focus:outline-none" /></div>
-            <div><label className="text-[10px] text-slate-400">اسم المنتخب الثاني</label><input type="text" value={matchSettings.team2} onChange={(e)=>setMatchSettings({...matchSettings, team2: e.target.value})} className="w-full bg-slate-950 p-2 rounded text-white mt-1 border border-white/5 focus:outline-none" /></div>
-            <div><label className="text-[10px] text-slate-400">النتيجة الحية الحين</label><input type="text" value={matchSettings.score} onChange={(e)=>setMatchSettings({...matchSettings, score: e.target.value})} className="w-full bg-slate-950 p-2 rounded text-green-400 font-bold mt-1 border border-white/5 focus:outline-none" /></div>
-            <div><label className="text-[10px] text-slate-400">وقت ركلة البداية (توقيت مكة)</label><input type="text" value={matchSettings.kickoff} onChange={(e)=>setMatchSettings({...matchSettings, kickoff: e.target.value})} className="w-full bg-slate-950 p-2 rounded text-white font-mono mt-1 border border-white/5 focus:outline-none" /></div>
-            <div><label className="text-[10px] text-slate-400">حالة البث والمباراة</label><input type="text" value={matchSettings.status} onChange={(e)=>setMatchSettings({...matchSettings, status: e.target.value})} className="w-full bg-slate-950 p-2 rounded text-white mt-1 border border-white/5 focus:outline-none" /></div>
-            <button type="submit" className="w-full bg-amber-500 text-slate-950 font-black py-2.5 rounded-xl transition-all shadow-md">تحديث المنصة 🚀</button>
-          </form>
+      {/* شريط السرعة */}
+      <section className="bg-slate-950 p-4 rounded-xl mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div><h3 className="font-black text-xs text-purple-300">⚙️ التحكم بسرعة شريط التوقعات بصفحة الجمهور</h3></div>
+        <div className="flex gap-2">
+          <select value={tickerSpeed} onChange={(e) => setTickerSpeed(e.target.value)} className="bg-slate-900 border p-2 rounded-lg text-xs text-white focus:outline-none"><option value="15s">سريع (15ث)</option><option value="30s">متوسط (30ث)</option><option value="50s">بطيء (50ث)</option></select>
+          <button onClick={handleUpdateTickerSpeed} className="bg-purple-600 px-4 py-2 rounded-lg text-xs font-black interactive-btn">تحديث ⚡</button>
         </div>
+      </section>
 
-        {/* 👥 جدول التحكم بالأعضاء متضمناً رقم الجوال الجديد */}
-        <div className="lg:col-span-2 bg-slate-900 p-4 rounded-xl border border-purple-500/10 h-[435px] flex flex-col justify-between shadow-md">
-          <div>
-            <h3 className="font-black text-amber-400 border-b border-white/5 pb-2 text-xs md:text-sm mb-2">👥 إدارة المشتركين، أرقام الجوال، كلمات السر والنقاط</h3>
-            <div className="overflow-y-auto max-h-[300px] text-xs hidden-scrollbar overflow-x-auto">
-              <table className="w-full text-center border-collapse min-w-[750px]">
-                <thead>
-                  <tr className="bg-slate-950/50 text-slate-400 font-bold border-b border-white/5">
-                    <th className="py-2 text-right">الاسم المسجل</th>
-                    <th>الرقم السري</th>
-                    <th>رقم الجوال 📱</th>
-                    <th>النقاط</th>
-                    <th>خيارات الإدارة الكلية</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-slate-300 font-semibold">
-                  {slicedAdminUsers.map((u, i) => (
-                    <tr key={i} className="hover:bg-white/5 transition-colors">
-                      <td className="py-2.5 text-right text-white font-black">{u.fullName} {u.teamEmoji}</td>
-                      <td className="font-mono text-purple-400 font-bold bg-purple-950/20 px-2 py-0.5 rounded-lg border border-purple-500/10 inline-block mt-1">{u.password || "لا يوجد"}</td>
-                      <td className="font-mono text-slate-300 font-bold">{u.phone || "—"}</td>
-                      <td className="font-mono text-yellow-400 font-black text-sm">{u.points || 0}</td>
-                      <td className="space-x-1 space-x-reverse">
-                        <button onClick={()=>adminUpdateUsername(u.id, u.fullName)} className="bg-slate-950 text-slate-300 border border-white/10 px-1.5 py-0.5 rounded text-[11px]">الاسم</button>
-                        <button onClick={()=>adminUpdateUserPassword(u.id, u.password)} className="bg-slate-950 text-slate-300 border border-white/10 px-1.5 py-0.5 rounded text-[11px]">الرمز</button>
-                        <button onClick={()=>adminUpdateUserPhone(u.id, u.phone)} className="bg-slate-950 text-slate-300 border border-white/10 px-1.5 py-0.5 rounded text-[11px]">الجوال</button>
-                        <button onClick={()=>updateUserPoints(u.id, u.points || 0)} className="bg-blue-900/40 text-blue-300 border border-blue-500/20 px-1.5 py-0.5 rounded text-[11px]">النقاط</button>
-                        <button onClick={()=>deleteItem("users", u.id)} className="bg-red-900/40 text-red-300 border border-red-500/20 px-1.5 py-0.5 rounded text-[11px]">طرد</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* إدارة الأعضاء */}
+      <section className="bg-slate-950 p-4 rounded-xl mb-6">
+        <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">👤 القسم الأول: التحكم الكامل بالأعضاء</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-center border-collapse">
+            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">الاسم</th><th className="p-2">الرمز</th><th className="p-2">الترشيح</th><th className="p-2">الإجراء</th></tr></thead>
+            <tbody className="divide-y divide-slate-900">
+              {users.slice((userPage - 1) * itemsPerPage, userPage * itemsPerPage).map((u) => (
+                <tr key={u.id} className="hover:bg-slate-900/40">
+                  <td className="p-2 text-right">{editingUserId === u.id ? <input type="text" className="bg-slate-900 border px-2 py-0.5 rounded" value={editName} onChange={(e)=>setEditName(e.target.value)} /> : u.fullName}</td>
+                  <td className="p-2">{editingUserId === u.id ? <input type="text" className="bg-slate-900 border px-2 py-0.5 rounded text-center" value={editPassword} onChange={(e)=>setEditPassword(e.target.value)} /> : u.password}</td>
+                  <td className="p-2">{editingUserId === u.id ? <input type="text" className="bg-slate-900 border px-2 py-0.5 rounded text-center" value={editTeam} onChange={(e)=>setEditTeam(e.target.value)} /> : u.favoriteTeam}</td>
+                  <td className="p-2 flex gap-1 justify-center">
+                    {editingUserId === u.id ? <button onClick={()=>handleUpdateUser(u.id)} className="bg-green-600 px-2 py-1 rounded text-[10px] interactive-btn">حفظ 💾</button> : <button onClick={()=>{setEditingUserId(u.id); setEditName(u.fullName); setEditPassword(u.password); setEditTeam(u.favoriteTeam);}} className="bg-blue-600 px-2 py-1 rounded text-[10px] interactive-btn">تعديل ⚙️</button>}
+                    <button onClick={async ()=>{if(confirm("حذف؟")) await deleteDoc(doc(db,"users",u.id))}} className="bg-red-600 px-2 py-1 rounded text-[10px] interactive-btn">حذف 🗑️</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-center gap-4 mt-3 text-xs font-bold"><button onClick={()=>setUserPage(p=>Math.max(p-1,1))} className="bg-slate-800 px-3 py-1 rounded">السابق</button><span>{userPage}</span><button onClick={()=>setUserPage(p=>p+1)} className="bg-slate-800 px-3 py-1 rounded">التالي</button></div>
+      </section>
+
+      {/* توزيع النقاط */}
+      <section className="bg-slate-950 p-4 rounded-xl mb-6">
+        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 القسم الثاني والثالث: فرز التوقعات وتوزيع النقاط اليدوي المباشر لوحة الصدارة</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs text-center border-collapse">
+            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">العضو</th><th className="p-2">المباراة</th><th className="p-2">التوقع</th><th className="p-2">الحالة</th><th className="p-2">توزيع النقاط كبسة زر واحدة</th></tr></thead>
+            <tbody className="divide-y divide-slate-900">
+              {predictions.slice((predPage - 1) * itemsPerPage, predPage * itemsPerPage).map((p) => (
+                <tr key={p.id} className="hover:bg-slate-900/40">
+                  <td className="p-2 text-right">👤 {p.user}</td>
+                  <td className="p-2">{p.t1} vs {p.t2}</td>
+                  <td className="p-2 text-green-400 font-mono">{p.score1} - {p.score2}</td>
+                  <td className="p-2">{p.processed ? <span className="text-green-500">حُسبت</span> : <span className="text-amber-500">انتظار</span>}</td>
+                  <td className="p-2 flex gap-1 justify-center">
+                    <button onClick={()=>handleGrantPointsManual(p, "full")} className="bg-emerald-600 px-2 py-0.5 rounded text-[10px] interactive-btn">بالملي (+3)</button>
+                    <button onClick={()=>handleGrantPointsManual(p, "win")} className="bg-blue-600 px-2 py-0.5 rounded text-[10px] interactive-btn">الفائز (+1)</button>
+                    <button onClick={()=>handleGrantPointsManual(p, "wrong")} className="bg-slate-700 px-2 py-0.5 rounded text-[10px] interactive-btn">خطأ (0)</button>
+                    <button onClick={async ()=>{if(confirm("حذف؟")) await deleteDoc(doc(db,"predictions",p.id))}} className="bg-red-950 text-red-400 px-2 py-0.5 rounded text-[10px] interactive-btn">حذف</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-center gap-4 mt-3 text-xs font-bold"><button onClick={()=>setPredPage(p=>Math.max(p-1,1))} className="bg-slate-800 px-3 py-1 rounded">السابق</button><span>{predPage}</span><button onClick={()=>setPredPage(p=>p+1)} className="bg-slate-800 px-3 py-1 rounded">التالي</button></div>
+      </section>
+
+      {/* الرقابة على الشات */}
+      <section className="bg-slate-950 p-4 rounded-xl">
+        <h3 className="font-black text-xs text-red-400 mb-2 border-b border-slate-800 pb-1">💬 القسم الرابع: الرقابة والتحكم بـ شات صفحة الجمهور</h3>
+        <div className="space-y-2 max-h-48 overflow-y-auto hidden-scrollbar">
+          {chats.map((c) => (
+            <div key={c.id} className="bg-slate-900 p-2 rounded-lg flex items-center justify-between text-xs">
+              <div><span className="font-black text-purple-400">👤 {c.user}:</span> <span className="text-slate-200 font-medium">{c.text}</span></div>
+              <button onClick={async()=>await deleteDoc(doc(db,"chats",c.id))} className="bg-red-900/50 text-red-300 px-2 py-0.5 rounded font-bold interactive-btn">حذف رسالة ✕</button>
             </div>
-          </div>
-
-          {maxAdminUserPages > 1 && (
-            <div className="flex justify-center items-center gap-4 pt-3 border-t border-purple-900/25 text-xs">
-              <button onClick={() => setUserCurrentPage(p => Math.max(p - 1, 1))} disabled={userCurrentPage === 1} className="bg-purple-950 border border-purple-500/20 px-3 py-1 rounded-lg text-purple-300">السابق ◀</button>
-              <span className="font-bold text-slate-400">صفحة {userCurrentPage} من {maxAdminUserPages}</span>
-              <button onClick={() => setUserCurrentPage(p => Math.min(p + 1, maxAdminUserPages))} disabled={userCurrentPage === maxAdminUserPages} className="bg-purple-950 border border-purple-500/20 px-3 py-1 rounded-lg text-purple-300">التالي ▶</button>
-            </div>
-          )}
+          ))}
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-slate-900 p-4 rounded-xl border border-purple-500/10 h-[320px] flex flex-col shadow-md">
-          <h3 className="font-black text-amber-400 border-b border-white/5 pb-2 text-xs md:text-sm mb-2">📺 التحكم في شريط عرض التوقعات لايف</h3>
-          <div className="overflow-y-auto flex-grow space-y-2 text-xs hidden-scrollbar">
-            {predictions.map((p, i) => (
-              <div key={i} className="bg-slate-950 p-2.5 rounded-xl flex justify-between items-center border border-white/5 shadow-inner">
-                <div className="font-semibold"><span className="text-yellow-400 font-black">{p.user}</span> متوقع: {p.t1E} {p.score1} - {p.score2} {p.t2E}</div>
-                <button onClick={()=>deleteItem("predictions", p.id)} className="text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/20 px-3 py-1 rounded-lg font-bold text-[10px]">حذف 🗑</button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-slate-900 p-4 rounded-xl border border-purple-500/10 h-[320px] flex flex-col shadow-md">
-          <h3 className="font-black text-amber-400 border-b border-white/5 pb-2 text-xs md:text-sm mb-2">💬 التحكم في شات ودردشة الزوار</h3>
-          <div className="overflow-y-auto flex-grow space-y-2 text-xs hidden-scrollbar">
-            {chats.map((c, i) => (
-              <div key={i} className="bg-slate-950 p-2.5 rounded-xl flex justify-between items-center border border-white/5 shadow-inner">
-                <div className="font-medium"><span className="text-purple-400 font-black">👤 {c.user} {c.teamEmoji}:</span> <span className="text-slate-200">{c.text}</span></div>
-                <button onClick={()=>deleteItem("chats", c.id)} className="text-red-400 hover:text-red-300 bg-red-950/20 border border-red-900/20 px-3 py-1 rounded-lg font-bold text-[10px]">حذف 🗑</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }
