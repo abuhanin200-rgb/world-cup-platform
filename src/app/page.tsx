@@ -10,7 +10,7 @@ const FIXTURES_365_DATABASE = [
   { id: "wc_02", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - دور المجموعات", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", kickoff: "2026-06-13T04:00:00" },
   { id: "wc_03", day: "السبت 13 يونيو (غداً)", group: "كأس العالم - دور المجموعات", team1: "قطر", team1Emoji: "🇶🇦", team2: "سويسرا", team2Emoji: "🇨🇭", time: "10:00 م", kickoff: "2026-06-13T22:00:00" },
   { id: "wc_04", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "البرازيل", team1Emoji: "🇧🇷", team2: "المغرب", team2Emoji: "🇲🇦", time: "01:00 ص", kickoff: "2026-06-14T01:00:00" },
-  { id: "wc_05", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "هايتي", team1Emoji: "🇭🇹", team2: "اسكتلندا", team2Emoji: "🏴󠁧󠁢󠁳󠁣طنّد", time: "04:00 ص", kickoff: "2026-06-14T04:00:00" },
+  { id: "wc_05", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "هايتي", team1Emoji: "🇭🇹", team2: "اسكتلندا", team2Emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", time: "04:00 ص", kickoff: "2026-06-14T04:00:00" },
   { id: "wc_06", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "أستراليا", team1Emoji: "🇦🇺", team2: "تركيا", team2Emoji: "🇹🇷", time: "07:00 ص", kickoff: "2026-06-14T07:00:00" },
   { id: "wc_07", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "ألمانيا", team1Emoji: "🇩🇪", team2: "كوراساو", team2Emoji: "🇨🇼", time: "08:00 م", kickoff: "2026-06-14T20:00:00" },
   { id: "wc_08", day: "الأحد 14 يونيو", group: "كأس العالم - دور المجموعات", team1: "هولندا", team1Emoji: "🇳🇱", team2: "اليابان", team2Emoji: "🇯🇵", time: "11:00 م", kickoff: "2026-06-14T23:00:00" },
@@ -29,7 +29,7 @@ const WORLD_CUP_2026_TEAMS = [
   { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
   { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
   { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
+  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥لن󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
   { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
   { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
   { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
@@ -68,11 +68,12 @@ export default function HomePage() {
   
   const [topFavTeams, setTopFavTeams] = useState<any[]>([]);
   const [predictionsValues, setPredictionsValues] = useState<{ [key: string]: { team1Score: string; team2Score: string } }>({});
+  const [userPredictionsKeys, setUserPredictionsKeys] = useState<{ [key: string]: boolean }>({});
   const [globalCountdowns, setGlobalCountdowns] = useState<{ [key: string]: string }>({});
-  // 🔐 ربط التوقعات بحساب العضو مباشرة لايف بسيرفر الفايربيز
+  // 🔐 ربط التوقعات بـ الحساب السحابي الموحد لتعمل عبر أي جهاز بالملي وبدون LocalStorage
   const [firebaseUserPredictions, setFirebaseUserPredictions] = useState<{ [key: string]: any }>({});
   
-  // 🔔 إشعارات النقاط والاحتفالية الفورية التفاعلية عند الدخول
+  // 🔔 حاويات الإشعارات التفاعلية الفورية والـ Confetti والـ Loading
   const [activeNotifications, setActiveNotifications] = useState<any[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
@@ -81,7 +82,7 @@ export default function HomePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // داتا بطاقات التحفيز العلوي لوحة الصدارة
+  // داتا بطاقات التحفيز العلوي
   const [streakKing, setStreakKing] = useState("لا يوجد حالياً 🔥");
   const [leaderKing, setLeaderKing] = useState("جاري الحساب... 👑");
 
@@ -122,7 +123,7 @@ export default function HomePage() {
     const unsubChat = onSnapshot(query(collection(db, "chats"), orderBy("createdAt", "desc")), (snap) => { setChatList(snap.docs.map(doc => doc.data())); });
     const unsubPred = onSnapshot(query(collection(db, "predictions"), orderBy("createdAt", "desc")), (snap) => { setLivePredictions(snap.docs.map(doc => doc.data())); });
     
-    // دمج مباريات الطوارئ المضافة من لوحة الأدمن لتنزل لايف للجمهور
+    // دمج مباريات الطوارئ المنشورة والمعدلة من لوحة الآدمن لايف بالجمهور
     const unsubMatches = onSnapshot(query(collection(db, "custom_matches"), orderBy("kickoff", "asc")), (snap) => {
       const dynamicMatches = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       const merged = [...FIXTURES_365_DATABASE, ...dynamicMatches];
@@ -171,7 +172,7 @@ export default function HomePage() {
     return () => { unsubSpeed(); unsubChat(); unsubPred(); unsubMatches(); unsubUsers(); };
   }, []);
 
-  // 🔐 الاستماع لتوقعات وإشعارات النقاط غير المقروءة للعضو المسجل لايف
+  // 🔐 الاستماع لتوقعات وإشعارات النقاط غير المقروءة للعضو المسجل لايف عبر السيرفر
   useEffect(() => {
     if (!user.fullName) return;
     const q = query(collection(db, "predictions"), where("user", "==", user.fullName));
@@ -240,7 +241,7 @@ export default function HomePage() {
       localStorage.setItem("worldCupUser", JSON.stringify(freshUser));
       setUser(freshUser); setIsProfileModalOpen(false);
       alert("✅ تم تحديث بروفايلك وجوالك بنجاح في السيرفر!");
-    } catch (err) { console.error(err); }
+    } catch (err) { alert("عطل في المزامنة."); }
   };
 
   const handleLogout = () => {
@@ -253,15 +254,16 @@ export default function HomePage() {
     if (!isLoggedIn) { setIsAuthModalOpen(true); return; }
     if (new Date().getTime() > new Date(kickoff).getTime()) { alert("أُغلقت التوقعات لبدء المباراة فعلياً!"); return; }
     if (firebaseUserPredictions[matchId]) { alert("لقد قمت بحفظ وتثبيت توقعك مسبقاً في حساب السيرفر!"); return; }
-    
+
     const matchScores = predictionsValues[matchId];
     if (!matchScores || !matchScores.team1Score || !matchScores.team2Score) { alert("يرجى إدخال نتيجة التوقع أولاً ⚽"); return; }
     
     setIsSubmitLoading(true);
     try {
       await addDoc(collection(db, "predictions"), { matchId, user: user.fullName, t1: team1, t1E: team1Emoji, t2: team2, t2E: team2Emoji, score1: matchScores.team1Score, score2: matchScores.team2Score, processed: false, pointsAwarded: 0, createdAt: new Date().toISOString() });
-      alert("🎯 تم تثبيت التوقع المباشر بالسيرفر!");
-    } catch (err) { alert("عطل بالشبكة."); }
+      setUserPredictionsKeys(prev => ({ ...prev, [matchId]: true }));
+      alert("🎯 تم اعتماد وتثبيت التوقع سحابياً عبر قاعدة البيانات!");
+    } catch (err) { console.error(err); }
     setIsSubmitLoading(false);
   };
 
@@ -334,13 +336,13 @@ export default function HomePage() {
           )}
         </header>
 
-        {/* 🔔 قسم كروت إشعارات النقاط المرتبة غير المزعجة عند الدخول */}
+        {/* 🔔 قسم كروت إشعارات الأرباح غير المزعجة عند الدخول */}
         {activeNotifications.length > 0 && (
           <div className="max-w-4xl mx-auto px-4 mt-4 space-y-2">
             {activeNotifications.map((notif: any) => (
-              <div key={notif.id} className="bg-slate-950/90 border border-purple-500/30 rounded-xl p-3 flex items-center justify-between gap-4 shadow-xl">
+              <div key={notif.id} className="bg-slate-950/90 border border-purple-500/20 rounded-xl p-3 flex items-center justify-between gap-4 shadow-xl">
                 <p className="text-xs font-bold text-slate-200">
-                  {notif.pointsAwarded === 3 && `🎉 مبروك! جبت التوقع صح وححصلت على 3 نقاط كاملة في مباراة (${notif.t1} vs ${notif.t2})`}
+                  {notif.pointsAwarded === 3 && `🎉 مبروك! جبت التوقع صح وحصلت على 3 نقاط في مباراة (${notif.t1} vs ${notif.t2})`}
                   {notif.pointsAwarded === 1 && `👏 ممتاز! حصلت على نقطة واحدة لمباراة (${notif.t1} vs ${notif.t2})`}
                   {notif.pointsAwarded === 0 && `ولا يهمك، أنت قدها وتعوضها بالتوقعات الجاية 💪 لمباراة (${notif.t1} vs ${notif.t2})`}
                 </p>
@@ -391,6 +393,7 @@ export default function HomePage() {
               
               <div className="space-y-2.5">
                 {next48HoursMatches.map((match: any) => {
+                  // قفل التوقعات من السيرفر مباشرة لتعمل على أي جهاز أو متصفح آخر
                   const savedPred = firebaseUserPredictions[match.id];
                   return (
                     <div key={match.id} className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-3 shadow-lg border border-purple-500/10 flex flex-col md:flex-row items-center justify-between gap-3 text-center">
@@ -401,6 +404,7 @@ export default function HomePage() {
 
                       <div className="flex items-center justify-center flex-1 w-full py-1">
                         {savedPred ? (
+                          /* 🕋 الحفاظ على أعلام اللقاء الأصلية وتثبيتها مية بالمية لمنع انعكاسها مجدداً */
                           <div className="text-center py-1.5 animate-fade-in font-bold text-xs">
                             <span className="text-slate-400">{match.team1} {match.team1Emoji} </span>
                             <span className="font-mono bg-purple-950 px-3 py-1 rounded-xl text-green-400 font-black text-sm mx-1">{savedPred.score1} - {savedPred.score2}</span>
@@ -437,7 +441,6 @@ export default function HomePage() {
               </div>
             </section>
 
-            {/* 🎁 بطاقات التحفيز الذكية فوق لوحة الصدارة بالظبط */}
             <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-4xl mx-auto pt-2">
               <div className="bg-gradient-to-br from-purple-950 to-slate-950 border border-purple-500/20 rounded-2xl p-4 flex items-center justify-between shadow-2xl">
                 <div>
@@ -456,49 +459,56 @@ export default function HomePage() {
             </section>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-              <div className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-purple-900/20 flex flex-col justify-between">
-                <div>
+              <div className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-purple-900/20 flex flex-col justify-between overflow-hidden">
+                <div className="w-full max-w-full overflow-hidden">
                   <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2">🏆 لوحة الصدارة العامة المباشرة</h3>
-                  <div className="overflow-x-auto w-full">
-                    <table className="w-full text-xs text-center border-collapse">
+                  <div className="w-full max-w-full overflow-x-hidden">
+                    
+                    {/* 🛠️ التعديل الجذري المعتمد: منع السحب الأفقي مية بالمية في الجوال وتقليل الـ Padding وحجم خطوط الأرقام */}
+                    <table className="w-full text-center border-collapse max-w-full" style={{ tableLayout: "fixed" }}>
                       <thead>
-                        <tr className="bg-purple-950/40 text-purple-300 font-black border-b border-purple-900/30">
-                          <th className="py-2.5 px-2 text-right w-24">المركز</th>
-                          <th className="py-2.5 px-2 text-right">الاسم</th>
-                          <th className="py-2.5 px-2">التوقعات</th>
-                          <th className="py-2.5 px-2 text-green-400">الصح</th>
-                          <th className="py-2.5 px-2 text-red-400">الخطأ</th>
-                          <th className="py-2.5 px-2 text-yellow-400">النقاط</th>
+                        <tr className="bg-purple-950/40 text-purple-300 font-black border-b border-purple-900/30 text-[10px] md:text-xs">
+                          <th className="py-2 px-1 text-right w-[20%] sm:w-[18%]">المركز</th>
+                          <th className="py-2 px-1 text-right w-[40%] sm:w-[42%]">الاسم</th>
+                          <th className="py-2 px-0.5 w-[10%] text-center">توقع</th>
+                          <th className="py-2 px-0.5 w-[10%] text-center text-green-400">صح</th>
+                          <th className="py-2 px-0.5 w-[10%] text-center text-red-400">خطأ</th>
+                          <th className="py-2 px-0.5 w-[10%] text-center text-yellow-400">نقاط</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-purple-950/20 font-bold text-slate-300">
                         {slicedLeaderboard.map((u: any, i: number) => (
-                          <tr key={i} className="hover:bg-purple-950/20 transition-all">
+                          <tr key={i} className="hover:bg-purple-950/20 transition-all text-[11px] md:text-xs">
                             
-                            {/* 1- عمود المركز المصلح: الأسهم يمين الرقم بشكل مصغر ومرتب مية بالمية */}
-                            <td className="py-3 px-1 text-right font-black text-xs md:text-sm bg-purple-950/10 rounded-r-lg whitespace-nowrap">
-                              <div className="flex items-center gap-1 inline-flex">
-                                <span className={`text-[9px] md:text-[11px] px-1 py-0.5 rounded font-black tracking-tight ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>
+                            {/* المركز والأسهم مصغرة جداً ومثبتة جهة اليمين */}
+                            <td className="py-2 px-1 text-right font-black bg-purple-950/10 rounded-r-lg">
+                              <div className="flex items-center gap-0.5 md:gap-1 justify-start">
+                                <span className={`text-[8px] md:text-[10px] px-1 py-0.5 rounded font-black flex-shrink-0 ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>
                                   {u.rankDirection}{u.rankChange > 0 ? u.rankChange : ""}
                                 </span>
-                                <span className="text-amber-500 font-black">#{u.rank}</span>
+                                <span className="text-amber-500 font-black text-[11px] md:text-sm">#{u.rank}</span>
                               </div>
                             </td>
 
-                            <td className="py-3 px-2 text-right font-black text-white whitespace-nowrap">
-                              <div className="flex items-center gap-1.5 inline-flex">
-                                <span>{u.name}</span>
-                                <span className="text-sm flex-shrink-0">{u.teamEmoji}</span>
+                            {/* الاسم الطويل ينزل على سطرين بكامل حروفه وبدون قص بنقاط طبقاً لطلبك الحرفي */}
+                            <td className="py-2 px-1 text-right font-black text-white">
+                              <div className="flex items-center gap-1 flex-wrap md:flex-nowrap justify-start w-full">
+                                <span className="text-xs md:text-[14px] leading-snug break-words overflow-wrap-anywhere whitespace-normal font-black block">
+                                  {u.name}
+                                </span>
+                                <span className="text-xs md:text-sm flex-shrink-0 block">{u.teamEmoji}</span>
                               </div>
                             </td>
-                            <td className="py-3 px-2 font-mono text-slate-400 text-center">{u.total}</td>
-                            <td className="py-3 px-2 font-mono text-green-400 text-center">{u.correct}</td>
-                            <td className="py-3 px-2 font-mono text-red-400 text-center">{u.wrong}</td>
-                            <td className="py-3 px-2 font-mono font-black text-amber-400 text-sm text-center">{u.points}</td>
+
+                            <td className="py-2 px-0.5 font-mono text-slate-400 text-center text-[11px] md:text-sm">{u.total}</td>
+                            <td className="py-2 px-0.5 font-mono text-green-400 text-center text-[11px] md:text-sm">{u.correct}</td>
+                            <td className="py-2 px-0.5 font-mono text-red-400 text-center text-[11px] md:text-sm">{u.wrong}</td>
+                            <td className="py-2 px-0.5 font-mono font-black text-amber-400 text-center text-[12px] md:text-sm">{u.points}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+
                   </div>
                 </div>
                 {maxPages > 1 && (
@@ -556,6 +566,7 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* الفوتر القديم المستعاد والمطابق تماماً */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
