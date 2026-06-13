@@ -32,7 +32,6 @@ const ADDITIONAL_FIXTURES = [
   { id: "wc_21", group: "المجموعة ل", team1: "إنجلترا", team1Emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", team2: "كرواتيا", team2Emoji: "HR", time: "11:00 م", kickoff: "2026-06-17T23:00:00" },
   { id: "wc_22", group: "المجموعة ك", team1: "أوزبكستان", team1Emoji: "🇺🇿", team2: "كولومبيا", team2Emoji: "🇨🇴", time: "05:00 ص", kickoff: "2026-06-18T05:00:00" },
   { id: "wc_23", group: "المجموعة ل", team1: "غانا", team1Emoji: "🇬🇭", team2: "بنما", team2Emoji: "🇵🇦", time: "02:00 ص", kickoff: "2026-06-18T02:00:00" },
-  // الجولة الثانية للمجموعات
   { id: "wc_24", group: "المجموعة أ", team1: "المكسيك", team1Emoji: "🇲🇽", team2: "كوريا الجنوبية", team2Emoji: "🇰🇷", time: "04:00 ص", kickoff: "2026-06-19T04:00:00" },
   { id: "wc_25", group: "المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "قطر", team2Emoji: "🇶🇦", time: "01:00 ص", kickoff: "2026-06-19T01:00:00" },
   { id: "wc_26", group: "المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "أستراليا", team2Emoji: "🇦🇺", time: "10:00 م", kickoff: "2026-06-19T22:00:00" },
@@ -115,10 +114,10 @@ export default function HomePage() {
   const [userPredictionsKeys, setUserPredictionsKeys] = useState<{ [key: string]: boolean }>({});
   const [globalCountdowns, setGlobalCountdowns] = useState<{ [key: string]: string }>({});
   
-  // 🔐 ربط التوقعات بحساب السيرفر لتعمل سحابياً وموحدة مية بالمية في أي جوال أو كمبيوتر
+  // 🔐 ربط ومزامنة داتا التوقعات سحابياً لمنع لخبطة أجهزة الجوال والكمبيوتر
   const [firebaseUserPredictions, setFirebaseUserPredictions] = useState<{ [key: string]: any }>({});
   
-  // 🔔 حاويات الإشعارات التفاعلية عند دخول الموقع والـ Confetti
+  // 🔔 حاويات إشعارات الأرباح التفاعلية عند دخول الموقع والـ Confetti والـ Loading
   const [activeNotifications, setActiveNotifications] = useState<any[]>([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isSubmitLoading, setIsSubmitLoading] = useState(false);
@@ -161,7 +160,6 @@ export default function HomePage() {
     }
   }, []);
 
-  // 📡 الاستماع الفوري لقنوات الدردشة والمباريات والأسهم الحركية السحابية من الفايربيز
   useEffect(() => {
     const unsubSpeed = onSnapshot(collection(db, "ticker_settings"), (snap) => {
       if (!snap.empty) setTickerSpeed(snap.docs[0].data().speed || "30s");
@@ -192,6 +190,7 @@ export default function HomePage() {
     });
 
     const unsubUsers = onSnapshot(query(collection(db, "users")), (snap) => {
+      // 🛠️ تفعيل حركات الأسهم لقراءة الصعود والنزول لايف وتغذيتها بالرموز الصحيحة من السيرفر
       const rawUsers = snap.docs.map(doc => ({ 
         id: doc.id, 
         name: doc.data().fullName, 
@@ -256,7 +255,6 @@ export default function HomePage() {
     return () => { unsubUserPreds(); unsubNotif(); };
   }, [user.fullName]);
 
-  // ✅ الدالة المصلحة لإخفاء وقراءة كروت الإشعارات الفورية سحابياً
   const handleDismissNotification = async (id: string) => {
     try {
       await updateDoc(doc(db, "user_notifications", id), { viewed: true });
@@ -331,7 +329,6 @@ export default function HomePage() {
     setIsSubmitLoading(false);
   };
 
-  // 🛠️ تثبيت وتصليح مكان دالة إرسال الشات الفورية لمنع عطل السطر 586 نهائياً
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatMessage.trim()) return;
@@ -401,7 +398,7 @@ export default function HomePage() {
           )}
         </header>
 
-        {/* 🔔 قسم عرض كروت إشعارات الأرباح التفاعلية عند دخول الموقع */}
+        {/* 🔔 قسم كروت إشعارات الأرباح غير المزعجة عند الدخول */}
         {activeNotifications.length > 0 && (
           <div className="max-w-4xl mx-auto px-4 mt-4 space-y-2">
             {activeNotifications.map((notif: any) => (
@@ -465,13 +462,13 @@ export default function HomePage() {
                   return (
                     <div key={match.id} className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-3 shadow-lg border border-purple-500/10 flex flex-col md:flex-row items-center justify-between gap-3 text-center">
                       <div className="flex flex-col text-center md:text-right md:w-48 w-full border-b md:border-b-0 md:border-l border-white/5 pb-2 md:pb-0 flex-shrink-0">
-                        <span className="text-[10px] font-black text-purple-400">{match.day}</span>
+                        <span className="text-xs font-black text-purple-400">{match.day}</span>
                         <span className="text-[9px] font-bold text-slate-500 mt-0.5">{match.group}</span>
                       </div>
 
                       <div className="flex items-center justify-center flex-1 w-full py-1">
                         {savedPred ? (
-                          /* 🛠️ تثبيت ترتيب المنتخبات والأعلام في اتجاهها العربي الصحيح مية بالمية ودون أي انعكاس بعد الحفظ */
+                          /* 🛠️ إصلاح عرض نتيجة التوقع المدخل بالذكاء الاصطناعي مية بالمية وبدون أي تداخل أو قلب للأعلام */
                           <div className="text-center py-1.5 animate-fade-in font-bold text-xs">
                             <span className="text-slate-400">{match.team1} {match.team1Emoji} </span>
                             <span className="font-mono bg-purple-950 px-3 py-1 rounded-xl text-green-400 font-black text-sm mx-1">
@@ -533,7 +530,6 @@ export default function HomePage() {
                   <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2">🏆 لوحة الصدارة العامة المباشرة</h3>
                   <div className="w-full max-w-full overflow-x-hidden">
                     
-                    {/* 🛠️ حماية السحب الأفقي مية بالمية في الجوال وتقليل الـ Padding وحجم خطوط الأرقام */}
                     <table className="w-full text-center border-collapse max-w-full" style={{ tableLayout: "fixed" }}>
                       <thead>
                         <tr className="bg-purple-950/40 text-purple-300 font-black border-b border-purple-900/30 text-[10px] md:text-xs">
@@ -549,17 +545,16 @@ export default function HomePage() {
                         {slicedLeaderboard.map((u: any, i: number) => (
                           <tr key={i} className="hover:bg-purple-950/20 transition-all text-[11px] md:text-xs">
                             
-                            {/* المركز والأسهم مصغرة جداً ومثبتة جهة اليمين بالقراءة السحابية من الفايربيز لايف */}
+                            {/* 🛠️ تفـعيل حركات الأسهم الخضراء والحمراء الرشيقة لايـف بجانب الرقم من داتا الفايربيز المباشرة */}
                             <td className="py-2 px-1 text-right font-black bg-purple-950/10 rounded-r-lg">
                               <div className="flex items-center gap-0.5 md:gap-1 justify-start">
-                                <span className={`text-[8px] md:text-[10px] px-1 py-0.5 rounded font-black flex-shrink-0 ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>
+                                <span className={`text-[9px] md:text-[11px] px-1 py-0.5 rounded font-black flex-shrink-0 ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>
                                   {u.rankDirection}{u.rankChange > 0 ? u.rankChange : ""}
                                 </span>
                                 <span className="text-amber-500 font-black text-[11px] md:text-sm">#{u.rank}</span>
                               </div>
                             </td>
 
-                            {/* الاسم ينزل على سطرين بكامل حروفه وبدون قص بنقاط طبقاً للطلب */}
                             <td className="py-2 px-1 text-right font-black text-white">
                               <div className="flex items-center gap-1 flex-wrap md:flex-nowrap justify-start w-full">
                                 <span className="text-xs md:text-[14px] leading-snug break-words overflow-wrap-anywhere whitespace-normal font-black block">
@@ -589,7 +584,7 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* صندوق الشات الفوري */}
+              {/* صندوق الشات */}
               <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 border border-purple-900/20 h-[450px] flex flex-col justify-between overflow-hidden w-full">
                 <div className="overflow-hidden flex flex-col h-full flex-1 w-full">
                   <h3 className="font-black text-xs md:text-base text-purple-300 border-b border-purple-900/20 pb-2.5 mb-2.5">💬 دردشة زوار المنصة الفورية</h3>
@@ -713,7 +708,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* الفوتر الأصيل والمطابق تماماً باسمك وحقوقك */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
