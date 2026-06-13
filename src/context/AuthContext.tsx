@@ -1,85 +1,102 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, onAuthStateChanged, signOut as fbSignOut } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
-import { UserProfile } from "@/types";
 
-interface AuthContextType {
-  user: User | null;
-  profile: UserProfile | null;
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  ReactNode,
+} from "react";
+import { AppUser, getUserById, loginUser, LoginUserInput } from "@/lib/users";
+
+type AuthContextType = {
+  user: AppUser | null;
   loading: boolean;
-  loginWithPhone: (phone: string, name: string, country: string, favoriteTeam: string) => Promise<void>;
-  logout: () => Promise<void>;
-}
+  isLoggedIn: boolean;
+  login: (input: LoginUserInput) => Promise<AppUser>;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
+};
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  profile: null,
-  loading: true,
-  loginWithPhone: async () => {},
-  logout: async () => {}
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+const STORAGE_KEY = "worldcup_2026_user_id";
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    return onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const docRef = doc(db, "Users", currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setProfile(docSnap.data() as UserProfile);
-        }
-      } else {
-        setProfile(null);
-      }
-      setLoading(false);
-    });
-  }, []);
+  async function refreshUser() {
+    const storedUserId = localStorage.getItem(STORAGE_KEY);
 
-  const loginWithPhone = async (phone: string, name: string, country: string, favoriteTeam: string) => {
-    // التأكد من أن رقم الجوال فريد ولا يتكرر
-    const usersRef = collection(db, "Users");
-    const q = query(usersRef, where("phone", "==", phone));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      const existingUser = querySnapshot.docs[0].data() as UserProfile;
-      setProfile(existingUser);
-      // ملاحظة: في النسخة النهائية هنا يتم ربط التحقق من رقم الجوال (OTP)
+    if (!storedUserId) {
+      setUser(null);
       return;
     }
 
-    const newUserId = "user_" + Math.random().toString(36).substr(2, 9);
-    const newProfile: UserProfile = {
-      id: newUserId,
-      name,
-      phone,
-      country,
-      favoriteTeam,
-      points: 0,
-      correctPredictionsCount: 0
-    };
+    const freshUser = await getUserById(storedUserId);
 
-    await setDoc(doc(db, "Users", newUserId), newProfile);
-    setProfile(newProfile);
-  };
+    if (!freshUser) {
+      localStorage.removeItem(STORAGE_KEY);
+      setUser(null);
+      return;
+    }
 
-  const logout = async () => {
-    await fbSignOut(auth);
-    setProfile(null);
-  };
+    setUser(freshUser);
+  }
 
-  return (
-    <AuthContext.Provider value={{ user, profile, loading, loginWithPhone, logout }}>
-      {children}
-    </AuthContext.Provider>
+  useEffect(() => {
+    async function loadStoredUser() {
+      try {
+        await refreshUser();
+      } catch (error) {
+        console.error("فشل تحميل جلسة العضو:", error);
+        localStorage.removeItem(STORAGE_KEY);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadStoredUser();
+  }, []);
+
+  async function login(input: LoginUserInput) {
+    const loggedUser = await loginUser(input);
+
+    localStorage.setItem(STORAGE_KEY, loggedUser.id);
+    setUser(loggedUser);
+
+    return loggedUser;
+  }
+
+  function logout() {
+    localStorage.removeItem(STORAGE_KEY);
+    setUser(null);
+  }
+
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      isLoggedIn: Boolean(user),
+      login,
+      logout,
+      refreshUser,
+    }),
+    [user, loading]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export const useAuth = () => useContext(AuthContext);
+export function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth يجب استخدامه داخل AuthProvider");
+  }
+
+  return context;
+}
