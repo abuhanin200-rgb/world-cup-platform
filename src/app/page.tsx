@@ -1,40 +1,156 @@
-import React from "react";
+"use client";
 
-export default function MaintenancePage() {
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import LatestPredictionsTicker from "@/components/LatestPredictionsTicker";
+import MatchesPredictionBox from "@/components/MatchesPredictionBox";
+
+export default function HomePage() {
+  const router = useRouter();
+  const { user, loading, isLoggedIn, logout } = useAuth();
+
   return (
-    <div
+    <main
       dir="rtl"
-      className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 text-slate-100 font-sans antialiased flex items-center justify-center p-4 selection:bg-purple-500/30"
+      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
     >
-      <div className="max-w-2xl w-full bg-slate-900/60 backdrop-blur-xl border border-purple-500/20 rounded-3xl p-8 sm:p-10 shadow-2xl text-center space-y-6">
-        <div className="text-4xl md:text-6xl drop-shadow-lg animate-pulse">🚧</div>
-        
-        <h1 className="text-2xl md:text-3xl font-black bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-transparent tracking-tight">
-          نعتذر منكم
-        </h1>
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 overflow-hidden rounded-2xl border border-white/20 bg-white/10">
+              <img
+                src="/wc2026-logo.png"
+                alt="شعار منصة توقعات كأس العالم 2026"
+                className="h-full w-full object-contain p-1"
+              />
+            </div>
 
-        <div className="space-y-5 text-sm md:text-base text-slate-200 font-bold leading-relaxed max-w-xl mx-auto">
-          <p className="text-lg md:text-xl text-amber-400">هلا والله بالجميع 🌹</p>
-          
-          <p className="text-slate-300 font-medium">
-            حالياً الموقع مغلق مؤقتاً للصيانة بسبب وجود مشاكل تقنية ناتجة عن تضخم البيانات وزيادة الأحمال على النظام.
+            <div>
+              <h1 className="text-base font-black md:text-xl">
+                منصة توقعات كأس العالم 2026
+              </h1>
+              <p className="text-xs text-slate-300 md:text-sm">
+                World Cup 2026 Predictions Platform
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {loading ? (
+              <div className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-300">
+                جاري التحقق...
+              </div>
+            ) : isLoggedIn && user ? (
+              <>
+                <div className="hidden rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-100 md:block">
+                  يا هلا، {user.fullName}
+                </div>
+
+                <button
+                  onClick={() => router.push("/test-auth")}
+                  className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold hover:bg-white/10"
+                >
+                  حسابي
+                </button>
+
+                <button
+                  onClick={() => {
+                    logout();
+                    router.push("/");
+                  }}
+                  className="rounded-xl bg-red-500 px-3 py-2 text-sm font-bold text-white hover:bg-red-400"
+                >
+                  خروج
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => router.push("/login")}
+                  className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold hover:bg-white/10"
+                >
+                  دخول
+                </button>
+
+                <button
+                  onClick={() => router.push("/register")}
+                  className="rounded-xl bg-amber-400 px-3 py-2 text-sm font-black text-slate-950 hover:bg-amber-300"
+                >
+                  تسجيل
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <section className="mx-auto max-w-6xl px-4 py-8">
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl">
+          <h2 className="mb-3 text-2xl font-black md:text-4xl">
+            تحدي توقعات كأس العالم 2026
+          </h2>
+
+          <p className="mx-auto max-w-2xl text-sm leading-7 text-slate-200 md:text-base">
+            سجّل توقعاتك، تابع نقاطك، وتحدّى أصحابك لمعرفة من يملك أقوى قراءة
+            لنتائج المباريات.
           </p>
-          
-          <p className="text-slate-300 font-medium">
-            نعمل حالياً على تحسين الأداء ومعالجة جميع الملاحظات لضمان تجربة أفضل للجميع بإذن الله.
-          </p>
-          
-          <p className="text-purple-300">
-            نعتذر عن هذا التوقف المؤقت، ونوعدكم إننا راجعين قريب بشكل أقوى وأفضل 🚀
-          </p>
+
+          {!isLoggedIn && !loading && (
+            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+              <button
+                onClick={() => router.push("/register")}
+                className="rounded-xl bg-amber-400 px-6 py-3 font-black text-slate-950 hover:bg-amber-300"
+              >
+                ابدأ التحدي الآن
+              </button>
+
+              <button
+                onClick={() => router.push("/login")}
+                className="rounded-xl border border-white/10 px-6 py-3 font-bold hover:bg-white/10"
+              >
+                لدي حساب
+              </button>
+            </div>
+          )}
+
+          {isLoggedIn && user && (
+            <div className="mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-100">
+              أهلًا بعودتك يا بطل {user.fullName}، نقاطك الحالية:{" "}
+              <strong>{user.points}</strong>
+            </div>
+          )}
         </div>
 
-        <div className="pt-6 border-t border-purple-900/30">
-          <span className="text-base md:text-lg font-black text-amber-400 tracking-wide block">
-            يعطيكم العافيه ❤️
-          </span>
+        <div className="mt-6">
+          <LatestPredictionsTicker />
         </div>
-      </div>
-    </div>
+
+        <div className="mt-6">
+          <MatchesPredictionBox />
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+            <div className="mb-2 text-2xl">🏆</div>
+            <h3 className="font-black">ملك التوقعات</h3>
+            <p className="mt-2 text-sm text-slate-300">
+              سيظهر هنا صاحب المركز الأول بعد احتساب النتائج.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+            <div className="mb-2 text-2xl">🔥</div>
+            <h3 className="font-black">أفضل سلسلة صحيحة</h3>
+            <p className="mt-2 text-sm text-slate-300">
+              سيتم عرض أفضل المتسابقين في التوقعات المتتالية الصحيحة.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-white/10 py-6 text-center text-sm text-slate-300">
+        فكرة وتصميم: عبدالسلام العنزي
+      </footer>
+    </main>
   );
 }
