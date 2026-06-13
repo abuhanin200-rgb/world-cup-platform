@@ -28,7 +28,7 @@ export default function LatestPredictionsTicker() {
 
   if (loading) {
     return (
-      <section className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+      <section className="rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3">
         <div className="text-sm text-slate-300">جاري تحميل آخر التوقعات...</div>
       </section>
     );
@@ -36,7 +36,7 @@ export default function LatestPredictionsTicker() {
 
   if (predictions.length === 0) {
     return (
-      <section className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+      <section className="rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3">
         <div className="flex items-center gap-2 text-sm text-slate-300">
           <span>📢</span>
           <span>لم يتم تسجيل أي توقع حتى الآن. كن أول من يبدأ التحدي.</span>
@@ -45,25 +45,29 @@ export default function LatestPredictionsTicker() {
     );
   }
 
-  const tickerItems = [...predictions, ...predictions];
+  const repeatedPredictions =
+    predictions.length === 1
+      ? Array(8).fill(predictions[0])
+      : [...predictions, ...predictions, ...predictions];
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-black text-amber-200 md:text-base">
+    <section className="overflow-hidden rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-black text-amber-200">
           📢 آخر التوقعات
         </h2>
-        <span className="text-xs text-amber-100/80">
+
+        <span className="text-[11px] text-amber-100/80">
           يتم التحديث تلقائيًا
         </span>
       </div>
 
-      <div className="relative overflow-hidden">
-        <div className="ticker-track flex w-max gap-4">
-          {tickerItems.map((prediction, index) => (
+      <div className="ticker-window relative overflow-hidden">
+        <div className="ticker-track flex w-max gap-3">
+          {repeatedPredictions.map((prediction, index) => (
             <div
               key={`${prediction.id}-${index}`}
-              className="whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-white"
+              className="whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-white md:text-sm"
             >
               <span className="font-black text-amber-300">
                 {prediction.userName}
@@ -84,8 +88,12 @@ export default function LatestPredictionsTicker() {
       </div>
 
       <style jsx>{`
+        .ticker-window {
+          direction: rtl;
+        }
+
         .ticker-track {
-          animation: tickerMove 34s linear infinite;
+          animation: tickerMove 22s linear infinite;
         }
 
         .ticker-track:hover {

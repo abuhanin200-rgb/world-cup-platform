@@ -1,4 +1,11 @@
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "./firebase";
 
 export type Match = {
@@ -21,6 +28,20 @@ export type Match = {
 
   createdAt?: string;
   updatedAt?: string;
+  createdAtServer?: unknown;
+};
+
+export type AddMatchInput = {
+  homeTeamCode: string;
+  homeTeamName: string;
+  homeTeamEmoji: string;
+
+  awayTeamCode: string;
+  awayTeamName: string;
+  awayTeamEmoji: string;
+
+  matchDate: string;
+  matchTime: string;
 };
 
 function getMakkahTodayStart() {
@@ -45,6 +66,15 @@ function getMakkahTomorrowEnd() {
   tomorrowEnd.setDate(tomorrowEnd.getDate() + 2);
 
   return tomorrowEnd;
+}
+
+function getArabicMatchDay(startAt: string) {
+  const date = new Date(startAt);
+
+  return new Intl.DateTimeFormat("ar-SA", {
+    weekday: "long",
+    timeZone: "Asia/Riyadh",
+  }).format(date);
 }
 
 export function isMatchVisible(match: Match) {
@@ -107,11 +137,70 @@ export async function getVisibleMatches(): Promise<Match[]> {
   const snapshot = await getDocs(q);
 
   const matches = snapshot.docs
-    .filter((doc) => doc.id !== "_init")
-    .map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Omit<Match, "id">),
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Match, "id">),
     }));
 
   return matches.filter(isMatchVisible);
+}
+
+export async function getAllMatches(): Promise<Match[]> {
+  const matchesRef = collection(db, "matches");
+  const q = query(matchesRef, orderBy("startAt", "asc"));
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => ({
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Match, "id">),
+    }));
+}
+
+export async function addMatch(input: AddMatchInput) {
+  if (!input.homeTeamCode || !input.awayTeamCode) {
+    throw new Error("اختر الفريقين");
+  }
+
+  if (input.homeTeamCode === input.awayTeamCode) {
+    throw new Error("لا يمكن اختيار نفس المنتخب في المباراة");
+  }
+
+  if (!input.matchDate || !input.matchTime) {
+    throw new Error("اختر تاريخ ووقت المباراة");
+  }
+
+  const startAt = `${input.matchDate}T${input.matchTime}:00+03:00`;
+  const matchDay = getArabicMatchDay(startAt);
+  const now = new Date().toISOString();
+
+  const matchData = {
+    homeTeamCode: input.homeTeamCode,
+    homeTeamName: input.homeTeamName,
+    homeTeamEmoji: input.homeTeamEmoji,
+
+    awayTeamCode: input.awayTeamCode,
+    awayTeamName: input.awayTeamName,
+    awayTeamEmoji: input.awayTeamEmoji,
+
+    matchDate: input.matchDate,
+    matchDay,
+    matchTime: input.matchTime,
+
+    startAt,
+    status: "scheduled" as const,
+
+    createdAt: now,
+    updatedAt: now,
+    createdAtServer: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(collection(db, "matches"), matchData);
+
+  return {
+    id: docRef.id,
+    ...matchData,
+  } as Match;
 }

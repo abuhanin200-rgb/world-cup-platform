@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import TopCandidateTeams from "@/components/TopCandidateTeams";
 import LatestPredictionsTicker from "@/components/LatestPredictionsTicker";
 import MatchesPredictionBox from "@/components/MatchesPredictionBox";
 import LeaderboardTable from "@/components/LeaderboardTable";
@@ -16,9 +17,9 @@ export default function HomePage() {
       className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
     >
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 overflow-hidden rounded-2xl border border-white/20 bg-white/10">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="h-10 w-10 overflow-hidden rounded-2xl border border-white/20 bg-white/10 md:h-12 md:w-12">
               <img
                 src="/wc2026-logo.png"
                 alt="شعار منصة توقعات كأس العالم 2026"
@@ -27,18 +28,18 @@ export default function HomePage() {
             </div>
 
             <div>
-              <h1 className="text-base font-black md:text-xl">
+              <h1 className="text-xs font-black md:text-xl">
                 منصة توقعات كأس العالم 2026
               </h1>
-              <p className="text-xs text-slate-300 md:text-sm">
+              <p className="text-[10px] text-slate-300 md:text-sm">
                 World Cup 2026 Predictions Platform
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 md:gap-2">
             {loading ? (
-              <div className="rounded-xl border border-white/10 px-3 py-2 text-xs text-slate-300">
+              <div className="rounded-xl border border-white/10 px-2 py-2 text-[10px] text-slate-300 md:px-3 md:text-xs">
                 جاري التحقق...
               </div>
             ) : isLoggedIn && user ? (
@@ -49,7 +50,7 @@ export default function HomePage() {
 
                 <button
                   onClick={() => router.push("/test-auth")}
-                  className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold hover:bg-white/10"
+                  className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
                 >
                   حسابي
                 </button>
@@ -59,7 +60,7 @@ export default function HomePage() {
                     logout();
                     router.push("/");
                   }}
-                  className="rounded-xl bg-red-500 px-3 py-2 text-sm font-bold text-white hover:bg-red-400"
+                  className="rounded-xl bg-red-500 px-2 py-2 text-xs font-bold text-white hover:bg-red-400 md:px-3 md:text-sm"
                 >
                   خروج
                 </button>
@@ -68,14 +69,14 @@ export default function HomePage() {
               <>
                 <button
                   onClick={() => router.push("/login")}
-                  className="rounded-xl border border-white/10 px-3 py-2 text-sm font-bold hover:bg-white/10"
+                  className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
                 >
                   دخول
                 </button>
 
                 <button
                   onClick={() => router.push("/register")}
-                  className="rounded-xl bg-amber-400 px-3 py-2 text-sm font-black text-slate-950 hover:bg-amber-300"
+                  className="rounded-xl bg-amber-400 px-2 py-2 text-xs font-black text-slate-950 hover:bg-amber-300 md:px-3 md:text-sm"
                 >
                   تسجيل
                 </button>
@@ -85,9 +86,9 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-4 py-8">
-        <div className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl">
-          <h2 className="mb-3 text-2xl font-black md:text-4xl">
+      <section className="mx-auto max-w-6xl px-3 py-5 md:px-4 md:py-8">
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl md:p-6">
+          <h2 className="mb-3 text-2xl font-black leading-snug md:text-4xl">
             تحدي توقعات كأس العالم 2026
           </h2>
 
@@ -97,17 +98,17 @@ export default function HomePage() {
           </p>
 
           {!isLoggedIn && !loading && (
-            <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+            <div className="mt-5 flex flex-row justify-center gap-2 md:mt-6 md:gap-3">
               <button
                 onClick={() => router.push("/register")}
-                className="rounded-xl bg-amber-400 px-6 py-3 font-black text-slate-950 hover:bg-amber-300"
+                className="rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 md:px-6"
               >
                 ابدأ التحدي الآن
               </button>
 
               <button
                 onClick={() => router.push("/login")}
-                className="rounded-xl border border-white/10 px-6 py-3 font-bold hover:bg-white/10"
+                className="rounded-xl border border-white/10 px-4 py-3 text-sm font-bold hover:bg-white/10 md:px-6"
               >
                 لدي حساب
               </button>
@@ -115,34 +116,40 @@ export default function HomePage() {
           )}
 
           {isLoggedIn && user && (
-            <div className="mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-100">
+            <div className="mt-5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100 md:mt-6 md:p-4 md:text-base">
               أهلًا بعودتك يا بطل {user.fullName}، نقاطك الحالية:{" "}
               <strong>{user.points}</strong>
             </div>
           )}
         </div>
 
-        <div className="mt-6">
+        <div className="mt-5 md:mt-6">
+          <TopCandidateTeams />
+        </div>
+
+        <div className="mt-5 md:mt-6">
           <LatestPredictionsTicker />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-5 md:mt-6">
           <MatchesPredictionBox />
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
-            <div className="mb-2 text-2xl">🏆</div>
-            <h3 className="font-black">ملك التوقعات</h3>
-            <p className="mt-2 text-sm text-slate-300">
+        <div className="mt-6 grid grid-cols-2 gap-3 md:mt-8 md:gap-4">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-3 md:p-5">
+            <div className="mb-2 text-xl md:text-2xl">🏆</div>
+            <h3 className="text-sm font-black md:text-base">ملك التوقعات</h3>
+            <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
               سيظهر هنا صاحب المركز الأول بعد احتساب النتائج.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
-            <div className="mb-2 text-2xl">🔥</div>
-            <h3 className="font-black">أفضل سلسلة صحيحة</h3>
-            <p className="mt-2 text-sm text-slate-300">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-3 md:p-5">
+            <div className="mb-2 text-xl md:text-2xl">🔥</div>
+            <h3 className="text-sm font-black md:text-base">
+              أفضل سلسلة صحيحة
+            </h3>
+            <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
               سيتم عرض أفضل المتسابقين في التوقعات المتتالية الصحيحة.
             </p>
           </div>
