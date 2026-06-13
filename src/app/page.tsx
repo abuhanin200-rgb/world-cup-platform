@@ -6,6 +6,7 @@ import TopCandidateTeams from "@/components/TopCandidateTeams";
 import LatestPredictionsTicker from "@/components/LatestPredictionsTicker";
 import MatchesPredictionBox from "@/components/MatchesPredictionBox";
 import LeaderboardTable from "@/components/LeaderboardTable";
+import HomeHighlights, { ExactHitsTicker } from "@/components/HomeHighlights";
 
 export default function HomePage() {
   const router = useRouter();
@@ -131,29 +132,13 @@ export default function HomePage() {
           <LatestPredictionsTicker />
         </div>
 
+        <HomeHighlights />
+
         <div className="mt-5 md:mt-6">
           <MatchesPredictionBox />
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 md:mt-8 md:gap-4">
-          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-3 md:p-5">
-            <div className="mb-2 text-xl md:text-2xl">🏆</div>
-            <h3 className="text-sm font-black md:text-base">ملك التوقعات</h3>
-            <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
-              سيظهر هنا صاحب المركز الأول بعد احتساب النتائج.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-3 md:p-5">
-            <div className="mb-2 text-xl md:text-2xl">🔥</div>
-            <h3 className="text-sm font-black md:text-base">
-              أفضل سلسلة صحيحة
-            </h3>
-            <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
-              سيتم عرض أفضل المتسابقين في التوقعات المتتالية الصحيحة.
-            </p>
-          </div>
-        </div>
+        <ExactHitsTicker />
 
         <LeaderboardTable />
       </section>

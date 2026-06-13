@@ -93,7 +93,7 @@ export default function LatestPredictionsTicker() {
         }
 
         .ticker-track {
-          animation: tickerMove 22s linear infinite;
+          animation: tickerMove 28s linear infinite;
         }
 
         .ticker-track:hover {

@@ -59,7 +59,6 @@ export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
   });
 
   return users
-    .filter((user) => user.total > 0 || user.points > 0)
     .sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.correct !== a.correct) return b.correct - a.correct;

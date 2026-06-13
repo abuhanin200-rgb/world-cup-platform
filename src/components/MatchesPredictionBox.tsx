@@ -2,355 +2,418 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import {
-  getMatchCountdown,
-  getVisibleMatches,
-  isPredictionOpen,
-  Match,
-} from "@/lib/matches";
-import {
-  getUserPredictionForMatch,
-  Prediction,
-  submitPrediction,
-} from "@/lib/predictions";
+  addDoc,
+  collection,
+  getDocs,
+  limit,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { getVisibleMatches, Match } from "@/lib/matches";
 import { useAuth } from "@/context/AuthContext";
 
-type MatchPredictionState = {
+type PredictionFormState = {
   homeScore: string;
   awayScore: string;
-  existingPrediction: Prediction | null;
-  message: string;
-  error: string;
-  loading: boolean;
 };
+
+type SavedPrediction = {
+  id: string;
+  homeScore: number;
+  awayScore: number;
+};
+
+function toNumber(value: string) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : NaN;
+}
+
+function validateScore(value: number) {
+  return Number.isInteger(value) && value >= 0 && value <= 30;
+}
+
+function getMatchStartTime(match: Match) {
+  const startAt = (match as Match & { startAt?: string }).startAt;
+
+  if (startAt) {
+    return new Date(startAt).getTime();
+  }
+
+  return new Date(`${match.matchDate}T${match.matchTime}:00+03:00`).getTime();
+}
+
+function getCountdownText(match: Match) {
+  const startTime = getMatchStartTime(match);
+  const now = Date.now();
+  const diff = startTime - now;
+
+  if (!Number.isFinite(startTime)) return "الوقت غير محدد";
+  if (diff <= 0) return "بدأت المباراة";
+
+  const totalMinutes = Math.floor(diff / 1000 / 60);
+  const days = Math.floor(totalMinutes / 60 / 24);
+  const hours = Math.floor((totalMinutes - days * 24 * 60) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `${days} يوم ${hours} ساعة`;
+  }
+
+  if (hours > 0) {
+    return `${hours} ساعة ${minutes} دقيقة`;
+  }
+
+  return `${minutes} دقيقة`;
+}
+
+async function getSavedPrediction(
+  userId: string,
+  matchId: string
+): Promise<SavedPrediction | null> {
+  const predictionsRef = collection(db, "predictions");
+
+  const q = query(
+    predictionsRef,
+    where("userId", "==", userId),
+    where("matchId", "==", matchId),
+    limit(1)
+  );
+
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+  const docSnap = snapshot.docs[0];
+  const data = docSnap.data();
+
+  return {
+    id: docSnap.id,
+    homeScore: Number(data.homeScore || 0),
+    awayScore: Number(data.awayScore || 0),
+  };
+}
+
+async function savePrediction({
+  userId,
+  userName,
+  match,
+  homeScore,
+  awayScore,
+}: {
+  userId: string;
+  userName: string;
+  match: Match;
+  homeScore: number;
+  awayScore: number;
+}) {
+  const existingPrediction = await getSavedPrediction(userId, match.id);
+
+  if (existingPrediction) {
+    throw new Error("سبق وسجلت توقعك لهذه المباراة");
+  }
+
+  const now = new Date().toISOString();
+
+  await addDoc(collection(db, "predictions"), {
+    userId,
+    userName,
+
+    matchId: match.id,
+
+    homeTeamCode: match.homeTeamCode,
+    homeTeamName: match.homeTeamName,
+    homeTeamEmoji: match.homeTeamEmoji,
+
+    awayTeamCode: match.awayTeamCode,
+    awayTeamName: match.awayTeamName,
+    awayTeamEmoji: match.awayTeamEmoji,
+
+    homeScore,
+    awayScore,
+
+    points: 0,
+    resultType: "",
+    isCalculated: false,
+
+    createdAt: now,
+    updatedAt: now,
+  });
+}
 
 export default function MatchesPredictionBox() {
   const { user, isLoggedIn } = useAuth();
 
   const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(0);
-  const [predictionStates, setPredictionStates] = useState<
-    Record<string, MatchPredictionState>
+  const [forms, setForms] = useState<Record<string, PredictionFormState>>({});
+  const [savedPredictions, setSavedPredictions] = useState<
+    Record<string, SavedPrediction>
   >({});
 
-  useEffect(() => {
-    async function loadMatches() {
-      try {
-        const data = await getVisibleMatches();
-        setMatches(data);
+  const [loading, setLoading] = useState(true);
+  const [savingMatchId, setSavingMatchId] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [, setTick] = useState(0);
 
-        const initialStates: Record<string, MatchPredictionState> = {};
+  async function loadMatches() {
+    try {
+      setLoading(true);
 
-        for (const match of data) {
-          let existingPrediction: Prediction | null = null;
+      const data = await getVisibleMatches();
+      setMatches(data);
 
-          if (user?.id) {
-            existingPrediction = await getUserPredictionForMatch(
-              user.id,
-              match.id
-            );
+      if (user) {
+        const predictionsEntries = await Promise.all(
+          data.map(async (match) => {
+            const prediction = await getSavedPrediction(user.id, match.id);
+            return [match.id, prediction] as const;
+          })
+        );
+
+        const predictionsMap: Record<string, SavedPrediction> = {};
+
+        predictionsEntries.forEach(([matchId, prediction]) => {
+          if (prediction) {
+            predictionsMap[matchId] = prediction;
           }
+        });
 
-          initialStates[match.id] = {
-            homeScore:
-              existingPrediction?.homeScore !== undefined
-                ? String(existingPrediction.homeScore)
-                : "",
-            awayScore:
-              existingPrediction?.awayScore !== undefined
-                ? String(existingPrediction.awayScore)
-                : "",
-            existingPrediction,
-            message: "",
-            error: "",
-            loading: false,
-          };
-        }
-
-        setPredictionStates(initialStates);
-      } catch (error) {
-        console.error("فشل تحميل المباريات:", error);
-      } finally {
-        setLoading(false);
+        setSavedPredictions(predictionsMap);
+      } else {
+        setSavedPredictions({});
       }
+    } catch (err) {
+      console.error("فشل تحميل المباريات:", err);
+      setError("تعذر تحميل المباريات المتاحة للتوقع");
+    } finally {
+      setLoading(false);
     }
-
-    loadMatches();
-  }, [user?.id]);
+  }
 
   useEffect(() => {
+    loadMatches();
+
     const interval = setInterval(() => {
       setTick((value) => value + 1);
-    }, 1000);
+    }, 60000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]);
 
-  function updateScore(
-    matchId: string,
-    field: "homeScore" | "awayScore",
-    value: string
-  ) {
-    const cleanValue = value.replace(/[^\d]/g, "").slice(0, 2);
-
-    setPredictionStates((prev) => ({
-      ...prev,
+  function updateForm(matchId: string, field: keyof PredictionFormState, value: string) {
+    setForms((current) => ({
+      ...current,
       [matchId]: {
-        ...prev[matchId],
-        [field]: cleanValue,
-        error: "",
-        message: "",
+        homeScore: current[matchId]?.homeScore || "",
+        awayScore: current[matchId]?.awayScore || "",
+        [field]: value,
       },
     }));
   }
 
-  async function handleSubmit(event: FormEvent, match: Match) {
+  async function handleSubmitPrediction(event: FormEvent, match: Match) {
     event.preventDefault();
 
+    setMessage("");
+    setError("");
+
     if (!isLoggedIn || !user) {
-      setPredictionStates((prev) => ({
-        ...prev,
-        [match.id]: {
-          ...prev[match.id],
-          error: "سجّل دخولك أولًا حتى تعتمد توقعك.",
-          message: "",
-        },
-      }));
+      setError("سجّل دخولك أولًا عشان تقدر تشاركنا توقعك");
       return;
     }
 
-    if (!isPredictionOpen(match)) {
-      setPredictionStates((prev) => ({
-        ...prev,
-        [match.id]: {
-          ...prev[match.id],
-          error: "انتهى وقت التوقع لهذه المباراة.",
-          message: "",
-        },
-      }));
+    if (savedPredictions[match.id]) {
+      setError("سبق وسجلت توقعك لهذه المباراة");
       return;
     }
 
-    const state = predictionStates[match.id];
+    const form = forms[match.id] || {
+      homeScore: "",
+      awayScore: "",
+    };
 
-    if (state?.existingPrediction) {
-      setPredictionStates((prev) => ({
-        ...prev,
-        [match.id]: {
-          ...prev[match.id],
-          error: "تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله.",
-          message: "",
-        },
-      }));
+    const homeScore = toNumber(form.homeScore);
+    const awayScore = toNumber(form.awayScore);
+
+    if (!validateScore(homeScore) || !validateScore(awayScore)) {
+      setError("أدخل نتيجة صحيحة من 0 إلى 30");
       return;
     }
 
-    const homeScore = Number(state?.homeScore);
-    const awayScore = Number(state?.awayScore);
-
-    if (
-      state?.homeScore === "" ||
-      state?.awayScore === "" ||
-      Number.isNaN(homeScore) ||
-      Number.isNaN(awayScore)
-    ) {
-      setPredictionStates((prev) => ({
-        ...prev,
-        [match.id]: {
-          ...prev[match.id],
-          error: "أدخل نتيجة التوقع كاملة.",
-          message: "",
-        },
-      }));
-      return;
-    }
-
-    setPredictionStates((prev) => ({
-      ...prev,
-      [match.id]: {
-        ...prev[match.id],
-        loading: true,
-        error: "",
-        message: "",
-      },
-    }));
+    setSavingMatchId(match.id);
 
     try {
-      const savedPrediction = await submitPrediction({
+      await savePrediction({
         userId: user.id,
         userName: user.fullName,
-        matchId: match.id,
-        homeTeamName: match.homeTeamName,
-        homeTeamEmoji: match.homeTeamEmoji,
-        awayTeamName: match.awayTeamName,
-        awayTeamEmoji: match.awayTeamEmoji,
+        match,
         homeScore,
         awayScore,
       });
 
-      setPredictionStates((prev) => ({
-        ...prev,
+      setSavedPredictions((current) => ({
+        ...current,
         [match.id]: {
-          ...prev[match.id],
-          existingPrediction: savedPrediction,
-          homeScore: String(savedPrediction.homeScore),
-          awayScore: String(savedPrediction.awayScore),
-          loading: false,
-          error: "",
-          message: "توقعك وصل واعتمدناه، ارجع بعد المباراة وتابع نتيجتك.",
+          id: match.id,
+          homeScore,
+          awayScore,
         },
       }));
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "حدث خطأ أثناء اعتماد التوقع";
 
-      setPredictionStates((prev) => ({
-        ...prev,
+      setForms((current) => ({
+        ...current,
         [match.id]: {
-          ...prev[match.id],
-          loading: false,
-          error: errorMessage,
-          message: "",
+          homeScore: "",
+          awayScore: "",
         },
       }));
+
+      setMessage("تم تسجيل توقعك بنجاح 🎯 لا تنسى ترجع وتشوف نتيجتك");
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "حدث خطأ أثناء تسجيل التوقع";
+      setError(errorMessage);
+    } finally {
+      setSavingMatchId("");
     }
   }
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
+    <section className="rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:p-5">
       <div className="mb-4 text-center">
-        <h2 className="text-xl font-black md:text-2xl">مباريات اليوم والغد</h2>
-        <p className="mt-1 text-xs text-slate-300 md:text-sm">
-          جميع الأوقات حسب توقيت مكة المكرمة، ويغلق التوقع مع بداية المباراة.
+        <h2 className="text-xl font-black md:text-2xl">🔥 شاركنا توقعك</h2>
+        <p className="mt-1 text-xs leading-6 text-slate-300 md:text-sm">
+          سجّل توقعك قبل بداية المباراة وتابع نقاطك في لوحة الصدارة.
         </p>
       </div>
 
+      {(message || error) && (
+        <div className="mb-4 space-y-2">
+          {message && (
+            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-xs text-emerald-100 md:text-sm">
+              {message}
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-center text-xs text-red-100 md:text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+      )}
+
       {loading ? (
-        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-center text-sm text-slate-300">
+        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-sm text-slate-300">
           جاري تحميل المباريات...
         </div>
       ) : matches.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-center">
-          <div className="mb-1 text-2xl">📅</div>
-          <h3 className="font-black">لا توجد مباريات اليوم أو الغد</h3>
-          <p className="mt-1 text-xs text-slate-300 md:text-sm">
-            ستظهر هنا المباريات التي يضيفها الأدمن حسب توقيت مكة المكرمة.
-          </p>
+        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-sm text-slate-300">
+          لا توجد مباريات متاحة للتوقع حاليًا.
         </div>
       ) : (
         <div className="space-y-3">
           {matches.map((match) => {
-            const state = predictionStates[match.id];
-            const predictionOpen = isPredictionOpen(match);
-            const hasPrediction = Boolean(state?.existingPrediction);
+            const savedPrediction = savedPredictions[match.id];
+            const form = forms[match.id] || {
+              homeScore: "",
+              awayScore: "",
+            };
 
             return (
               <form
                 key={match.id}
-                onSubmit={(event) => handleSubmit(event, match)}
+                onSubmit={(event) => handleSubmitPrediction(event, match)}
                 className="rounded-2xl border border-white/10 bg-slate-950/70 p-3 md:p-4"
               >
-                <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div className="text-center text-xs text-slate-300 md:text-right">
-                    {match.matchDay} • {match.matchDate} • {match.matchTime} بتوقيت مكة
-                  </div>
+                <div className="mb-3 flex items-center justify-between gap-3 text-[11px] text-slate-300 md:text-xs">
+                  <span>
+                    {match.matchDay} • {match.matchDate}
+                  </span>
 
-                  <div
-                    className={`rounded-full px-3 py-1.5 text-center text-[11px] font-bold md:text-xs ${
-                      predictionOpen
-                        ? "border border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                        : "border border-red-500/30 bg-red-500/10 text-red-200"
-                    }`}
-                  >
-                    {predictionOpen
-                      ? `ينتهي التوقع بعد: ${getMatchCountdown(match)}`
-                      : "تم إغلاق التوقع"}
-                  </div>
+                  <span className="rounded-full bg-white/10 px-2 py-1 text-amber-200">
+                    يبدأ بعد: {getCountdownText(match)}
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 md:gap-3">
-                  <div className="text-center">
-                    <div className="text-2xl md:text-3xl">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center md:gap-4">
+                  <div className="min-w-0">
+                    <div className="text-3xl md:text-4xl">
                       {match.homeTeamEmoji}
                     </div>
-                    <div className="mt-1 text-xs font-black md:text-sm">
+                    <div className="mt-1 truncate text-xs font-black md:text-base">
                       {match.homeTeamName}
                     </div>
-
-                    {!hasPrediction && (
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={state?.homeScore ?? ""}
-                        onChange={(event) =>
-                          updateScore(match.id, "homeScore", event.target.value)
-                        }
-                        disabled={!predictionOpen}
-                        className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-white px-2 text-center text-lg font-black text-slate-950 outline-none focus:border-amber-400 disabled:cursor-not-allowed disabled:bg-slate-300 md:h-11"
-                        placeholder="0"
-                      />
-                    )}
                   </div>
 
-                  <div className="rounded-full border border-white/10 bg-white/10 px-2 py-1 text-xs font-black text-amber-300 md:px-3 md:py-2">
+                  <div className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-amber-300">
                     VS
                   </div>
 
-                  <div className="text-center">
-                    <div className="text-2xl md:text-3xl">
+                  <div className="min-w-0">
+                    <div className="text-3xl md:text-4xl">
                       {match.awayTeamEmoji}
                     </div>
-                    <div className="mt-1 text-xs font-black md:text-sm">
+                    <div className="mt-1 truncate text-xs font-black md:text-base">
                       {match.awayTeamName}
                     </div>
-
-                    {!hasPrediction && (
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={state?.awayScore ?? ""}
-                        onChange={(event) =>
-                          updateScore(match.id, "awayScore", event.target.value)
-                        }
-                        disabled={!predictionOpen}
-                        className="mt-2 h-10 w-full rounded-xl border border-white/10 bg-white px-2 text-center text-lg font-black text-slate-950 outline-none focus:border-amber-400 disabled:cursor-not-allowed disabled:bg-slate-300 md:h-11"
-                        placeholder="0"
-                      />
-                    )}
                   </div>
                 </div>
 
-                {hasPrediction && (
-                  <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs text-amber-100 md:text-sm">
-                    توقعك المعتمد: {match.homeTeamEmoji} {match.homeTeamName}{" "}
-                    <strong>
-                      {state?.existingPrediction?.homeScore} -{" "}
-                      {state?.existingPrediction?.awayScore}
-                    </strong>{" "}
-                    {match.awayTeamName} {match.awayTeamEmoji}
+                {savedPrediction ? (
+                  <div className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-sm text-emerald-100">
+                    توقعك المعتمد:{" "}
+                    <span className="font-black">
+                      {savedPrediction.homeScore} - {savedPrediction.awayScore}
+                    </span>
                   </div>
-                )}
+                ) : (
+                  <>
+                    <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={form.homeScore}
+                        onChange={(event) =>
+                          updateForm(match.id, "homeScore", event.target.value)
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-center text-lg font-black text-slate-950 outline-none focus:border-amber-400"
+                        placeholder="0"
+                        required
+                      />
 
-                {state?.message && (
-                  <div className="mt-3 rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-2.5 text-center text-xs text-emerald-200 md:text-sm">
-                    {state.message}
-                  </div>
-                )}
+                      <span className="text-sm font-black text-slate-300">
+                        -
+                      </span>
 
-                {state?.error && (
-                  <div className="mt-3 rounded-xl border border-red-500/40 bg-red-500/15 p-2.5 text-center text-xs text-red-200 md:text-sm">
-                    {state.error}
-                  </div>
-                )}
+                      <input
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={form.awayScore}
+                        onChange={(event) =>
+                          updateForm(match.id, "awayScore", event.target.value)
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-center text-lg font-black text-slate-950 outline-none focus:border-amber-400"
+                        placeholder="0"
+                        required
+                      />
+                    </div>
 
-                {!hasPrediction && (
-                  <button
-                    type="submit"
-                    disabled={state?.loading || !predictionOpen}
-                    className="mt-3 w-full rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-black text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {state?.loading ? "جاري الاعتماد..." : "اعتماد التوقع"}
-                  </button>
+                    <button
+                      type="submit"
+                      disabled={savingMatchId === match.id}
+                      className="mt-3 w-full rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingMatchId === match.id
+                        ? "جاري تسجيل التوقع..."
+                        : "اعتماد التوقع"}
+                    </button>
+                  </>
                 )}
               </form>
             );

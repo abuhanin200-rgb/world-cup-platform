@@ -4,8 +4,15 @@ import { FormEvent, useEffect, useState } from "react";
 import { getTeams, Team } from "@/lib/teams";
 import { addMatch, getAllMatches, Match } from "@/lib/matches";
 import { calculateMatchResult } from "@/lib/scoring";
+import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
 
 export default function AdminPage() {
+  const [adminReady, setAdminReady] = useState(false);
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [adminUsername, setAdminUsername] = useState("");
+  const [adminPasscode, setAdminPasscode] = useState("");
+  const [adminError, setAdminError] = useState("");
+
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
 
@@ -24,6 +31,18 @@ export default function AdminPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const unlocked = isAdminUnlocked();
+    setAdminUnlocked(unlocked);
+    setAdminReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (adminUnlocked) {
+      loadData();
+    }
+  }, [adminUnlocked]);
 
   async function loadData() {
     try {
@@ -44,9 +63,27 @@ export default function AdminPage() {
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  function handleAdminLogin(event: FormEvent) {
+    event.preventDefault();
+
+    setAdminError("");
+
+    try {
+      unlockAdmin(adminUsername, adminPasscode);
+      setAdminUnlocked(true);
+      setAdminUsername("");
+      setAdminPasscode("");
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "تعذر تسجيل الدخول";
+      setAdminError(errorMessage);
+    }
+  }
+
+  function handleAdminLogout() {
+    lockAdmin();
+    setAdminUnlocked(false);
+  }
 
   function getSelectedTeam(code: string) {
     return teams.find((team) => team.code === code);
@@ -67,6 +104,11 @@ export default function AdminPage() {
 
     if (!homeTeam || !awayTeam) {
       setError("اختر الفريقين بشكل صحيح");
+      return;
+    }
+
+    if (homeTeam.code === awayTeam.code) {
+      setError("لا يمكن اختيار نفس الفريق في المباراة");
       return;
     }
 
@@ -136,7 +178,7 @@ export default function AdminPage() {
       });
 
       setMessage(
-        `تم احتساب المباراة بنجاح. عدد التوقعات: ${result.totalPredictions}، بالملي: ${result.exactCount}، الفائز: ${result.winnerCount}، الخطأ: ${result.wrongCount}.`
+        `تم احتساب المباراة بنجاح. عدد التوقعات: ${result.totalPredictions}، بالملي: ${result.exactCount}، الفائز/التعادل الصحيح: ${result.winnerCount}، الخطأ: ${result.wrongCount}.`
       );
 
       setSelectedMatchId("");
@@ -155,6 +197,79 @@ export default function AdminPage() {
 
   const selectedMatch = getSelectedMatch();
 
+  if (!adminReady) {
+    return (
+      <main
+        dir="rtl"
+        className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+      >
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl">
+          جاري التحقق...
+        </div>
+      </main>
+    );
+  }
+
+  if (!adminUnlocked) {
+    return (
+      <main
+        dir="rtl"
+        className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+      >
+        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
+          <div className="mb-6 text-center">
+            <div className="mb-3 text-4xl">🔐</div>
+            <h1 className="text-2xl font-black">دخول لوحة التحكم</h1>
+            <p className="mt-2 text-sm text-slate-300">
+              هذه الصفحة خاصة بإدارة المنصة.
+            </p>
+          </div>
+
+          {adminError && (
+            <div className="mb-4 rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-center text-sm text-red-100">
+              {adminError}
+            </div>
+          )}
+
+          <form onSubmit={handleAdminLogin} className="space-y-4">
+            <div>
+              <label className="mb-2 block text-sm font-bold">
+                اسم المستخدم
+              </label>
+              <input
+                type="text"
+                value={adminUsername}
+                onChange={(event) => setAdminUsername(event.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
+                placeholder="admin"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-bold">رمز الدخول</label>
+              <input
+                type="password"
+                value={adminPasscode}
+                onChange={(event) => setAdminPasscode(event.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
+                placeholder="••••"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-amber-400 px-4 py-3 font-black text-slate-950 transition hover:bg-amber-300"
+            >
+              دخول
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main
       dir="rtl"
@@ -162,14 +277,26 @@ export default function AdminPage() {
     >
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
-          <h1 className="text-3xl font-black">لوحة التحكم</h1>
-          <p className="mt-2 text-sm text-slate-300">
-            إدارة مباريات ونتائج منصة توقعات كأس العالم 2026.
-          </p>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-black">لوحة التحكم</h1>
+              <p className="mt-2 text-sm text-slate-300">
+                إدارة مباريات ونتائج منصة توقعات كأس العالم 2026.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAdminLogout}
+              className="rounded-xl bg-red-500 px-4 py-2 text-sm font-black text-white hover:bg-red-400"
+            >
+              خروج من الأدمن
+            </button>
+          </div>
         </header>
 
         {(message || error) && (
-          <div className="mb-6">
+          <div className="mb-6 space-y-3">
             {message && (
               <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/15 p-4 text-sm text-emerald-200">
                 {message}
