@@ -1,18 +1,24 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isLoggedIn, loading: authLoading } = useAuth();
 
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && isLoggedIn) {
+      router.push("/");
+    }
+  }, [authLoading, isLoggedIn, router]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -101,7 +107,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || authLoading}
             className="w-full rounded-xl bg-amber-400 px-4 py-3 font-black text-slate-950 transition hover:bg-amber-300 disabled:opacity-60"
           >
             {loading ? "جاري الدخول..." : "دخول"}
@@ -110,8 +116,16 @@ export default function LoginPage() {
 
         <button
           type="button"
-          onClick={() => router.push("/")}
+          onClick={() => router.push("/register")}
           className="mt-4 w-full rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-200 hover:bg-white/10"
+        >
+          ما عندك حساب؟ تسجيل جديد
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="mt-3 w-full rounded-xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-300 hover:bg-white/10"
         >
           العودة للرئيسية
         </button>

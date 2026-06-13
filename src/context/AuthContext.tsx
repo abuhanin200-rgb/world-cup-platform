@@ -8,13 +8,21 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { AppUser, getUserById, loginUser, LoginUserInput } from "@/lib/users";
+import {
+  AppUser,
+  getUserById,
+  loginUser,
+  LoginUserInput,
+  registerUser,
+  RegisterUserInput,
+} from "@/lib/users";
 
 type AuthContextType = {
   user: AppUser | null;
   loading: boolean;
   isLoggedIn: boolean;
   login: (input: LoginUserInput) => Promise<AppUser>;
+  register: (input: RegisterUserInput) => Promise<AppUser>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 };
@@ -71,6 +79,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loggedUser;
   }
 
+  async function register(input: RegisterUserInput) {
+    const newUser = await registerUser(input);
+
+    localStorage.setItem(STORAGE_KEY, newUser.id);
+    setUser(newUser);
+
+    return newUser;
+  }
+
   function logout() {
     localStorage.removeItem(STORAGE_KEY);
     setUser(null);
@@ -82,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       isLoggedIn: Boolean(user),
       login,
+      register,
       logout,
       refreshUser,
     }),
