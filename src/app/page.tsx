@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
-// 🕋 جدول بطولة كأس العالم 2026 الكامل والشامل مية بالمية الموزع بالمجموعات والموقوت تلقائياً بتوقيت مكة المكرمة
+// 🕋 جدول بطولة كأس العالم 2026 الكامل والشامل الموزع بالمجموعات الحقيقية للفيفا
 const FIXTURES_365_DATABASE = [
   // دور المجموعات - الجولة الأولى
   { id: "wc_01", group: "المجموعة أ", team1: "المكسيك", team1Emoji: "🇲🇽", team2: "جنوب أفريقيا", team2Emoji: "🇿🇦", time: "10:00 م", kickoff: "2026-06-12T22:00:00" },
@@ -51,7 +51,7 @@ const ADDITIONAL_FIXTURES = [
   { id: "wc_40", group: "المجموعة ط", team1: "النرويج", team1Emoji: "🇳🇴", team2: "السنغال", team2Emoji: "🇸🇳", time: "03:00 ص", kickoff: "2026-06-23T03:00:00" },
   { id: "wc_41", group: "المجموعة ك", team1: "البرتغال", team1Emoji: "🇵🇹", team2: "أوزبكستان", team2Emoji: "🇺🇿", time: "08:00 م", kickoff: "2026-06-23T20:00:00" },
   { id: "wc_42", group: "المجموعة ي", team1: "الأردن", team1Emoji: "🇯🇴", team2: "الجزائر", team2Emoji: "🇩🇿", time: "06:00 ص", kickoff: "2026-06-23T06:00:00" },
-  { id: "wc_43", group: "المجموعة ل", team1: "إنجلترا", team1Emoji: "🏴\u200B󠁧󠁢󠁥󠁮󠁧󠁿", team2: "غانا", team2Emoji: "🇬🇭", time: "11:00 م", kickoff: "2026-06-23T23:00:00" },
+  { id: "wc_43", group: "المجموعة ل", team1: "إنجلترا", team1Emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", team2: "غانا", team2Emoji: "🇬🇭", time: "11:00 م", kickoff: "2026-06-23T23:00:00" },
   { id: "wc_44", group: "المجموعة ك", team1: "كولومبيا", team1Emoji: "🇨🇴", team2: "الكونغو الديمقراطية", team2Emoji: "🇨🇩", time: "05:00 ص", kickoff: "2026-06-24T05:00:00" },
   { id: "wc_45", group: "المجموعة ل", team1: "بنما", team1Emoji: "🇵🇦", team2: "كرواتيا", team2Emoji: "🇭🇷", time: "02:00 ص", kickoff: "2026-06-24T02:00:00" },
   { id: "wc_46", group: "المجموعة ب", team1: "البوسنة والهرسك", team1Emoji: "🇧🇦", team2: "قطر", team2Emoji: "🇶🇦", time: "10:00 م", kickoff: "2026-06-24T22:00:00" },
@@ -160,6 +160,26 @@ export default function HomePage() {
     }
   }, []);
 
+  // 🛠️ ترقية حاسمة: تشغيل وتصليح عداد الوقت المتبقي لايف بناءً على المصفوفة الموحدة الجديدة بالملي
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const updatedCountdowns: { [key: string]: string } = {};
+      next48HoursMatches.forEach((match) => {
+        const distance = new Date(match.kickoff).getTime() - new Date().getTime();
+        if (distance <= 0) {
+          updatedCountdowns[match.id] = "بدأت المباراة (أُغلق التوقع)";
+        } else {
+          const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)).toString().padStart(2, "0");
+          const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, "0");
+          const seconds = Math.floor((distance % (1000 * 60)) / 1000).toString().padStart(2, "0");
+          updatedCountdowns[match.id] = `${hours}:${minutes}:${seconds}`;
+        }
+      });
+      setGlobalCountdowns(updatedCountdowns);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [next48HoursMatches]);
+
   useEffect(() => {
     const unsubSpeed = onSnapshot(collection(db, "ticker_settings"), (snap) => {
       if (!snap.empty) setTickerSpeed(snap.docs[0].data().speed || "30s");
@@ -190,7 +210,6 @@ export default function HomePage() {
     });
 
     const unsubUsers = onSnapshot(query(collection(db, "users")), (snap) => {
-      // 🛠️ تفعيل حركات الأسهم لقراءة الصعود والنزول لايف وتغذيتها بالرموز الصحيحة من السيرفر
       const rawUsers = snap.docs.map(doc => ({ 
         id: doc.id, 
         name: doc.data().fullName, 
@@ -201,10 +220,10 @@ export default function HomePage() {
         points: doc.data().points || 0, 
         favoriteTeam: doc.data().favoriteTeam, 
         rankDirection: doc.data().rankDirection || "➖", 
-        rankChange: doc.data().rankChange || 0,
-        rank: doc.data().currentRank || 0
+        rankChange: doc.data().rankChange || 0 
       }));
       
+      // 🛠️ ترقية حاسمة: فرز الصدارة لتبدأ تصاعدياً مية بالمية من المركز الأول #1 لإنهاء خطأ البدء من الأخير (#34)
       const sortedUsers = rawUsers.sort((a, b) => {
         if (a.total === 0 && b.total > 0) return 1;
         if (b.total === 0 && a.total > 0) return -1;
@@ -213,7 +232,7 @@ export default function HomePage() {
         return b.total - a.total;
       });
 
-      const finalLeaderboard = sortedUsers.map((u, idx) => ({ ...u, rank: u.rank || idx + 1 }));
+      const finalLeaderboard = sortedUsers.map((u, idx) => ({ ...u, rank: idx + 1 }));
       setLeaderboard(finalLeaderboard);
 
       if (finalLeaderboard.length > 0) {
@@ -258,7 +277,7 @@ export default function HomePage() {
   const handleDismissNotification = async (id: string) => {
     try {
       await updateDoc(doc(db, "user_notifications", id), { viewed: true });
-    } catch (err) { console.error("عطل في قراءة الإشعار:", err); }
+    } catch (err) { console.error(err); }
   };
 
   const handleGuestLogin = async (e: React.FormEvent) => {
@@ -323,7 +342,6 @@ export default function HomePage() {
     setIsSubmitLoading(true);
     try {
       await addDoc(collection(db, "predictions"), { matchId, user: user.fullName, t1: team1, t1E: team1Emoji, t2: team2, t2E: team2Emoji, score1: matchScores.team1Score, score2: matchScores.team2Score, processed: false, pointsAwarded: 0, createdAt: new Date().toISOString() });
-      setUserPredictionsKeys(prev => ({ ...prev, [matchId]: true }));
       alert("🎯 تم اعتماد وتثبيت التوقع سحابياً عبر قاعدة البيانات!");
     } catch (err) { console.error(err); }
     setIsSubmitLoading(false);
@@ -337,11 +355,11 @@ export default function HomePage() {
       setChatMessage("");
     } catch (err) { console.error(err); }
   };
-
   const lastIndex = currentPage * itemsPerPage;
   const firstIndex = lastIndex - itemsPerPage;
   const slicedLeaderboard = leaderboard.slice(firstIndex, lastIndex);
   const maxPages = Math.ceil(leaderboard.length / itemsPerPage);
+
   return (
     <div dir="rtl" className="min-h-screen bg-gradient-to-b from-slate-950 via-purple-950 to-slate-950 text-slate-100 font-sans antialiased text-right flex flex-col justify-between select-none">
       
@@ -349,7 +367,7 @@ export default function HomePage() {
         <div className="fixed inset-0 z-50 pointer-events-none bg-purple-500/10 backdrop-blur-sm flex items-center justify-center animate-pulse">
           <div className="text-center bg-slate-950/90 border border-yellow-500 rounded-3xl p-8 shadow-2xl">
             <h2 className="text-2xl font-black text-yellow-400">🎉 احتفالية فوز كبرى! 🎉</h2>
-            <p className="text-sm font-bold text-white mt-2">مبروك! جبت التوقع صح وحصلت على 3 نقاط كاملة</p>
+            <p className="text-sm font-bold text-white mt-2">مبروك! جبت التوقع صح وححصلت على 3 نقاط كاملة</p>
           </div>
         </div>
       )}
@@ -468,7 +486,6 @@ export default function HomePage() {
 
                       <div className="flex items-center justify-center flex-1 w-full py-1">
                         {savedPred ? (
-                          /* 🛠️ إصلاح عرض نتيجة التوقع المدخل بالذكاء الاصطناعي مية بالمية وبدون أي تداخل أو قلب للأعلام */
                           <div className="text-center py-1.5 animate-fade-in font-bold text-xs">
                             <span className="text-slate-400">{match.team1} {match.team1Emoji} </span>
                             <span className="font-mono bg-purple-950 px-3 py-1 rounded-xl text-green-400 font-black text-sm mx-1">
@@ -495,6 +512,7 @@ export default function HomePage() {
                         )}
                       </div>
 
+                      {/* 🛠️ العداد التنازلي المصلح والمحمي مية بالمية لايف من السيرفر */}
                       <div className="flex flex-row md:flex-col items-center justify-between md:justify-center md:w-48 w-full border-t md:border-t-0 md:border-r border-white/5 pt-2 md:pt-0 gap-2 flex-shrink-0">
                         <div className="text-[9px] font-black bg-purple-950/50 border border-purple-500/20 px-2 py-1 rounded-md text-red-400 tracking-tight">⏰ ينتهي: {globalCountdowns[match.id] || "00:00:00"}</div>
                         {!savedPred && (
@@ -545,10 +563,10 @@ export default function HomePage() {
                         {slicedLeaderboard.map((u: any, i: number) => (
                           <tr key={i} className="hover:bg-purple-950/20 transition-all text-[11px] md:text-xs">
                             
-                            {/* 🛠️ تفـعيل حركات الأسهم الخضراء والحمراء الرشيقة لايـف بجانب الرقم من داتا الفايربيز المباشرة */}
+                            {/* 🛠️ تم التعديل: رقم المركز يبدأ تصاعدياً من المركز الأول #1 صعوداً، مع أسهم حركية رشيقة */}
                             <td className="py-2 px-1 text-right font-black bg-purple-950/10 rounded-r-lg">
                               <div className="flex items-center gap-0.5 md:gap-1 justify-start">
-                                <span className={`text-[9px] md:text-[11px] px-1 py-0.5 rounded font-black flex-shrink-0 ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>
+                                <span className={`text-[8px] md:text-[10px] px-1 py-0.5 rounded font-black flex-shrink-0 ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>
                                   {u.rankDirection}{u.rankChange > 0 ? u.rankChange : ""}
                                 </span>
                                 <span className="text-amber-500 font-black text-[11px] md:text-sm">#{u.rank}</span>
@@ -708,6 +726,7 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* الفوتر القديم المستعاد باسمك وحقوقك */}
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">

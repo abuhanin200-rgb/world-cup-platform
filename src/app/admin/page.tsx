@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, onSnapshot, query, orderBy, getDocs, doc, updateDoc, deleteDoc, where, addDoc } from "firebase/firestore";
 
-// 🕋 مصفوفة بطولة كأس العالم 2026 الكاملة مدمجة بالصندوق المركزي لفرز وتوزيع النقاط ذكياً عضو عضو بالملي
+// مصفوفة بطولة كأس العالم 2026 للصندوق الجماعي العلوي
 const SETTLEMENT_MATCHES_LIST = [
   { id: "wc_01", title: "🇲🇽 المكسيك ضد جنوب أفريقيا 🇿🇦 (مجموعة أ)" },
   { id: "wc_02", title: "🇨🇦 كندا ضد البوسنة والهرسك 🇧🇦 (مجموعة ب)" },
@@ -20,70 +20,14 @@ const SETTLEMENT_MATCHES_LIST = [
   { id: "wc_12", title: "🇪🇸 إسبانيا ضد الرأس الأخضر 🇨🇻 (مجموعة ح)" },
   { id: "wc_13", title: "🇧🇪 بلجيكا ضد مصر 🇪🇬 (مجموعة ر)" },
   { id: "wc_14", title: "🇸🇦 السعودية ضد أوروغواي 🇺🇾 (مجموعة ح)" },
-  { id: "wc_15", title: "🇮🇷 إيران ضد نيوزيلندا 🇳🇿 (مجموعة ر)" },
-  { id: "wc_16", title: "🇫🇷 فرنسا ضد السنغال 🇸🇳 (مجموعة ط)" },
-  { id: "wc_17", title: "🇮🇶 العراق ضد النرويج 🇳🇴 (مجموعة ط)" },
-  { id: "wc_18", title: "🇦🇷 الأرجنتين ضد الجزائر 🇩🇿 (مجموعة ي)" },
-  { id: "wc_19", title: "🇦🇹 النمسا ضد الأردن 🇯🇴 (مجموعة ي)" },
-  { id: "wc_20", title: "🇵🇹 البرتغال ضد الكونغو الديمقراطية 🇨🇩 (مجموعة ك)" },
-  { id: "wc_21", title: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 إنجلترا ضد كرواتيا 🇭🇷 (مجموعة ل)" },
-  { id: "wc_22", title: "🇺🇿 أوزبكستان ضد كولومبيا 🇨🇴 (مجموعة ك)" },
-  { id: "wc_23", title: "🇬🇭 غانا ضد بنما 🇵🇦 (مجموعة ل)" },
-  { id: "wc_24", title: "🇲🇽 المكسيك ضد كوريا الجنوبية 🇰🇷 (مجموعة أ)" },
-  { id: "wc_25", title: "🇨🇦 كندا ضد قطر 🇶🇦 (مجموعة ب)" },
-  { id: "wc_26", title: "🇺🇸 الولايات المتحدة ضد أستراليا 🇦🇺 (مجموعة د)" },
-  { id: "wc_27", title: "🇧🇷 البرازيل ضد هايتي 🇭🇹 (مجموعة ج)" },
-  { id: "wc_28", title: "🏴󠁧󠁢󠁳󠁣󠁴󠁿 اسكتلندا ضد المغرب 🇲🇦 (مجموعة ج)" },
-  { id: "wc_29", title: "🇳🇱 هولندا ضد السويد 🇸🇪 (مجموعة و)" },
-  { id: "wc_30", title: "🇹🇷 تركيا ضد باراغواي 🇵🇾 (مجموعة د)" },
-  { id: "wc_31", title: "🇩🇪 ألمانيا ضد ساحل العاج 🇨🇮 (مجموعة هـ)" },
-  { id: "wc_32", title: "🇹🇳 تونس ضد اليابان 🇯🇵 (مجموعة و)" },
-  { id: "wc_33", title: "🇪🇨 الإكوادور ضد كوراساو 🇨🇼 (مجموعة هـ)" },
-  { id: "wc_34", title: "🇧🇪 بلجيكا ضد إيران 🇮🇷 (مجموعة ر)" },
-  { id: "wc_35", title: "🇪🇸 إسبانيا ضد السعودية 🇸🇦 (مجموعة ح)" },
-  { id: "wc_36", title: "🇺🇾 أوروغواي ضد الرأس الأخضر 🇨🇻 (مجموعة ح)" },
-  { id: "wc_37", title: "🇳🇿 نيوزيلندا ضد مصر 🇪🇬 (مجموعة ر)" },
-  { id: "wc_38", title: "🇦🇷 الأرجنتين ضد النمسا 🇦🇹 (مجموعة ي)" },
-  { id: "wc_39", title: "🇫🇷 فرنسا ضد العراق 🇮🇶 (مجموعة ط)" },
-  { id: "wc_40", title: "🇳🇴 النرويج ضد السنغال 🇸🇳 (مجموعة ط)" },
-  { id: "wc_41", title: "🇵🇹 البرتغال ضد أوزبكستان 🇺🇿 (مجموعة ك)" },
-  { id: "wc_42", title: "🇯🇴 الأردن ضد الجزائر 🇩🇿 (مجموعة ي)" },
-  { id: "wc_43", title: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 إنجلترا ضد غانا 🇬🇭 (مجموعة ل)" },
-  { id: "wc_44", title: "🇨🇴 كولومبيا ضد الكونغو الديمقراطية 🇨🇩 (مجموعة ك)" },
-  { id: "wc_45", title: "🇵🇦 بنما ضد كرواتيا 🇭🇷 (مجموعة ل)" },
-  { id: "wc_46", title: "🇧🇦 البوسنة والهرسك ضد قطر 🇶🇦 (مجموعة ب)" },
-  { id: "wc_47", title: "🇨🇭 سويسرا ضد كندا 🇨🇦 (مجموعة ب)" },
-  { id: "wc_48", title: "🇿🇦 جنوب أفريقيا ضد كوريا الجنوبية 🇰🇷 (مجموعة أ)" }
+  { id: "wc_15", title: "🇮🇷 إيران ضد نيوزيلندا 🇳🇿 (مجموعة ر)" }
 ];
 
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
   { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
-  { code: "EG", name: "مصر", emoji: "🇪🇬" }, { code: "DZ", name: "الجزائر", emoji: "🇩🇿" },
-  { code: "TN", name: "تونس", emoji: "🇹🇳" }, { code: "AE", name: "الإمارات", emoji: "🇦🇪" },
-  { code: "QA", name: "قطر", emoji: "🇶🇦" }, { code: "IQ", name: "العراق", emoji: "🇮🇶" },
-  { code: "JO", name: "الأردن", emoji: "🇯🇴" }, { code: "OM", name: "عُمان", emoji: "🇴🇲" },
-  { code: "BH", name: "البحرين", emoji: "🇧🇭" }, { code: "KW", name: "الكويت", emoji: "🇰🇼" },
   { code: "US", name: "الولايات المتحدة الأمريكية", emoji: "🇺🇸" }, { code: "CA", name: "كندا", emoji: "🇨🇦" },
-  { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
-  { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
-  { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
-  { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
-  { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
-  { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
-  { code: "EC", name: "الإكوادور", emoji: "🇪🇨" }, { code: "PE", name: "بيرو", emoji: "🇵🇪" },
-  { code: "SN", name: "السنغال", emoji: "🇸🇳" }, { code: "CM", name: "الكاميرون", emoji: "🇨🇲" },
-  { code: "GH", name: "غانا", emoji: "🇬🇭" }, { code: "NG", name: "نيجيريا", emoji: "🇳🇬" },
-  { code: "CI", name: "ساحل العاج", emoji: "🇨🇮" }, { code: "JP", name: "اليابان", emoji: "🇯🇵" },
-  { code: "KR", name: "كوريا الجنوبية", emoji: "🇰🇷" }, { code: "AU", name: "أستراليا", emoji: "🇦🇺" },
-  { code: "IR", name: "إيران", emoji: "🇮🇷" }, { code: "CR", name: "كوستاريكا", emoji: "🇨🇷" },
-  { code: "JM", name: "جامايكا", emoji: "🇯🇲" }, { code: "PA", name: "بنما", emoji: "🇵🇦" },
-  { code: "NZ", name: "نيوزيلندا", emoji: "🇳🇿" }, { code: "CH", name: "سويسرا", emoji: "🇨🇭" },
-  { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" },
-  { code: "BA", name: "البوسنة والهرسك", emoji: "🇧🇦" }, { code: "PY", name: "باراغواي", emoji: "🇵🇾" },
-  { code: "HT", name: "هايتي", emoji: "🇭🇹" }, { code: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", name: "اسكتلندا", emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
-  { code: "CW", name: "كوراساو", emoji: "🇨🇼" }
+  { code: "BR", name: "البرازيل", emoji: "🇧🇷" }, { code: "BA", name: "البوسنة والهرسك", emoji: "🇧🇦" }
 ];
 
 export default function AdminDashboard() {
@@ -134,6 +78,7 @@ export default function AdminDashboard() {
     });
   }, []);
 
+  // الاحتساب الجماعي المركزي من الصندوق العلوي
   const handleSettleMatchPredictionsBulk = async () => {
     if (!selectedBulkMatchId) { alert("⚠️ اختر لقاء أولاً!"); return; }
     const score1 = parseInt(bulkScore1); const score2 = parseInt(bulkScore2);
@@ -164,7 +109,7 @@ export default function AdminDashboard() {
             await updateDoc(doc(db, "users", userDoc.id), { points: (cur.points || 0) + earnedPoints, total: (cur.total || 0) + 1, correct: (cur.correct || 0) + isCorrect, wrong: (cur.wrong || 0) + isWrong });
             await addDoc(collection(db, "user_notifications"), { userId: userDoc.id, user: pred.user, matchId: selectedBulkMatchId, pointsAwarded: earnedPoints, t1: pred.t1, t2: pred.t2, viewed: false, createdAt: new Date().toISOString() });
           }
-          await updateDoc(doc(db, "predictions", predictionDoc.id), { processed: true, pointsAwarded: earnedPoints, bulkSettleScore1: score1, bulkSettleScore2: score2 });
+          await updateDoc(doc(db, "predictions", predictionDoc.id), { processed: true, pointsAwarded: earnedPoints });
         }
       }
 
@@ -179,37 +124,51 @@ export default function AdminDashboard() {
       });
 
       setBulkScore1(""); setBulkScore2(""); setSelectedMatchId("");
-      alert("🎉 نجاح الفرز الجماعي وتنشيط حركة الصعود والهبوط السحابية لايف!");
+      alert("🎉 نجاح الفرز الجماعي السحابي وتحديث المراكز!");
     } catch (err) { console.error(err); }
     setIsGlobalLoading(false);
   };
 
-  const handleProcessSinglePredictionManualOldWay = async (pred: any) => {
-    const score1 = parseInt(pred.bulkSettleScore1); const score2 = parseInt(pred.bulkSettleScore2);
-    if (isNaN(score1) || isNaN(score2)) { alert("⚠️ المباراة لم تُفرز جماعياً بعد من الصندوق العلوي!"); return; }
-    
+  // 🎯 المحرك الأصلي المستعاد للطوارئ: احتساب يدوي مباشر بـ 3 أزرار مستقلة (بالملي+3 / الفائز+1 / خطأ0) مربوط بالصدارة لايف
+  const handleSettlePredictionSingleManualOldWay = async (pred: any, scoreType: "full" | "win" | "wrong") => {
+    let earnedPoints = 0;
+    let isCorrect = 0;
+    let isWrong = 0;
+
+    if (scoreType === "full") { earnedPoints = 3; isCorrect = 1; }
+    else if (scoreType === "win") { earnedPoints = 1; isCorrect = 1; }
+    else { isWrong = 1; }
+
     setIsGlobalLoading(true);
     try {
-      const p1 = parseInt(pred.score1); const p2 = parseInt(pred.score2);
-      let earnedPoints = 0; let isCorrect = 0; let isWrong = 0;
-
-      if (p1 === score1 && p2 === score2) { earnedPoints = 3; isCorrect = 1; }
-      else if ((score1 > score2 && p1 > p2) || (score2 > score1 && p2 > p1) || (score1 === score2 && p1 === p2)) { earnedPoints = 1; isCorrect = 1; }
-      else { isWrong = 1; }
-
       const uSnap = await getDocs(query(collection(db, "users"), where("fullName", "==", pred.user)));
       if (!uSnap.empty) {
-        const uDoc = uSnap.docs[0]; const cur = uDoc.data();
-        const oldPoints = pred.pointsAwarded || 0;
+        const uDoc = uSnap.docs[0];
+        const cur = uDoc.data();
         
+        // خصم النقاط والعمليات القديمة للتوقع لو كان محسوباً سابقاً منعاً للتكرار والتدبيل
+        const oldPoints = pred.pointsAwarded || 0;
+        const oldCorrect = pred.oldIsCorrect || 0;
+        const oldWrong = pred.oldIsWrong || 0;
+
         await updateDoc(doc(db, "users", uDoc.id), {
           points: Math.max(((cur.points || 0) - oldPoints) + earnedPoints, 0),
-          correct: pred.processed ? (cur.correct || 0) : (cur.correct || 0) + isCorrect,
-          wrong: pred.processed ? (cur.wrong || 0) : (cur.wrong || 0) + isWrong,
-          total: pred.processed ? (cur.total || 0) : (cur.total || 0) + 1
+          total: pred.processed ? (cur.total || 0) : (cur.total || 0) + 1,
+          correct: Math.max(((cur.correct || 0) - oldCorrect) + isCorrect, 0),
+          wrong: Math.max(((cur.wrong || 0) - oldWrong) + isWrong, 0)
         });
-        await updateDoc(doc(db, "predictions", pred.id), { processed: true, pointsAwarded: earnedPoints });
-        alert(`🎯 تم إعادة احتساب هذا التوقع يدوياً بالملي! النقاط: [ ${earnedPoints} ]`);
+
+        // قفل التوقع وتحديث داتا الحالة
+        await updateDoc(doc(db, "predictions", pred.id), { 
+          processed: true, 
+          pointsAwarded: earnedPoints,
+          oldIsCorrect: isCorrect,
+          oldIsWrong: isWrong
+        });
+
+        alert(`✅ تم الاحتساب اليدوي فوراً! حساب (${pred.user}) حصل على [ ${earnedPoints} ] نقاط وتحدثت صفحة الجمهور لايف.`);
+      } else {
+        alert("✕ لم يتم العثور على العضو في قاعدة البيانات.");
       }
     } catch (err) { console.error(err); }
     setIsGlobalLoading(false);
@@ -229,7 +188,7 @@ export default function AdminDashboard() {
     setIsGlobalLoading(true);
     const matched = WORLD_CUP_2026_TEAMS.find(t => t.name === editTeam);
     await updateDoc(doc(db, "users", userId), { fullName: editName, password: editPassword, favoriteTeam: editTeam, teamEmoji: matched ? matched.emoji : "🏆" });
-    setEditingUserId(""); setIsGlobalLoading(false); alert("✅ تم التعديل لايف!");
+    setEditingUserId(""); setIsGlobalLoading(false); alert("✅ تم التعديل!");
   };
 
   const handleUpdateUserScoresManual = async (userId: string) => {
@@ -238,28 +197,19 @@ export default function AdminDashboard() {
     setScoreEditUserId(""); setIsGlobalLoading(false); alert("🏆 تم التحديث!");
   };
 
-  const handleUpdateTickerSpeed = async () => {
-    if (tickerId) { await updateDoc(doc(db, "ticker_settings", tickerId), { speed: tickerSpeed }); }
-    else { await addDoc(collection(db, "ticker_settings"), { speed: tickerSpeed }); }
-    alert("⚡ تم التحديث!");
-  };
-
-  // 🛠️ ترقية وتصليح معادلة الـ Pagination المسببة للمشاكل الـ 16 بشاشتك وثبات الحسبة بصيغة المفرد المتطابقة
   const maxUserPages = Math.ceil(users.length / itemsPerPage);
   const maxLeaderboardPages = Math.ceil(sortedPointsUsers.length / itemsPerPage);
   const maxPredPages = Math.ceil(predictions.length / itemsPerPage);
-  const maxMatchPages = Math.ceil(matches.length / itemsPerPage);
-  const maxChatPages = Math.ceil(chats.length / itemsPerPage);
   return (
     <div dir="rtl" className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-8 font-sans text-right select-none">
       <style>{`.interactive-btn:active { transform: scale(0.95); filter: brightness(1.2); } .hidden-scrollbar::-webkit-scrollbar { display: none; }`}</style>
       
       <div className="flex items-center justify-between border-b border-slate-700 pb-4 mb-6">
         <h1 className="text-xl md:text-2xl font-black text-amber-400">⚙️ لوحة قيادة تحكم الآدمن الرسمية المطورة</h1>
-        {isGlobalLoading && <span className="text-xs bg-amber-500 text-slate-950 font-black px-3 py-1 rounded-full animate-pulse">جاري المزامنة السحابية... ⏳</span>}
+        {isGlobalLoading && <span className="text-xs bg-amber-500 text-slate-950 font-black px-3 py-1 rounded-full animate-pulse">جاري المزامنة والحفظ... ⏳</span>}
       </div>
 
-      {/* الصندوق المركزي المستقل */}
+      {/* الصندوق المركزي المستقل العلوي */}
       <section className="bg-gradient-to-r from-purple-950 to-indigo-950 p-5 rounded-2xl border border-purple-500/30 mb-8 shadow-2xl">
         <h2 className="font-black text-xs md:text-sm text-white mb-2">⚡ صندوق الاحتساب الفوري الجماعي والمسح السحابي الذكي عضو عضو بالملي</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-slate-950/50 p-4 rounded-xl">
@@ -297,36 +247,12 @@ export default function AdminDashboard() {
             <button type="submit" className="w-full bg-blue-600 text-white font-black py-2 rounded-lg text-xs interactive-btn">{matchEditingId ? "تحديث ونشر التغييرات 💾" : "إضافة ونشر المباراة فوراً للجماهير 🚀"}</button>
           </div>
         </form>
-        <div className="overflow-x-auto mt-4">
-          <table className="w-full text-xs text-center border-collapse">
-            <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">المباراة المنشورة يدوياً</th><th className="p-2">التوقيت</th><th className="p-2">الإجراءات</th></tr></thead>
-            <tbody className="divide-y divide-slate-900">
-              {matches.slice((matchPage - 1) * itemsPerPage, matchPage * itemsPerPage).map((m) => (
-                <tr key={m.id} className="hover:bg-slate-900/30">
-                  <td className="p-2 text-right font-black text-white">{m.team1Emoji} {m.team1} vs {m.team2} {m.team2Emoji}</td>
-                  <td className="p-2 font-bold text-purple-300">{m.day} المجموعة {m.group}</td>
-                  <td className="p-2 flex gap-1 justify-center">
-                    <button onClick={()=>{setMatchEditingId(m.id); setMatchForm({team1:m.team1, team1Emoji:m.team1Emoji, team2:m.team2, team2Emoji:m.team2Emoji, day:m.day, group:m.group, time:m.time, kickoff:m.kickoff});}} className="bg-blue-600 px-2.5 py-1 rounded text-[10px] interactive-btn">تعديل ⚙️</button>
-                    <button onClick={async()=>{if(confirm("حذف هذه المباراة؟")) await deleteDoc(doc(db,"custom_matches",m.id))}} className="bg-red-600 px-2.5 py-1 rounded text-[10px] interactive-btn">حذف 🗑️</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {maxMatchPages > 1 && (
-          <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setMatchPage(p=>Math.max(p-1,1))} disabled={matchPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
-            <span className="text-slate-400">صفحة {matchPage} من {maxMatchPages}</span>
-            <button onClick={()=>setMatchPage(p=>Math.min(p+1,maxMatchPages))} disabled={matchPage === maxMatchPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
-          </div>
-        )}
       </section>
 
       {/* 👥 قسم التحكم بالأعضاء */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 shadow-xl">
         <h3 className="font-black text-xs text-amber-400 mb-3 border-b border-slate-800 pb-1">👤 التحكم بالأعضاء وبينات الحسابات (التسلسل من الأحدث مسجلاً إلى الأقدم 🟢)</h3>
-        <div className="overflow-x-auto min-h-[250px]">
+        <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
             <thead><tr className="bg-slate-900 text-slate-400 border-b border-slate-800"><th className="p-2 text-right">الاسم</th><th className="p-2">الرمز السري</th><th className="p-2">المنتخب المرشح لللقب (قائمة أعلام الفيفا 🏆)</th><th className="p-2">الإجراء</th></tr></thead>
             <tbody className="divide-y divide-slate-900">
@@ -401,9 +327,9 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      {/* 🧮 جدول توقعات الجماهير للطوارئ والمحرك الفردي المصلح */}
+      {/* 🧮 جدول توقعات الجماهير للطوارئ والمحرك الفردي بـ 3 أزرار مستقلة بالملي */}
       <section className="bg-slate-950 p-4 rounded-xl mb-6 shadow-xl">
-        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 جدول توقعات الجماهير للطوارئ (إعادة احتساب يدوي بالملي+3 - الفائز+1 - خطأ0 🔄)</h3>
+        <h3 className="font-black text-xs text-green-400 mb-3 border-b border-slate-800 pb-1">🧮 جدول توقعات الجماهير للطوارئ (التحكم اليدوي الفردي الدقيق بـ 3 أزرار مستقلة 🔄)</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-center border-collapse">
             <thead>
@@ -411,8 +337,8 @@ export default function AdminDashboard() {
                 <th className="p-2 text-right">العضو</th>
                 <th className="p-2">المباراة الملعوبة</th>
                 <th className="p-2 text-green-400">التوقع المرسل</th>
-                <th className="p-2">الحالة السحابية الحالية</th>
-                <th className="p-2">الإجراء اليدوي الأصلي المستعاد</th>
+                <th className="p-2">الحالة السحابية</th>
+                <th className="p-2">الإجراء اليدوي الأصلي المستعاد لفرز النقاط يدوياً بالملي</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-900 font-bold">
@@ -426,14 +352,12 @@ export default function AdminDashboard() {
                       {p.processed ? <span className="text-green-500 font-black">حُسبت بالكامل ✓</span> : <span className="text-amber-500 font-black">بانتظار الفرز ⏰</span>}
                     </td>
                     <td className="p-2">
+                      {/* 🛠️ تعديل حاسم: حقن الـ 3 أزرار المستقلة للطوارئ لفرز وتوزيع النقاط فوراً بالصدارة بالملي وبدون أي لَخبطة */}
                       <div className="flex gap-1 justify-center items-center">
-                        <button 
-                          onClick={() => handleProcessSinglePredictionManualOldWay(p)} 
-                          className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-black px-3 py-1 rounded text-[10px] interactive-btn shadow-md whitespace-nowrap"
-                        >
-                          🔄 إعادة فرز التوقع فردياً
-                        </button>
-                        <button onClick={async ()=>{if(confirm("حذف التوقع نهائياً؟")) await deleteDoc(doc(db,"predictions",p.id))}} className="bg-red-950 text-red-400 px-2 py-1 rounded text-[10px]">حذف</button>
+                        <button onClick={() => handleSettlePredictionSingleManualOldWay(p, "full")} className="bg-green-600 hover:bg-green-500 text-white font-black px-2 py-1 rounded text-[10px] interactive-btn shadow-md whitespace-nowrap">🎯 بالملي +3</button>
+                        <button onClick={() => handleSettlePredictionSingleManualOldWay(p, "win")} className="bg-blue-600 hover:bg-blue-500 text-white font-black px-2 py-1 rounded text-[10px] interactive-btn shadow-md whitespace-nowrap">⚽ الفائز +1</button>
+                        <button onClick={() => handleSettlePredictionSingleManualOldWay(p, "wrong")} className="bg-red-600 hover:bg-red-500 text-white font-black px-2 py-1 rounded text-[10px] interactive-btn shadow-md whitespace-nowrap">✕ خطأ 0</button>
+                        <button onClick={async ()=>{if(confirm("حذف التوقع نهائياً؟")) await deleteDoc(doc(db,"predictions",p.id))}} className="bg-slate-800 text-red-400 px-2 py-1 rounded text-[10px] interactive-btn">حذف</button>
                       </div>
                     </td>
                   </tr>
@@ -442,31 +366,12 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+        {/* ✅ استعادة أزرار التنقل (السابق / التالي) لجدول التوقعات لإنهاء الاختفاء لخبطة الزحام */}
         {maxPredPages > 1 && (
           <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
             <button onClick={()=>setPredPage(p=>Math.max(p-1,1))} disabled={predPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
             <span className="text-slate-400">صفحة {predPage} من {maxPredPages}</span>
             <button onClick={()=>setPredPage(p=>Math.min(p+1,maxPredPages))} disabled={predPage === maxPredPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
-          </div>
-        )}
-      </section>
-
-      {/* الرقابة على الشات */}
-      <section className="bg-slate-950 p-4 rounded-xl shadow-xl">
-        <h3 className="font-black text-xs text-red-400 mb-2 border-b border-slate-800 pb-1">💬 شات صفحة الجمهور (يعرض 20 رسالة)</h3>
-        <div className="space-y-2 mb-3">
-          {chats.slice((chatPage - 1) * itemsPerPage, chatPage * itemsPerPage).map((c) => (
-            <div key={c.id} className="bg-slate-900 p-2 rounded-lg flex items-center justify-between text-xs">
-              <div><span className="font-black text-purple-400">👤 {c.user}:</span> <span className="text-slate-200 font-medium">{c.text}</span></div>
-              <button onClick={async()=>await deleteDoc(doc(db,"chats",c.id))} className="bg-red-900/50 text-red-300 px-2 py-0.5 rounded font-bold interactive-btn">✕</button>
-            </div>
-          ))}
-        </div>
-        {maxChatPages > 1 && (
-          <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setChatPage(p=>Math.max(p-1,1))} disabled={chatPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
-            <span className="text-slate-400">صفحة {chatPage} من {maxChatPages}</span>
-            <button onClick={()=>setChatPage(p=>Math.min(p+1,maxChatPages))} disabled={chatPage === maxChatPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
           </div>
         )}
       </section>
