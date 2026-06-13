@@ -50,7 +50,7 @@ export default function HomePage() {
                 </div>
 
                 <button
-                  onClick={() => router.push("/test-auth")}
+                  onClick={() => router.push("/account")}
                   className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
                 >
                   حسابي
