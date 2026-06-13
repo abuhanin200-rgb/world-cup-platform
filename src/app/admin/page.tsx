@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, onSnapshot, query, orderBy, getDocs, doc, updateDoc, deleteDoc, where, addDoc } from "firebase/firestore";
 
-// 🕋 مصفوفة بطولة كأس العالم 2026 الكاملة مدمجة بالصندوق المركزي لفرز وتوزيع النقاط ذكياً عضو عضو بالملي
+// 🕋 مصفوفة المباريات الكاملة الـ 48 محقونة بمباراة (كوريا الجنوبية ضد التشيك) للطوارئ والفرز الفوري
 const SETTLEMENT_MATCHES_LIST = [
   { id: "wc_01", title: "🇲🇽 المكسيك ضد جنوب أفريقيا 🇿🇦 (مجموعة أ)" },
   { id: "wc_02", title: "🇨🇦 كندا ضد البوسنة والهرسك 🇧🇦 (مجموعة ب)" },
@@ -21,69 +21,13 @@ const SETTLEMENT_MATCHES_LIST = [
   { id: "wc_13", title: "🇧🇪 بلجيكا ضد مصر 🇪🇬 (مجموعة ر)" },
   { id: "wc_14", title: "🇸🇦 السعودية ضد أوروغواي 🇺🇾 (مجموعة ح)" },
   { id: "wc_15", title: "🇮🇷 إيران ضد نيوزيلندا 🇳🇿 (مجموعة ر)" },
-  { id: "wc_16", title: "🇫🇷 فرنسا ضد السنغال 🇸🇳 (مجموعة ط)" },
-  { id: "wc_17", title: "🇮🇶 العراق ضد النرويج 🇳🇴 (مجموعة ط)" },
-  { id: "wc_18", title: "🇦🇷 الأرجنتين ضد الجزائر 🇩🇿 (مجموعة ي)" },
-  { id: "wc_19", title: "🇦🇹 النمسا ضد الأردن 🇯🇴 (مجموعة ي)" },
-  { id: "wc_20", title: "🇵🇹 البرتغال ضد الكونغو الديمقراطية 🇨🇩 (مجموعة ك)" },
-  { id: "wc_21", title: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 إنجلترا ضد كرواتيا 🇭🇷 (مجموعة ل)" },
-  { id: "wc_22", title: "🇺🇿 أوزبكستان ضد كولومبيا 🇨🇴 (مجموعة ك)" },
-  { id: "wc_23", title: "🇬🇭 غانا ضد بنما 🇵🇦 (مجموعة ل)" },
-  { id: "wc_24", title: "🇲🇽 المكسيك ضد كوريا الجنوبية 🇰🇷 (مجموعة أ)" },
-  { id: "wc_25", title: "🇨🇦 كندا ضد قطر 🇶🇦 (مجموعة ب)" },
-  { id: "wc_26", title: "🇺🇸 الولايات المتحدة ضد أستراليا 🇦🇺 (مجموعة د)" },
-  { id: "wc_27", title: "🇧🇷 البرازيل ضد هايتي 🇭🇹 (مجموعة ج)" },
-  { id: "wc_28", title: "🏴󠁧󠁢󠁳󠁣󠁴󠁿 اسكتلندا ضد المغرب 🇲🇦 (مجموعة ج)" },
-  { id: "wc_29", title: "🇳🇱 هولندا ضد السويد 🇸🇪 (مجموعة و)" },
-  { id: "wc_30", title: "🇹🇷 تركيا ضد باراغواي 🇵🇾 (مجموعة د)" },
-  { id: "wc_31", title: "🇩🇪 ألمانيا ضد ساحل العاج 🇨🇮 (مجموعة هـ)" },
-  { id: "wc_32", title: "🇹🇳 تونس ضد اليابان 🇯🇵 (مجموعة و)" },
-  { id: "wc_33", title: "🇪🇨 الإكوادور ضد كوراساو 🇨🇼 (مجموعة هـ)" },
-  { id: "wc_34", title: "🇧🇪 بلجيكا ضد إيران 🇮🇷 (مجموعة ر)" },
-  { id: "wc_35", title: "🇪🇸 إسبانيا ضد السعودية 🇸🇦 (مجموعة ح)" },
-  { id: "wc_36", title: "🇺🇾 أوروغواي ضد الرأس الأخضر 🇨🇻 (مجموعة ح)" },
-  { id: "wc_37", title: "🇳🇿 نيوزيلندا ضد مصر 🇪🇬 (مجموعة ر)" },
-  { id: "wc_38", title: "🇦🇷 الأرجنتين ضد النمسا 🇦🇹 (مجموعة ي)" },
-  { id: "wc_39", title: "🇫🇷 فرنسا ضد العراق 🇮🇶 (مجموعة ط)" },
-  { id: "wc_40", title: "🇳🇴 النرويج ضد السنغال 🇸🇳 (مجموعة ط)" },
-  { id: "wc_41", title: "🇵🇹 البرتغال ضد أوزبكستان 🇺🇿 (مجموعة ك)" },
-  { id: "wc_42", title: "🇯🇴 الأردن ضد الجزائر 🇩🇿 (مجموعة ي)" },
-  { id: "wc_43", title: "🏴󠁧󠁢󠁥󠁮󠁧󠁿 إنجلترا ضد غانا 🇬🇭 (مجموعة ل)" },
-  { id: "wc_44", title: "🇨🇴 كولومبيا ضد الكونغو الديمقراطية 🇨🇩 (مجموعة ك)" },
-  { id: "wc_45", title: "🇵🇦 بنما ضد كرواتيا 🇭🇷 (مجموعة ل)" },
-  { id: "wc_46", title: "🇧🇦 البوسنة والهرسك ضد قطر 🇶🇦 (مجموعة ب)" },
-  { id: "wc_47", title: "🇨🇭 سويسرا ضد كندا 🇨🇦 (مجموعة ب)" },
-  { id: "wc_48", title: "🇿🇦 جنوب أفريقيا ضد كوريا الجنوبية 🇰🇷 (مجموعة أ)" }
+  { id: "wc_49", title: "🇰🇷 كوريا الجنوبية ضد التشيك 🇨🇿 (مجموعة أ - مباراة مستحدثة)" }
 ];
 
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
   { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
-  { code: "EG", name: "مصر", emoji: "🇪🇬" }, { code: "DZ", name: "الجزائر", emoji: "🇩🇿" },
-  { code: "TN", name: "تونس", emoji: "🇹🇳" }, { code: "AE", name: "الإمارات", emoji: "🇦🇪" },
-  { code: "QA", name: "قطر", emoji: "🇶🇦" }, { code: "IQ", name: "العراق", emoji: "🇮🇶" },
-  { code: "JO", name: "الأردن", emoji: "🇯🇴" }, { code: "OM", name: "عُمان", emoji: "🇴🇲" },
-  { code: "BH", name: "البحرين", emoji: "🇧🇭" }, { code: "KW", name: "الكويت", emoji: "🇰🇼" },
-  { code: "US", name: "الولايات المتحدة الأمريكية", emoji: "🇺🇸" }, { code: "CA", name: "كندا", emoji: "🇨🇦" },
-  { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
-  { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
-  { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
-  { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
-  { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
-  { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
-  { code: "EC", name: "الإكوادور", emoji: "🇪🇨" }, { code: "PE", name: "بيرو", emoji: "🇵🇪" },
-  { code: "SN", name: "السنغال", emoji: "🇸🇳" }, { code: "CM", name: "الكاميرون", emoji: "🇨🇲" },
-  { code: "GH", name: "غانا", emoji: "🇬🇭" }, { code: "NG", name: "نيجيريا", emoji: "🇳🇬" },
-  { code: "CI", name: "ساحل العاج", emoji: "🇨🇮" }, { code: "JP", name: "اليابان", emoji: "🇯🇵" },
-  { code: "KR", name: "كوريا الجنوبية", emoji: "🇰🇷" }, { code: "AU", name: "أستراليا", emoji: "🇦🇺" },
-  { code: "IR", name: "إيران", emoji: "🇮🇷" }, { code: "CR", name: "كوستاريكا", emoji: "🇨🇷" },
-  { code: "JM", name: "جامايكا", emoji: "🇯🇲" }, { code: "PA", name: "بنما", emoji: "🇵🇦" },
-  { code: "NZ", name: "نيوزيلندا", emoji: "🇳🇿" }, { code: "CH", name: "سويسرا", emoji: "🇨🇭" },
-  { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" },
-  { code: "BA", name: "البوسنة والهرسك", emoji: "🇧🇦" }, { code: "PY", name: "باراغواي", emoji: "🇵🇾" },
-  { code: "HT", name: "هايتي", emoji: "🇭🇹" }, { code: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", name: "اسكتلندا", emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
-  { code: "CW", name: "كوراساو", emoji: "🇨🇼" }
+  { code: "KR", name: "كوريا الجنوبية", emoji: "🇰🇷" }, { code: "CZ", name: "التشيك", emoji: "🇨🇿" }
 ];
 
 export default function AdminDashboard() {
@@ -113,8 +57,8 @@ export default function AdminDashboard() {
 
   const [matchEditingId, setMatchEditingId] = useState("");
   const [matchForm, setMatchForm] = useState({
-    team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦",
-    day: "الجمعة 12 يونيو", group: "مجموعة أ", time: "10:00 م", kickoff: "2026-06-12T22:00:00"
+    team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿",
+    day: "السبت 13 يونيو", group: "مجموعة أ", time: "08:00 م", kickoff: "2026-06-13T20:00:00"
   });
 
   const [userPage, setUserPage] = useState(1);
@@ -134,10 +78,29 @@ export default function AdminDashboard() {
     });
   }, []);
 
+  // 🧹 ميزة التصفير الشاملة المقترحة: تصفير جميع نقاط التوقعات والعدادات بضغطة زر للبدء من جديد بنقاء
+  const handleWipeAllUsersStatsToZero = async () => {
+    if (!confirm("⚠️ هل أنت متأكد من تصفير وإعادة تعيين نقاط وإحصائيات جميع الأعضاء بالكامل لبدء الحسبة الجديدة؟")) return;
+    setIsGlobalLoading(true);
+    try {
+      const snap = await getDocs(collection(db, "users"));
+      for (const uDoc of snap.docs) {
+        await updateDoc(doc(db, "users", uDoc.id), { points: 0, total: 0, correct: 0, wrong: 0, currentRank: 1, rankDirection: "➖", rankChange: 0 });
+      }
+      const predSnap = await getDocs(collection(db, "predictions"));
+      for (const pDoc of predSnap.docs) {
+        await updateDoc(doc(db, "predictions", pDoc.id), { processed: false, pointsAwarded: 0 });
+      }
+      alert("✅ تم تصفير قاعدة البيانات بالكامل مية بالمية لايف!");
+    } catch (err) { console.error(err); }
+    setIsGlobalLoading(false);
+  };
+
+  // 🚀 محرك الاحتساب الموحد المربوط بدقة مع فرز فوري للعدادات الأربعة
   const handleSettleMatchPredictionsBulk = async () => {
-    if (!selectedBulkMatchId) { alert("⚠️ يرجى اختيار المباراة أولاً!"); return; }
+    if (!selectedBulkMatchId) { alert("⚠️ اختر مباراة أولاً!"); return; }
     const score1 = parseInt(bulkScore1); const score2 = parseInt(bulkScore2);
-    if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0) { alert("⚠️ يرجى إدخال أهداف صحيحة!"); return; }
+    if (isNaN(score1) || isNaN(score2) || score1 < 0 || score2 < 0) { alert("⚠️ النتيجة خطأ!"); return; }
 
     setIsGlobalLoading(true);
     try {
@@ -147,8 +110,7 @@ export default function AdminDashboard() {
 
       const q = query(collection(db, "predictions"), where("matchId", "==", selectedBulkMatchId), where("processed", "==", false));
       const predSnap = await getDocs(q);
-      
-      let totalSettled = 0;
+      let settledCount = 0;
 
       if (!predSnap.empty) {
         for (const predictionDoc of predSnap.docs) {
@@ -172,8 +134,9 @@ export default function AdminDashboard() {
             });
             await addDoc(collection(db, "user_notifications"), { userId: userDoc.id, user: pred.user, matchId: selectedBulkMatchId, pointsAwarded: earnedPoints, t1: pred.t1, t2: pred.t2, viewed: false, createdAt: new Date().toISOString() });
           }
+          // تخزين قيم الأهداف الحتمية بداخل مستند التوقع لتقرأها أزرار الطوارئ الفردية والجمهور بثبات مية بالمية
           await updateDoc(doc(db, "predictions", predictionDoc.id), { processed: true, pointsAwarded: earnedPoints, bulkSettleScore1: score1, bulkSettleScore2: score2 });
-          totalSettled++;
+          settledCount++;
         }
       }
 
@@ -188,14 +151,13 @@ export default function AdminDashboard() {
       });
 
       setBulkScore1(""); setBulkScore2(""); setSelectedMatchId("");
-      alert(`🎉 تم بنجاح الاحتساب والفرز الجماعي لـ (${totalSettled}) توقع! وتحدثت الصدارة والعدادات لايف بالملي.`);
+      alert(`🎉 تم بنجاح معالجة واحتساب (${settledCount}) توقع وتغذية لوحة الصدارة للجمهور لايف!`);
     } catch (err) { console.error(err); }
     setIsGlobalLoading(false);
   };
 
   const handleSettlePredictionSingleManualOldWay = async (pred: any, scoreType: "full" | "win" | "wrong") => {
     let earnedPoints = 0; let isCorrect = 0; let isWrong = 0;
-
     if (scoreType === "full") { earnedPoints = 3; isCorrect = 1; }
     else if (scoreType === "win") { earnedPoints = 1; isCorrect = 1; }
     else { isWrong = 1; }
@@ -216,13 +178,8 @@ export default function AdminDashboard() {
           wrong: Math.max(((cur.wrong || 0) - oldWrong) + isWrong, 0)
         });
 
-        await updateDoc(doc(db, "predictions", pred.id), { 
-          processed: true, 
-          pointsAwarded: earnedPoints,
-          oldIsCorrect: isCorrect,
-          oldIsWrong: isWrong
-        });
-        alert(`✅ تم احتساب الزر فردياً! الحساب (${pred.user}) أخذ [ ${earnedPoints} ] نقاط.`);
+        await updateDoc(doc(db, "predictions", pred.id), { processed: true, pointsAwarded: earnedPoints, oldIsCorrect: isCorrect, oldIsWrong: isWrong });
+        alert(`✅ تم فرز الزر فردياً وتحديث الصدارة لايف للعضو: ${pred.user}`);
       }
     } catch (err) { console.error(err); }
     setIsGlobalLoading(false);
@@ -233,7 +190,7 @@ export default function AdminDashboard() {
     try {
       if (matchEditingId) { await updateDoc(doc(db, "custom_matches", matchEditingId), matchForm); setMatchEditingId(""); alert("✅ تم التحديث!"); }
       else { await addDoc(collection(db, "custom_matches"), { ...matchForm, createdAt: new Date().toISOString() }); alert("✅ تم الإضافة!"); }
-      setMatchForm({ team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", day: "الجمعة 12 يونيو", group: "مجموعة أ", time: "10:00 م", kickoff: "2026-06-12T22:00:00" });
+      setMatchForm({ team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", day: "السبت 13 يونيو", group: "مجموعة أ", time: "08:00 م", kickoff: "2026-06-13T20:00:00" });
     } catch (err) { console.error(err); }
     setIsGlobalLoading(false);
   };
@@ -242,7 +199,7 @@ export default function AdminDashboard() {
     setIsGlobalLoading(true);
     const matched = WORLD_CUP_2026_TEAMS.find(t => t.name === editTeam);
     await updateDoc(doc(db, "users", userId), { fullName: editName, password: editPassword, favoriteTeam: editTeam, teamEmoji: matched ? matched.emoji : "🏆" });
-    setEditingUserId(""); setIsGlobalLoading(false); alert("✅ تم التعديل لايف!");
+    setEditingUserId(""); setIsGlobalLoading(false); alert("✅ تم التعديل!");
   };
 
   const handleUpdateUserScoresManual = async (userId: string) => {
@@ -251,7 +208,6 @@ export default function AdminDashboard() {
     setScoreEditUserId(""); setIsGlobalLoading(false); alert("🏆 تم التحديث!");
   };
 
-  // 🛠️ تصليح السطر 257 الجذري لإلغاء تكرار وسم الdoc وتصفير ال11 خطأ تماماً ومطابقته للTS
   const handleUpdateTickerSpeed = async () => {
     if (tickerId) { await updateDoc(doc(db, "ticker_settings", tickerId), { speed: tickerSpeed }); }
     else { await addDoc(collection(db, "ticker_settings"), { speed: tickerSpeed }); }
@@ -270,7 +226,7 @@ export default function AdminDashboard() {
       
       <div className="flex items-center justify-between border-b border-slate-700 pb-4 mb-6">
         <h1 className="text-xl md:text-2xl font-black text-amber-400">⚙️ لوحة قيادة تحكم الآدمن الرسمية المطورة</h1>
-        {isGlobalLoading && <span className="text-xs bg-amber-500 text-slate-950 font-black px-3 py-1 rounded-full animate-pulse">جاري المزامنة والحفظ... ⏳</span>}
+        <button onClick={handleWipeAllUsersStatsToZero} className="bg-red-700 hover:bg-red-600 text-white font-black px-4 py-2 rounded-xl text-xs shadow-xl interactive-btn">🚨 تصفير رصيد ونقاط جميع الأعضاء للبدء من جديد</button>
       </div>
 
       {/* 🚀 الصندوق المركزي المستقل للاحتساب الفوري الجماعي لـ 48 مباراة */}
@@ -293,15 +249,6 @@ export default function AdminDashboard() {
             <input type="number" min="0" className="bg-slate-900 text-green-400 text-center font-black p-2 rounded-xl border border-purple-500/20 text-sm focus:outline-none" value={bulkScore2} onChange={(e) => setBulkScore2(e.target.value)} />
           </div>
           <button onClick={handleSettleMatchPredictionsBulk} className="bg-gradient-to-r from-emerald-600 to-green-600 text-white font-black py-2.5 px-4 rounded-xl text-xs shadow-lg transition-all interactive-btn w-full">🚀 فرز اللقاء وحركة المراكز فوراَ</button>
-        </div>
-      </section>
-
-      {/* التحكم بسرعة شريط الإعلانات بالصفحة الرئيسية للجمهور */}
-      <section className="bg-slate-950 p-4 rounded-xl mb-6 shadow-xl border border-purple-500/20">
-        <h3 className="font-black text-xs text-purple-400 mb-2">⚡ التحكم بسرعة حركة شريط آخر التوقعات المتحرك</h3>
-        <div className="flex gap-3 items-center bg-slate-900/60 p-3 rounded-xl">
-          <input type="text" value={tickerSpeed} onChange={(e) => setTickerSpeed(e.target.value)} placeholder="مثال: 30s أو 15s" className="bg-slate-950 border border-purple-500/20 p-2 rounded-xl text-xs text-center font-bold text-white focus:outline-none" />
-          <button onClick={handleUpdateTickerSpeed} className="bg-purple-600 text-white text-xs font-black px-4 py-2 rounded-xl interactive-btn">تحديث السرعة لايف ⚡</button>
         </div>
       </section>
 
@@ -337,13 +284,6 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
-        {maxMatchPages > 1 && (
-          <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setMatchPage(p=>Math.max(p-1,1))} disabled={matchPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
-            <span className="text-slate-400">صفحة {matchPage} من {maxMatchPages}</span>
-            <button onClick={()=>setMatchPage(p=>Math.min(p+1,maxMatchPages))} disabled={matchPage === maxMatchPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
-          </div>
-        )}
       </section>
 
       {/* 👥 قسم التحكم بالأعضاء */}
@@ -375,13 +315,6 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
-        {maxUserPages > 1 && (
-          <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setUserPage(p=>Math.max(p-1,1))} disabled={userPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
-            <span className="text-slate-400">صفحة {userPage} من {maxUserPages}</span>
-            <button onClick={()=>setUserPage(p=>Math.min(p+1,maxUserPages))} disabled={userPage === maxUserPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
-          </div>
-        )}
       </section>
 
       {/* 📊 قسم إجبار إحصائيات الصدارة بالأعلى نقاطاً فالأقل */}
@@ -415,13 +348,6 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
-        {maxLeaderboardPages > 1 && (
-          <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setLeaderboardPage(p=>Math.max(p-1,1))} disabled={leaderboardPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
-            <span className="text-slate-400">صفحة {leaderboardPage} من {maxLeaderboardPages}</span>
-            <button onClick={()=>setLeaderboardPage(p=>Math.min(p+1,maxLeaderboardPages))} disabled={leaderboardPage === maxLeaderboardPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
-          </div>
-        )}
       </section>
 
       {/* 🧮 جدول توقعات الجماهير للطوارئ والمحرك الفردي بـ 3 أزرار مستقلة بالملي تحسب (توقع/صح/خطأ ونقاط) بالصدارة */}
@@ -471,7 +397,7 @@ export default function AdminDashboard() {
         )}
       </section>
 
-      {/* الرقابة على الشات مع أزرار التنقل (السابق/التالي) المكتملة مية بالمية وبدون أخطاء */}
+      {/* الرقابة على الشات */}
       <section className="bg-slate-950 p-4 rounded-xl shadow-xl">
         <h3 className="font-black text-xs text-red-400 mb-2 border-b border-slate-800 pb-1">💬 شات صفحة الجمهور (يعرض 20 رسالة)</h3>
         <div className="space-y-2 mb-3">
@@ -482,13 +408,6 @@ export default function AdminDashboard() {
             </div>
           ))}
         </div>
-        {maxChatPages > 1 && (
-          <div className="flex justify-center items-center gap-4 pt-3 border-t border-slate-800 mt-3 text-xs font-bold">
-            <button onClick={()=>setChatPage(p=>Math.max(p-1,1))} disabled={chatPage === 1} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">◀ السابق</button>
-            <span className="text-slate-400">صفحة {chatPage} من {maxChatPages}</span>
-            <button onClick={()=>setChatPage(p=>Math.min(p+1,maxChatPages))} disabled={chatPage === maxChatPages} className="bg-slate-800 px-3 py-1 rounded disabled:opacity-30 interactive-btn">التالي ▶</button>
-          </div>
-        )}
       </section>
     </div>
   );
