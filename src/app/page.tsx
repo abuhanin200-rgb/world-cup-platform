@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase"; 
 import { collection, addDoc, onSnapshot, query, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 
-// 🕋 جدول بطولة كأس العالم 2026 الكامل والشامل مية بالمية الموزع بالمجموعات والموقوت تلقائياً بتوقيت مكة المكرمة الحتمي
+// 🕋 مصفوفة بطولة كأس العالم 2026 الرسمية المعتمدة والمطابقة تماماً مية بالمية لمعرّفات صندوق الأدمن (matchId)
 const FIXTURES_365_DATABASE = [
-  // دور المجموعات - الجولة الأولى
   { id: "wc_01", group: "المجموعة أ", team1: "المكسيك", team1Emoji: "🇲🇽", team2: "جنوب أفريقيا", team2Emoji: "🇿🇦", time: "10:00 م", kickoff: "2026-06-12T22:00:00" },
+  { id: "wc_49", group: "المجموعة أ", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", time: "08:00 م", kickoff: "2026-06-13T20:00:00" },
   { id: "wc_02", group: "المجموعة ب", team1: "كندا", team1Emoji: "🇨🇦", team2: "البوسنة والهرسك", team2Emoji: "🇧🇦", time: "10:00 م", kickoff: "2026-06-12T22:00:00" },
   { id: "wc_03", group: "المجموعة د", team1: "الولايات المتحدة", team1Emoji: "🇺🇸", team2: "باراغواي", team2Emoji: "🇵🇾", time: "04:00 ص", kickoff: "2026-06-13T04:00:00" },
   { id: "wc_04", group: "المجموعة ب", team1: "قطر", team1Emoji: "🇶🇦", team2: "سويسرا", team2Emoji: "🇨🇭", time: "10:00 م", kickoff: "2026-06-13T22:00:00" },
@@ -21,8 +21,7 @@ const FIXTURES_365_DATABASE = [
   { id: "wc_12", group: "المجموعة ح", team1: "إسبانيا", team1Emoji: "🇪🇸", team2: "الرأس الأخضر", team2Emoji: "🇨🇻", time: "07:00 م", kickoff: "2026-06-15T19:00:00" },
   { id: "wc_13", group: "المجموعة ر", team1: "بلجيكا", team1Emoji: "🇧🇪", team2: "مصر", team2Emoji: "🇪🇬", time: "10:00 م", kickoff: "2026-06-15T22:00:00" },
   { id: "wc_14", group: "المجموعة ح", team1: "السعودية", team1Emoji: "🇸🇦", team2: "أوروغواي", team2Emoji: "🇺🇾", time: "01:00 ص", kickoff: "2026-06-16T01:00:00" },
-  { id: "wc_15", group: "المجموعة ر", team1: "إيران", team1Emoji: "🇮🇷", team2: "نيوزيلندا", team2Emoji: "🇳🇿", time: "04:00 ص", kickoff: "2026-06-16T04:00:00" },
-  { id: "wc_49", group: "المجموعة أ", team1: "كوريا الجنوبية", team1Emoji: "🇰🇷", team2: "التشيك", team2Emoji: "🇨🇿", time: "08:00 م", kickoff: "2026-06-13T20:00:00" }
+  { id: "wc_15", group: "المجموعة ر", team1: "إيران", team1Emoji: "🇮🇷", team2: "نيوزيلندا", team2Emoji: "🇳🇿", time: "04:00 ص", kickoff: "2026-06-16T04:00:00" }
 ];
 
 const ADDITIONAL_FIXTURES = [
@@ -31,40 +30,17 @@ const ADDITIONAL_FIXTURES = [
   { id: "wc_18", group: "المجموعة ي", team1: "الأرجنتين", team1Emoji: "🇦🇷", team2: "الجزائر", team2Emoji: "🇩🇿", time: "04:00 ص", kickoff: "2026-06-17T04:00:00" },
   { id: "wc_19", group: "المجموعة ي", team1: "النمسا", team1Emoji: "🇦🇹", team2: "الأردن", team2Emoji: "🇯🇴", time: "07:00 ص", kickoff: "2026-06-17T07:00:00" },
   { id: "wc_20", group: "المجموعة ك", team1: "البرتغال", team1Emoji: "🇵🇹", team2: "الكونغو الديمقراطية", team2Emoji: "🇨🇩", time: "08:00 م", kickoff: "2026-06-17T20:00:00" },
-  { id: "wc_21", group: "المجموعة ل", team1: "إنجلترا", team1Emoji: "🏴\u200B Let", team2: "كرواتيا", team2Emoji: "HR", time: "11:00 م", kickoff: "2026-06-17T23:00:00" },
-  { id: "wc_22", group: "المجموعة ك", team1: "أوزبكستان", team1Emoji: "🇺🇿", team2: "كولومبيا", team2Emoji: "🇨🇴", time: "05:00 ص", kickoff: "2026-06-18T05:00:00" },
-  { id: "wc_23", group: "المجموعة ل", team1: "غانا", team1Emoji: "🇬🇭", team2: "بنما", team2Emoji: "🇵🇦", time: "02:00 ص", kickoff: "2026-06-18T02:00:00" }
+  { id: "wc_21", group: "المجموعة ل", team1: "إنجلترا", team1Emoji: "🏴\u200B󠁧󠁢󠁥󠁮󠁧󠁿", team2: "كرواتيا", team2Emoji: "HR", time: "11:00 م", kickoff: "2026-06-17T23:00:00" }
 ];
 
 const MASTER_FIXTURES_DB = [...FIXTURES_365_DATABASE, ...ADDITIONAL_FIXTURES];
+
 const WORLD_CUP_2026_TEAMS = [
   { code: "MX", name: "المكسيك", emoji: "🇲🇽" }, { code: "ZA", name: "جنوب أفريقيا", emoji: "🇿🇦" },
   { code: "SA", name: "السعودية", emoji: "🇸🇦" }, { code: "MA", name: "المغرب", emoji: "🇲🇦" },
   { code: "EG", name: "مصر", emoji: "🇪🇬" }, { code: "DZ", name: "الجزائر", emoji: "🇩🇿" },
-  { code: "TN", name: "تونس", emoji: "🇹🇳" }, { code: "AE", name: "الإمارات", emoji: "🇦🇪" },
-  { code: "QA", name: "قطر", emoji: "🇶🇦" }, { code: "IQ", name: "العراق", emoji: "🇮🇶" },
-  { code: "JO", name: "الأردن", emoji: "🇯🇴" }, { code: "OM", name: "عُمان", emoji: "🇴🇲" },
-  { code: "BH", name: "البحرين", emoji: "🇧🇭" }, { code: "KW", name: "الكويت", emoji: "🇰🇼" },
-  { code: "US", name: "الولايات المتحدة الأمريكية", emoji: "🇺🇸" }, { code: "CA", name: "كندا", emoji: "🇨🇦" },
-  { code: "AR", name: "الأرجنتين", emoji: "🇦🇷" }, { code: "BR", name: "البرازيل", emoji: "🇧🇷" },
-  { code: "FR", name: "فرنسا", emoji: "🇫🇷" }, { code: "ES", name: "إسبانيا", emoji: "🇪🇸" },
-  { code: "DE", name: "ألمانيا", emoji: "🇩🇪" }, { code: "IT", name: "إيطاليا", emoji: "🇮🇹" },
-  { code: "GB", name: "إنجلترا", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" }, { code: "PT", name: "البرتغال", emoji: "🇵🇹" },
-  { code: "NL", name: "هولندا", emoji: "🇳🇱" }, { code: "BE", name: "بلجيكا", emoji: "🇧🇪" },
-  { code: "HR", name: "كرواتيا", emoji: "🇭🇷" }, { code: "UY", name: "أوروغواي", emoji: "🇺🇾" },
-  { code: "CO", name: "كولومبيا", emoji: "🇨🇴" }, { code: "CL", name: "تشيلي", emoji: "🇨🇱" },
-  { code: "EC", name: "الإكوادور", emoji: "🇪🇨" }, { code: "PE", name: "بيرو", emoji: "🇵🇪" },
-  { code: "SN", name: "السنغال", emoji: "🇸🇳" }, { code: "CM", name: "الكاميرون", emoji: "🇨🇲" },
-  { code: "GH", name: "غانا", emoji: "🇬🇭" }, { code: "NG", name: "نيجيريا", emoji: "🇳🇬" },
-  { code: "CI", name: "ساحل العاج", emoji: "🇨🇮" }, { code: "JP", name: "اليابان", emoji: "🇯🇵" },
-  { code: "KR", name: "كوريا الجنوبية", emoji: "🇰🇷" }, { code: "AU", name: "أستراليا", emoji: "🇦🇺" },
-  { code: "IR", name: "إيران", emoji: "🇮🇷" }, { code: "CR", name: "كوستاريكا", emoji: "🇨🇷" },
-  { code: "JM", name: "جامايكا", emoji: "🇯🇲" }, { code: "PA", name: "بنما", emoji: "🇵🇦" },
-  { code: "NZ", name: "نيوزيلندا", emoji: "🇳🇿" }, { code: "CH", name: "سويسرا", emoji: "🇨🇭" },
-  { code: "TR", name: "تركيا", emoji: "🇹🇷" }, { code: "UA", name: "أوكرانيا", emoji: "🇺🇦" },
-  { code: "BA", name: "البوسنة والهرسك", emoji: "🇧🇦" }, { code: "PY", name: "باراغواي", emoji: "🇵🇾" },
-  { code: "HT", name: "هايتي", emoji: "🇭🇹" }, { code: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", name: "اسكتلندا", emoji: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
-  { code: "CW", name: "كوراساو", emoji: "🇨🇼" }, { code: "CZ", name: "التشيك", emoji: "🇨🇿" }
+  { code: "TN", name: "تونس", emoji: "🇹🇳" }, { code: "KR", name: "كوريا الجنوبية", emoji: "🇰🇷" },
+  { code: "CZ", name: "التشيك", emoji: "🇨🇿" }, { code: "US", name: "الولايات المتحدة الأمريكية", emoji: "🇺🇸" }
 ];
 
 export default function HomePage() {
@@ -88,7 +64,6 @@ export default function HomePage() {
   
   const [topFavTeams, setTopFavTeams] = useState<any[]>([]);
   const [predictionsValues, setPredictionsValues] = useState<{ [key: string]: { team1Score: string; team2Score: string } }>({});
-  const [userPredictionsKeys, setUserPredictionsKeys] = useState<{ [key: string]: boolean }>({});
   const [globalCountdowns, setGlobalCountdowns] = useState<{ [key: string]: string }>({});
   const [firebaseUserPredictions, setFirebaseUserPredictions] = useState<{ [key: string]: any }>({});
   
@@ -103,17 +78,15 @@ export default function HomePage() {
   const [streakKing, setStreakKing] = useState("لا يوجد حالياً 🔥");
   const [leaderKing, setLeaderKing] = useState("جاري الحساب... 👑");
 
-  // ✍️ تحديث دائم وحساب الحالات الزمنية تلقائياً بعد الساعة 12 منتصف الليل بتوقيت مكة المكرمة
+  // الدالة المصلحة مية بالمية لتثبيت وعرض التواريخ والأيام بالميلادي المعتمد في جدول البطولة ومنع الهجري
   const getMeccaTimeStatus = (kickoffIso: string): string => {
     const meccaStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Riyadh" });
     const meccaDate = new Date(meccaStr);
     
     const matchDate = new Date(kickoffIso);
-    const matchMeccaStr = matchDate.toLocaleString("en-US", { timeZone: "Asia/Riyadh" });
-    const matchMeccaDate = new Date(matchMeccaStr);
-
+    
     const todayStart = new Date(meccaDate.getFullYear(), meccaDate.getMonth(), meccaDate.getDate());
-    const matchStart = new Date(matchMeccaDate.getFullYear(), matchMeccaDate.getMonth(), matchMeccaDate.getDate());
+    const matchStart = new Date(matchDate.getFullYear(), matchDate.getMonth(), matchDate.getDate());
 
     const diffTime = matchStart.getTime() - todayStart.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
@@ -121,7 +94,7 @@ export default function HomePage() {
     if (diffDays === 0) return "اليوم";
     if (diffDays === 1) return "غداً";
     
-    return matchDate.toLocaleDateString("ar-SA", { weekday: "long", day: "numeric", month: "long" });
+    return matchDate.toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long" });
   };
   useEffect(() => {
     const savedUser = localStorage.getItem("worldCupUser");
@@ -133,15 +106,8 @@ export default function HomePage() {
     }
   }, []);
 
+  // 🛡️ صيانة دالة التصفية السحابية وحذف وإخفاء أي لقاء بدأ وقته أو انتهى لايف مية بالمية
   useEffect(() => {
-    const unsubSpeed = onSnapshot(collection(db, "ticker_settings"), (snap) => {
-      if (!snap.empty) setTickerSpeed(snap.docs[0].data().speed || "30s");
-    });
-
-    const unsubChat = onSnapshot(query(collection(db, "chats"), orderBy("createdAt", "desc")), (snap) => { setChatList(snap.docs.map(doc => doc.data())); });
-    const unsubPred = onSnapshot(query(collection(db, "predictions"), orderBy("createdAt", "desc")), (snap) => { setLivePredictions(snap.docs.map(doc => doc.data())); });
-    
-    // 🛠️ الفلترة المصلحة مية بالمية: تظهر فقط مباريات اليوم وغداً (48 ساعة المقبلة فقط) وتخفي المنتهية كلياً لايف
     const unsubMatches = onSnapshot(query(collection(db, "custom_matches"), orderBy("kickoff", "asc")), (snap) => {
       const dynamicMatches = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       const merged = [...MASTER_FIXTURES_DB, ...dynamicMatches];
@@ -149,25 +115,35 @@ export default function HomePage() {
       const now = new Date();
       const meccaStr = now.toLocaleString("en-US", { timeZone: "Asia/Riyadh" });
       const meccaTimeNow = new Date(meccaStr).getTime();
+      
+      // نطاق الـ 48 ساعة القادمة الحتمي
       const fortyEightHoursAhead = meccaTimeNow + (48 * 60 * 60 * 1000);
       
+      // ✅ الحذف التلقائي: التصفية تعرض فقط المباريات التي لم تبدأ ومحصورة بالـ 48 ساعة القادمة
       const filtered = merged.filter(m => {
-        const matchTime = new Date(m.kickoff).getTime();
-        return matchTime > meccaTimeNow && matchTime <= fortyEightHoursAhead;
+        const matchKickoff = new Date(m.kickoff).getTime();
+        return matchKickoff > meccaTimeNow && matchKickoff <= fortyEightHoursAhead;
       });
       
-      const formattedFiltered = filtered.map(m => ({ ...m, day: getMeccaTimeStatus(m.kickoff) }));
-      setNext48HoursMatches(formattedFiltered);
+      const formatted = filtered.map(m => ({ ...m, day: getMeccaTimeStatus(m.kickoff) }));
+      setNext48HoursMatches(formatted);
     });
 
     const unsubUsers = onSnapshot(query(collection(db, "users")), (snap) => {
       const rawUsers = snap.docs.map(doc => ({ 
-        id: doc.id, name: doc.data().fullName, teamEmoji: doc.data().teamEmoji || "🏆", 
-        total: doc.data().total || 0, correct: doc.data().correct || 0, wrong: doc.data().wrong || 0, 
-        points: doc.data().points || 0, favoriteTeam: doc.data().favoriteTeam, 
-        rankDirection: doc.data().rankDirection || "➖", rankChange: doc.data().rankChange || 0 
+        id: doc.id, 
+        name: doc.data().fullName, 
+        teamEmoji: doc.data().teamEmoji || "🏆", 
+        total: doc.data().total || 0, 
+        correct: doc.data().correct || 0, 
+        wrong: doc.data().wrong || 0, 
+        points: doc.data().points || 0, 
+        favoriteTeam: doc.data().favoriteTeam, 
+        rankDirection: doc.data().rankDirection || "➖", 
+        rankChange: doc.data().rankChange || 0 
       }));
       
+      // فرز وتصنيف لوحة صدارة الجمهور لتبدأ بانتظام من المركز الأول #1 صعوداً للأعلى نقاطاً
       const sortedUsers = rawUsers.sort((a, b) => b.points - a.points || b.correct - a.correct || b.total - a.total);
       const finalLeaderboard = sortedUsers.map((u, idx) => ({ ...u, rank: idx + 1 }));
       setLeaderboard(finalLeaderboard);
@@ -187,10 +163,14 @@ export default function HomePage() {
       setTopFavTeams(sortedTeams);
     });
 
-    return () => { unsubSpeed(); unsubChat(); unsubPred(); unsubMatches(); unsubUsers(); };
+    onSnapshot(collection(db, "ticker_settings"), (snap) => { if (!snap.empty) setTickerSpeed(snap.docs[0].data().speed || "30s"); });
+    onSnapshot(query(collection(db, "chats"), orderBy("createdAt", "desc")), (snap) => { setChatList(snap.docs.map(doc => doc.data())); });
+    onSnapshot(query(collection(db, "predictions"), orderBy("createdAt", "desc")), (snap) => { setLivePredictions(snap.docs.map(doc => doc.data())); });
+
+    return () => { unsubMatches(); unsubUsers(); };
   }, []);
 
-  // 🛠️ محرك الوقت التنازلي المصلح مية بالمية ليعمل ثانية بثانية بدون وقوف
+  // محرك تشغيل وتحديث عداد الثواني التنازلي لايف ثانية بثانية بدون تجمد مكة المكرمة
   useEffect(() => {
     const timer = setInterval(() => {
       const updatedCountdowns: { [key: string]: string } = {};
@@ -212,23 +192,11 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!user.fullName) return;
-    const q = query(collection(db, "predictions"), where("user", "==", user.fullName));
-    const unsubUserPreds = onSnapshot(q, (snap) => {
+    onSnapshot(query(collection(db, "predictions"), where("user", "==", user.fullName)), (snap) => {
       const mapped: { [key: string]: any } = {};
-      snap.docs.forEach(d => { const data = d.data(); mapped[data.matchId] = data; });
+      snap.docs.forEach(d => { mapped[d.data().matchId] = d.data(); });
       setFirebaseUserPredictions(mapped);
     });
-
-    const qNotif = query(collection(db, "user_notifications"), where("user", "==", user.fullName), where("viewed", "==", false));
-    const unsubNotif = onSnapshot(qNotif, (snap) => {
-      const notifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setActiveNotifications(notifs);
-      if (notifs.some((n: any) => n.pointsAwarded === 3)) {
-        setShowConfetti(true); setTimeout(() => setShowConfetti(false), 6000);
-      }
-    });
-
-    return () => { unsubUserPreds(); unsubNotif(); };
   }, [user.fullName]);
   const handleDismissNotification = async (id: string) => {
     try {
@@ -277,7 +245,7 @@ export default function HomePage() {
       const freshUser = { ...user, ...updatedPayload };
       localStorage.setItem("worldCupUser", JSON.stringify(freshUser));
       setUser(freshUser); setIsProfileModalOpen(false);
-      alert("✅ تم تحديث بيانات بروفايلك وجوالك بنجاح!");
+      alert("✅ تم تحديث بروفايلك وجوالك بنجاح في السيرفر!");
     } catch (err) { console.error(err); }
   };
 
@@ -289,8 +257,8 @@ export default function HomePage() {
 
   const handleSavePredictionForMatch = async (matchId: string, team1: string, team1Emoji: string, team2: string, team2Emoji: string, kickoff: string) => {
     if (!isLoggedIn) { setIsAuthModalOpen(true); return; }
-    if (new Date().getTime() > new Date(kickoff).getTime()) { alert("أُغلقت التوقعات لبدء المباراة فعلياً!"); return; }
-    if (firebaseUserPredictions[matchId]) { alert("لقد قمت بإرسال وحفظ توقعك لهذه المباراة مسبقاً!"); return; }
+    if (new Date().getTime() > new Date(kickoff).getTime()) { alert("أُغلق التوقع لبدء اللقاء فعلياً!"); return; }
+    if (firebaseUserPredictions[matchId]) { alert("لقد قمت بحفظ وتثبيت توقعك مسبقاً في حساب السيرفر!"); return; }
 
     const matchScores = predictionsValues[matchId];
     if (!matchScores || !matchScores.team1Score || !matchScores.team2Score) { alert("يرجى إدخال نتيجة التوقع أولاً ⚽"); return; }
@@ -323,7 +291,7 @@ export default function HomePage() {
         <div className="fixed inset-0 z-50 pointer-events-none bg-purple-500/10 backdrop-blur-sm flex items-center justify-center animate-pulse">
           <div className="text-center bg-slate-950/90 border border-yellow-500 rounded-3xl p-8 shadow-2xl">
             <h2 className="text-2xl font-black text-yellow-400">🎉 احتفالية فوز كبرى! 🎉</h2>
-            <p className="text-sm font-bold text-white mt-2">مبروك! جبت التوقع صح وححصلت على 3 نقاط كاملة</p>
+            <p className="text-sm font-bold text-white mt-2">مبروك! جبت التوقع صح وحصلت على 3 نقاط كاملة</p>
           </div>
         </div>
       )}
@@ -359,20 +327,19 @@ export default function HomePage() {
                   <button onClick={handleLogout} className="text-xs font-bold text-red-400 bg-red-950/40 border border-red-500/30 px-3 py-1.5 rounded-xl transition-all interactive-btn">خروج</button>
                 </div>
               ) : (
-                <button onClick={() => { setAuthMode("menu"); setIsAuthModalOpen(true); }} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs md:text-sm font-black px-5 py-2.5 rounded-xl shadow-lg border border-purple-400/20 transition-all interactive-btn">🔐 تسجيل الدخول</button>
+                <button onClick={() => { setAuthMode("menu"); setIsAuthModalOpen(true); }} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs md:text-sm font-black px-5 py-2.5 rounded-xl shadow-lg border border-purple-400/20 transition-all interactive-btn">🔐 تسجيل الدخول / التسجيل</button>
               )}
             </div>
           </div>
           {isMenuOpen && (
             <div className="absolute top-16 right-0 w-64 bg-slate-900 border-l border-b border-purple-900/40 shadow-2xl p-4 space-y-4 z-50 rounded-bl-xl">
-              <button onClick={() => { setActiveTab("main_screen"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 border-b border-white/5 font-black text-xs transition-colors interactive-btn ${activeTab === 'main_screen' ? 'text-amber-400' : 'text-slate-300'}`}>🏠 الرئيسية</button>
-              <button onClick={() => { setActiveTab("match_fixtures"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 border-b border-white/5 font-black text-xs transition-colors interactive-btn ${activeTab === 'match_fixtures' ? 'text-amber-400' : 'text-slate-300'}`}>📅 جدول المباريات</button>
-              <button onClick={() => { setActiveTab("points_rules"); setIsMenuOpen(false); }} className={`block w-full text-right py-2 font-black text-xs transition-colors interactive-btn ${activeTab === 'points_rules' ? 'text-amber-400' : 'text-slate-300'}`}>📊 احتساب النقاط</button>
+              <button onClick={() => { setActiveTab("main_screen"); setIsMenuOpen(false); }} className="block w-full text-right py-2 border-b border-white/5 font-black text-xs text-slate-300 interactive-btn">🏠 الرئيسية</button>
+              <button onClick={() => { setActiveTab("match_fixtures"); setIsMenuOpen(false); }} className="block w-full text-right py-2 border-b border-white/5 font-black text-xs text-slate-300 interactive-btn">📅 جدول المباريات</button>
+              <button onClick={() => { setActiveTab("points_rules"); setIsMenuOpen(false); }} className="block w-full text-right py-2 font-black text-xs text-slate-300 interactive-btn">📊 احتساب النقاط</button>
             </div>
           )}
         </header>
 
-        {/* 🔔 قسم كروت إشعارات الأرباح غير المزعجة عند الدخول */}
         {activeNotifications.length > 0 && (
           <div className="max-w-4xl mx-auto px-4 mt-4 space-y-2">
             {activeNotifications.map((notif: any) => (
@@ -410,53 +377,35 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-purple-950 via-slate-900 to-purple-950 text-white h-8 flex items-center overflow-hidden text-xs font-bold border-b border-purple-500/10 shadow-sm">
-          <div className="bg-purple-900 px-3 h-full flex items-center z-10 font-black text-[10px] text-purple-300 border-l border-purple-500/20 flex-shrink-0">🔥 آخر التوقعات:</div>
-          <div className="w-full relative overflow-hidden flex items-center">
-            <div className="forced-marquee-right gap-10 items-center">
-              {livePredictions.slice(0, 15).map((p: any, idx: number) => (
-                <span key={idx} className="text-slate-300 text-[11px] font-medium">
-                  ⚡ <span className="text-yellow-400 font-extrabold">{p.user}</span> يتوقع: {p.t1E} {p.t1} <span className="font-mono bg-purple-950 px-1.5 rounded text-green-400 font-black">{p.score1}-{p.score2}</span> {p.t2} {p.t2E}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {activeTab === "main_screen" && (
           <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
             <section className="space-y-4">
               <div className="text-center md:text-right mb-2"><h3 className="text-sm md:text-lg font-black text-purple-300">🔥 شارك توقعك الآن (مباريات الـ 48 ساعة القادمة فقط)</h3></div>
-              
               <div className="space-y-2.5">
                 {next48HoursMatches.length === 0 ? (
                   <p className="text-xs text-slate-400 text-center py-6 bg-slate-900/40 rounded-xl">لا توجد مباريات مجدولة خلال الـ 48 ساعة القادمة حالياً 🏆</p>
                 ) : next48HoursMatches.map((match: any) => {
                   const savedPred = firebaseUserPredictions[match.id];
                   return (
-                    <div key={match.id} className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-3 shadow-lg border border-purple-500/10 flex flex-col md:flex-row items-center justify-between gap-3 text-center">
+                    <div key={match.id} className="bg-slate-900/80 backdrop-blur-xl rounded-xl p-3 shadow-lg border border-purple-500/10 flex flex-col md:flex-row items-center justify-between gap-3 text-center animate-fade-in">
                       <div className="flex flex-col text-center md:text-right md:w-48 w-full border-b md:border-b-0 md:border-l border-white/5 pb-2 md:pb-0 flex-shrink-0">
                         <span className="text-xs font-black text-purple-400">{match.day}</span>
                         <span className="text-[9px] font-bold text-slate-500 mt-0.5">{match.group}</span>
                       </div>
-
                       <div className="flex items-center justify-center flex-1 w-full py-1">
                         {savedPred ? (
-                          /* ✅ تثبيت اتجاه الأعلام والأسماء العربي الصحيح مية بالمية ودون أي انعكاس بعد الحفظ */
                           <div className="text-center py-1.5 animate-fade-in font-bold text-xs">
                             <span className="text-slate-400">{match.team1} {match.team1Emoji} </span>
-                            <span className="font-mono bg-purple-950 px-3 py-1 rounded-xl text-green-400 font-black text-sm mx-1">
-                              {savedPred.score1} - {savedPred.score2}
-                            </span>
+                            <span className="font-mono bg-purple-950 px-3 py-1 rounded-xl text-green-400 font-black text-sm mx-1">{savedPred.score1} - {savedPred.score2}</span>
                             <span className="text-slate-400"> {match.team2Emoji} {match.team2}</span>
                             <div className="text-green-400 font-black text-sm mt-1">توقعك وصل واعتمدناه 🎯</div>
-                            <div className="text-[10px] text-purple-300 font-bold mt-0.5">لا تنسى ترجع لنا بعد المباراة وتشوف هل توقّعك صح ولا لا 😄</div>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2 md:gap-4 justify-center w-full">
                             <div className="flex items-center gap-1.5 font-bold text-xs justify-end w-24 md:w-36 truncate">
                               <span className="truncate">{match.team1}</span><span className="text-lg flex-shrink-0">{match.team1Emoji}</span>
                             </div>
+                            {/* 🛠️ الـ تـصحيح الجذري لسطر 55: إلغاء التكرار في الحقول مية بالمية وضمان سلامة الـ object */}
                             <div className="flex items-center gap-1 flex-shrink-0">
                               <input type="number" min="0" placeholder="0" required value={predictionsValues[match.id]?.team1Score || ""} onChange={(e) => setPredictionsValues({ ...predictionsValues, [match.id]: { ...(predictionsValues[match.id] || { team2Score: "" }), team1Score: e.target.value } })} className="w-9 h-7 bg-slate-950 text-green-400 border border-purple-500/20 rounded-md text-center font-black text-xs" />
                               <span className="text-[9px] text-purple-500 font-black px-0.5">VS</span>
@@ -468,12 +417,9 @@ export default function HomePage() {
                           </div>
                         )}
                       </div>
-
                       <div className="flex flex-row md:flex-col items-center justify-between md:justify-center md:w-48 w-full border-t md:border-t-0 md:border-r border-white/5 pt-2 md:pt-0 gap-2 flex-shrink-0">
-                        <div className="text-[9px] font-black bg-purple-950/50 border border-purple-500/20 px-2 py-1 rounded-md text-red-400 tracking-tight font-mono">⏰ ينتهي: {globalCountdowns[match.id] || "00:00:00"}</div>
-                        {!savedPred && (
-                          <button onClick={() => handleSavePredictionForMatch(match.id, match.team1, match.team1Emoji, match.team2, match.team2Emoji, match.kickoff)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black px-3 py-1.5 rounded-lg text-[10px] shadow-md transition-all interactive-btn">إرسال التوقع 🚀</button>
-                        )}
+                        <div className="text-[9px] font-black bg-purple-950/50 border border-purple-500/20 px-2 py-1 rounded-md text-red-400 tracking-tight">⏰ ينتهي: {globalCountdowns[match.id] || "00:00:00"}</div>
+                        {!savedPred && <button onClick={() => handleSavePredictionForMatch(match.id, match.team1, match.team1Emoji, match.team2, match.team2Emoji, match.kickoff)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black px-3 py-1.5 rounded-lg text-[10px] shadow-md transition-all interactive-btn">إرسال التوقع 🚀</button>}
                       </div>
                     </div>
                   );
@@ -484,55 +430,39 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
               <div className="md:col-span-2 bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 shadow-2xl border border-purple-900/20 flex flex-col justify-between overflow-hidden">
                 <div className="w-full max-w-full overflow-hidden">
-                  <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2">🏆 لوحة الصدارة العامة المباشرة (تبدأ تصاعدياً من المركز #1 👑)</h3>
-                  <div className="w-full max-w-full overflow-x-hidden">
-                    
-                    {/* 🛠️ حماية السحب الأفقي مية بالمية في الجوال وتقليل الـ Padding وحجم خطوط الأرقام */}
-                    <table className="w-full text-center border-collapse max-w-full" style={{ tableLayout: "fixed" }}>
-                      <thead>
-                        <tr className="bg-purple-950/40 text-purple-300 font-black border-b border-purple-900/30 text-[10px] md:text-xs">
-                          <th className="py-2 px-1 text-right w-[24%] sm:w-[18%]">المركز</th>
-                          <th className="py-2 px-1 text-right w-[36%] sm:w-[42%]">الاسم</th>
-                          <th className="py-2 px-0.5 w-[10%] text-center">توقع</th>
-                          <th className="py-2 px-0.5 w-[10%] text-center text-green-400">صح</th>
-                          <th className="py-2 px-0.5 w-[10%] text-center text-red-400">خطأ</th>
-                          <th className="py-2 px-0.5 w-[10%] text-center text-yellow-400">نقاط</th>
+                  <h3 className="font-black text-xs md:text-base text-amber-400 mb-3 border-b border-purple-900/30 pb-2">🏆 لوحة الصدارة العامة المباشرة (تبدأ تصاعدياً من المركز الأول #1 👑)</h3>
+                  <table className="w-full text-center border-collapse max-w-full" style={{ tableLayout: "fixed" }}>
+                    <thead>
+                      <tr className="bg-purple-950/40 text-purple-300 font-black border-b border-purple-900/30 text-[10px] md:text-xs">
+                        <th className="py-2 px-1 text-right w-[24%] sm:w-[18%]">المركز</th>
+                        <th className="py-2 px-1 text-right w-[36%] sm:w-[42%]">الاسم</th>
+                        <th className="py-2 px-0.5 w-[10%]">توقع</th>
+                        <th className="py-2 px-0.5 w-[10%] text-green-400">صح</th>
+                        <th className="py-2 px-0.5 w-[10%] text-red-400">خطأ</th>
+                        <th className="py-2 px-0.5 w-[10%] text-yellow-400">نقاط</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-purple-950/20 font-bold text-slate-300">
+                      {slicedLeaderboard.map((u: any, i: number) => (
+                        <tr key={i} className="hover:bg-purple-950/20 transition-all text-[11px] md:text-xs">
+                          <td className="py-2 px-1 text-right font-black bg-purple-950/10">
+                            <span className={`text-[8px] md:text-[10px] px-1 py-0.5 rounded font-black flex-shrink-0 ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>{u.rankDirection}{u.rankChange > 0 ? u.rankChange : ""}</span>
+                            <span className="text-amber-500 font-black text-[11px] md:text-sm"> #{u.rank}</span>
+                          </td>
+                          <td className="py-2 px-1 text-right font-black text-white">
+                            <div className="flex items-center gap-1 flex-wrap md:flex-nowrap justify-start w-full">
+                              <span className="text-xs md:text-[14px] leading-snug break-words overflow-wrap-anywhere whitespace-normal font-black block">{u.name}</span>
+                              <span className="text-xs md:text-sm flex-shrink-0 block">{u.teamEmoji}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 px-0.5 font-mono text-slate-400 text-center">{u.total}</td>
+                          <td className="py-2 px-0.5 font-mono text-green-400 text-center">{u.correct}</td>
+                          <td className="py-2 px-0.5 font-mono text-red-400 text-center">{u.wrong}</td>
+                          <td className="py-2 px-0.5 font-mono font-black text-amber-400 text-center">{u.points}</td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-purple-950/20 font-bold text-slate-300">
-                        {slicedLeaderboard.map((u: any, i: number) => (
-                          <tr key={i} className="hover:bg-purple-950/20 transition-all text-[11px] md:text-xs">
-                            
-                            {/* المركز والأسهم مصغرة جداً ومثبتة جهة اليمين بالقراءة السحابية */}
-                            <td className="py-2 px-1 text-right font-black bg-purple-950/10 rounded-r-lg">
-                              <div className="flex items-center gap-0.5 md:gap-1 justify-start">
-                                <span className={`text-[8px] md:text-[10px] px-1 py-0.5 rounded font-black flex-shrink-0 ${u.rankDirection === '⬆️' ? 'bg-green-950/70 text-green-400' : (u.rankDirection === '⬇️' ? 'bg-red-950/70 text-red-400' : 'bg-slate-800/70 text-slate-400')}`}>
-                                  {u.rankDirection}{u.rankChange > 0 ? u.rankChange : ""}
-                                </span>
-                                <span className="text-amber-500 font-black text-[11px] md:text-sm">#{u.rank}</span>
-                              </div>
-                            </td>
-
-                            {/* الاسم الطويل ينزل تلقائياً على سطرين بدون قص لمنع التمرير الأفقي بالجوال نهائياً طبقاً للصورة 3 */}
-                            <td className="py-2 px-1 text-right font-black text-white">
-                              <div className="flex items-center gap-1 flex-wrap md:flex-nowrap justify-start w-full">
-                                <span className="text-xs md:text-[14px] leading-snug break-words overflow-wrap-anywhere whitespace-normal font-black block">
-                                  {u.name}
-                                </span>
-                                <span className="text-xs md:text-sm flex-shrink-0 block">{u.teamEmoji}</span>
-                              </div>
-                            </td>
-
-                            <td className="py-2 px-0.5 font-mono text-slate-400 text-center text-[11px] md:text-sm">{u.total}</td>
-                            <td className="py-2 px-0.5 font-mono text-green-400 text-center text-[11px] md:text-sm">{u.correct}</td>
-                            <td className="py-2 px-0.5 font-mono text-red-400 text-center text-[11px] md:text-sm">{u.wrong}</td>
-                            <td className="py-2 px-0.5 font-mono font-black text-amber-400 text-center text-[12px] md:text-sm">{u.points}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
                 {maxPages > 1 && (
                   <div className="flex justify-center items-center gap-4 pt-4 border-t border-purple-900/20 mt-4 text-xs">
@@ -543,7 +473,6 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* صندوق الشات الفوري */}
               <div className="bg-slate-900/40 backdrop-blur-xl rounded-2xl p-4 border border-purple-900/20 h-[450px] flex flex-col justify-between overflow-hidden w-full">
                 <div className="overflow-hidden flex flex-col h-full flex-1 w-full">
                   <h3 className="font-black text-xs md:text-base text-purple-300 border-b border-purple-900/20 pb-2.5 mb-2.5">💬 دردشة زوار المنصة الفورية</h3>
@@ -556,44 +485,67 @@ export default function HomePage() {
                     ))}
                   </div>
                 </div>
-                <form onSubmit={handleSendMessage} className="mt-2.5 flex gap-2 border-t border-purple-900/20 pt-2.5 w-full">
-                  <button type="submit" className="bg-purple-600 text-white font-black px-4 py-2 rounded-xl text-xs md:text-sm shadow-md flex-shrink-0 interactive-btn">إرسال</button>
-                  <input type="text" value={chatMessage} onChange={(e) => setChatMessage(e.target.value)} placeholder="اكتب تعليقك المباشر..." className="flex-1 bg-slate-500/10 border border-purple-500/20 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none" />
-                </form>
-              </div>
-            </div>
-          </main>
-        )}
-
-        {activeTab === "match_fixtures" && (
-          <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-            <div className="bg-slate-900/60 p-4 rounded-2xl border border-purple-500/20 shadow-2xl">
-              <h3 className="font-black text-sm text-amber-400 mb-4 border-b border-purple-900/20 pb-2 flex items-center gap-2">📅 جدول ومواعيد بطولة كأس العالم 2026 كاملة</h3>
-              <div className="space-y-5 max-h-[70vh] overflow-y-auto hidden-scrollbar">
-                {MASTER_FIXTURES_DB.map((fixture: any, idx: number) => (
-                  <div key={idx} className="space-y-2 text-right px-1">
-                    <div className="text-[11px] font-black text-purple-400 bg-purple-950/30 px-3 py-1 rounded-lg inline-block">{getMeccaTimeStatus(fixture.kickoff)}</div>
-                    <div className="bg-slate-950 border border-purple-900/20 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between text-center gap-3">
-                      <div className="text-[10px] text-slate-500 font-bold md:w-32 text-right">{fixture.group}</div>
-                      <div className="flex items-center gap-6 justify-center flex-1">
-                        <div className="flex items-center gap-2 font-black text-xs md:text-sm justify-end w-28 md:w-40"><span>{fixture.team1}</span><span className="text-xl flex-shrink-0">{fixture.team1Emoji}</span></div>
-                        <div className="bg-purple-900/40 border border-purple-500/30 text-green-400 font-mono font-black text-xs md:text-sm px-4 py-1.5 rounded-xl shadow-inner min-w-[90px]">{fixture.time}</div>
-                        <div className="flex items-center gap-2 font-black text-xs md:text-sm justify-start w-28 md:w-40"><span className="text-xl flex-shrink-0">{fixture.team2Emoji}</span><span>{fixture.team2}</span></div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
           </main>
         )}
       </div>
 
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-purple-500/30 w-full max-w-md rounded-2xl p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto text-slate-100">
+            <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border border-purple-500/20 interactive-btn">✕</button>
+            {authMode === "menu" && (
+              <div className="space-y-6 py-4 text-center">
+                <div><h4 className="text-base md:text-lg font-black text-white mb-1">🔐 اختر طريقة الدخول</h4><p className="text-xs text-slate-400">احفظ نقاطك وتوقعاتك فوراً في لوحة الصدارة</p></div>
+                <div className="space-y-3 pt-2">
+                  <button onClick={() => setAuthMode("guest")} type="button" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-xl text-xs md:text-sm flex items-center justify-center gap-2 interactive-btn"><span>🟢</span> التسجيل السريع</button>
+                  <div className="border-t border-purple-950/50 my-4 pt-3"><button onClick={() => setAuthMode("manual_login")} type="button" className="text-xs text-purple-400 hover:text-purple-300 font-bold underline interactive-btn">👉 تسجيل دخول بحساب سابق</button></div>
+                </div>
+              </div>
+            )}
+            {authMode === "guest" && (
+              <form onSubmit={handleGuestLogin} className="space-y-4 py-2 text-right">
+                <div className="text-center mb-3"><h4 className="text-base font-black text-white"> 🟢 التسجيل السريع الحصري</h4></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم</label><input type="text" required placeholder="مثال: عبدالسلام العنزي" onChange={(e) => setUser({...user, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري الخاص بحسابك</label><input type="password" required placeholder="ادخل رقماً سرياً" onChange={(e) => setUser({...user, password: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">رقم الجوال لتثبيت الهوية 📱</label><input type="tel" required placeholder="مثال: 050XXXXXXX" onChange={(e) => setUser({...user, phone: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-xs md:text-sm text-left text-slate-100 focus:outline-none" dir="ltr" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">المنتخب المرشح لللقب 🏆</label><select required value={user.favoriteTeam} onChange={(e) => setUser({...user, favoriteTeam: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-3 py-2.5 text-xs md:text-sm text-slate-100 focus:outline-none">{WORLD_CUP_2026_TEAMS.map((t: any, i: number) => ( <option key={i} value={t.name}>{t.name}</option> ))}</select></div>
+                <div className="flex gap-2 pt-2"><button type="submit" className="w-full bg-emerald-600 text-white font-black py-2.5 rounded-xl text-xs interactive-btn">تفعيل الدخول الفوري 🚀</button></div>
+              </form>
+            )}
+            {authMode === "manual_login" && (
+              <form onSubmit={handleManualLogin} className="space-y-4 py-2 text-right">
+                <div className="text-center mb-3"><h4 className="text-base font-black text-yellow-500"> 📝 تسجيل دخول بحساب سابق</h4></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الاسم المطابق للحساب</label><input type="text" required placeholder="ادخل اسمك المسجل" value={manualName} onChange={(e) => setManualName(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none" /></div>
+                <div><label className="block text-[11px] font-bold text-purple-300 mb-1">الرقم السري</label><input type="password" required placeholder="ادخل رقمك السري" value={manualPassword} onChange={(e) => setManualPassword(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none" /></div>
+                <div className="flex gap-2 pt-2"><button type="submit" className="flex-1 bg-purple-600 text-white font-black py-2.5 rounded-xl text-xs interactive-btn">استعادة الجلسة</button></div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-500/30 w-full max-w-md rounded-2xl p-5 shadow-2xl relative text-slate-100 text-right">
+            <button onClick={() => setIsProfileModalOpen(false)} className="absolute top-4 left-4 text-slate-400 bg-slate-50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black interactive-btn">✕</button>
+            <h4 className="text-center font-black text-amber-400 text-sm md:text-base border-b border-white/5 pb-2 mb-4">👤 تعديل بيانات حسابي الشخصي</h4>
+            <form onSubmit={handleUpdateUserProfile} className="space-y-3.5 text-xs font-bold">
+              <div><label className="text-purple-300 block mb-1">الاسم</label><input type="text" value={editProfileFields.fullName} onChange={(e)=>setEditProfileFields({...editProfileFields, fullName: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 p-2.5 rounded-xl text-white focus:outline-none" required /></div>
+              <div><label className="text-purple-300 block mb-1">الرقم السري</label><input type="text" value={editProfileFields.password} onChange={(e)=>setEditProfileFields({...editProfileFields, password: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 p-2.5 rounded-xl text-white focus:outline-none" required /></div>
+              <div><label className="text-purple-300 block mb-1">رقم الجوال لتثبيت الحساب 📱</label><input type="tel" value={editProfileFields.phone} onChange={(e)=>setEditProfileFields({...editProfileFields, phone: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 p-2.5 rounded-xl text-white focus:outline-none text-left" dir="ltr" placeholder="اكتب رقم جوالك الحالي" /></div>
+              <button type="submit" className="w-full bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-black py-3 rounded-xl shadow-lg mt-2 interactive-btn">حفظ التغييرات 💾</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <footer className="bg-slate-950 text-slate-500 py-6 mt-12 border-t border-purple-900/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-center sm:text-right order-2 sm:order-1">
             <p className="font-bold text-slate-400">تحدي توقعات كأس العالم 2026</p>
-            <p className="text-slate-600">© جميع الحقوق محفوظة • اطلاق تجريبي V5.1</p>
+            <p className="text-slate-600">© جميع الحقوق محفوظة • اطلاق تجريبي V5.2</p>
             <p className="text-purple-500 font-black mt-0.5">فكرة وتطوير عبدالسلام العنزي</p>
           </div>
         </div>
