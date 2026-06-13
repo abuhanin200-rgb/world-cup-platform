@@ -1,64 +1,73 @@
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 
 export type LeaderboardUser = {
   id: string;
   fullName: string;
+  favoriteTeam?: string;
+  teamEmoji?: string;
+
   points: number;
   total: number;
   correct: number;
   wrong: number;
+
   currentRank: number;
   previousRank: number;
   rankChange: number;
-  rankDirection: "-" | "up" | "down";
+  rankDirection: "up" | "down" | "-";
+
+  currentStreak: number;
+  bestStreak: number;
 };
 
+function toNumber(value: unknown) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
 export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
-  const usersRef = collection(db, "users");
+  const snapshot = await getDocs(collection(db, "users"));
 
-  const q = query(
-    usersRef,
-    orderBy("points", "desc"),
-    orderBy("correct", "desc"),
-    orderBy("total", "asc")
-  );
-
-  const snapshot = await getDocs(q);
-
-  const users = snapshot.docs.map((docSnap, index) => {
+  const users = snapshot.docs.map((docSnap) => {
     const data = docSnap.data();
-
-    const currentRank = index + 1;
-    const previousRank =
-      typeof data.previousRank === "number" && data.previousRank > 0
-        ? data.previousRank
-        : currentRank;
-
-    let rankDirection: "-" | "up" | "down" = "-";
-    let rankChange = 0;
-
-    if (previousRank > currentRank) {
-      rankDirection = "up";
-      rankChange = previousRank - currentRank;
-    } else if (previousRank < currentRank) {
-      rankDirection = "down";
-      rankChange = currentRank - previousRank;
-    }
 
     return {
       id: docSnap.id,
-      fullName: data.fullName || "عضو بدون اسم",
-      points: Number(data.points || 0),
-      total: Number(data.total || 0),
-      correct: Number(data.correct || 0),
-      wrong: Number(data.wrong || 0),
-      currentRank,
-      previousRank,
-      rankChange,
-      rankDirection,
-    };
+      fullName: String(data.fullName || "عضو بدون اسم"),
+      favoriteTeam: String(data.favoriteTeam || ""),
+      teamEmoji: String(data.teamEmoji || ""),
+
+      points: toNumber(data.points),
+      total: toNumber(data.total),
+      correct: toNumber(data.correct),
+      wrong: toNumber(data.wrong),
+
+      currentRank: toNumber(data.currentRank),
+      previousRank: toNumber(data.previousRank),
+      rankChange: toNumber(data.rankChange),
+      rankDirection:
+        data.rankDirection === "up" ||
+        data.rankDirection === "down" ||
+        data.rankDirection === "-"
+          ? data.rankDirection
+          : "-",
+
+      currentStreak: toNumber(data.currentStreak),
+      bestStreak: toNumber(data.bestStreak),
+    } as LeaderboardUser;
   });
 
-  return users.filter((user) => user.total > 0 || user.points > 0);
+  return users
+    .filter((user) => user.total > 0 || user.points > 0)
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.correct !== a.correct) return b.correct - a.correct;
+      if (a.total !== b.total) return a.total - b.total;
+      return a.fullName.localeCompare(b.fullName, "ar");
+    })
+    .map((user, index) => ({
+      ...user,
+      currentRank: index + 1,
+    }));
 }
