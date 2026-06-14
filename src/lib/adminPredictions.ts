@@ -1,0 +1,159 @@
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "./firebase";
+
+export type AdminPrediction = {
+  id: string;
+
+  userId: string;
+  userName: string;
+
+  matchId: string;
+
+  homeTeamName: string;
+  homeTeamEmoji: string;
+  awayTeamName: string;
+  awayTeamEmoji: string;
+
+  homeScore: number;
+  awayScore: number;
+
+  actualHomeScore: number | null;
+  actualAwayScore: number | null;
+
+  points: number;
+  resultType: string;
+  isCalculated: boolean;
+
+  createdAt: string;
+  calculatedAt: string | null;
+};
+
+export type PredictionMatchOption = {
+  matchId: string;
+  label: string;
+  count: number;
+};
+
+function toText(value: unknown) {
+  return String(value || "").trim();
+}
+
+function toNumber(value: unknown) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function toNullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function getTimeValue(value: unknown) {
+  const text = toText(value);
+  if (!text) return 0;
+
+  const time = new Date(text).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+export function getPredictionResultLabel(prediction: AdminPrediction) {
+  if (!prediction.isCalculated) return "لم يُحتسب";
+
+  if (prediction.resultType === "exact" || prediction.points === 3) {
+    return "بالملي +3";
+  }
+
+  if (prediction.resultType === "winner" || prediction.points === 1) {
+    return "الفائز +1";
+  }
+
+  return "خطأ +0";
+}
+
+export function getPredictionResultClass(prediction: AdminPrediction) {
+  if (!prediction.isCalculated) {
+    return "border-slate-400/20 bg-slate-400/10 text-slate-200";
+  }
+
+  if (prediction.resultType === "exact" || prediction.points === 3) {
+    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-100";
+  }
+
+  if (prediction.resultType === "winner" || prediction.points === 1) {
+    return "border-amber-400/20 bg-amber-400/10 text-amber-100";
+  }
+
+  return "border-red-400/20 bg-red-500/10 text-red-100";
+}
+
+export async function getAdminPredictions(): Promise<AdminPrediction[]> {
+  const snapshot = await getDocs(collection(db, "predictions"));
+
+  return snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => {
+      const data = docSnap.data();
+
+      return {
+        id: docSnap.id,
+
+        userId: toText(data.userId),
+        userName: toText(data.userName) || "عضو",
+
+        matchId: toText(data.matchId),
+
+        homeTeamName: toText(data.homeTeamName),
+        homeTeamEmoji: toText(data.homeTeamEmoji),
+        awayTeamName: toText(data.awayTeamName),
+        awayTeamEmoji: toText(data.awayTeamEmoji),
+
+        homeScore: toNumber(data.homeScore),
+        awayScore: toNumber(data.awayScore),
+
+        actualHomeScore: toNullableNumber(data.actualHomeScore),
+        actualAwayScore: toNullableNumber(data.actualAwayScore),
+
+        points: toNumber(data.points),
+        resultType: toText(data.resultType),
+        isCalculated: Boolean(data.isCalculated),
+
+        createdAt: toText(data.createdAt),
+        calculatedAt:
+          data.calculatedAt === null || data.calculatedAt === undefined
+            ? null
+            : toText(data.calculatedAt),
+      };
+    })
+    .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
+}
+
+export function getPredictionMatchOptions(
+  predictions: AdminPrediction[]
+): PredictionMatchOption[] {
+  const map = new Map<string, PredictionMatchOption>();
+
+  predictions.forEach((prediction) => {
+    if (!prediction.matchId) return;
+
+    const label = `${prediction.homeTeamEmoji} ${prediction.homeTeamName} × ${prediction.awayTeamName} ${prediction.awayTeamEmoji}`;
+
+    const current = map.get(prediction.matchId);
+
+    if (current) {
+      map.set(prediction.matchId, {
+        ...current,
+        count: current.count + 1,
+      });
+    } else {
+      map.set(prediction.matchId, {
+        matchId: prediction.matchId,
+        label,
+        count: 1,
+      });
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}

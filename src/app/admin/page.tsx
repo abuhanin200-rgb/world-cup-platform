@@ -1,16 +1,24 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { getTeams, Team } from "@/lib/teams";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { addMatch, getAllMatches, Match } from "@/lib/matches";
-import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
-import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
+import { getTeams, Team } from "@/lib/teams";
+import {
+  calculateMatchResult,
+  undoMatchCalculation,
+} from "@/lib/scoring";
+import {
+  isAdminUnlocked,
+  lockAdmin,
+  unlockAdmin,
+} from "@/lib/adminAuth";
 import { addAdminLog } from "@/lib/adminLogs";
 import AdminOverviewPanel from "@/components/AdminOverviewPanel";
 import AdminMembersPanel from "@/components/AdminMembersPanel";
 import AdminSettingsPanel from "@/components/AdminSettingsPanel";
 import AdminMatchesPanel from "@/components/AdminMatchesPanel";
 import AdminLogsPanel from "@/components/AdminLogsPanel";
+import AdminPredictionsPanel from "@/components/AdminPredictionsPanel";
 
 type AdminTab =
   | "overview"
@@ -18,59 +26,64 @@ type AdminTab =
   | "calculate"
   | "settings"
   | "members"
+  | "predictions"
   | "matches"
   | "logs";
 
-const adminTabs: { id: AdminTab; label: string; icon: string }[] = [
-  { id: "overview", label: "نظرة عامة", icon: "📊" },
-  { id: "add", label: "إضافة مباراة", icon: "➕" },
-  { id: "calculate", label: "احتساب النتائج", icon: "🧮" },
-  { id: "settings", label: "إعدادات الشرائط", icon: "⚙️" },
-  { id: "members", label: "إدارة الأعضاء", icon: "👥" },
-  { id: "matches", label: "المباريات", icon: "📅" },
-  { id: "logs", label: "السجل", icon: "📝" },
-];
+function toDateInputValue(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getDefaultTime() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() + 30);
+
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${hours}:${minutes}`;
+}
+
+function formatMatchLabel(match: Match) {
+  return `${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamName} ${match.awayTeamEmoji}`;
+}
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [unlocked, setUnlocked] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
-  const [adminReady, setAdminReady] = useState(false);
-  const [adminUnlocked, setAdminUnlocked] = useState(false);
-  const [adminUsername, setAdminUsername] = useState("");
-  const [adminPasscode, setAdminPasscode] = useState("");
-  const [adminError, setAdminError] = useState("");
+  const [username, setUsername] = useState("");
+  const [passcode, setPasscode] = useState("");
+
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [homeTeamCode, setHomeTeamCode] = useState("");
   const [awayTeamCode, setAwayTeamCode] = useState("");
-  const [matchDate, setMatchDate] = useState("");
-  const [matchTime, setMatchTime] = useState("");
+  const [matchDate, setMatchDate] = useState(toDateInputValue(new Date()));
+  const [matchTime, setMatchTime] = useState(getDefaultTime());
+  const [addingMatch, setAddingMatch] = useState(false);
 
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [actualHomeScore, setActualHomeScore] = useState("");
   const [actualAwayScore, setActualAwayScore] = useState("");
-
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [undoing, setUndoing] = useState(false);
 
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const selectedMatch = useMemo(() => {
+    return matches.find((match) => match.id === selectedMatchId) || null;
+  }, [matches, selectedMatchId]);
 
-  useEffect(() => {
-    const unlocked = isAdminUnlocked();
-    setAdminUnlocked(unlocked);
-    setAdminReady(true);
-  }, []);
+  const scheduledMatches = useMemo(() => {
+    return matches.filter((match) => !match.resultCalculated);
+  }, [matches]);
 
-  useEffect(() => {
-    if (adminUnlocked) {
-      loadData();
-    }
-  }, [adminUnlocked]);
+  const calculatedMatches = useMemo(() => {
+    return matches.filter((match) => match.resultCalculated);
+  }, [matches]);
 
   async function loadData() {
     try {
@@ -83,293 +96,283 @@ export default function AdminPage() {
 
       setTeams(teamsData);
       setMatches(matchesData);
-    } catch (err) {
-      console.error(err);
-      setError("تعذر تحميل بيانات لوحة التحكم");
+
+      if (!homeTeamCode && teamsData[0]) {
+        setHomeTeamCode(teamsData[0].code);
+      }
+
+      if (!awayTeamCode && teamsData[1]) {
+        setAwayTeamCode(teamsData[1].code);
+      }
+
+      if (!selectedMatchId && matchesData[0]) {
+        setSelectedMatchId(matchesData[0].id);
+      }
+    } catch (error) {
+      console.error("Admin load data error:", error);
+      alert("تعذر تحميل بيانات الأدمن");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleAdminLogin(event: FormEvent) {
+  useEffect(() => {
+    setUnlocked(isAdminUnlocked());
+    setCheckingAccess(false);
+  }, []);
+
+  useEffect(() => {
+    if (unlocked) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlocked]);
+
+  function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    setAdminError("");
-
     try {
-      unlockAdmin(adminUsername, adminPasscode);
-      setAdminUnlocked(true);
-      setAdminUsername("");
-      setAdminPasscode("");
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "تعذر تسجيل الدخول";
-      setAdminError(errorMessage);
+      unlockAdmin(username, passcode);
+      setUnlocked(true);
+      setUsername("");
+      setPasscode("");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "تعذر دخول الأدمن");
     }
   }
 
-  function handleAdminLogout() {
+  function handleLogout() {
     lockAdmin();
-    setAdminUnlocked(false);
+    setUnlocked(false);
   }
 
-  function getSelectedTeam(code: string) {
-    return teams.find((team) => team.code === code);
-  }
-
-  function getSelectedMatch() {
-    return matches.find((match) => match.id === selectedMatchId);
-  }
-
-  async function handleAddMatch(event: FormEvent) {
+  async function handleAddMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    setMessage("");
-    setError("");
+    if (!homeTeamCode || !awayTeamCode) {
+      alert("اختر المنتخبين");
+      return;
+    }
 
-    const homeTeam = getSelectedTeam(homeTeamCode);
-    const awayTeam = getSelectedTeam(awayTeamCode);
+    if (homeTeamCode === awayTeamCode) {
+      alert("لا يمكن اختيار نفس المنتخبين");
+      return;
+    }
+
+    if (!matchDate || !matchTime) {
+      alert("أدخل التاريخ والوقت");
+      return;
+    }
+
+    const homeTeam = teams.find((team) => team.code === homeTeamCode);
+    const awayTeam = teams.find((team) => team.code === awayTeamCode);
 
     if (!homeTeam || !awayTeam) {
-      setError("اختر الفريقين بشكل صحيح");
+      alert("بيانات المنتخب غير صحيحة");
       return;
     }
-
-    if (homeTeam.code === awayTeam.code) {
-      setError("لا يمكن اختيار نفس الفريق في المباراة");
-      return;
-    }
-
-    setSaving(true);
 
     try {
-      await addMatch({
-        homeTeamCode: homeTeam.code,
-        homeTeamName: homeTeam.nameAr,
-        homeTeamEmoji: homeTeam.emoji,
+      setAddingMatch(true);
 
-        awayTeamCode: awayTeam.code,
-        awayTeamName: awayTeam.nameAr,
-        awayTeamEmoji: awayTeam.emoji,
-
+      const newMatch = await addMatch({
+        homeTeam,
+        awayTeam,
         matchDate,
         matchTime,
       });
 
       await addAdminLog({
         action: "add_match",
-        title: "إضافة مباراة جديدة",
-        description: `تمت إضافة مباراة ${homeTeam.nameAr} ضد ${awayTeam.nameAr} بتاريخ ${matchDate} الساعة ${matchTime} بتوقيت مكة.`,
+        title: "إضافة مباراة",
+        description: `${homeTeam.emoji} ${homeTeam.nameAr} × ${awayTeam.nameAr} ${awayTeam.emoji}`,
+        metadata: {
+          matchId: newMatch.id,
+          matchDate,
+          matchTime,
+        },
       });
 
-      setMessage("تمت إضافة المباراة بنجاح وستظهر في صفحة الجمهور حسب تاريخها.");
-      setHomeTeamCode("");
-      setAwayTeamCode("");
-      setMatchDate("");
-      setMatchTime("");
+      alert("تمت إضافة المباراة بنجاح");
+
+      setSelectedMatchId(newMatch.id);
+      setActiveTab("matches");
 
       await loadData();
-      setActiveTab("matches");
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "حدث خطأ أثناء إضافة المباراة";
-      setError(errorMessage);
+    } catch (error) {
+      console.error("Add match error:", error);
+      alert(error instanceof Error ? error.message : "تعذر إضافة المباراة");
     } finally {
-      setSaving(false);
+      setAddingMatch(false);
     }
   }
 
-  async function handleCalculateMatch(event: FormEvent) {
+  async function handleCalculate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    setMessage("");
-    setError("");
+    if (!selectedMatchId) {
+      alert("اختر المباراة");
+      return;
+    }
 
     const homeScore = Number(actualHomeScore);
     const awayScore = Number(actualAwayScore);
-    const selectedMatch = getSelectedMatch();
-
-    if (!selectedMatchId) {
-      setError("اختر المباراة المراد احتسابها");
-      return;
-    }
 
     if (
-      actualHomeScore === "" ||
-      actualAwayScore === "" ||
-      Number.isNaN(homeScore) ||
-      Number.isNaN(awayScore)
+      !Number.isInteger(homeScore) ||
+      !Number.isInteger(awayScore) ||
+      homeScore < 0 ||
+      awayScore < 0
     ) {
-      setError("أدخل النتيجة الصحيحة كاملة");
+      alert("أدخل نتيجة صحيحة");
       return;
     }
 
-    const confirmed = window.confirm(
-      "هل أنت متأكد من احتساب هذه المباراة؟ سيتم توزيع النقاط على جميع الأعضاء."
-    );
-
-    if (!confirmed) return;
-
-    setCalculating(true);
-
     try {
-      const result = await calculateMatchResult({
+      setCalculating(true);
+
+      await calculateMatchResult({
         matchId: selectedMatchId,
         actualHomeScore: homeScore,
         actualAwayScore: awayScore,
       });
 
+      const match = matches.find((item) => item.id === selectedMatchId);
+
       await addAdminLog({
         action: "calculate_match",
         title: "احتساب نتيجة مباراة",
-        description: selectedMatch
-          ? `تم احتساب مباراة ${selectedMatch.homeTeamName} ضد ${selectedMatch.awayTeamName} بنتيجة ${homeScore} - ${awayScore}. عدد التوقعات: ${result.totalPredictions}، بالملي: ${result.exactCount}، فائز/تعادل صحيح: ${result.winnerCount}، خطأ: ${result.wrongCount}.`
-          : `تم احتساب مباراة بنتيجة ${homeScore} - ${awayScore}.`,
+        description: match
+          ? `${formatMatchLabel(match)} — النتيجة ${homeScore} - ${awayScore}`
+          : `احتساب مباراة — النتيجة ${homeScore} - ${awayScore}`,
+        metadata: {
+          matchId: selectedMatchId,
+          actualHomeScore: homeScore,
+          actualAwayScore: awayScore,
+        },
       });
 
-      setMessage(
-        `تم احتساب المباراة بنجاح. عدد التوقعات: ${result.totalPredictions}، بالملي: ${result.exactCount}، الفائز/التعادل الصحيح: ${result.winnerCount}، الخطأ: ${result.wrongCount}.`
-      );
+      alert("تم احتساب النتيجة وتحديث النقاط");
 
-      setSelectedMatchId("");
       setActualHomeScore("");
       setActualAwayScore("");
+      setActiveTab("matches");
 
       await loadData();
-      setActiveTab("matches");
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "حدث خطأ أثناء احتساب المباراة";
-      setError(errorMessage);
+    } catch (error) {
+      console.error("Calculate match error:", error);
+      alert(error instanceof Error ? error.message : "تعذر احتساب النتيجة");
     } finally {
       setCalculating(false);
     }
   }
 
   async function handleUndoCalculation() {
-    setMessage("");
-    setError("");
-
     if (!selectedMatchId) {
-      setError("اختر المباراة المراد التراجع عن احتسابها");
+      alert("اختر المباراة");
       return;
     }
 
-    const selectedMatch = getSelectedMatch();
+    const match = matches.find((item) => item.id === selectedMatchId);
 
-    const confirmed = window.confirm(
-      `هل أنت متأكد من التراجع عن احتساب هذه المباراة؟\n\n${
-        selectedMatch
-          ? `${selectedMatch.homeTeamName} × ${selectedMatch.awayTeamName}`
-          : ""
-      }\n\nسيتم حذف نقاط هذه المباراة من جميع الأعضاء وإعادة ترتيب لوحة الصدارة.`
+    const confirmed = confirm(
+      "هل أنت متأكد من التراجع عن احتساب هذه المباراة؟ سيتم تحديث نقاط الأعضاء من جديد."
     );
 
     if (!confirmed) return;
 
-    setUndoing(true);
-
     try {
-      const result = await undoMatchCalculation(selectedMatchId);
+      setUndoing(true);
+
+      await undoMatchCalculation(selectedMatchId);
 
       await addAdminLog({
         action: "undo_match_calculation",
         title: "تراجع عن احتساب مباراة",
-        description: selectedMatch
-          ? `تم التراجع عن احتساب مباراة ${selectedMatch.homeTeamName} ضد ${selectedMatch.awayTeamName}. تم إرجاع ${result.undonePredictions} توقع إلى حالة غير محتسب.`
-          : `تم التراجع عن احتساب مباراة. عدد التوقعات المرجعة: ${result.undonePredictions}.`,
+        description: match
+          ? `تم التراجع عن احتساب ${formatMatchLabel(match)}`
+          : "تم التراجع عن احتساب مباراة",
+        metadata: {
+          matchId: selectedMatchId,
+        },
       });
 
-      setMessage(
-        `تم التراجع عن احتساب المباراة بنجاح. تم إرجاع ${result.undonePredictions} توقع إلى حالة غير محتسب.`
-      );
+      alert("تم التراجع عن الاحتساب");
 
-      setSelectedMatchId("");
       setActualHomeScore("");
       setActualAwayScore("");
 
       await loadData();
-      setActiveTab("matches");
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "حدث خطأ أثناء التراجع عن الحسبة";
-      setError(errorMessage);
+    } catch (error) {
+      console.error("Undo calculation error:", error);
+      alert(error instanceof Error ? error.message : "تعذر التراجع عن الاحتساب");
     } finally {
       setUndoing(false);
     }
   }
 
-  const selectedMatch = getSelectedMatch();
-
-  if (!adminReady) {
+  if (checkingAccess) {
     return (
       <main
         dir="rtl"
-        className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+        className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-white"
       >
-        <div className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl">
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center">
           جاري التحقق...
         </div>
       </main>
     );
   }
 
-  if (!adminUnlocked) {
+  if (!unlocked) {
     return (
       <main
         dir="rtl"
         className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
       >
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
-          <div className="mb-6 text-center">
-            <div className="mb-3 text-4xl">🔐</div>
-            <h1 className="text-2xl font-black">دخول لوحة التحكم</h1>
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl"
+        >
+          <div className="mb-5 text-center">
+            <div className="mx-auto mb-3 h-16 w-16 overflow-hidden rounded-3xl border border-white/20 bg-white/10">
+              <img
+                src="/wc2026-logo.png"
+                alt="شعار منصة توقعات كأس العالم 2026"
+                className="h-full w-full object-contain p-2"
+              />
+            </div>
+
+            <h1 className="text-2xl font-black">دخول الأدمن</h1>
             <p className="mt-2 text-sm text-slate-300">
-              هذه الصفحة خاصة بإدارة المنصة.
+              لوحة تحكم منصة توقعات كأس العالم 2026
             </p>
           </div>
 
-          {adminError && (
-            <div className="mb-4 rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-center text-sm text-red-100">
-              {adminError}
-            </div>
-          )}
+          <div className="space-y-3">
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="اسم المستخدم"
+              className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+            />
 
-          <form onSubmit={handleAdminLogin} className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm font-bold">
-                اسم المستخدم
-              </label>
-              <input
-                type="text"
-                value={adminUsername}
-                onChange={(event) => setAdminUsername(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-                placeholder="admin"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold">رمز الدخول</label>
-              <input
-                type="password"
-                value={adminPasscode}
-                onChange={(event) => setAdminPasscode(event.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-                placeholder="••••"
-                required
-              />
-            </div>
+            <input
+              value={passcode}
+              onChange={(event) => setPasscode(event.target.value)}
+              placeholder="كلمة المرور"
+              type="password"
+              className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+            />
 
             <button
               type="submit"
-              className="w-full rounded-xl bg-amber-400 px-4 py-3 font-black text-slate-950 transition hover:bg-amber-300"
+              className="w-full rounded-2xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300"
             >
               دخول
             </button>
-          </form>
-        </div>
+          </div>
+        </form>
       </main>
     );
   }
@@ -377,284 +380,381 @@ export default function AdminPage() {
   return (
     <main
       dir="rtl"
-      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-3 text-white md:p-5"
     >
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-4 rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-5 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-2xl font-black md:text-3xl">لوحة التحكم</h1>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                إدارة مباريات ونتائج وأعضاء وإعدادات منصة توقعات كأس العالم
-                2026.
+              <h1 className="text-2xl font-black md:text-3xl">
+                لوحة تحكم الأدمن
+              </h1>
+              <p className="mt-2 text-sm text-slate-300">
+                إدارة المباريات، النتائج، الأعضاء، التوقعات، والإعدادات.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleAdminLogout}
-              className="rounded-xl bg-red-500 px-4 py-2 text-sm font-black text-white hover:bg-red-400"
-            >
-              خروج من الأدمن
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={loadData}
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10"
+              >
+                تحديث البيانات
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-black text-white hover:bg-red-400"
+              >
+                خروج الأدمن
+              </button>
+            </div>
           </div>
         </header>
 
-        <nav className="sticky top-3 z-40 mb-6 rounded-3xl border border-white/10 bg-slate-950/80 p-2 shadow-2xl backdrop-blur-xl">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-7">
-            {adminTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setMessage("");
-                  setError("");
-                }}
-                className={`rounded-2xl px-3 py-3 text-xs font-black transition md:text-sm ${
-                  activeTab === tab.id
-                    ? "bg-amber-400 text-slate-950"
-                    : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-                }`}
-              >
-                <span className="ml-1">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <nav className="mb-5 flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl">
+          <button
+            type="button"
+            onClick={() => setActiveTab("overview")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "overview"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            📊 نظرة عامة
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("add")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "add"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            ➕ إضافة مباراة
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("calculate")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "calculate"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            🧮 احتساب النتائج
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("settings")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "settings"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            ⚙️ إعدادات الشرائط
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("members")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "members"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            👥 إدارة الأعضاء
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("predictions")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "predictions"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            🔮 توقعات الأعضاء
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("matches")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "matches"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            📅 المباريات
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("logs")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "logs"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            📝 السجل
+          </button>
         </nav>
-
-        {(message || error) && (
-          <div className="mb-6 space-y-3">
-            {message && (
-              <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/15 p-4 text-sm text-emerald-200">
-                {message}
-              </div>
-            )}
-
-            {error && (
-              <div className="rounded-2xl border border-red-500/40 bg-red-500/15 p-4 text-sm text-red-200">
-                {error}
-              </div>
-            )}
-          </div>
-        )}
 
         {activeTab === "overview" && <AdminOverviewPanel />}
 
         {activeTab === "add" && (
-          <section className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
-            <h2 className="mb-4 text-xl font-black">إضافة مباراة جديدة</h2>
+          <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
+            <div className="mb-4">
+              <h2 className="text-xl font-black md:text-2xl">
+                ➕ إضافة مباراة
+              </h2>
+              <p className="mt-1 text-sm text-slate-300">
+                أضف مباراة جديدة لتظهر في صندوق التوقعات حسب وقتها.
+              </p>
+            </div>
 
-            <form
-              onSubmit={handleAddMatch}
-              className="mx-auto max-w-2xl space-y-4"
-            >
-              <div>
-                <label className="mb-2 block text-sm font-bold">
-                  الفريق الأول
-                </label>
-                <select
-                  value={homeTeamCode}
-                  onChange={(event) => setHomeTeamCode(event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
-                  required
-                >
-                  <option value="">اختر الفريق الأول</option>
-                  {teams.map((team) => (
-                    <option key={team.code} value={team.code}>
-                      {team.emoji} {team.nameAr}
-                    </option>
-                  ))}
-                </select>
+            {loading ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300">
+                جاري تحميل المنتخبات...
               </div>
-
-              <div className="text-center text-sm font-black text-amber-300">
-                VS
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-bold">
-                  الفريق الثاني
-                </label>
-                <select
-                  value={awayTeamCode}
-                  onChange={(event) => setAwayTeamCode(event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
-                  required
-                >
-                  <option value="">اختر الفريق الثاني</option>
-                  {teams.map((team) => (
-                    <option key={team.code} value={team.code}>
-                      {team.emoji} {team.nameAr}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-bold">
-                    تاريخ المباراة
+            ) : (
+              <form onSubmit={handleAddMatch} className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      المنتخب الأول
+                    </span>
+                    <select
+                      value={homeTeamCode}
+                      onChange={(event) => setHomeTeamCode(event.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                    >
+                      {teams.map((team) => (
+                        <option key={team.code} value={team.code}>
+                          {team.emoji} {team.nameAr}
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                  <input
-                    type="date"
-                    value={matchDate}
-                    onChange={(event) => setMatchDate(event.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
-                    required
-                  />
+
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      المنتخب الثاني
+                    </span>
+                    <select
+                      value={awayTeamCode}
+                      onChange={(event) => setAwayTeamCode(event.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                    >
+                      {teams.map((team) => (
+                        <option key={team.code} value={team.code}>
+                          {team.emoji} {team.nameAr}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-bold">
-                    وقت المباراة بتوقيت مكة
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      تاريخ المباراة
+                    </span>
+                    <input
+                      type="date"
+                      value={matchDate}
+                      onChange={(event) => setMatchDate(event.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                    />
                   </label>
-                  <input
-                    type="time"
-                    value={matchTime}
-                    onChange={(event) => setMatchTime(event.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
-                    required
-                  />
-                </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={saving || loading}
-                className="w-full rounded-xl bg-amber-400 px-4 py-3 font-black text-slate-950 transition hover:bg-amber-300 disabled:opacity-60"
-              >
-                {saving ? "جاري الإضافة..." : "إضافة المباراة"}
-              </button>
-            </form>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      وقت المباراة
+                    </span>
+                    <input
+                      type="time"
+                      value={matchTime}
+                      onChange={(event) => setMatchTime(event.target.value)}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={addingMatch}
+                  className="w-full rounded-2xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {addingMatch ? "جاري الإضافة..." : "إضافة المباراة"}
+                </button>
+              </form>
+            )}
           </section>
         )}
 
         {activeTab === "calculate" && (
-          <section className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
-            <h2 className="mb-4 text-xl font-black">احتساب نتيجة مباراة</h2>
+          <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
+            <div className="mb-4">
+              <h2 className="text-xl font-black md:text-2xl">
+                🧮 احتساب النتائج
+              </h2>
+              <p className="mt-1 text-sm text-slate-300">
+                اختر مباراة وأدخل النتيجة الفعلية لتحديث نقاط جميع الأعضاء.
+              </p>
+            </div>
 
-            <form
-              onSubmit={handleCalculateMatch}
-              className="mx-auto max-w-2xl space-y-4"
-            >
-              <div>
-                <label className="mb-2 block text-sm font-bold">
-                  اختر المباراة
+            {loading ? (
+              <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300">
+                جاري تحميل المباريات...
+              </div>
+            ) : matches.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/60 p-6 text-center text-slate-300">
+                لا توجد مباريات حتى الآن.
+              </div>
+            ) : (
+              <form onSubmit={handleCalculate} className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold">
+                    اختر المباراة
+                  </span>
+                  <select
+                    value={selectedMatchId}
+                    onChange={(event) => {
+                      setSelectedMatchId(event.target.value);
+                      setActualHomeScore("");
+                      setActualAwayScore("");
+                    }}
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                  >
+                    {matches.map((match) => (
+                      <option key={match.id} value={match.id}>
+                        {formatMatchLabel(match)}{" "}
+                        {match.resultCalculated ? "— محتسبة" : "— غير محتسبة"}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
-                <select
-                  value={selectedMatchId}
-                  onChange={(event) => setSelectedMatchId(event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
-                  required
-                >
-                  <option value="">اختر مباراة للاحتساب</option>
+                {selectedMatch && (
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                    <div className="text-center text-lg font-black">
+                      {formatMatchLabel(selectedMatch)}
+                    </div>
 
-                  {matches.map((match) => (
-                    <option key={match.id} value={match.id}>
-                      {match.homeTeamName} × {match.awayTeamName} -{" "}
-                      {match.matchDate} {match.matchTime}
-                    </option>
-                  ))}
-                </select>
+                    <div className="mt-2 text-center text-sm text-slate-300">
+                      الحالة:{" "}
+                      {selectedMatch.resultCalculated
+                        ? "محتسبة"
+                        : "لم تُحتسب"}
+                    </div>
+
+                    {selectedMatch.resultCalculated && (
+                      <div className="mt-2 text-center text-sm text-emerald-200">
+                        النتيجة الحالية:{" "}
+                        <strong>
+                          {selectedMatch.actualHomeScore} -{" "}
+                          {selectedMatch.actualAwayScore}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      نتيجة المنتخب الأول
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={actualHomeScore}
+                      onChange={(event) =>
+                        setActualHomeScore(event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black outline-none focus:border-amber-400"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      نتيجة المنتخب الثاني
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={actualAwayScore}
+                      onChange={(event) =>
+                        setActualAwayScore(event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black outline-none focus:border-amber-400"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <button
+                    type="submit"
+                    disabled={calculating}
+                    className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {calculating ? "جاري الاحتساب..." : "احتساب النتيجة"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={undoing || !selectedMatch?.resultCalculated}
+                    onClick={handleUndoCalculation}
+                    className="rounded-2xl bg-red-500 px-4 py-3 text-sm font-black text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {undoing ? "جاري التراجع..." : "تراجع عن الاحتساب"}
+                  </button>
+                </div>
+
+                <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
+                  <strong>تنبيه:</strong> عند احتساب النتيجة سيتم تحديث كل
+                  التوقعات المرتبطة بالمباراة، ثم إعادة بناء إحصائيات جميع
+                  الأعضاء ولوحة الصدارة.
+                </div>
+              </form>
+            )}
+
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                <div className="text-sm text-slate-300">مباريات غير محتسبة</div>
+                <div className="mt-1 text-3xl font-black">
+                  {scheduledMatches.length}
+                </div>
               </div>
 
-              {selectedMatch && (
-                <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-center">
-                  <div className="mb-2 text-xs text-slate-300">
-                    {selectedMatch.matchDay} • {selectedMatch.matchDate} •{" "}
-                    {selectedMatch.matchTime} بتوقيت مكة
-                  </div>
-
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                    <div>
-                      <div className="text-3xl">
-                        {selectedMatch.homeTeamEmoji}
-                      </div>
-                      <div className="font-black">
-                        {selectedMatch.homeTeamName}
-                      </div>
-                    </div>
-
-                    <div className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-amber-300">
-                      VS
-                    </div>
-
-                    <div>
-                      <div className="text-3xl">
-                        {selectedMatch.awayTeamEmoji}
-                      </div>
-                      <div className="font-black">
-                        {selectedMatch.awayTeamName}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-2 block text-sm font-bold">
-                    نتيجة الفريق الأول
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={30}
-                    value={actualHomeScore}
-                    onChange={(event) => setActualHomeScore(event.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-center text-xl font-black text-slate-950 outline-none focus:border-amber-400"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-bold">
-                    نتيجة الفريق الثاني
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={30}
-                    value={actualAwayScore}
-                    onChange={(event) => setActualAwayScore(event.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-center text-xl font-black text-slate-950 outline-none focus:border-amber-400"
-                    required
-                  />
+              <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                <div className="text-sm text-slate-300">مباريات محتسبة</div>
+                <div className="mt-1 text-3xl font-black">
+                  {calculatedMatches.length}
                 </div>
               </div>
-
-              <button
-                type="submit"
-                disabled={calculating || undoing || loading}
-                className="w-full rounded-xl bg-emerald-400 px-4 py-3 font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-60"
-              >
-                {calculating ? "جاري الاحتساب..." : "احتساب لجميع الأعضاء"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleUndoCalculation}
-                disabled={undoing || calculating || loading || !selectedMatchId}
-                className="w-full rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 font-black text-red-200 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {undoing ? "جاري التراجع..." : "تراجع عن الحسبة"}
-              </button>
-
-              <p className="text-xs leading-6 text-slate-300">
-                يتم توزيع النقاط تلقائيًا: النتيجة الصحيحة +3، توقع الفائز أو
-                التعادل الصحيح +1، التوقع الخاطئ +0. وزر التراجع يعيد المباراة
-                إلى حالة غير محتسبة ويحذف نقاطها من جميع الأعضاء.
-              </p>
-            </form>
+            </div>
           </section>
         )}
 
         {activeTab === "settings" && <AdminSettingsPanel />}
 
         {activeTab === "members" && <AdminMembersPanel />}
+
+        {activeTab === "predictions" && <AdminPredictionsPanel />}
 
         {activeTab === "matches" && (
           <AdminMatchesPanel
