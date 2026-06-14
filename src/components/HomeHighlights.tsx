@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ExactHit,
   getHomeHighlights,
   HomeHighlightUser,
 } from "@/lib/highlights";
-import { getSiteSettings, getTickerDuration } from "@/lib/siteSettings";
+import { getSiteSettings, TickerSpeed } from "@/lib/siteSettings";
 
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
@@ -14,6 +14,7 @@ function EmptyCard({ title, text }: { title: string; text: string }) {
       <div className="text-sm font-black text-slate-200 md:text-base">
         {title}
       </div>
+
       <p className="mt-1 text-[11px] leading-5 text-slate-300 md:text-xs">
         {text}
       </p>
@@ -35,12 +36,7 @@ function HighlightCard({
   accentClass: string;
 }) {
   if (!user) {
-    return (
-      <EmptyCard
-        title={title}
-        text="تظهر بعد احتساب أول النتائج."
-      />
-    );
+    return <EmptyCard title={title} text="تظهر بعد احتساب أول النتائج." />;
   }
 
   return (
@@ -66,6 +62,36 @@ function HighlightCard({
       </div>
     </div>
   );
+}
+
+function getPixelsPerSecond(speed: TickerSpeed) {
+  if (speed === "very_slow") return 16;
+  if (speed === "slow") return 24;
+  if (speed === "normal") return 34;
+  if (speed === "fast") return 48;
+  if (speed === "very_fast") return 64;
+
+  return 34;
+}
+
+function getRepeatCount(count: number) {
+  if (count <= 1) return 14;
+  if (count <= 3) return 10;
+  if (count <= 6) return 7;
+  if (count <= 12) return 4;
+  if (count <= 25) return 2;
+
+  return 1;
+}
+
+function getSpeedLabel(speed: string) {
+  if (speed === "very_slow") return "بطيء جدًا";
+  if (speed === "slow") return "بطيء";
+  if (speed === "normal") return "متوسط";
+  if (speed === "fast") return "سريع";
+  if (speed === "very_fast") return "سريع جدًا";
+
+  return "متوسط";
 }
 
 export default function HomeHighlights() {
@@ -129,7 +155,11 @@ export default function HomeHighlights() {
 export function ExactHitsTicker() {
   const [exactHits, setExactHits] = useState<ExactHit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [duration, setDuration] = useState(22);
+  const [speed, setSpeed] = useState<TickerSpeed>("normal");
+  const [isPaused, setIsPaused] = useState(false);
+  const [groupWidth, setGroupWidth] = useState(0);
+
+  const groupRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     async function loadExactHits() {
@@ -146,10 +176,10 @@ export function ExactHitsTicker() {
     async function loadTickerSettings() {
       try {
         const settings = await getSiteSettings();
-        setDuration(getTickerDuration(settings.exactHitsSpeed));
+        setSpeed(settings.exactHitsSpeed);
       } catch (error) {
         console.error("فشل تحميل إعدادات سرعة جابها صح:", error);
-        setDuration(22);
+        setSpeed("normal");
       }
     }
 
@@ -164,6 +194,78 @@ export function ExactHitsTicker() {
       clearInterval(settingsInterval);
     };
   }, []);
+
+  const repeatedHits = useMemo(() => {
+    if (exactHits.length === 0) return [];
+
+    const repeated: ExactHit[] = [];
+    const repeatCount = getRepeatCount(exactHits.length);
+
+    for (let i = 0; i < repeatCount; i += 1) {
+      repeated.push(...exactHits);
+    }
+
+    return repeated;
+  }, [exactHits]);
+
+  useEffect(() => {
+    function measureWidth() {
+      if (!groupRef.current) return;
+      setGroupWidth(groupRef.current.scrollWidth);
+    }
+
+    measureWidth();
+
+    const resizeObserver = new ResizeObserver(measureWidth);
+
+    if (groupRef.current) {
+      resizeObserver.observe(groupRef.current);
+    }
+
+    window.addEventListener("resize", measureWidth);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measureWidth);
+    };
+  }, [repeatedHits]);
+
+  const pixelsPerSecond = getPixelsPerSecond(speed);
+
+  const duration = Math.max(
+    25,
+    Math.round((groupWidth || 1200) / pixelsPerSecond)
+  );
+
+  function pauseTicker() {
+    setIsPaused(true);
+  }
+
+  function resumeTicker() {
+    setIsPaused(false);
+  }
+
+  function renderExactHitCard(hit: ExactHit, index: number) {
+    return (
+      <div
+        key={`${hit.id}-${index}`}
+        dir="rtl"
+        className="whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-white md:text-sm"
+      >
+        <span className="font-black text-emerald-300">{hit.userName}</span>{" "}
+        جابها صح بالملي في مباراة{" "}
+        <span className="font-bold">
+          {hit.homeTeamEmoji} {hit.homeTeamName}
+        </span>{" "}
+        <span className="font-black text-amber-300">
+          {hit.homeScore} - {hit.awayScore}
+        </span>{" "}
+        <span className="font-bold">
+          {hit.awayTeamName} {hit.awayTeamEmoji}
+        </span>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -186,70 +288,72 @@ export function ExactHitsTicker() {
     );
   }
 
-  const repeatedHits =
-    exactHits.length === 1
-      ? Array(8).fill(exactHits[0])
-      : [...exactHits, ...exactHits, ...exactHits];
-
   return (
     <section className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 md:mt-6">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-black text-emerald-200">🎯 جابها صح</h2>
 
-        <span className="text-[11px] text-emerald-100/80">آخر 24 ساعة</span>
+        <div className="flex items-center gap-2">
+          <span className="hidden text-[11px] text-emerald-100/80 md:inline">
+            السرعة: {getSpeedLabel(speed)}
+          </span>
+
+          <span className="text-[11px] text-emerald-100/80">آخر 24 ساعة</span>
+        </div>
       </div>
 
-      <div className="exact-hits-window relative overflow-hidden">
+      <div
+        dir="ltr"
+        className="exact-hits-window relative overflow-hidden"
+        onMouseEnter={pauseTicker}
+        onMouseLeave={resumeTicker}
+        onTouchStart={pauseTicker}
+        onTouchEnd={resumeTicker}
+        onTouchCancel={resumeTicker}
+        onPointerDown={pauseTicker}
+        onPointerUp={resumeTicker}
+        onPointerCancel={resumeTicker}
+      >
         <div
           className="exact-hits-track flex w-max gap-3"
           style={{
             animationDuration: `${duration}s`,
+            animationPlayState: isPaused ? "paused" : "running",
           }}
         >
-          {repeatedHits.map((hit, index) => (
-            <div
-              key={`${hit.id}-${index}`}
-              className="whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-white md:text-sm"
-            >
-              <span className="font-black text-emerald-300">
-                {hit.userName}
-              </span>{" "}
-              جابها صح بالملي في مباراة{" "}
-              <span className="font-bold">
-                {hit.homeTeamEmoji} {hit.homeTeamName}
-              </span>{" "}
-              <span className="font-black text-amber-300">
-                {hit.homeScore} - {hit.awayScore}
-              </span>{" "}
-              <span className="font-bold">
-                {hit.awayTeamName} {hit.awayTeamEmoji}
-              </span>
-            </div>
-          ))}
+          <div ref={groupRef} className="flex flex-none gap-3">
+            {repeatedHits.map((hit, index) => renderExactHitCard(hit, index))}
+          </div>
+
+          <div className="flex flex-none gap-3">
+            {repeatedHits.map((hit, index) =>
+              renderExactHitCard(hit, index + repeatedHits.length)
+            )}
+          </div>
         </div>
       </div>
 
       <style jsx>{`
-        .exact-hits-window {
-          direction: rtl;
-        }
-
         .exact-hits-track {
           animation-name: exactHitsMove;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
+          will-change: transform;
         }
 
-        .exact-hits-track:hover {
+        .exact-hits-window:hover .exact-hits-track,
+        .exact-hits-window:active .exact-hits-track,
+        .exact-hits-window:focus-within .exact-hits-track {
           animation-play-state: paused;
         }
 
         @keyframes exactHitsMove {
-          from {
-            transform: translateX(0);
+          0% {
+            transform: translateX(-50%);
           }
-          to {
-            transform: translateX(50%);
+
+          100% {
+            transform: translateX(0%);
           }
         }
       `}</style>

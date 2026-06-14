@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getLatestPredictions, LatestPrediction } from "@/lib/predictions";
 import {
   getSiteSettings,
-  getTickerDuration,
   SiteSettings,
+  TickerSpeed,
 } from "@/lib/siteSettings";
 
 function getSpeedLabel(speed: string) {
@@ -16,6 +16,16 @@ function getSpeedLabel(speed: string) {
   if (speed === "very_fast") return "سريع جدًا";
 
   return "متوسط";
+}
+
+function getPixelsPerSecond(speed: TickerSpeed) {
+  if (speed === "very_slow") return 16;
+  if (speed === "slow") return 24;
+  if (speed === "normal") return 34;
+  if (speed === "fast") return 48;
+  if (speed === "very_fast") return 64;
+
+  return 34;
 }
 
 function getPredictionsSignature(predictions: LatestPrediction[]) {
@@ -33,13 +43,25 @@ function getPredictionsSignature(predictions: LatestPrediction[]) {
     .join("|");
 }
 
+function getRepeatCount(count: number) {
+  if (count <= 1) return 14;
+  if (count <= 3) return 10;
+  if (count <= 6) return 7;
+  if (count <= 12) return 4;
+  if (count <= 25) return 2;
+
+  return 1;
+}
+
 export default function LatestPredictionsTicker() {
   const [predictions, setPredictions] = useState<LatestPrediction[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const [groupWidth, setGroupWidth] = useState(0);
 
   const predictionsSignatureRef = useRef("");
+  const groupRef = useRef<HTMLDivElement | null>(null);
 
   async function loadPredictions() {
     try {
@@ -93,19 +115,47 @@ export default function LatestPredictionsTicker() {
   }, []);
 
   const currentSpeed = settings?.latestPredictionsSpeed || "normal";
-  const duration = getTickerDuration(currentSpeed);
+  const pixelsPerSecond = getPixelsPerSecond(currentSpeed);
 
   const tickerItems = useMemo(() => {
     if (predictions.length === 0) return [];
 
     const repeated: LatestPrediction[] = [];
+    const repeatCount = getRepeatCount(predictions.length);
 
-    for (let i = 0; i < 12; i += 1) {
+    for (let i = 0; i < repeatCount; i += 1) {
       repeated.push(...predictions);
     }
 
     return repeated;
   }, [predictions]);
+
+  useEffect(() => {
+    function measureWidth() {
+      if (!groupRef.current) return;
+      setGroupWidth(groupRef.current.scrollWidth);
+    }
+
+    measureWidth();
+
+    const resizeObserver = new ResizeObserver(measureWidth);
+
+    if (groupRef.current) {
+      resizeObserver.observe(groupRef.current);
+    }
+
+    window.addEventListener("resize", measureWidth);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measureWidth);
+    };
+  }, [tickerItems]);
+
+  const duration = Math.max(
+    25,
+    Math.round((groupWidth || 1200) / pixelsPerSecond)
+  );
 
   function pauseTicker() {
     setIsPaused(true);
@@ -206,9 +256,17 @@ export default function LatestPredictionsTicker() {
             animationPlayState: isPaused ? "paused" : "running",
           }}
         >
-          {tickerItems.map((prediction, index) =>
-            renderPredictionCard(prediction, index)
-          )}
+          <div ref={groupRef} className="flex flex-none gap-3">
+            {tickerItems.map((prediction, index) =>
+              renderPredictionCard(prediction, index)
+            )}
+          </div>
+
+          <div className="flex flex-none gap-3">
+            {tickerItems.map((prediction, index) =>
+              renderPredictionCard(prediction, index + tickerItems.length)
+            )}
+          </div>
         </div>
       </div>
 
