@@ -5,11 +5,19 @@ import { getTeams, Team } from "@/lib/teams";
 import { addMatch, getAllMatches, Match } from "@/lib/matches";
 import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
 import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
+import { addAdminLog } from "@/lib/adminLogs";
 import AdminMembersPanel from "@/components/AdminMembersPanel";
 import AdminSettingsPanel from "@/components/AdminSettingsPanel";
 import AdminMatchesPanel from "@/components/AdminMatchesPanel";
+import AdminLogsPanel from "@/components/AdminLogsPanel";
 
-type AdminTab = "add" | "calculate" | "settings" | "members" | "matches";
+type AdminTab =
+  | "add"
+  | "calculate"
+  | "settings"
+  | "members"
+  | "matches"
+  | "logs";
 
 const adminTabs: { id: AdminTab; label: string; icon: string }[] = [
   { id: "add", label: "إضافة مباراة", icon: "➕" },
@@ -17,6 +25,7 @@ const adminTabs: { id: AdminTab; label: string; icon: string }[] = [
   { id: "settings", label: "إعدادات الشرائط", icon: "⚙️" },
   { id: "members", label: "إدارة الأعضاء", icon: "👥" },
   { id: "matches", label: "المباريات", icon: "📅" },
+  { id: "logs", label: "السجل", icon: "📝" },
 ];
 
 export default function AdminPage() {
@@ -144,6 +153,12 @@ export default function AdminPage() {
         matchTime,
       });
 
+      await addAdminLog({
+        action: "add_match",
+        title: "إضافة مباراة جديدة",
+        description: `تمت إضافة مباراة ${homeTeam.nameAr} ضد ${awayTeam.nameAr} بتاريخ ${matchDate} الساعة ${matchTime} بتوقيت مكة.`,
+      });
+
       setMessage("تمت إضافة المباراة بنجاح وستظهر في صفحة الجمهور حسب تاريخها.");
       setHomeTeamCode("");
       setAwayTeamCode("");
@@ -169,6 +184,7 @@ export default function AdminPage() {
 
     const homeScore = Number(actualHomeScore);
     const awayScore = Number(actualAwayScore);
+    const selectedMatch = getSelectedMatch();
 
     if (!selectedMatchId) {
       setError("اختر المباراة المراد احتسابها");
@@ -198,6 +214,14 @@ export default function AdminPage() {
         matchId: selectedMatchId,
         actualHomeScore: homeScore,
         actualAwayScore: awayScore,
+      });
+
+      await addAdminLog({
+        action: "calculate_match",
+        title: "احتساب نتيجة مباراة",
+        description: selectedMatch
+          ? `تم احتساب مباراة ${selectedMatch.homeTeamName} ضد ${selectedMatch.awayTeamName} بنتيجة ${homeScore} - ${awayScore}. عدد التوقعات: ${result.totalPredictions}، بالملي: ${result.exactCount}، فائز/تعادل صحيح: ${result.winnerCount}، خطأ: ${result.wrongCount}.`
+          : `تم احتساب مباراة بنتيجة ${homeScore} - ${awayScore}.`,
       });
 
       setMessage(
@@ -244,6 +268,14 @@ export default function AdminPage() {
 
     try {
       const result = await undoMatchCalculation(selectedMatchId);
+
+      await addAdminLog({
+        action: "undo_match_calculation",
+        title: "تراجع عن احتساب مباراة",
+        description: selectedMatch
+          ? `تم التراجع عن احتساب مباراة ${selectedMatch.homeTeamName} ضد ${selectedMatch.awayTeamName}. تم إرجاع ${result.undonePredictions} توقع إلى حالة غير محتسب.`
+          : `تم التراجع عن احتساب مباراة. عدد التوقعات المرجعة: ${result.undonePredictions}.`,
+      });
 
       setMessage(
         `تم التراجع عن احتساب المباراة بنجاح. تم إرجاع ${result.undonePredictions} توقع إلى حالة غير محتسب.`
@@ -365,7 +397,7 @@ export default function AdminPage() {
         </header>
 
         <nav className="sticky top-3 z-40 mb-6 rounded-3xl border border-white/10 bg-slate-950/80 p-2 shadow-2xl backdrop-blur-xl">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
             {adminTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -408,7 +440,10 @@ export default function AdminPage() {
           <section className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
             <h2 className="mb-4 text-xl font-black">إضافة مباراة جديدة</h2>
 
-            <form onSubmit={handleAddMatch} className="mx-auto max-w-2xl space-y-4">
+            <form
+              onSubmit={handleAddMatch}
+              className="mx-auto max-w-2xl space-y-4"
+            >
               <div>
                 <label className="mb-2 block text-sm font-bold">
                   الفريق الأول
@@ -618,6 +653,8 @@ export default function AdminPage() {
         {activeTab === "matches" && (
           <AdminMatchesPanel matches={matches} loading={loading} />
         )}
+
+        {activeTab === "logs" && <AdminLogsPanel />}
       </div>
     </main>
   );

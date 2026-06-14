@@ -7,6 +7,7 @@ import {
   resetAdminMemberStats,
   updateAdminMember,
 } from "@/lib/adminMembers";
+import { addAdminLog } from "@/lib/adminLogs";
 import { getTeams, Team } from "@/lib/teams";
 
 const MEMBERS_PER_PAGE = 10;
@@ -185,6 +186,12 @@ export default function AdminMembersPanel() {
         bestStreak: toNumber(formState.bestStreak),
       });
 
+      await addAdminLog({
+        action: "update_member",
+        title: "تعديل بيانات عضو",
+        description: `تم تعديل بيانات العضو: ${selectedMember.fullName}. البيانات الجديدة: الاسم ${formState.fullName}، الجوال ${formState.phone}، المنتخب ${selectedTeam.nameAr}، النقاط ${formState.points}.`,
+      });
+
       setMessage("تم تحديث بيانات العضو بنجاح ✅");
       await loadData();
     } catch (err) {
@@ -215,6 +222,13 @@ export default function AdminMembersPanel() {
 
     try {
       await resetAdminMemberStats(selectedMember.id);
+
+      await addAdminLog({
+        action: "reset_member_stats",
+        title: "تصفير نقاط عضو",
+        description: `تم تصفير نقاط وإحصائيات العضو: ${selectedMember.fullName}.`,
+      });
+
       setMessage("تم تصفير نقاط العضو بنجاح ✅");
       await loadData();
     } catch (err) {

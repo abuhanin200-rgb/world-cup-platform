@@ -7,33 +7,46 @@ import {
   TickerSpeed,
   updateSiteSettings,
 } from "@/lib/siteSettings";
+import { addAdminLog } from "@/lib/adminLogs";
 
-const speedOptions: { value: TickerSpeed; label: string; description: string }[] =
-  [
-    {
-      value: "slow",
-      label: "بطيء",
-      description: "حركة هادئة وبطيئة",
-    },
-    {
-      value: "normal",
-      label: "متوسط",
-      description: "السرعة الافتراضية المناسبة",
-    },
-    {
-      value: "fast",
-      label: "سريع",
-      description: "حركة أسرع قليلًا",
-    },
-    {
-      value: "very_fast",
-      label: "سريع جدًا",
-      description: "حركة عالية ومناسبة للمحتوى الكثير",
-    },
-  ];
+const speedOptions: {
+  value: TickerSpeed;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "slow",
+    label: "بطيء",
+    description: "حركة هادئة وبطيئة",
+  },
+  {
+    value: "normal",
+    label: "متوسط",
+    description: "السرعة الافتراضية المناسبة",
+  },
+  {
+    value: "fast",
+    label: "سريع",
+    description: "حركة أسرع قليلًا",
+  },
+  {
+    value: "very_fast",
+    label: "سريع جدًا",
+    description: "حركة عالية ومناسبة للمحتوى الكثير",
+  },
+];
+
+function getSpeedLabel(speed: TickerSpeed) {
+  return speedOptions.find((option) => option.value === speed)?.label || "متوسط";
+}
 
 export default function AdminSettingsPanel() {
   const [settings, setSettings] = useState<SiteSettings>({
+    latestPredictionsSpeed: "normal",
+    exactHitsSpeed: "normal",
+  });
+
+  const [originalSettings, setOriginalSettings] = useState<SiteSettings>({
     latestPredictionsSpeed: "normal",
     exactHitsSpeed: "normal",
   });
@@ -49,7 +62,9 @@ export default function AdminSettingsPanel() {
       try {
         setLoading(true);
         const data = await getSiteSettings();
+
         setSettings(data);
+        setOriginalSettings(data);
       } catch (err) {
         console.error("فشل تحميل إعدادات الموقع:", err);
         setError("تعذر تحميل إعدادات الشرائط");
@@ -77,7 +92,43 @@ export default function AdminSettingsPanel() {
 
     try {
       const updatedSettings = await updateSiteSettings(settings);
+
+      const latestChanged =
+        originalSettings.latestPredictionsSpeed !==
+        updatedSettings.latestPredictionsSpeed;
+
+      const exactChanged =
+        originalSettings.exactHitsSpeed !== updatedSettings.exactHitsSpeed;
+
+      const changes: string[] = [];
+
+      if (latestChanged) {
+        changes.push(
+          `شريط آخر التوقعات من ${getSpeedLabel(
+            originalSettings.latestPredictionsSpeed
+          )} إلى ${getSpeedLabel(updatedSettings.latestPredictionsSpeed)}`
+        );
+      }
+
+      if (exactChanged) {
+        changes.push(
+          `شريط جابها صح من ${getSpeedLabel(
+            originalSettings.exactHitsSpeed
+          )} إلى ${getSpeedLabel(updatedSettings.exactHitsSpeed)}`
+        );
+      }
+
+      await addAdminLog({
+        action: "update_settings",
+        title: "تعديل إعدادات الشرائط",
+        description:
+          changes.length > 0
+            ? `تم تعديل ${changes.join("، ")}.`
+            : "تم حفظ إعدادات الشرائط بدون تغيير في القيم.",
+      });
+
       setSettings(updatedSettings);
+      setOriginalSettings(updatedSettings);
       setMessage("تم حفظ إعدادات الشرائط بنجاح ✅");
     } catch (err) {
       const errorMessage =
@@ -203,7 +254,7 @@ export default function AdminSettingsPanel() {
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-xs leading-6 text-slate-300">
             بعد الحفظ، الشرائط في الصفحة الرئيسية تقرأ السرعة من Firebase وتتحدث
-            تلقائيًا خلال ثواني.
+            تلقائيًا خلال ثواني، وسيتم تسجيل العملية في تبويب السجل.
           </div>
         </form>
       )}
