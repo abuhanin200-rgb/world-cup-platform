@@ -1,49 +1,119 @@
 "use client";
-import { motion } from "framer-motion";
-import { ShieldCheck, Award, Target, HelpCircle } from "lucide-react";
+
+import { useRouter } from "next/navigation";
 
 export default function RulesPage() {
-  const ruleCards = [
-    {
-      icon: <Target className="w-8 h-8 text-brand-gold" />,
-      title: "التوقع الصحيح تماماً (3 نقاط)",
-      desc: "إذا توقعت نتيجة المباراة بالملي (مثال: توقعت 2-1 وانتهت المباراة فعلياً 2-1)، ستحصل على العلامة الكاملة."
-    },
-    {
-      icon: <Award className="w-8 h-8 text-emerald-500" />,
-      title: "توقع الفائز أو التعادل فقط (1 نقطة)",
-      desc: "إذا أصبت في تحديد الطرف الفائز أو توقعت التعادل ولكن الأرقام اختلفت (مثال: توقعت 1-0 وانتهت 3-1)."
-    },
-    {
-      icon: <ShieldCheck className="w-8 h-8 text-brand-pink" />,
-      title: "إغلاق التوقعات الآلي",
-      desc: "نظام الحماية يغلق إمكانية إدخال أو تعديل التوقعات تلقائياً قبل انطلاق صافرة المباراة بـ 15 دقيقة بدون أي تدخل بشري."
-    }
-  ];
+  const router = useRouter();
 
   return (
-    <div className="flex flex-col gap-8 max-w-4xl mx-auto">
-      <div className="text-center py-6 bg-gradient-to-b from-brand-purple/10 to-transparent rounded-3xl p-6">
-        <HelpCircle className="w-12 h-12 text-brand-purple mx-auto mb-2 animate-pulse" />
-        <h1 className="text-2xl font-black text-slate-900 dark:text-white">الشروط والقوانين الحاكمة للتحدي</h1>
-        <p className="text-xs text-slate-400 font-bold mt-1">يرجى قراءة القواعد بعناية لضمان المنافسة الشريفة بين جميع الجماهير</p>
-      </div>
+    <main
+      dir="rtl"
+      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+    >
+      <div className="mx-auto max-w-4xl">
+        <header className="mb-5 rounded-3xl border border-white/10 bg-white/10 p-5 text-center shadow-2xl md:p-6">
+          <div className="mx-auto mb-4 h-16 w-16 overflow-hidden rounded-3xl border border-white/20 bg-white/10">
+            <img
+              src="/wc2026-logo.png"
+              alt="شعار منصة توقعات كأس العالم 2026"
+              className="h-full w-full object-contain p-2"
+            />
+          </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {ruleCards.map((rule, idx) => (
-          <motion.div 
-            key={idx}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center text-center gap-4"
+          <h1 className="text-2xl font-black md:text-4xl">
+            قوانين تحدي التوقعات
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
+            هنا توضيح طريقة المشاركة واحتساب النقاط في منصة توقعات كأس العالم
+            2026.
+          </p>
+        </header>
+
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-5 text-center shadow-xl">
+            <div className="text-4xl">🎯</div>
+            <h2 className="mt-3 text-xl font-black text-emerald-200">
+              بالملي
+            </h2>
+            <p className="mt-2 text-4xl font-black text-emerald-300">+3</p>
+            <p className="mt-3 text-sm leading-6 text-emerald-100">
+              إذا توقعت النتيجة الصحيحة كاملة مثل 2 - 1.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5 text-center shadow-xl">
+            <div className="text-4xl">🏆</div>
+            <h2 className="mt-3 text-xl font-black text-amber-200">
+              الفائز الصحيح
+            </h2>
+            <p className="mt-2 text-4xl font-black text-amber-300">+1</p>
+            <p className="mt-3 text-sm leading-6 text-amber-100">
+              إذا توقعت الفائز أو التعادل بشكل صحيح بدون تطابق النتيجة.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-red-400/20 bg-red-500/10 p-5 text-center shadow-xl">
+            <div className="text-4xl">❌</div>
+            <h2 className="mt-3 text-xl font-black text-red-100">
+              توقع خاطئ
+            </h2>
+            <p className="mt-2 text-4xl font-black text-red-300">+0</p>
+            <p className="mt-3 text-sm leading-6 text-red-100">
+              إذا كان توقع الفائز أو التعادل غير صحيح.
+            </p>
+          </div>
+        </section>
+
+        <section className="mt-5 rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
+          <h2 className="mb-4 text-xl font-black">شروط المشاركة</h2>
+
+          <div className="space-y-3 text-sm leading-7 text-slate-200 md:text-base">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+              ✅ يجب تسجيل الدخول قبل اعتماد التوقع.
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+              ✅ كل عضو يملك توقعًا واحدًا فقط لكل مباراة.
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+              ✅ بعد اعتماد التوقع لا يمكن تعديله.
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+              ✅ التوقع يكون متاحًا قبل بداية المباراة، وقد يُغلق تلقائيًا بعد
+              بداية المباراة.
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+              ✅ ترتيب لوحة الصدارة يعتمد على النقاط أولًا، ثم عدد التوقعات
+              الصحيحة، ثم عدد التوقعات الأقل عند التعادل.
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-5 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-5 text-center shadow-2xl">
+          <h2 className="text-xl font-black text-amber-200">
+            الهدف من التحدي
+          </h2>
+
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-amber-100 md:text-base">
+            التحدي للتسلية والحماس بين الأصدقاء، ونهاية البطولة نشوف من صاحب
+            أقوى توقعات وأفضل قراءة للنتائج.
+          </p>
+        </section>
+
+        <div className="mt-6 flex justify-center">
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="rounded-xl bg-amber-400 px-6 py-3 text-sm font-black text-slate-950 hover:bg-amber-300"
           >
-            <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl">{rule.icon}</div>
-            <h3 className="font-black text-sm text-slate-900 dark:text-white">{rule.title}</h3>
-            <p className="text-xs text-slate-400 leading-relaxed font-medium">{rule.desc}</p>
-          </motion.div>
-        ))}
+            العودة للرئيسية
+          </button>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

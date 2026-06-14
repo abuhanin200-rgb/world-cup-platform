@@ -122,6 +122,15 @@ export default function HomePage() {
               <strong>{user.points}</strong>
             </div>
           )}
+
+          <div className="mt-3">
+            <button
+              onClick={() => router.push("/rules")}
+              className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100 hover:bg-amber-400/20 md:text-sm"
+            >
+              📘 قوانين التحدي وطريقة احتساب النقاط
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 md:mt-5">
