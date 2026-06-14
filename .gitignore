@@ -41,3 +41,10 @@ yarn-error.log*
 next-env.d.ts
 serviceAccountKey.json
 users-backup-*.json
+# Firebase Admin secrets
+serviceAccountKey.json
+*.service-account.json
+
+# Environment files
+.env.local
+.env.*.local
