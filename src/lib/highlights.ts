@@ -1,11 +1,4 @@
-import {
-  collection,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 
 export type HomeHighlightUser = {
@@ -52,6 +45,21 @@ function toText(value: unknown) {
   return String(value || "").trim();
 }
 
+function getTimeValue(...dates: unknown[]) {
+  for (const dateValue of dates) {
+    const text = toText(dateValue);
+    if (!text) continue;
+
+    const time = new Date(text).getTime();
+
+    if (Number.isFinite(time)) {
+      return time;
+    }
+  }
+
+  return 0;
+}
+
 function mapHighlightUser(
   id: string,
   data: Record<string, unknown>
@@ -75,33 +83,26 @@ function mapHighlightUser(
 async function getUsersForHighlights() {
   const snapshot = await getDocs(collection(db, "users"));
 
-  return snapshot.docs.map((docSnap) =>
-    mapHighlightUser(docSnap.id, docSnap.data())
-  );
+  return snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => mapHighlightUser(docSnap.id, docSnap.data()));
 }
 
 async function getExactHits(): Promise<ExactHit[]> {
-  const predictionsRef = collection(db, "predictions");
-
-  const q = query(
-    predictionsRef,
-    where("isCalculated", "==", true),
-    where("resultType", "==", "exact"),
-    orderBy("calculatedAt", "desc"),
-    limit(8)
-  );
-
-  const snapshot = await getDocs(q);
-
-  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const snapshot = await getDocs(collection(db, "predictions"));
 
   return snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => {
       const data = docSnap.data();
 
+      const points = toNumber(data.points);
+      const resultType = toText(data.resultType);
+      const isCalculated = Boolean(data.isCalculated);
+
       return {
         id: docSnap.id,
+
         userId: toText(data.userId),
         userName: toText(data.userName) || "عضو",
 
@@ -113,18 +114,47 @@ async function getExactHits(): Promise<ExactHit[]> {
         homeScore: toNumber(data.homeScore),
         awayScore: toNumber(data.awayScore),
 
-        calculatedAt: toText(data.calculatedAt),
+        calculatedAt:
+          toText(data.calculatedAt) ||
+          toText(data.updatedAt) ||
+          toText(data.createdAt),
+
+        points,
+        resultType,
+        isCalculated,
+
+        timeValue: getTimeValue(data.calculatedAt, data.updatedAt, data.createdAt),
       };
     })
-    .filter((hit) => {
-      if (!hit.calculatedAt) return false;
+    .filter((prediction) => {
+      const hasMatchData =
+        prediction.userName &&
+        prediction.homeTeamName &&
+        prediction.awayTeamName;
 
-      const calculatedTime = new Date(hit.calculatedAt).getTime();
+      const isExact =
+        prediction.resultType === "exact" ||
+        prediction.points === 3;
 
-      if (!Number.isFinite(calculatedTime)) return false;
+      return hasMatchData && prediction.isCalculated && isExact;
+    })
+    .sort((a, b) => b.timeValue - a.timeValue)
+    .slice(0, 12)
+    .map((prediction) => ({
+      id: prediction.id,
+      userId: prediction.userId,
+      userName: prediction.userName,
 
-      return calculatedTime >= oneDayAgo;
-    });
+      homeTeamName: prediction.homeTeamName,
+      homeTeamEmoji: prediction.homeTeamEmoji,
+      awayTeamName: prediction.awayTeamName,
+      awayTeamEmoji: prediction.awayTeamEmoji,
+
+      homeScore: prediction.homeScore,
+      awayScore: prediction.awayScore,
+
+      calculatedAt: prediction.calculatedAt,
+    }));
 }
 
 export async function getHomeHighlights(): Promise<HomeHighlightsData> {
@@ -133,7 +163,9 @@ export async function getHomeHighlights(): Promise<HomeHighlightsData> {
     getExactHits(),
   ]);
 
-  const activeUsers = users.filter((user) => user.total > 0);
+  const activeUsers = users.filter((user) => {
+    return user.points > 0 || user.total > 0 || user.correct > 0;
+  });
 
   const predictionKing =
     [...activeUsers].sort((a, b) => {
@@ -146,8 +178,11 @@ export async function getHomeHighlights(): Promise<HomeHighlightsData> {
   const bestStreakUser =
     [...activeUsers].sort((a, b) => {
       if (b.bestStreak !== a.bestStreak) return b.bestStreak - a.bestStreak;
-      if (b.points !== a.points) return b.points - a.points;
+      if (b.currentStreak !== a.currentStreak) {
+        return b.currentStreak - a.currentStreak;
+      }
       if (b.correct !== a.correct) return b.correct - a.correct;
+      if (b.points !== a.points) return b.points - a.points;
       return a.fullName.localeCompare(b.fullName, "ar");
     })[0] || null;
 

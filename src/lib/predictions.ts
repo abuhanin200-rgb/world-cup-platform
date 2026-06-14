@@ -3,7 +3,6 @@ import {
   collection,
   getDocs,
   limit,
-  orderBy,
   query,
   serverTimestamp,
   where,
@@ -64,6 +63,48 @@ function validateScore(score: number) {
   return Number.isInteger(score) && score >= 0 && score <= 30;
 }
 
+function toText(value: unknown) {
+  return String(value || "").trim();
+}
+
+function toNumber(value: unknown) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function getTimeValue(createdAt?: string) {
+  if (!createdAt) return 0;
+
+  const time = new Date(createdAt).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+}
+
+function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
+  return {
+    id,
+
+    userId: toText(data.userId),
+    userName: toText(data.userName) || "عضو",
+
+    matchId: toText(data.matchId),
+
+    homeTeamName: toText(data.homeTeamName),
+    homeTeamEmoji: toText(data.homeTeamEmoji),
+    awayTeamName: toText(data.awayTeamName),
+    awayTeamEmoji: toText(data.awayTeamEmoji),
+
+    homeScore: toNumber(data.homeScore),
+    awayScore: toNumber(data.awayScore),
+
+    points: toNumber(data.points),
+    isCalculated: Boolean(data.isCalculated),
+
+    createdAt: toText(data.createdAt),
+    createdAtServer: data.createdAtServer,
+  };
+}
+
 export async function getUserPredictionForMatch(
   userId: string,
   matchId: string
@@ -85,10 +126,7 @@ export async function getUserPredictionForMatch(
 
   const docSnap = snapshot.docs[0];
 
-  return {
-    id: docSnap.id,
-    ...(docSnap.data() as Omit<Prediction, "id">),
-  };
+  return mapPrediction(docSnap.id, docSnap.data());
 }
 
 export async function submitPrediction(input: SubmitPredictionInput) {
@@ -117,7 +155,7 @@ export async function submitPrediction(input: SubmitPredictionInput) {
 
   const predictionData = {
     userId: input.userId,
-    userName: input.userName,
+    userName: input.userName || "عضو",
 
     matchId: input.matchId,
 
@@ -130,10 +168,16 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     awayScore: input.awayScore,
 
     points: 0,
+    resultType: "",
     isCalculated: false,
+
+    actualHomeScore: null,
+    actualAwayScore: null,
+    calculatedAt: null,
 
     createdAt: now,
     createdAtServer: serverTimestamp(),
+    updatedAt: now,
   };
 
   const docRef = await addDoc(collection(db, "predictions"), predictionData);
@@ -147,31 +191,30 @@ export async function submitPrediction(input: SubmitPredictionInput) {
 export async function getLatestPredictions(
   maxItems = 12
 ): Promise<LatestPrediction[]> {
-  const predictionsRef = collection(db, "predictions");
-
-  const q = query(
-    predictionsRef,
-    orderBy("createdAt", "desc"),
-    limit(maxItems)
-  );
-
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocs(collection(db, "predictions"));
 
   return snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => {
-      const data = docSnap.data() as Omit<Prediction, "id">;
-
-      return {
-        id: docSnap.id,
-        userName: data.userName,
-        homeTeamName: data.homeTeamName,
-        homeTeamEmoji: data.homeTeamEmoji,
-        awayTeamName: data.awayTeamName,
-        awayTeamEmoji: data.awayTeamEmoji,
-        homeScore: data.homeScore,
-        awayScore: data.awayScore,
-        createdAt: data.createdAt,
-      };
-    });
+    .map((docSnap) => mapPrediction(docSnap.id, docSnap.data()))
+    .filter((prediction) => {
+      return (
+        prediction.userName &&
+        prediction.matchId &&
+        prediction.homeTeamName &&
+        prediction.awayTeamName
+      );
+    })
+    .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
+    .slice(0, maxItems)
+    .map((prediction) => ({
+      id: prediction.id,
+      userName: prediction.userName,
+      homeTeamName: prediction.homeTeamName,
+      homeTeamEmoji: prediction.homeTeamEmoji,
+      awayTeamName: prediction.awayTeamName,
+      awayTeamEmoji: prediction.awayTeamEmoji,
+      homeScore: prediction.homeScore,
+      awayScore: prediction.awayScore,
+      createdAt: prediction.createdAt,
+    }));
 }
