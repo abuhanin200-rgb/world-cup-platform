@@ -9,6 +9,7 @@ import {
 } from "@/lib/siteSettings";
 
 function getSpeedLabel(speed: string) {
+  if (speed === "very_slow") return "بطيء جدًا";
   if (speed === "slow") return "بطيء";
   if (speed === "normal") return "متوسط";
   if (speed === "fast") return "سريع";
@@ -106,6 +107,14 @@ export default function LatestPredictionsTicker() {
     return repeated;
   }, [predictions]);
 
+  function pauseTicker() {
+    setIsPaused(true);
+  }
+
+  function resumeTicker() {
+    setIsPaused(false);
+  }
+
   function renderPredictionCard(prediction: LatestPrediction, index: number) {
     return (
       <div
@@ -181,14 +190,14 @@ export default function LatestPredictionsTicker() {
       <div
         dir="ltr"
         className="latest-predictions-wrapper relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 py-3"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        onTouchStart={() => setIsPaused(true)}
-        onTouchEnd={() => setIsPaused(false)}
-        onTouchCancel={() => setIsPaused(false)}
-        onPointerDown={() => setIsPaused(true)}
-        onPointerUp={() => setIsPaused(false)}
-        onPointerCancel={() => setIsPaused(false)}
+        onMouseEnter={pauseTicker}
+        onMouseLeave={resumeTicker}
+        onTouchStart={pauseTicker}
+        onTouchEnd={resumeTicker}
+        onTouchCancel={resumeTicker}
+        onPointerDown={pauseTicker}
+        onPointerUp={resumeTicker}
+        onPointerCancel={resumeTicker}
       >
         <div
           className="latest-predictions-marquee flex w-max gap-3 whitespace-nowrap"

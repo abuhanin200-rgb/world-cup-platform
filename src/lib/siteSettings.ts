@@ -1,7 +1,12 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "./firebase";
 
-export type TickerSpeed = "slow" | "normal" | "fast" | "very_fast";
+export type TickerSpeed =
+  | "very_slow"
+  | "slow"
+  | "normal"
+  | "fast"
+  | "very_fast";
 
 export type SiteSettings = {
   latestPredictionsSpeed: TickerSpeed;
@@ -25,6 +30,7 @@ const defaultSettings: SiteSettings = {
 };
 
 export function getTickerDuration(speed: TickerSpeed) {
+  if (speed === "very_slow") return 90;
   if (speed === "slow") return 55;
   if (speed === "normal") return 35;
   if (speed === "fast") return 20;
@@ -35,6 +41,7 @@ export function getTickerDuration(speed: TickerSpeed) {
 
 function normalizeTickerSpeed(value: unknown): TickerSpeed {
   if (
+    value === "very_slow" ||
     value === "slow" ||
     value === "normal" ||
     value === "fast" ||
