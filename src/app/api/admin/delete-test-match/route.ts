@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebaseAdmin";
 
 type UserStats = {
@@ -20,14 +19,20 @@ function toText(value: unknown) {
   return String(value || "").trim();
 }
 
-async function deleteCollectionByQuery(
-  collectionName: string,
-  fieldName: string,
-  fieldValue: string
-) {
+function getTimeValue(value: unknown) {
+  const text = toText(value);
+
+  if (!text) return 0;
+
+  const time = new Date(text).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+}
+
+async function deletePredictionsByMatchId(matchId: string) {
   const snapshot = await adminDb
-    .collection(collectionName)
-    .where(fieldName, "==", fieldValue)
+    .collection("predictions")
+    .where("matchId", "==", matchId)
     .get();
 
   let deletedCount = 0;
@@ -35,6 +40,8 @@ async function deleteCollectionByQuery(
   let operationCount = 0;
 
   for (const docSnap of snapshot.docs) {
+    if (docSnap.id === "_init") continue;
+
     batch.delete(docSnap.ref);
     deletedCount += 1;
     operationCount += 1;
@@ -89,26 +96,22 @@ async function rebuildAllUserStats() {
     })
     .filter((prediction) => prediction.userId && prediction.isCalculated)
     .sort((a, b) => {
-      const aTime = new Date(a.calculatedAt || a.createdAt).getTime();
-      const bTime = new Date(b.calculatedAt || b.createdAt).getTime();
-
       return (
-        (Number.isFinite(aTime) ? aTime : 0) -
-        (Number.isFinite(bTime) ? bTime : 0)
+        getTimeValue(a.calculatedAt || a.createdAt) -
+        getTimeValue(b.calculatedAt || b.createdAt)
       );
     });
 
   for (const prediction of calculatedPredictions) {
     const currentStats =
-      statsByUserId.get(prediction.userId) ||
-      ({
+      statsByUserId.get(prediction.userId) || {
         points: 0,
         total: 0,
         correct: 0,
         wrong: 0,
         currentStreak: 0,
         bestStreak: 0,
-      } satisfies UserStats);
+      };
 
     currentStats.points += prediction.points;
     currentStats.total += 1;
@@ -132,14 +135,16 @@ async function rebuildAllUserStats() {
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => {
       const data = docSnap.data();
-      const stats = statsByUserId.get(docSnap.id) || {
-        points: 0,
-        total: 0,
-        correct: 0,
-        wrong: 0,
-        currentStreak: 0,
-        bestStreak: 0,
-      };
+
+      const stats =
+        statsByUserId.get(docSnap.id) || {
+          points: 0,
+          total: 0,
+          correct: 0,
+          wrong: 0,
+          currentStreak: 0,
+          bestStreak: 0,
+        };
 
       return {
         id: docSnap.id,
@@ -160,7 +165,9 @@ async function rebuildAllUserStats() {
   let batch = adminDb.batch();
   let operationCount = 0;
 
-  usersForRanking.forEach((user, index) => {
+  for (let index = 0; index < usersForRanking.length; index += 1) {
+    const user = usersForRanking[index];
+
     batch.set(
       user.ref,
       {
@@ -178,7 +185,13 @@ async function rebuildAllUserStats() {
     );
 
     operationCount += 1;
-  });
+
+    if (operationCount >= 450) {
+      await batch.commit();
+      batch = adminDb.batch();
+      operationCount = 0;
+    }
+  }
 
   if (operationCount > 0) {
     await batch.commit();
@@ -196,7 +209,10 @@ export async function POST(request: NextRequest) {
 
     if (!matchId) {
       return NextResponse.json(
-        { ok: false, message: "معرّف المباراة غير موجود" },
+        {
+          ok: false,
+          message: "معرّف المباراة غير موجود",
+        },
         { status: 400 }
       );
     }
@@ -216,37 +232,51 @@ export async function POST(request: NextRequest) {
 
     if (!matchSnap.exists) {
       return NextResponse.json(
-        { ok: false, message: "المباراة غير موجودة" },
+        {
+          ok: false,
+          message: "المباراة غير موجودة أو تم حذفها مسبقًا",
+        },
         { status: 404 }
       );
     }
 
     const matchData = matchSnap.data() || {};
 
-    const deletedPredictionsCount = await deleteCollectionByQuery(
-      "predictions",
-      "matchId",
-      matchId
-    );
+    if (matchData.isActive === true) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "لا يمكن حذف مباراة ظاهرة للجمهور. أخفِ المباراة أولًا ثم احذفها.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const deletedPredictionsCount = await deletePredictionsByMatchId(matchId);
 
     await matchRef.delete();
 
     const rebuiltUsersCount = await rebuildAllUserStats();
 
-    await adminDb.collection("admin_logs").add({
-      action: "other",
-      title: "حذف مباراة اختبار",
-      description: `تم حذف مباراة اختبار وكل توقعاتها ثم إعادة بناء الإحصائيات.`,
-      metadata: {
-        matchId,
-        homeTeamName: matchData.homeTeamName || "",
-        awayTeamName: matchData.awayTeamName || "",
-        deletedPredictionsCount,
-        rebuiltUsersCount,
-      },
-      createdAt: new Date().toISOString(),
-      createdAtServer: FieldValue.serverTimestamp(),
-    });
+    try {
+      await adminDb.collection("admin_logs").add({
+        action: "other",
+        title: "حذف مباراة اختبار",
+        description:
+          "تم حذف مباراة اختبار وكل توقعاتها ثم إعادة بناء الإحصائيات.",
+        metadata: {
+          matchId,
+          homeTeamName: matchData.homeTeamName || "",
+          awayTeamName: matchData.awayTeamName || "",
+          deletedPredictionsCount,
+          rebuiltUsersCount,
+        },
+        createdAt: new Date().toISOString(),
+      });
+    } catch (logError) {
+      console.error("Admin log after delete test match failed:", logError);
+    }
 
     return NextResponse.json({
       ok: true,
@@ -257,10 +287,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Delete test match error:", error);
 
+    const message =
+      error instanceof Error
+        ? `حدث خطأ أثناء حذف مباراة الاختبار: ${error.message}`
+        : "حدث خطأ أثناء حذف مباراة الاختبار";
+
     return NextResponse.json(
       {
         ok: false,
-        message: "حدث خطأ أثناء حذف مباراة الاختبار",
+        message,
       },
       { status: 500 }
     );

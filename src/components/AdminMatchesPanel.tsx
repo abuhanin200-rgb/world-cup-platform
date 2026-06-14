@@ -14,7 +14,7 @@ type AdminMatchesPanelProps = {
 
 const MATCHES_PER_PAGE = 12;
 
-type MatchFilter = "all" | "scheduled" | "finished";
+type MatchFilter = "all" | "scheduled" | "hidden";
 
 export default function AdminMatchesPanel({
   matches,
@@ -50,8 +50,10 @@ export default function AdminMatchesPanel({
 
       const matchesFilter =
         filter === "all" ||
-        (filter === "scheduled" && match.status !== "finished") ||
-        (filter === "finished" && match.status === "finished");
+        (filter === "scheduled" &&
+          match.status !== "finished" &&
+          match.isActive) ||
+        (filter === "hidden" && !match.isActive);
 
       return matchesSearch && matchesFilter;
     });
@@ -139,6 +141,43 @@ export default function AdminMatchesPanel({
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "تعذر تعديل المباراة";
+      setError(errorMessage);
+    } finally {
+      setSavingMatchId("");
+    }
+  }
+
+  async function handleToggleMatch(match: Match) {
+    setMessage("");
+    setError("");
+    setSavingMatchId(match.id);
+
+    const nextIsActive = !match.isActive;
+
+    try {
+      await updateAdminMatch({
+        matchId: match.id,
+        matchDate: match.matchDate,
+        matchTime: match.matchTime,
+        isActive: nextIsActive,
+      });
+
+      await addAdminLog({
+        action: "other",
+        title: nextIsActive ? "تفعيل مباراة" : "إخفاء مباراة",
+        description: `تم ${nextIsActive ? "تفعيل" : "إخفاء"} مباراة ${
+          match.homeTeamName
+        } ضد ${match.awayTeamName}.`,
+      });
+
+      setMessage(nextIsActive ? "تم تفعيل المباراة ✅" : "تم إخفاء المباراة ✅");
+
+      if (onChanged) {
+        await onChanged();
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "تعذر تحديث حالة المباراة";
       setError(errorMessage);
     } finally {
       setSavingMatchId("");
@@ -308,14 +347,14 @@ export default function AdminMatchesPanel({
 
             <button
               type="button"
-              onClick={() => changeFilter("finished")}
+              onClick={() => changeFilter("hidden")}
               className={`rounded-xl px-4 py-3 text-sm font-black transition ${
-                filter === "finished"
-                  ? "bg-emerald-400 text-slate-950"
+                filter === "hidden"
+                  ? "bg-red-400 text-slate-950"
                   : "border border-white/10 bg-slate-950/60 text-white hover:bg-white/10"
               }`}
             >
-              المحتسبة
+              المخفية
             </button>
           </div>
         </div>
@@ -435,6 +474,7 @@ export default function AdminMatchesPanel({
                         <span className="font-bold">
                           تفعيل المباراة للجمهور
                         </span>
+
                         <input
                           type="checkbox"
                           checked={editIsActive}
@@ -469,10 +509,15 @@ export default function AdminMatchesPanel({
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => startEdit(match)}
-                        className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-black text-amber-200 hover:bg-amber-400/20"
+                        onClick={() => handleToggleMatch(match)}
+                        disabled={savingMatchId === match.id}
+                        className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-black text-amber-200 hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        تعديل
+                        {savingMatchId === match.id
+                          ? "جاري التحديث..."
+                          : match.isActive
+                          ? "تعطيل"
+                          : "تفعيل"}
                       </button>
 
                       <button
@@ -482,6 +527,14 @@ export default function AdminMatchesPanel({
                         className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-black text-red-200 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {deletingMatchId === match.id ? "جاري الحذف..." : "حذف"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => startEdit(match)}
+                        className="col-span-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/15"
+                      >
+                        تعديل التاريخ والوقت
                       </button>
 
                       {!match.isActive && (
