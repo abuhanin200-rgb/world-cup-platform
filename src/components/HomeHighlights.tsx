@@ -10,9 +10,13 @@ import { getSiteSettings, getTickerDuration } from "@/lib/siteSettings";
 
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl md:p-5">
-      <div className="text-lg font-black text-slate-200">{title}</div>
-      <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">{text}</p>
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center shadow-xl">
+      <div className="text-sm font-black text-slate-200 md:text-base">
+        {title}
+      </div>
+      <p className="mt-1 text-[11px] leading-5 text-slate-300 md:text-xs">
+        {text}
+      </p>
     </div>
   );
 }
@@ -34,28 +38,28 @@ function HighlightCard({
     return (
       <EmptyCard
         title={title}
-        text="لم تظهر الإحصائية بعد. تبدأ بعد احتساب أول النتائج."
+        text="تظهر بعد احتساب أول النتائج."
       />
     );
   }
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl md:p-5">
-      <h2 className="text-lg font-black md:text-xl">{title}</h2>
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center shadow-xl">
+      <h2 className="text-sm font-black md:text-base">{title}</h2>
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-        <div className="text-3xl">{user.teamEmoji || "🏳️"}</div>
+      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 p-3">
+        <div className="text-2xl">{user.teamEmoji || "🏳️"}</div>
 
-        <div className="mt-2 text-xl font-black text-white">
+        <div className="mt-1 truncate text-sm font-black text-white md:text-base">
           {user.fullName}
         </div>
 
-        <div className="mt-1 text-xs text-slate-300">
+        <div className="mt-0.5 truncate text-[10px] text-slate-300 md:text-xs">
           {user.favoriteTeam || "بدون منتخب"}
         </div>
 
         <div
-          className={`mt-4 rounded-2xl px-4 py-3 text-sm font-black ${accentClass}`}
+          className={`mt-2 rounded-xl px-3 py-2 text-xs font-black md:text-sm ${accentClass}`}
         >
           {valueLabel}: {value}
         </div>
@@ -94,18 +98,15 @@ export default function HomeHighlights() {
 
   if (loading) {
     return (
-      <section className="mt-5 grid grid-cols-1 gap-4 md:mt-6 md:grid-cols-2">
-        <EmptyCard title="🏆 ملك التوقعات" text="جاري تحميل الإحصائيات..." />
-        <EmptyCard
-          title="🔥 أفضل سلسلة صحيحة"
-          text="جاري تحميل الإحصائيات..."
-        />
+      <section className="mt-4 grid grid-cols-2 gap-3 md:mt-5 md:gap-4">
+        <EmptyCard title="🏆 ملك التوقعات" text="جاري التحميل..." />
+        <EmptyCard title="🔥 أفضل سلسلة" text="جاري التحميل..." />
       </section>
     );
   }
 
   return (
-    <section className="mt-5 grid grid-cols-1 gap-4 md:mt-6 md:grid-cols-2">
+    <section className="mt-4 grid grid-cols-2 gap-3 md:mt-5 md:gap-4">
       <HighlightCard
         title="🏆 ملك التوقعات"
         user={predictionKing}
@@ -115,9 +116,9 @@ export default function HomeHighlights() {
       />
 
       <HighlightCard
-        title="🔥 أفضل سلسلة صحيحة"
+        title="🔥 أفضل سلسلة"
         user={bestStreakUser}
-        valueLabel="أفضل سلسلة"
+        valueLabel="السلسلة"
         value={bestStreakUser?.bestStreak || 0}
         accentClass="bg-emerald-400 text-slate-950"
       />
@@ -193,13 +194,9 @@ export function ExactHitsTicker() {
   return (
     <section className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 md:mt-6">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-black text-emerald-200">
-          🎯 جابها صح
-        </h2>
+        <h2 className="text-sm font-black text-emerald-200">🎯 جابها صح</h2>
 
-        <span className="text-[11px] text-emerald-100/80">
-          آخر 24 ساعة
-        </span>
+        <span className="text-[11px] text-emerald-100/80">آخر 24 ساعة</span>
       </div>
 
       <div className="exact-hits-window relative overflow-hidden">

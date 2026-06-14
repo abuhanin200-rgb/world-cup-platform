@@ -9,6 +9,9 @@ import {
 } from "@/lib/siteSettings";
 import { addAdminLog } from "@/lib/adminLogs";
 
+const defaultMaintenanceMessage =
+  "الموقع مغلق مؤقتًا للصيانة بسبب بعض المشاكل التقنية وتضخم البيانات. نعتذر لكم، وراح نرجع لكم قريب بإذن الله.";
+
 const speedOptions: {
   value: TickerSpeed;
   label: string;
@@ -44,11 +47,15 @@ export default function AdminSettingsPanel() {
   const [settings, setSettings] = useState<SiteSettings>({
     latestPredictionsSpeed: "normal",
     exactHitsSpeed: "normal",
+    maintenanceMode: false,
+    maintenanceMessage: defaultMaintenanceMessage,
   });
 
   const [originalSettings, setOriginalSettings] = useState<SiteSettings>({
     latestPredictionsSpeed: "normal",
     exactHitsSpeed: "normal",
+    maintenanceMode: false,
+    maintenanceMessage: defaultMaintenanceMessage,
   });
 
   const [loading, setLoading] = useState(true);
@@ -67,7 +74,7 @@ export default function AdminSettingsPanel() {
         setOriginalSettings(data);
       } catch (err) {
         console.error("فشل تحميل إعدادات الموقع:", err);
-        setError("تعذر تحميل إعدادات الشرائط");
+        setError("تعذر تحميل إعدادات الموقع");
       } finally {
         setLoading(false);
       }
@@ -76,10 +83,24 @@ export default function AdminSettingsPanel() {
     loadSettings();
   }, []);
 
-  function updateField(field: keyof SiteSettings, value: TickerSpeed) {
+  function updateSpeedField(field: keyof SiteSettings, value: TickerSpeed) {
     setSettings((current) => ({
       ...current,
       [field]: value,
+    }));
+  }
+
+  function updateMaintenanceMode(value: boolean) {
+    setSettings((current) => ({
+      ...current,
+      maintenanceMode: value,
+    }));
+  }
+
+  function updateMaintenanceMessage(value: string) {
+    setSettings((current) => ({
+      ...current,
+      maintenanceMessage: value,
     }));
   }
 
@@ -100,6 +121,13 @@ export default function AdminSettingsPanel() {
       const exactChanged =
         originalSettings.exactHitsSpeed !== updatedSettings.exactHitsSpeed;
 
+      const maintenanceModeChanged =
+        originalSettings.maintenanceMode !== updatedSettings.maintenanceMode;
+
+      const maintenanceMessageChanged =
+        originalSettings.maintenanceMessage !==
+        updatedSettings.maintenanceMessage;
+
       const changes: string[] = [];
 
       if (latestChanged) {
@@ -118,21 +146,33 @@ export default function AdminSettingsPanel() {
         );
       }
 
+      if (maintenanceModeChanged) {
+        changes.push(
+          updatedSettings.maintenanceMode
+            ? "تم تفعيل وضع الصيانة"
+            : "تم إيقاف وضع الصيانة"
+        );
+      }
+
+      if (maintenanceMessageChanged) {
+        changes.push("تم تعديل رسالة الصيانة");
+      }
+
       await addAdminLog({
         action: "update_settings",
-        title: "تعديل إعدادات الشرائط",
+        title: "تعديل إعدادات الموقع",
         description:
           changes.length > 0
             ? `تم تعديل ${changes.join("، ")}.`
-            : "تم حفظ إعدادات الشرائط بدون تغيير في القيم.",
+            : "تم حفظ إعدادات الموقع بدون تغيير في القيم.",
       });
 
       setSettings(updatedSettings);
       setOriginalSettings(updatedSettings);
-      setMessage("تم حفظ إعدادات الشرائط بنجاح ✅");
+      setMessage("تم حفظ إعدادات الموقع بنجاح ✅");
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : "تعذر حفظ إعدادات الشرائط";
+        err instanceof Error ? err.message : "تعذر حفظ إعدادات الموقع";
       setError(errorMessage);
     } finally {
       setSaving(false);
@@ -142,9 +182,9 @@ export default function AdminSettingsPanel() {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-6">
       <div className="mb-5">
-        <h2 className="text-2xl font-black">إعدادات الشرائط</h2>
+        <h2 className="text-2xl font-black">إعدادات الموقع</h2>
         <p className="mt-2 text-sm text-slate-300">
-          التحكم بسرعة شريط آخر التوقعات وشريط جابها صح.
+          التحكم بسرعة الشرائط ووضع الصيانة ورسالة الإغلاق المؤقت.
         </p>
       </div>
 
@@ -170,6 +210,59 @@ export default function AdminSettingsPanel() {
         </div>
       ) : (
         <form onSubmit={handleSaveSettings} className="space-y-5">
+          <div className="rounded-3xl border border-red-400/20 bg-red-500/10 p-4 md:p-5">
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="text-xl font-black text-red-100">
+                  وضع الصيانة
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-red-100/80">
+                  عند التفعيل تظهر رسالة إغلاق مؤقت للزوار بدل الصفحة الرئيسية.
+                </p>
+              </div>
+
+              <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3">
+                <span className="text-sm font-black">
+                  {settings.maintenanceMode ? "مفعل" : "غير مفعل"}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={settings.maintenanceMode}
+                  onChange={(event) =>
+                    updateMaintenanceMode(event.target.checked)
+                  }
+                  className="h-5 w-5"
+                />
+              </label>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-bold">
+                رسالة الصيانة
+              </label>
+              <textarea
+                value={settings.maintenanceMessage}
+                onChange={(event) =>
+                  updateMaintenanceMessage(event.target.value)
+                }
+                rows={4}
+                className="w-full resize-none rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm leading-7 text-slate-950 outline-none focus:border-red-400"
+                placeholder="اكتب رسالة تظهر للزوار أثناء إغلاق الموقع"
+                required
+              />
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+              <div className="mb-2 text-xs font-black text-slate-300">
+                معاينة رسالة الصيانة
+              </div>
+
+              <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm leading-7 text-red-100">
+                {settings.maintenanceMessage || defaultMaintenanceMessage}
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
               <label className="mb-3 block text-sm font-black">
@@ -199,7 +292,10 @@ export default function AdminSettingsPanel() {
                       value={option.value}
                       checked={settings.latestPredictionsSpeed === option.value}
                       onChange={() =>
-                        updateField("latestPredictionsSpeed", option.value)
+                        updateSpeedField(
+                          "latestPredictionsSpeed",
+                          option.value
+                        )
                       }
                       className="h-4 w-4"
                     />
@@ -235,7 +331,9 @@ export default function AdminSettingsPanel() {
                       name="exactHitsSpeed"
                       value={option.value}
                       checked={settings.exactHitsSpeed === option.value}
-                      onChange={() => updateField("exactHitsSpeed", option.value)}
+                      onChange={() =>
+                        updateSpeedField("exactHitsSpeed", option.value)
+                      }
                       className="h-4 w-4"
                     />
                   </label>
@@ -249,12 +347,11 @@ export default function AdminSettingsPanel() {
             disabled={saving}
             className="w-full rounded-xl bg-amber-400 px-4 py-3 font-black text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "جاري حفظ الإعدادات..." : "حفظ إعدادات الشرائط"}
+            {saving ? "جاري حفظ الإعدادات..." : "حفظ إعدادات الموقع"}
           </button>
 
           <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-xs leading-6 text-slate-300">
-            بعد الحفظ، الشرائط في الصفحة الرئيسية تقرأ السرعة من Firebase وتتحدث
-            تلقائيًا خلال ثواني، وسيتم تسجيل العملية في تبويب السجل.
+            يتم حفظ الإعدادات في Firebase، وتسجيل أي تغيير داخل تبويب السجل.
           </div>
         </form>
       )}

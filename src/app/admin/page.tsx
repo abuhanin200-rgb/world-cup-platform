@@ -6,12 +6,14 @@ import { addMatch, getAllMatches, Match } from "@/lib/matches";
 import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
 import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
 import { addAdminLog } from "@/lib/adminLogs";
+import AdminOverviewPanel from "@/components/AdminOverviewPanel";
 import AdminMembersPanel from "@/components/AdminMembersPanel";
 import AdminSettingsPanel from "@/components/AdminSettingsPanel";
 import AdminMatchesPanel from "@/components/AdminMatchesPanel";
 import AdminLogsPanel from "@/components/AdminLogsPanel";
 
 type AdminTab =
+  | "overview"
   | "add"
   | "calculate"
   | "settings"
@@ -20,6 +22,7 @@ type AdminTab =
   | "logs";
 
 const adminTabs: { id: AdminTab; label: string; icon: string }[] = [
+  { id: "overview", label: "نظرة عامة", icon: "📊" },
   { id: "add", label: "إضافة مباراة", icon: "➕" },
   { id: "calculate", label: "احتساب النتائج", icon: "🧮" },
   { id: "settings", label: "إعدادات الشرائط", icon: "⚙️" },
@@ -29,7 +32,7 @@ const adminTabs: { id: AdminTab; label: string; icon: string }[] = [
 ];
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>("add");
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
   const [adminReady, setAdminReady] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(false);
@@ -398,7 +401,7 @@ export default function AdminPage() {
         </header>
 
         <nav className="sticky top-3 z-40 mb-6 rounded-3xl border border-white/10 bg-slate-950/80 p-2 shadow-2xl backdrop-blur-xl">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-7">
             {adminTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -436,6 +439,8 @@ export default function AdminPage() {
             )}
           </div>
         )}
+
+        {activeTab === "overview" && <AdminOverviewPanel />}
 
         {activeTab === "add" && (
           <section className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
