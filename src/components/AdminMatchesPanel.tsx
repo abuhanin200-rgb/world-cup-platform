@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { Match } from "@/lib/matches";
+import { deleteAdminMatch, updateAdminMatch } from "@/lib/adminMatches";
+import { addAdminLog } from "@/lib/adminLogs";
 
 type AdminMatchesPanelProps = {
   matches: Match[];
   loading: boolean;
+  onChanged?: () => Promise<void> | void;
 };
 
 const MATCHES_PER_PAGE = 12;
@@ -15,10 +18,22 @@ type MatchFilter = "all" | "scheduled" | "finished";
 export default function AdminMatchesPanel({
   matches,
   loading,
+  onChanged,
 }: AdminMatchesPanelProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<MatchFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [editingMatchId, setEditingMatchId] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editTime, setEditTime] = useState("");
+  const [editIsActive, setEditIsActive] = useState(true);
+
+  const [savingMatchId, setSavingMatchId] = useState("");
+  const [deletingMatchId, setDeletingMatchId] = useState("");
+
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   const filteredMatches = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
@@ -71,13 +86,103 @@ export default function AdminMatchesPanel({
     setCurrentPage((page) => Math.min(totalPages, page + 1));
   }
 
+  function startEdit(match: Match) {
+    setMessage("");
+    setError("");
+
+    setEditingMatchId(match.id);
+    setEditDate(match.matchDate);
+    setEditTime(match.matchTime);
+    setEditIsActive(Boolean(match.isActive));
+  }
+
+  function cancelEdit() {
+    setEditingMatchId("");
+    setEditDate("");
+    setEditTime("");
+    setEditIsActive(true);
+  }
+
+  async function handleSaveMatch(event: FormEvent, match: Match) {
+    event.preventDefault();
+
+    setMessage("");
+    setError("");
+    setSavingMatchId(match.id);
+
+    try {
+      await updateAdminMatch({
+        matchId: match.id,
+        matchDate: editDate,
+        matchTime: editTime,
+        isActive: editIsActive,
+      });
+
+      await addAdminLog({
+        action: "other",
+        title: "تعديل مباراة",
+        description: `تم تعديل مباراة ${match.homeTeamName} ضد ${match.awayTeamName}. التاريخ الجديد: ${editDate}، الوقت الجديد: ${editTime}، الحالة: ${
+          editIsActive ? "مفعلة" : "مخفية"
+        }.`,
+      });
+
+      setMessage("تم تعديل المباراة بنجاح ✅");
+      cancelEdit();
+
+      if (onChanged) {
+        await onChanged();
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "تعذر تعديل المباراة";
+      setError(errorMessage);
+    } finally {
+      setSavingMatchId("");
+    }
+  }
+
+  async function handleDeleteMatch(match: Match) {
+    setMessage("");
+    setError("");
+
+    const confirmed = window.confirm(
+      `هل أنت متأكد من حذف مباراة ${match.homeTeamName} ضد ${match.awayTeamName}؟\n\nملاحظة: لا يمكن حذف مباراة محتسبة أو عليها توقعات.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingMatchId(match.id);
+
+    try {
+      await deleteAdminMatch(match);
+
+      await addAdminLog({
+        action: "other",
+        title: "حذف مباراة",
+        description: `تم حذف مباراة ${match.homeTeamName} ضد ${match.awayTeamName} بتاريخ ${match.matchDate} الساعة ${match.matchTime}.`,
+      });
+
+      setMessage("تم حذف المباراة بنجاح ✅");
+
+      if (onChanged) {
+        await onChanged();
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "تعذر حذف المباراة";
+      setError(errorMessage);
+    } finally {
+      setDeletingMatchId("");
+    }
+  }
+
   return (
     <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-6">
       <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-2xl font-black">المباريات المضافة</h2>
           <p className="mt-2 text-sm text-slate-300">
-            عرض مرتب للمباريات مع البحث والفلترة والصفحات.
+            عرض وتعديل وإخفاء المباريات مع البحث والفلترة.
           </p>
         </div>
 
@@ -88,6 +193,22 @@ export default function AdminMatchesPanel({
           </span>
         </div>
       </div>
+
+      {(message || error) && (
+        <div className="mb-5 space-y-2">
+          {message && (
+            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
+              {message}
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">
+              {error}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mb-5 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
         <div>
@@ -156,67 +277,166 @@ export default function AdminMatchesPanel({
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {visibleMatches.map((match) => (
-              <div
-                key={match.id}
-                className="rounded-2xl border border-white/10 bg-slate-950/70 p-4"
-              >
-                <div className="mb-3 flex items-center justify-between gap-2 text-xs">
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
-                    {match.matchDay}
-                  </span>
+            {visibleMatches.map((match) => {
+              const isEditing = editingMatchId === match.id;
+              const isCalculated =
+                match.resultCalculated || match.status === "finished";
 
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
-                    {match.matchDate} • {match.matchTime}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
-                  <div className="min-w-0">
-                    <div className="text-2xl">{match.homeTeamEmoji}</div>
-                    <div className="truncate text-sm font-black">
-                      {match.homeTeamName}
-                    </div>
-                  </div>
-
-                  <div className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-black text-amber-300">
-                    VS
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="text-2xl">{match.awayTeamEmoji}</div>
-                    <div className="truncate text-sm font-black">
-                      {match.awayTeamName}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                  {match.status === "finished" ? (
-                    <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-emerald-300">
-                      تم الاحتساب
+              return (
+                <div
+                  key={match.id}
+                  className="rounded-2xl border border-white/10 bg-slate-950/70 p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-2 text-xs">
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
+                      {match.matchDay}
                     </span>
+
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
+                      {match.matchDate} • {match.matchTime}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
+                    <div className="min-w-0">
+                      <div className="text-2xl">{match.homeTeamEmoji}</div>
+                      <div className="truncate text-sm font-black">
+                        {match.homeTeamName}
+                      </div>
+                    </div>
+
+                    <div className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-[10px] font-black text-amber-300">
+                      VS
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="text-2xl">{match.awayTeamEmoji}</div>
+                      <div className="truncate text-sm font-black">
+                        {match.awayTeamName}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                    {match.status === "finished" ? (
+                      <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-emerald-300">
+                        تم الاحتساب
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-blue-400/10 px-3 py-1 text-blue-300">
+                        قادمة
+                      </span>
+                    )}
+
+                    {match.resultCalculated && (
+                      <span className="rounded-full bg-amber-400/10 px-3 py-1 text-amber-300">
+                        النتيجة: {match.actualHomeScore} -{" "}
+                        {match.actualAwayScore}
+                      </span>
+                    )}
+
+                    {!match.isActive && (
+                      <span className="rounded-full bg-red-400/10 px-3 py-1 text-red-300">
+                        مخفية
+                      </span>
+                    )}
+                  </div>
+
+                  {isEditing ? (
+                    <form
+                      onSubmit={(event) => handleSaveMatch(event, match)}
+                      className="mt-4 space-y-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3"
+                    >
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-xs font-bold">
+                            التاريخ
+                          </label>
+                          <input
+                            type="date"
+                            value={editDate}
+                            onChange={(event) => setEditDate(event.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-slate-950 outline-none focus:border-amber-400"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-xs font-bold">
+                            الوقت
+                          </label>
+                          <input
+                            type="time"
+                            value={editTime}
+                            onChange={(event) => setEditTime(event.target.value)}
+                            className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-slate-950 outline-none focus:border-amber-400"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <label className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm">
+                        <span className="font-bold">تفعيل المباراة للجمهور</span>
+                        <input
+                          type="checkbox"
+                          checked={editIsActive}
+                          onChange={(event) =>
+                            setEditIsActive(event.target.checked)
+                          }
+                          className="h-5 w-5"
+                        />
+                      </label>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="submit"
+                          disabled={savingMatchId === match.id}
+                          className="rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-slate-950 hover:bg-amber-300 disabled:opacity-50"
+                        >
+                          {savingMatchId === match.id
+                            ? "جاري الحفظ..."
+                            : "حفظ"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/15"
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </form>
                   ) : (
-                    <span className="rounded-full bg-blue-400/10 px-3 py-1 text-blue-300">
-                      قادمة
-                    </span>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(match)}
+                        className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-black text-amber-200 hover:bg-amber-400/20"
+                      >
+                        تعديل
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMatch(match)}
+                        disabled={isCalculated || deletingMatchId === match.id}
+                        className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs font-black text-red-200 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {deletingMatchId === match.id ? "جاري الحذف..." : "حذف"}
+                      </button>
+                    </div>
                   )}
 
-                  {match.resultCalculated && (
-                    <span className="rounded-full bg-amber-400/10 px-3 py-1 text-amber-300">
-                      النتيجة: {match.actualHomeScore} -{" "}
-                      {match.actualAwayScore}
-                    </span>
-                  )}
-
-                  {!match.isActive && (
-                    <span className="rounded-full bg-red-400/10 px-3 py-1 text-red-300">
-                      غير مفعلة
-                    </span>
+                  {isCalculated && (
+                    <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-slate-300">
+                      لا يمكن حذف مباراة محتسبة. للتعديل الجذري استخدم تراجع عن
+                      الحسبة أولًا.
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="mt-5 flex items-center justify-between gap-3">

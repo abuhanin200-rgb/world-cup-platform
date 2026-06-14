@@ -382,7 +382,8 @@ export default function AdminPage() {
             <div>
               <h1 className="text-2xl font-black md:text-3xl">لوحة التحكم</h1>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                إدارة مباريات ونتائج وأعضاء وإعدادات منصة توقعات كأس العالم 2026.
+                إدارة مباريات ونتائج وأعضاء وإعدادات منصة توقعات كأس العالم
+                2026.
               </p>
             </div>
 
@@ -651,7 +652,11 @@ export default function AdminPage() {
         {activeTab === "members" && <AdminMembersPanel />}
 
         {activeTab === "matches" && (
-          <AdminMatchesPanel matches={matches} loading={loading} />
+          <AdminMatchesPanel
+            matches={matches}
+            loading={loading}
+            onChanged={loadData}
+          />
         )}
 
         {activeTab === "logs" && <AdminLogsPanel />}
