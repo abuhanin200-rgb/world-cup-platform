@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getSiteSettings,
   SiteSettings,
@@ -12,36 +12,39 @@ import { addAdminLog } from "@/lib/adminLogs";
 const defaultMaintenanceMessage =
   "الموقع مغلق مؤقتًا للصيانة بسبب بعض المشاكل التقنية وتضخم البيانات. نعتذر لكم، وراح نرجع لكم قريب بإذن الله.";
 
-const speedOptions: {
+type SpeedOption = {
   value: TickerSpeed;
-  label: string;
+  title: string;
   description: string;
-}[] = [
+};
+
+const speedOptions: SpeedOption[] = [
+  {
+    value: "very_slow",
+    title: "بطيء جدًا",
+    description: "حركة هادئة جدًا ومناسبة للقراءة",
+  },
   {
     value: "slow",
-    label: "بطيء",
+    title: "بطيء",
     description: "حركة هادئة وبطيئة",
   },
   {
     value: "normal",
-    label: "متوسط",
+    title: "متوسط",
     description: "السرعة الافتراضية المناسبة",
   },
   {
     value: "fast",
-    label: "سريع",
+    title: "سريع",
     description: "حركة أسرع قليلًا",
   },
   {
     value: "very_fast",
-    label: "سريع جدًا",
+    title: "سريع جدًا",
     description: "حركة عالية ومناسبة للمحتوى الكثير",
   },
 ];
-
-function getSpeedLabel(speed: TickerSpeed) {
-  return speedOptions.find((option) => option.value === speed)?.label || "متوسط";
-}
 
 export default function AdminSettingsPanel() {
   const [settings, setSettings] = useState<SiteSettings>({
@@ -51,42 +54,30 @@ export default function AdminSettingsPanel() {
     maintenanceMessage: defaultMaintenanceMessage,
   });
 
-  const [originalSettings, setOriginalSettings] = useState<SiteSettings>({
-    latestPredictionsSpeed: "normal",
-    exactHitsSpeed: "normal",
-    maintenanceMode: false,
-    maintenanceMessage: defaultMaintenanceMessage,
-  });
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  async function loadSettings() {
+    try {
+      setLoading(true);
+      const data = await getSiteSettings();
+      setSettings(data);
+    } catch (error) {
+      console.error("Load settings error:", error);
+      alert("تعذر تحميل الإعدادات");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadSettings() {
-      try {
-        setLoading(true);
-        const data = await getSiteSettings();
-
-        setSettings(data);
-        setOriginalSettings(data);
-      } catch (err) {
-        console.error("فشل تحميل إعدادات الموقع:", err);
-        setError("تعذر تحميل إعدادات الموقع");
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadSettings();
   }, []);
 
-  function updateSpeedField(field: keyof SiteSettings, value: TickerSpeed) {
+  function updateSpeed(key: "latestPredictionsSpeed" | "exactHitsSpeed", value: TickerSpeed) {
     setSettings((current) => ({
       ...current,
-      [field]: value,
+      [key]: value,
     }));
   }
 
@@ -104,257 +95,171 @@ export default function AdminSettingsPanel() {
     }));
   }
 
-  async function handleSaveSettings(event: FormEvent) {
-    event.preventDefault();
-
-    setMessage("");
-    setError("");
-    setSaving(true);
-
+  async function handleSave() {
     try {
-      const updatedSettings = await updateSiteSettings(settings);
+      setSaving(true);
 
-      const latestChanged =
-        originalSettings.latestPredictionsSpeed !==
-        updatedSettings.latestPredictionsSpeed;
+      const updated = await updateSiteSettings({
+        ...settings,
+        maintenanceMessage:
+          settings.maintenanceMessage.trim() || defaultMaintenanceMessage,
+      });
 
-      const exactChanged =
-        originalSettings.exactHitsSpeed !== updatedSettings.exactHitsSpeed;
-
-      const maintenanceModeChanged =
-        originalSettings.maintenanceMode !== updatedSettings.maintenanceMode;
-
-      const maintenanceMessageChanged =
-        originalSettings.maintenanceMessage !==
-        updatedSettings.maintenanceMessage;
-
-      const changes: string[] = [];
-
-      if (latestChanged) {
-        changes.push(
-          `شريط آخر التوقعات من ${getSpeedLabel(
-            originalSettings.latestPredictionsSpeed
-          )} إلى ${getSpeedLabel(updatedSettings.latestPredictionsSpeed)}`
-        );
-      }
-
-      if (exactChanged) {
-        changes.push(
-          `شريط جابها صح من ${getSpeedLabel(
-            originalSettings.exactHitsSpeed
-          )} إلى ${getSpeedLabel(updatedSettings.exactHitsSpeed)}`
-        );
-      }
-
-      if (maintenanceModeChanged) {
-        changes.push(
-          updatedSettings.maintenanceMode
-            ? "تم تفعيل وضع الصيانة"
-            : "تم إيقاف وضع الصيانة"
-        );
-      }
-
-      if (maintenanceMessageChanged) {
-        changes.push("تم تعديل رسالة الصيانة");
-      }
+      setSettings(updated);
 
       await addAdminLog({
         action: "update_settings",
-        title: "تعديل إعدادات الموقع",
-        description:
-          changes.length > 0
-            ? `تم تعديل ${changes.join("، ")}.`
-            : "تم حفظ إعدادات الموقع بدون تغيير في القيم.",
+        title: "تحديث إعدادات الموقع",
+        description: "تم تحديث إعدادات الشرائط ووضع الصيانة",
+        metadata: {
+          latestPredictionsSpeed: updated.latestPredictionsSpeed,
+          exactHitsSpeed: updated.exactHitsSpeed,
+          maintenanceMode: updated.maintenanceMode,
+        },
       });
 
-      setSettings(updatedSettings);
-      setOriginalSettings(updatedSettings);
-      setMessage("تم حفظ إعدادات الموقع بنجاح ✅");
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "تعذر حفظ إعدادات الموقع";
-      setError(errorMessage);
+      alert("تم حفظ الإعدادات بنجاح");
+    } catch (error) {
+      console.error("Save settings error:", error);
+      alert("تعذر حفظ الإعدادات");
     } finally {
       setSaving(false);
     }
   }
 
-  return (
-    <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-6">
-      <div className="mb-5">
-        <h2 className="text-2xl font-black">إعدادات الموقع</h2>
-        <p className="mt-2 text-sm text-slate-300">
-          التحكم بسرعة الشرائط ووضع الصيانة ورسالة الإغلاق المؤقت.
-        </p>
-      </div>
+  function renderSpeedOptions(
+    title: string,
+    selectedValue: TickerSpeed,
+    onChange: (value: TickerSpeed) => void,
+    activeColor: "amber" | "emerald"
+  ) {
+    return (
+      <section className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+        <h3 className="mb-4 text-xl font-black">{title}</h3>
 
-      {(message || error) && (
-        <div className="mb-5 space-y-2">
-          {message && (
-            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
-              {message}
-            </div>
-          )}
+        <div className="space-y-3">
+          {speedOptions.map((option) => {
+            const selected = selectedValue === option.value;
 
-          {error && (
-            <div className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">
-              {error}
-            </div>
-          )}
-        </div>
-      )}
+            const selectedClass =
+              activeColor === "amber"
+                ? "border-amber-400 bg-amber-400/10"
+                : "border-emerald-400 bg-emerald-400/10";
 
-      {loading ? (
-        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-sm text-slate-300">
-          جاري تحميل الإعدادات...
-        </div>
-      ) : (
-        <form onSubmit={handleSaveSettings} className="space-y-5">
-          <div className="rounded-3xl border border-red-400/20 bg-red-500/10 p-4 md:p-5">
-            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h3 className="text-xl font-black text-red-100">
-                  وضع الصيانة
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-red-100/80">
-                  عند التفعيل تظهر رسالة إغلاق مؤقت للزوار بدل الصفحة الرئيسية.
-                </p>
-              </div>
-
-              <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3">
-                <span className="text-sm font-black">
-                  {settings.maintenanceMode ? "مفعل" : "غير مفعل"}
-                </span>
+            return (
+              <label
+                key={option.value}
+                className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition ${
+                  selected
+                    ? selectedClass
+                    : "border-white/10 bg-white/5 hover:bg-white/10"
+                }`}
+              >
                 <input
-                  type="checkbox"
-                  checked={settings.maintenanceMode}
-                  onChange={(event) =>
-                    updateMaintenanceMode(event.target.checked)
-                  }
+                  type="radio"
+                  checked={selected}
+                  onChange={() => onChange(option.value)}
                   className="h-5 w-5"
                 />
-              </label>
-            </div>
 
+                <div className="flex-1 text-right">
+                  <div className="text-lg font-black">{option.title}</div>
+                  <div className="mt-1 text-sm text-slate-300">
+                    {option.description}
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  if (loading) {
+    return (
+      <section className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center text-slate-300 shadow-2xl">
+        جاري تحميل الإعدادات...
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-5">
+      <div className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
+        <div className="mb-4">
+          <h2 className="text-xl font-black md:text-2xl">⚙️ إعدادات الموقع</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            تحكم في سرعة الشرائط ووضع الصيانة.
+          </p>
+        </div>
+
+        <section className="rounded-3xl border border-red-400/20 bg-red-500/10 p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <label className="mb-2 block text-sm font-bold">
-                رسالة الصيانة
-              </label>
-              <textarea
-                value={settings.maintenanceMessage}
+              <h3 className="text-xl font-black text-red-100">
+                وضع الصيانة
+              </h3>
+              <p className="mt-1 text-sm text-red-100/80">
+                عند التفعيل، يظهر للزوار تنبيه إغلاق مؤقت، ويبقى الأدمن متاحًا.
+              </p>
+            </div>
+
+            <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={settings.maintenanceMode}
                 onChange={(event) =>
-                  updateMaintenanceMessage(event.target.value)
+                  updateMaintenanceMode(event.target.checked)
                 }
-                rows={4}
-                className="w-full resize-none rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm leading-7 text-slate-950 outline-none focus:border-red-400"
-                placeholder="اكتب رسالة تظهر للزوار أثناء إغلاق الموقع"
-                required
+                className="h-5 w-5"
               />
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-              <div className="mb-2 text-xs font-black text-slate-300">
-                معاينة رسالة الصيانة
-              </div>
-
-              <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm leading-7 text-red-100">
-                {settings.maintenanceMessage || defaultMaintenanceMessage}
-              </div>
-            </div>
+              <span className="text-sm font-black">
+                {settings.maintenanceMode ? "مفعل" : "غير مفعل"}
+              </span>
+            </label>
           </div>
 
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-              <label className="mb-3 block text-sm font-black">
-                سرعة شريط آخر التوقعات
-              </label>
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-red-100">
+              رسالة الصيانة
+            </span>
 
-              <div className="space-y-2">
-                {speedOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-3 transition ${
-                      settings.latestPredictionsSpeed === option.value
-                        ? "border-amber-400 bg-amber-400/10"
-                        : "border-white/10 bg-slate-900/70 hover:bg-white/10"
-                    }`}
-                  >
-                    <div>
-                      <div className="font-black">{option.label}</div>
-                      <div className="mt-1 text-xs text-slate-300">
-                        {option.description}
-                      </div>
-                    </div>
+            <textarea
+              value={settings.maintenanceMessage}
+              onChange={(event) =>
+                updateMaintenanceMessage(event.target.value)
+              }
+              rows={4}
+              className="w-full rounded-2xl border border-red-400/20 bg-slate-950/70 px-4 py-3 text-sm leading-7 text-white outline-none focus:border-red-300"
+              placeholder={defaultMaintenanceMessage}
+            />
+          </label>
+        </section>
+      </div>
 
-                    <input
-                      type="radio"
-                      name="latestPredictionsSpeed"
-                      value={option.value}
-                      checked={settings.latestPredictionsSpeed === option.value}
-                      onChange={() =>
-                        updateSpeedField(
-                          "latestPredictionsSpeed",
-                          option.value
-                        )
-                      }
-                      className="h-4 w-4"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-              <label className="mb-3 block text-sm font-black">
-                سرعة شريط جابها صح
-              </label>
-
-              <div className="space-y-2">
-                {speedOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border p-3 transition ${
-                      settings.exactHitsSpeed === option.value
-                        ? "border-emerald-400 bg-emerald-400/10"
-                        : "border-white/10 bg-slate-900/70 hover:bg-white/10"
-                    }`}
-                  >
-                    <div>
-                      <div className="font-black">{option.label}</div>
-                      <div className="mt-1 text-xs text-slate-300">
-                        {option.description}
-                      </div>
-                    </div>
-
-                    <input
-                      type="radio"
-                      name="exactHitsSpeed"
-                      value={option.value}
-                      checked={settings.exactHitsSpeed === option.value}
-                      onChange={() =>
-                        updateSpeedField("exactHitsSpeed", option.value)
-                      }
-                      className="h-4 w-4"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full rounded-xl bg-amber-400 px-4 py-3 font-black text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? "جاري حفظ الإعدادات..." : "حفظ إعدادات الموقع"}
-          </button>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-xs leading-6 text-slate-300">
-            يتم حفظ الإعدادات في Firebase، وتسجيل أي تغيير داخل تبويب السجل.
-          </div>
-        </form>
+      {renderSpeedOptions(
+        "سرعة شريط آخر التوقعات",
+        settings.latestPredictionsSpeed,
+        (value) => updateSpeed("latestPredictionsSpeed", value),
+        "amber"
       )}
+
+      {renderSpeedOptions(
+        "سرعة شريط جابها صح",
+        settings.exactHitsSpeed,
+        (value) => updateSpeed("exactHitsSpeed", value),
+        "emerald"
+      )}
+
+      <button
+        type="button"
+        disabled={saving}
+        onClick={handleSave}
+        className="w-full rounded-2xl bg-amber-400 px-4 py-4 text-base font-black text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {saving ? "جاري الحفظ..." : "حفظ الإعدادات"}
+      </button>
     </section>
   );
 }

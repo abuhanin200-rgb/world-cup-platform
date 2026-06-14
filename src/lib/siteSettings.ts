@@ -30,7 +30,7 @@ const defaultSettings: SiteSettings = {
 };
 
 export function getTickerDuration(speed: TickerSpeed) {
-  if (speed === "very_slow") return 90;
+  if (speed === "very_slow") return 95;
   if (speed === "slow") return 55;
   if (speed === "normal") return 35;
   if (speed === "fast") return 20;
