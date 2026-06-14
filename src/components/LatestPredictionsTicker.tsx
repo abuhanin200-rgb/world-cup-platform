@@ -36,6 +36,7 @@ export default function LatestPredictionsTicker() {
   const [predictions, setPredictions] = useState<LatestPrediction[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
 
   const predictionsSignatureRef = useRef("");
 
@@ -172,16 +173,28 @@ export default function LatestPredictionsTicker() {
           </span>
 
           <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] text-emerald-100">
-            تختفي بعد بداية المباراة أو احتسابها
+            يتوقف عند اللمس
           </span>
         </div>
       </div>
 
-      <div dir="ltr" className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 py-3">
+      <div
+        dir="ltr"
+        className="latest-predictions-wrapper relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 py-3"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setIsPaused(false)}
+        onTouchCancel={() => setIsPaused(false)}
+        onPointerDown={() => setIsPaused(true)}
+        onPointerUp={() => setIsPaused(false)}
+        onPointerCancel={() => setIsPaused(false)}
+      >
         <div
           className="latest-predictions-marquee flex w-max gap-3 whitespace-nowrap"
           style={{
             animationDuration: `${duration}s`,
+            animationPlayState: isPaused ? "paused" : "running",
           }}
         >
           {tickerItems.map((prediction, index) =>
@@ -196,6 +209,12 @@ export default function LatestPredictionsTicker() {
           animation-timing-function: linear;
           animation-iteration-count: infinite;
           will-change: transform;
+        }
+
+        .latest-predictions-wrapper:hover .latest-predictions-marquee,
+        .latest-predictions-wrapper:active .latest-predictions-marquee,
+        .latest-predictions-wrapper:focus-within .latest-predictions-marquee {
+          animation-play-state: paused;
         }
 
         @keyframes latestPredictionsTicker {
