@@ -3,8 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getTeams, Team } from "@/lib/teams";
 import { addMatch, getAllMatches, Match } from "@/lib/matches";
-import { calculateMatchResult } from "@/lib/scoring";
+import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
 import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
+import AdminMembersPanel from "@/components/AdminMembersPanel";
+import AdminSettingsPanel from "@/components/AdminSettingsPanel";
+import AdminMatchesPanel from "@/components/AdminMatchesPanel";
 
 export default function AdminPage() {
   const [adminReady, setAdminReady] = useState(false);
@@ -28,6 +31,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [calculating, setCalculating] = useState(false);
+  const [undoing, setUndoing] = useState(false);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -168,6 +172,12 @@ export default function AdminPage() {
       return;
     }
 
+    const confirmed = window.confirm(
+      "هل أنت متأكد من احتساب هذه المباراة؟ سيتم توزيع النقاط على جميع الأعضاء."
+    );
+
+    if (!confirmed) return;
+
     setCalculating(true);
 
     try {
@@ -192,6 +202,50 @@ export default function AdminPage() {
       setError(errorMessage);
     } finally {
       setCalculating(false);
+    }
+  }
+
+  async function handleUndoCalculation() {
+    setMessage("");
+    setError("");
+
+    if (!selectedMatchId) {
+      setError("اختر المباراة المراد التراجع عن احتسابها");
+      return;
+    }
+
+    const selectedMatch = getSelectedMatch();
+
+    const confirmed = window.confirm(
+      `هل أنت متأكد من التراجع عن احتساب هذه المباراة؟\n\n${
+        selectedMatch
+          ? `${selectedMatch.homeTeamName} × ${selectedMatch.awayTeamName}`
+          : ""
+      }\n\nسيتم حذف نقاط هذه المباراة من جميع الأعضاء وإعادة ترتيب لوحة الصدارة.`
+    );
+
+    if (!confirmed) return;
+
+    setUndoing(true);
+
+    try {
+      const result = await undoMatchCalculation(selectedMatchId);
+
+      setMessage(
+        `تم التراجع عن احتساب المباراة بنجاح. تم إرجاع ${result.undonePredictions} توقع إلى حالة غير محتسب.`
+      );
+
+      setSelectedMatchId("");
+      setActualHomeScore("");
+      setActualAwayScore("");
+
+      await loadData();
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "حدث خطأ أثناء التراجع عن الحسبة";
+      setError(errorMessage);
+    } finally {
+      setUndoing(false);
     }
   }
 
@@ -281,7 +335,7 @@ export default function AdminPage() {
             <div>
               <h1 className="text-3xl font-black">لوحة التحكم</h1>
               <p className="mt-2 text-sm text-slate-300">
-                إدارة مباريات ونتائج منصة توقعات كأس العالم 2026.
+                إدارة مباريات ونتائج وأعضاء وإعدادات منصة توقعات كأس العالم 2026.
               </p>
             </div>
 
@@ -487,75 +541,41 @@ export default function AdminPage() {
 
               <button
                 type="submit"
-                disabled={calculating || loading}
+                disabled={calculating || undoing || loading}
                 className="w-full rounded-xl bg-emerald-400 px-4 py-3 font-black text-slate-950 transition hover:bg-emerald-300 disabled:opacity-60"
               >
                 {calculating ? "جاري الاحتساب..." : "احتساب لجميع الأعضاء"}
               </button>
 
+              <button
+                type="button"
+                onClick={handleUndoCalculation}
+                disabled={undoing || calculating || loading || !selectedMatchId}
+                className="w-full rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 font-black text-red-200 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {undoing ? "جاري التراجع..." : "تراجع عن الحسبة"}
+              </button>
+
               <p className="text-xs leading-6 text-slate-300">
                 يتم توزيع النقاط تلقائيًا: النتيجة الصحيحة +3، توقع الفائز أو
-                التعادل الصحيح +1، التوقع الخاطئ +0.
+                التعادل الصحيح +1، التوقع الخاطئ +0. وزر التراجع يعيد المباراة
+                إلى حالة غير محتسبة ويحذف نقاطها من جميع الأعضاء.
               </p>
             </form>
           </div>
         </section>
 
-        <section className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
-          <h2 className="mb-4 text-xl font-black">المباريات المضافة</h2>
+        <div className="mt-6">
+          <AdminSettingsPanel />
+        </div>
 
-          {loading ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-slate-300">
-              جاري تحميل المباريات...
-            </div>
-          ) : matches.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-slate-300">
-              لا توجد مباريات مضافة حتى الآن.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {matches.map((match) => (
-                <div
-                  key={match.id}
-                  className="rounded-2xl border border-white/10 bg-slate-950/70 p-4"
-                >
-                  <div className="mb-2 text-sm text-slate-300">
-                    {match.matchDay} • {match.matchDate} • {match.matchTime}{" "}
-                    بتوقيت مكة
-                  </div>
+        <div className="mt-6">
+          <AdminMembersPanel />
+        </div>
 
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-center font-black">
-                      <div className="text-2xl">{match.homeTeamEmoji}</div>
-                      <div>{match.homeTeamName}</div>
-                    </div>
-
-                    <div className="rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-amber-300">
-                      VS
-                    </div>
-
-                    <div className="text-center font-black">
-                      <div className="text-2xl">{match.awayTeamEmoji}</div>
-                      <div>{match.awayTeamName}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
-                      الحالة: {match.status}
-                    </span>
-
-                    {match.status === "finished" && (
-                      <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-emerald-300">
-                        تم الاحتساب
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        <div className="mt-6">
+          <AdminMatchesPanel matches={matches} loading={loading} />
+        </div>
       </div>
     </main>
   );

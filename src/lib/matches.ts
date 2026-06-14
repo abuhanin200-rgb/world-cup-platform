@@ -4,7 +4,6 @@ import {
   getDocs,
   orderBy,
   query,
-  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -20,15 +19,20 @@ export type Match = {
   awayTeamEmoji: string;
 
   matchDate: string;
-  matchDay: string;
   matchTime: string;
-
+  matchDay: string;
   startAt: string;
-  status: "scheduled" | "closed" | "finished";
+
+  status: "scheduled" | "finished";
+  isActive: boolean;
+
+  resultCalculated?: boolean;
+  actualHomeScore?: number | null;
+  actualAwayScore?: number | null;
+  calculatedAt?: string | null;
 
   createdAt?: string;
   updatedAt?: string;
-  createdAtServer?: unknown;
 };
 
 export type AddMatchInput = {
@@ -44,32 +48,8 @@ export type AddMatchInput = {
   matchTime: string;
 };
 
-function getMakkahTodayStart() {
-  const now = new Date();
-
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Riyadh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-
-  const makkahDate = formatter.format(now);
-
-  return new Date(`${makkahDate}T00:00:00+03:00`);
-}
-
-function getMakkahTomorrowEnd() {
-  const todayStart = getMakkahTodayStart();
-  const tomorrowEnd = new Date(todayStart);
-
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 2);
-
-  return tomorrowEnd;
-}
-
-function getArabicMatchDay(startAt: string) {
-  const date = new Date(startAt);
+function getMatchDayArabic(dateText: string) {
+  const date = new Date(`${dateText}T12:00:00+03:00`);
 
   return new Intl.DateTimeFormat("ar-SA", {
     weekday: "long",
@@ -77,73 +57,66 @@ function getArabicMatchDay(startAt: string) {
   }).format(date);
 }
 
-export function isMatchVisible(match: Match) {
-  if (!match.startAt) return false;
-
+function getMakkahTodayDate() {
   const now = new Date();
-  const matchStart = new Date(match.startAt);
 
-  const todayStart = getMakkahTodayStart();
-  const tomorrowEnd = getMakkahTomorrowEnd();
-
-  const hideAfter = new Date(matchStart);
-  hideAfter.setMinutes(hideAfter.getMinutes() + 120);
-
-  const isTodayOrTomorrow = matchStart >= todayStart && matchStart < tomorrowEnd;
-  const isNotHiddenYet = now < hideAfter;
-
-  return isTodayOrTomorrow && isNotHiddenYet;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
 }
 
-export function isPredictionOpen(match: Match) {
-  if (!match.startAt) return false;
+function addDaysToDate(dateText: string, days: number) {
+  const date = new Date(`${dateText}T12:00:00+03:00`);
+  date.setDate(date.getDate() + days);
 
-  const now = new Date();
-  const matchStart = new Date(match.startAt);
-
-  return now < matchStart;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
-export function getMatchCountdown(match: Match) {
-  if (!match.startAt) return "انتهى وقت التوقع";
+function mapMatchDoc(docId: string, data: Record<string, unknown>): Match {
+  return {
+    id: docId,
 
-  const now = new Date().getTime();
-  const start = new Date(match.startAt).getTime();
-  const diff = start - now;
+    homeTeamCode: String(data.homeTeamCode || ""),
+    homeTeamName: String(data.homeTeamName || ""),
+    homeTeamEmoji: String(data.homeTeamEmoji || ""),
 
-  if (diff <= 0) return "انتهى وقت التوقع";
+    awayTeamCode: String(data.awayTeamCode || ""),
+    awayTeamName: String(data.awayTeamName || ""),
+    awayTeamEmoji: String(data.awayTeamEmoji || ""),
 
-  const totalSeconds = Math.floor(diff / 1000);
+    matchDate: String(data.matchDate || ""),
+    matchTime: String(data.matchTime || ""),
+    matchDay: String(data.matchDay || ""),
+    startAt: String(data.startAt || ""),
 
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
+    status: data.status === "finished" ? "finished" : "scheduled",
+    isActive: Boolean(data.isActive),
 
-  if (days > 0) {
-    return `${days} يوم ${hours} ساعة ${minutes} دقيقة`;
-  }
+    resultCalculated: Boolean(data.resultCalculated),
+    actualHomeScore:
+      data.actualHomeScore === undefined || data.actualHomeScore === null
+        ? null
+        : Number(data.actualHomeScore),
+    actualAwayScore:
+      data.actualAwayScore === undefined || data.actualAwayScore === null
+        ? null
+        : Number(data.actualAwayScore),
+    calculatedAt:
+      data.calculatedAt === undefined || data.calculatedAt === null
+        ? null
+        : String(data.calculatedAt),
 
-  if (hours > 0) {
-    return `${hours} ساعة ${minutes} دقيقة ${seconds} ثانية`;
-  }
-
-  return `${minutes} دقيقة ${seconds} ثانية`;
-}
-
-export async function getVisibleMatches(): Promise<Match[]> {
-  const matchesRef = collection(db, "matches");
-  const q = query(matchesRef, orderBy("startAt", "asc"));
-  const snapshot = await getDocs(q);
-
-  const matches = snapshot.docs
-    .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Match, "id">),
-    }));
-
-  return matches.filter(isMatchVisible);
+    createdAt: data.createdAt ? String(data.createdAt) : undefined,
+    updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
+  };
 }
 
 export async function getAllMatches(): Promise<Match[]> {
@@ -153,28 +126,50 @@ export async function getAllMatches(): Promise<Match[]> {
 
   return snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => ({
-      id: docSnap.id,
-      ...(docSnap.data() as Omit<Match, "id">),
-    }));
+    .map((docSnap) => mapMatchDoc(docSnap.id, docSnap.data()));
+}
+
+export async function getVisibleMatches(): Promise<Match[]> {
+  const allMatches = await getAllMatches();
+
+  const today = getMakkahTodayDate();
+  const tomorrow = addDaysToDate(today, 1);
+  const now = Date.now();
+
+  return allMatches.filter((match) => {
+    if (!match.isActive) return false;
+    if (match.status === "finished") return false;
+
+    const isTodayOrTomorrow =
+      match.matchDate === today || match.matchDate === tomorrow;
+
+    if (!isTodayOrTomorrow) return false;
+
+    const startTime = new Date(match.startAt).getTime();
+
+    if (!Number.isFinite(startTime)) return true;
+
+    const twoHoursAfterStart = startTime + 2 * 60 * 60 * 1000;
+
+    return now < twoHoursAfterStart;
+  });
 }
 
 export async function addMatch(input: AddMatchInput) {
   if (!input.homeTeamCode || !input.awayTeamCode) {
-    throw new Error("اختر الفريقين");
+    throw new Error("اختر الفريقين بشكل صحيح");
   }
 
   if (input.homeTeamCode === input.awayTeamCode) {
-    throw new Error("لا يمكن اختيار نفس المنتخب في المباراة");
+    throw new Error("لا يمكن اختيار نفس الفريقين");
   }
 
   if (!input.matchDate || !input.matchTime) {
-    throw new Error("اختر تاريخ ووقت المباراة");
+    throw new Error("أدخل تاريخ ووقت المباراة");
   }
 
-  const startAt = `${input.matchDate}T${input.matchTime}:00+03:00`;
-  const matchDay = getArabicMatchDay(startAt);
   const now = new Date().toISOString();
+  const startAt = `${input.matchDate}T${input.matchTime}:00+03:00`;
 
   const matchData = {
     homeTeamCode: input.homeTeamCode,
@@ -186,15 +181,20 @@ export async function addMatch(input: AddMatchInput) {
     awayTeamEmoji: input.awayTeamEmoji,
 
     matchDate: input.matchDate,
-    matchDay,
     matchTime: input.matchTime,
-
+    matchDay: getMatchDayArabic(input.matchDate),
     startAt,
-    status: "scheduled" as const,
+
+    status: "scheduled",
+    isActive: true,
+
+    resultCalculated: false,
+    actualHomeScore: null,
+    actualAwayScore: null,
+    calculatedAt: null,
 
     createdAt: now,
     updatedAt: now,
-    createdAtServer: serverTimestamp(),
   };
 
   const docRef = await addDoc(collection(db, "matches"), matchData);
@@ -202,5 +202,5 @@ export async function addMatch(input: AddMatchInput) {
   return {
     id: docRef.id,
     ...matchData,
-  } as Match;
+  };
 }

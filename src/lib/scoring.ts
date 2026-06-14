@@ -3,7 +3,6 @@ import {
   doc,
   getDocs,
   query,
-  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -22,7 +21,10 @@ type PredictionDoc = {
   isCalculated?: boolean;
   createdAt?: string;
 
-  resultType?: "exact" | "winner" | "wrong";
+  actualHomeScore?: number | null;
+  actualAwayScore?: number | null;
+
+  resultType?: "exact" | "winner" | "wrong" | "";
 };
 
 type UserStats = {
@@ -135,7 +137,6 @@ async function getMatchPredictions(matchId: string): Promise<PredictionDoc[]> {
 
 function buildUserStats(predictions: PredictionDoc[]) {
   const statsByUser: Record<string, UserStats> = {};
-
   const predictionsByUser: Record<string, PredictionDoc[]> = {};
 
   for (const prediction of predictions) {
@@ -203,6 +204,49 @@ function mergeCalculatedPredictions(
   return [...otherPredictions, ...updatedMatchPredictions];
 }
 
+function getRankMovement(oldRank: number, newRank: number) {
+  let rankDirection: "up" | "down" | "-" = "-";
+  let rankChange = 0;
+
+  if (oldRank > newRank) {
+    rankDirection = "up";
+    rankChange = oldRank - newRank;
+  } else if (oldRank < newRank) {
+    rankDirection = "down";
+    rankChange = newRank - oldRank;
+  }
+
+  return {
+    rankDirection,
+    rankChange,
+  };
+}
+
+function buildRankedUsers(allUsers: UserDoc[], statsByUser: Record<string, UserStats>) {
+  return allUsers
+    .map((user) => {
+      const stats = statsByUser[user.id] || {
+        points: 0,
+        total: 0,
+        correct: 0,
+        wrong: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+      };
+
+      return {
+        ...user,
+        ...stats,
+      };
+    })
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.correct !== a.correct) return b.correct - a.correct;
+      if (a.total !== b.total) return a.total - b.total;
+      return a.fullName.localeCompare(b.fullName, "ar");
+    });
+}
+
 export async function calculateMatchResult(input: CalculateMatchInput) {
   if (!input.matchId) {
     throw new Error("اختر المباراة أولًا");
@@ -255,29 +299,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
   );
 
   const statsByUser = buildUserStats(mergedPredictions);
-
-  const rankedUsers = allUsers
-    .map((user) => {
-      const stats = statsByUser[user.id] || {
-        points: 0,
-        total: 0,
-        correct: 0,
-        wrong: 0,
-        currentStreak: 0,
-        bestStreak: 0,
-      };
-
-      return {
-        ...user,
-        ...stats,
-      };
-    })
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.correct !== a.correct) return b.correct - a.correct;
-      if (a.total !== b.total) return a.total - b.total;
-      return a.fullName.localeCompare(b.fullName, "ar");
-    });
+  const rankedUsers = buildRankedUsers(allUsers, statsByUser);
 
   const batch = writeBatch(db);
   const now = new Date().toISOString();
@@ -292,6 +314,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
       actualHomeScore: input.actualHomeScore,
       actualAwayScore: input.actualAwayScore,
       calculatedAt: now,
+      updatedAt: now,
     });
   }
 
@@ -303,16 +326,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
         ? user.currentRank
         : newRank;
 
-    let rankDirection: "up" | "down" | "-" = "-";
-    let rankChange = 0;
-
-    if (oldRank > newRank) {
-      rankDirection = "up";
-      rankChange = oldRank - newRank;
-    } else if (oldRank < newRank) {
-      rankDirection = "down";
-      rankChange = newRank - oldRank;
-    }
+    const movement = getRankMovement(oldRank, newRank);
 
     batch.update(userRef, {
       points: user.points,
@@ -325,8 +339,8 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
 
       previousRank: oldRank,
       currentRank: newRank,
-      rankDirection,
-      rankChange,
+      rankDirection: movement.rankDirection,
+      rankChange: movement.rankChange,
 
       lastUpdated: now,
     });
@@ -362,5 +376,97 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
     exactCount,
     winnerCount,
     wrongCount,
+  };
+}
+
+export async function undoMatchCalculation(matchId: string) {
+  if (!matchId) {
+    throw new Error("اختر المباراة أولًا");
+  }
+
+  const matchPredictions = await getMatchPredictions(matchId);
+
+  if (matchPredictions.length === 0) {
+    throw new Error("لا توجد توقعات لهذه المباراة");
+  }
+
+  const calculatedPredictions = matchPredictions.filter(
+    (prediction) => prediction.isCalculated
+  );
+
+  if (calculatedPredictions.length === 0) {
+    throw new Error("هذه المباراة غير محتسبة حاليًا");
+  }
+
+  const allUsers = await getAllUsers();
+  const allCalculatedPredictions = await getAllCalculatedPredictions();
+
+  const remainingCalculatedPredictions = allCalculatedPredictions.filter(
+    (prediction) => prediction.matchId !== matchId
+  );
+
+  const statsByUser = buildUserStats(remainingCalculatedPredictions);
+  const rankedUsers = buildRankedUsers(allUsers, statsByUser);
+
+  const batch = writeBatch(db);
+  const now = new Date().toISOString();
+
+  for (const prediction of calculatedPredictions) {
+    const predictionRef = doc(db, "predictions", prediction.id);
+
+    batch.update(predictionRef, {
+      points: 0,
+      resultType: "",
+      isCalculated: false,
+      actualHomeScore: null,
+      actualAwayScore: null,
+      calculatedAt: null,
+      updatedAt: now,
+    });
+  }
+
+  for (const user of rankedUsers) {
+    const userRef = doc(db, "users", user.id);
+    const newRank = rankedUsers.findIndex((item) => item.id === user.id) + 1;
+    const oldRank =
+      typeof user.currentRank === "number" && user.currentRank > 0
+        ? user.currentRank
+        : newRank;
+
+    const movement = getRankMovement(oldRank, newRank);
+
+    batch.update(userRef, {
+      points: user.points,
+      total: user.total,
+      correct: user.correct,
+      wrong: user.wrong,
+
+      currentStreak: user.currentStreak,
+      bestStreak: user.bestStreak,
+
+      previousRank: oldRank,
+      currentRank: newRank,
+      rankDirection: movement.rankDirection,
+      rankChange: movement.rankChange,
+
+      lastUpdated: now,
+    });
+  }
+
+  const matchRef = doc(db, "matches", matchId);
+
+  batch.update(matchRef, {
+    status: "scheduled",
+    actualHomeScore: null,
+    actualAwayScore: null,
+    resultCalculated: false,
+    calculatedAt: null,
+    updatedAt: now,
+  });
+
+  await batch.commit();
+
+  return {
+    undonePredictions: calculatedPredictions.length,
   };
 }
