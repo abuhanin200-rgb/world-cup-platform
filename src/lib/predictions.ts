@@ -26,10 +26,16 @@ export type Prediction = {
   awayScore: number;
 
   points: number;
+  resultType?: string;
   isCalculated: boolean;
+
+  actualHomeScore?: number | null;
+  actualAwayScore?: number | null;
+  calculatedAt?: string | null;
 
   createdAt?: string;
   createdAtServer?: unknown;
+  updatedAt?: string;
 };
 
 export type SubmitPredictionInput = {
@@ -57,6 +63,13 @@ export type LatestPrediction = {
   homeScore: number;
   awayScore: number;
   createdAt?: string;
+};
+
+type MatchForTicker = {
+  id: string;
+  startAt: string;
+  status: string;
+  isActive: boolean;
 };
 
 function validateScore(score: number) {
@@ -98,11 +111,50 @@ function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
     awayScore: toNumber(data.awayScore),
 
     points: toNumber(data.points),
+    resultType: toText(data.resultType),
     isCalculated: Boolean(data.isCalculated),
+
+    actualHomeScore:
+      data.actualHomeScore === null || data.actualHomeScore === undefined
+        ? null
+        : toNumber(data.actualHomeScore),
+
+    actualAwayScore:
+      data.actualAwayScore === null || data.actualAwayScore === undefined
+        ? null
+        : toNumber(data.actualAwayScore),
+
+    calculatedAt:
+      data.calculatedAt === null || data.calculatedAt === undefined
+        ? null
+        : toText(data.calculatedAt),
 
     createdAt: toText(data.createdAt),
     createdAtServer: data.createdAtServer,
+    updatedAt: toText(data.updatedAt),
   };
+}
+
+function mapMatch(id: string, data: Record<string, unknown>): MatchForTicker {
+  return {
+    id,
+    startAt: toText(data.startAt),
+    status: toText(data.status) || "scheduled",
+    isActive: Boolean(data.isActive),
+  };
+}
+
+function isMatchStillBeforeStart(match?: MatchForTicker) {
+  if (!match) return false;
+
+  if (!match.isActive) return false;
+  if (match.status !== "scheduled") return false;
+
+  const startTime = new Date(match.startAt).getTime();
+
+  if (!Number.isFinite(startTime)) return false;
+
+  return startTime > Date.now();
 }
 
 export async function getUserPredictionForMatch(
@@ -189,19 +241,37 @@ export async function submitPrediction(input: SubmitPredictionInput) {
 }
 
 export async function getLatestPredictions(
-  maxItems = 12
+  maxItems = 100
 ): Promise<LatestPrediction[]> {
-  const snapshot = await getDocs(collection(db, "predictions"));
+  const [predictionsSnapshot, matchesSnapshot] = await Promise.all([
+    getDocs(collection(db, "predictions")),
+    getDocs(collection(db, "matches")),
+  ]);
 
-  return snapshot.docs
+  const matchesMap = new Map<string, MatchForTicker>();
+
+  matchesSnapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .forEach((docSnap) => {
+      matchesMap.set(docSnap.id, mapMatch(docSnap.id, docSnap.data()));
+    });
+
+  return predictionsSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => mapPrediction(docSnap.id, docSnap.data()))
     .filter((prediction) => {
-      return (
+      const match = matchesMap.get(prediction.matchId);
+
+      const hasPredictionData =
         prediction.userName &&
         prediction.matchId &&
         prediction.homeTeamName &&
-        prediction.awayTeamName
+        prediction.awayTeamName;
+
+      return (
+        hasPredictionData &&
+        !prediction.isCalculated &&
+        isMatchStillBeforeStart(match)
       );
     })
     .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
