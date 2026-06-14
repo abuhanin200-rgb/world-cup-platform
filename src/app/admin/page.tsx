@@ -9,7 +9,19 @@ import AdminMembersPanel from "@/components/AdminMembersPanel";
 import AdminSettingsPanel from "@/components/AdminSettingsPanel";
 import AdminMatchesPanel from "@/components/AdminMatchesPanel";
 
+type AdminTab = "add" | "calculate" | "settings" | "members" | "matches";
+
+const adminTabs: { id: AdminTab; label: string; icon: string }[] = [
+  { id: "add", label: "إضافة مباراة", icon: "➕" },
+  { id: "calculate", label: "احتساب النتائج", icon: "🧮" },
+  { id: "settings", label: "إعدادات الشرائط", icon: "⚙️" },
+  { id: "members", label: "إدارة الأعضاء", icon: "👥" },
+  { id: "matches", label: "المباريات", icon: "📅" },
+];
+
 export default function AdminPage() {
+  const [activeTab, setActiveTab] = useState<AdminTab>("add");
+
   const [adminReady, setAdminReady] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [adminUsername, setAdminUsername] = useState("");
@@ -139,6 +151,7 @@ export default function AdminPage() {
       setMatchTime("");
 
       await loadData();
+      setActiveTab("matches");
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "حدث خطأ أثناء إضافة المباراة";
@@ -196,6 +209,7 @@ export default function AdminPage() {
       setActualAwayScore("");
 
       await loadData();
+      setActiveTab("matches");
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "حدث خطأ أثناء احتساب المباراة";
@@ -240,6 +254,7 @@ export default function AdminPage() {
       setActualAwayScore("");
 
       await loadData();
+      setActiveTab("matches");
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "حدث خطأ أثناء التراجع عن الحسبة";
@@ -330,11 +345,11 @@ export default function AdminPage() {
       className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
     >
       <div className="mx-auto max-w-6xl">
-        <header className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
+        <header className="mb-4 rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl font-black">لوحة التحكم</h1>
-              <p className="mt-2 text-sm text-slate-300">
+              <h1 className="text-2xl font-black md:text-3xl">لوحة التحكم</h1>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
                 إدارة مباريات ونتائج وأعضاء وإعدادات منصة توقعات كأس العالم 2026.
               </p>
             </div>
@@ -348,6 +363,30 @@ export default function AdminPage() {
             </button>
           </div>
         </header>
+
+        <nav className="sticky top-3 z-40 mb-6 rounded-3xl border border-white/10 bg-slate-950/80 p-2 shadow-2xl backdrop-blur-xl">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+            {adminTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setMessage("");
+                  setError("");
+                }}
+                className={`rounded-2xl px-3 py-3 text-xs font-black transition md:text-sm ${
+                  activeTab === tab.id
+                    ? "bg-amber-400 text-slate-950"
+                    : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+                }`}
+              >
+                <span className="ml-1">{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </nav>
 
         {(message || error) && (
           <div className="mb-6 space-y-3">
@@ -365,11 +404,11 @@ export default function AdminPage() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
+        {activeTab === "add" && (
+          <section className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
             <h2 className="mb-4 text-xl font-black">إضافة مباراة جديدة</h2>
 
-            <form onSubmit={handleAddMatch} className="space-y-4">
+            <form onSubmit={handleAddMatch} className="mx-auto max-w-2xl space-y-4">
               <div>
                 <label className="mb-2 block text-sm font-bold">
                   الفريق الأول
@@ -412,30 +451,32 @@ export default function AdminPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-bold">
-                  تاريخ المباراة
-                </label>
-                <input
-                  type="date"
-                  value={matchDate}
-                  onChange={(event) => setMatchDate(event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
-                  required
-                />
-              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-bold">
+                    تاريخ المباراة
+                  </label>
+                  <input
+                    type="date"
+                    value={matchDate}
+                    onChange={(event) => setMatchDate(event.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-bold">
-                  وقت المباراة بتوقيت مكة
-                </label>
-                <input
-                  type="time"
-                  value={matchTime}
-                  onChange={(event) => setMatchTime(event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
-                  required
-                />
+                <div>
+                  <label className="mb-2 block text-sm font-bold">
+                    وقت المباراة بتوقيت مكة
+                  </label>
+                  <input
+                    type="time"
+                    value={matchTime}
+                    onChange={(event) => setMatchTime(event.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none focus:border-amber-400"
+                    required
+                  />
+                </div>
               </div>
 
               <button
@@ -446,12 +487,17 @@ export default function AdminPage() {
                 {saving ? "جاري الإضافة..." : "إضافة المباراة"}
               </button>
             </form>
-          </div>
+          </section>
+        )}
 
-          <div className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl">
+        {activeTab === "calculate" && (
+          <section className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl md:p-6">
             <h2 className="mb-4 text-xl font-black">احتساب نتيجة مباراة</h2>
 
-            <form onSubmit={handleCalculateMatch} className="space-y-4">
+            <form
+              onSubmit={handleCalculateMatch}
+              className="mx-auto max-w-2xl space-y-4"
+            >
               <div>
                 <label className="mb-2 block text-sm font-bold">
                   اختر المباراة
@@ -562,20 +608,16 @@ export default function AdminPage() {
                 إلى حالة غير محتسبة ويحذف نقاطها من جميع الأعضاء.
               </p>
             </form>
-          </div>
-        </section>
+          </section>
+        )}
 
-        <div className="mt-6">
-          <AdminSettingsPanel />
-        </div>
+        {activeTab === "settings" && <AdminSettingsPanel />}
 
-        <div className="mt-6">
-          <AdminMembersPanel />
-        </div>
+        {activeTab === "members" && <AdminMembersPanel />}
 
-        <div className="mt-6">
+        {activeTab === "matches" && (
           <AdminMatchesPanel matches={matches} loading={loading} />
-        </div>
+        )}
       </div>
     </main>
   );

@@ -4,115 +4,82 @@ import { useEffect, useState } from "react";
 import {
   ExactHit,
   getHomeHighlights,
-  HighlightUser,
-  HomeHighlights as HomeHighlightsType,
+  HomeHighlightUser,
 } from "@/lib/highlights";
+import { getSiteSettings, getTickerDuration } from "@/lib/siteSettings";
 
-function EmptyCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-}) {
+function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-3 md:p-5">
-      <div className="mb-2 text-xl md:text-2xl">{icon}</div>
-      <h3 className="text-sm font-black md:text-base">{title}</h3>
-      <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
-        {description}
-      </p>
+    <div className="rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl md:p-5">
+      <div className="text-lg font-black text-slate-200">{title}</div>
+      <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">{text}</p>
     </div>
   );
 }
 
 function HighlightCard({
-  icon,
   title,
   user,
   valueLabel,
   value,
+  accentClass,
 }: {
-  icon: string;
   title: string;
-  user: HighlightUser | null;
+  user: HomeHighlightUser | null;
   valueLabel: string;
   value: number;
+  accentClass: string;
 }) {
   if (!user) {
     return (
       <EmptyCard
-        icon={icon}
         title={title}
-        description="سيظهر هنا بعد احتساب النتائج."
+        text="لم تظهر الإحصائية بعد. تبدأ بعد احتساب أول النتائج."
       />
     );
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-3 md:p-5">
-      <div className="mb-2 text-xl md:text-2xl">{icon}</div>
+    <div className="rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl md:p-5">
+      <h2 className="text-lg font-black md:text-xl">{title}</h2>
 
-      <h3 className="text-sm font-black md:text-base">{title}</h3>
+      <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+        <div className="text-3xl">{user.teamEmoji || "🏳️"}</div>
 
-      <div className="mt-3 truncate text-base font-black text-amber-300 md:text-xl">
-        {user.fullName}
+        <div className="mt-2 text-xl font-black text-white">
+          {user.fullName}
+        </div>
+
+        <div className="mt-1 text-xs text-slate-300">
+          {user.favoriteTeam || "بدون منتخب"}
+        </div>
+
+        <div
+          className={`mt-4 rounded-2xl px-4 py-3 text-sm font-black ${accentClass}`}
+        >
+          {valueLabel}: {value}
+        </div>
       </div>
-
-      <div className="mt-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs text-slate-200 md:text-sm">
-        {valueLabel}:{" "}
-        <span className="font-black text-white">{value}</span>
-      </div>
-    </div>
-  );
-}
-
-function ExactHitPill({ hit }: { hit: ExactHit }) {
-  return (
-    <div className="exact-hit-pill inline-flex min-w-max items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-xs shadow-lg shadow-emerald-950/20">
-      <span className="font-black text-emerald-200">{hit.userName}</span>
-
-      <span className="text-slate-300">جابها صح</span>
-
-      <span className="rounded-full bg-slate-950/80 px-2 py-1 font-black text-amber-300">
-        {hit.actualHomeScore} - {hit.actualAwayScore}
-      </span>
-
-      <span className="text-slate-200">
-        {hit.homeTeamEmoji || "🏳️"} {hit.homeTeamName}
-      </span>
-
-      <span className="text-slate-400">×</span>
-
-      <span className="text-slate-200">
-        {hit.awayTeamName} {hit.awayTeamEmoji || "🏳️"}
-      </span>
-
-      <span className="rounded-full bg-emerald-400 px-2 py-0.5 text-[10px] font-black text-slate-950">
-        +3
-      </span>
     </div>
   );
 }
 
 export default function HomeHighlights() {
-  const [data, setData] = useState<HomeHighlightsType>({
-    predictionKing: null,
-    bestStreakUser: null,
-    exactHits: [],
-  });
-
+  const [predictionKing, setPredictionKing] =
+    useState<HomeHighlightUser | null>(null);
+  const [bestStreakUser, setBestStreakUser] =
+    useState<HomeHighlightUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadHighlights() {
       try {
-        const result = await getHomeHighlights();
-        setData(result);
+        const data = await getHomeHighlights();
+
+        setPredictionKing(data.predictionKing);
+        setBestStreakUser(data.bestStreakUser);
       } catch (error) {
-        console.error("فشل تحميل مميزات الصفحة:", error);
+        console.error("فشل تحميل مميزات الصفحة الرئيسية:", error);
       } finally {
         setLoading(false);
       }
@@ -127,33 +94,33 @@ export default function HomeHighlights() {
 
   if (loading) {
     return (
-      <section className="mt-5 rounded-2xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-6">
-        <div className="text-center text-xs text-slate-300">
-          جاري تحميل الإحصائيات...
-        </div>
+      <section className="mt-5 grid grid-cols-1 gap-4 md:mt-6 md:grid-cols-2">
+        <EmptyCard title="🏆 ملك التوقعات" text="جاري تحميل الإحصائيات..." />
+        <EmptyCard
+          title="🔥 أفضل سلسلة صحيحة"
+          text="جاري تحميل الإحصائيات..."
+        />
       </section>
     );
   }
 
   return (
-    <section className="mt-5 md:mt-6">
-      <div className="grid grid-cols-2 gap-3 md:gap-4">
-        <HighlightCard
-          icon="🏆"
-          title="ملك التوقعات"
-          user={data.predictionKing}
-          valueLabel="النقاط"
-          value={data.predictionKing?.points || 0}
-        />
+    <section className="mt-5 grid grid-cols-1 gap-4 md:mt-6 md:grid-cols-2">
+      <HighlightCard
+        title="🏆 ملك التوقعات"
+        user={predictionKing}
+        valueLabel="النقاط"
+        value={predictionKing?.points || 0}
+        accentClass="bg-amber-400 text-slate-950"
+      />
 
-        <HighlightCard
-          icon="🔥"
-          title="أفضل سلسلة صحيحة"
-          user={data.bestStreakUser}
-          valueLabel="أفضل سلسلة"
-          value={data.bestStreakUser?.bestStreak || 0}
-        />
-      </div>
+      <HighlightCard
+        title="🔥 أفضل سلسلة صحيحة"
+        user={bestStreakUser}
+        valueLabel="أفضل سلسلة"
+        value={bestStreakUser?.bestStreak || 0}
+        accentClass="bg-emerald-400 text-slate-950"
+      />
     </section>
   );
 }
@@ -161,69 +128,119 @@ export default function HomeHighlights() {
 export function ExactHitsTicker() {
   const [exactHits, setExactHits] = useState<ExactHit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [duration, setDuration] = useState(22);
 
   useEffect(() => {
     async function loadExactHits() {
       try {
-        const result = await getHomeHighlights();
-        setExactHits(result.exactHits);
+        const data = await getHomeHighlights();
+        setExactHits(data.exactHits);
       } catch (error) {
-        console.error("فشل تحميل جابها صح:", error);
+        console.error("فشل تحميل شريط جابها صح:", error);
       } finally {
         setLoading(false);
       }
     }
 
+    async function loadTickerSettings() {
+      try {
+        const settings = await getSiteSettings();
+        setDuration(getTickerDuration(settings.exactHitsSpeed));
+      } catch (error) {
+        console.error("فشل تحميل إعدادات سرعة جابها صح:", error);
+        setDuration(22);
+      }
+    }
+
     loadExactHits();
+    loadTickerSettings();
 
-    const interval = setInterval(loadExactHits, 30000);
+    const exactHitsInterval = setInterval(loadExactHits, 30000);
+    const settingsInterval = setInterval(loadTickerSettings, 15000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(exactHitsInterval);
+      clearInterval(settingsInterval);
+    };
   }, []);
 
   if (loading) {
     return (
-      <section className="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3 shadow-2xl md:mt-6">
-        <div className="text-center text-xs text-emerald-100/80">
-          جاري تحميل جابها صح...
+      <section className="mt-5 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 md:mt-6">
+        <div className="text-sm text-slate-300">
+          جاري تحميل شريط جابها صح...
         </div>
       </section>
     );
   }
 
+  if (exactHits.length === 0) {
+    return (
+      <section className="mt-5 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 md:mt-6">
+        <div className="flex items-center gap-2 text-sm text-slate-300">
+          <span>🎯</span>
+          <span>لم يسجل أحد نتيجة بالملي خلال آخر 24 ساعة.</span>
+        </div>
+      </section>
+    );
+  }
+
+  const repeatedHits =
+    exactHits.length === 1
+      ? Array(8).fill(exactHits[0])
+      : [...exactHits, ...exactHits, ...exactHits];
+
   return (
-    <section className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3 shadow-2xl md:mt-6">
+    <section className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 md:mt-6">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-black text-emerald-100 md:text-base">
+        <h2 className="text-sm font-black text-emerald-200">
           🎯 جابها صح
         </h2>
 
-        <span className="rounded-full bg-slate-950/50 px-2 py-1 text-[10px] text-emerald-100/80">
+        <span className="text-[11px] text-emerald-100/80">
           آخر 24 ساعة
         </span>
       </div>
 
-      {exactHits.length === 0 ? (
-        <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3 text-center text-xs text-slate-300">
-          ما فيه أحد جاب نتيجة بالملي خلال آخر 24 ساعة.
+      <div className="exact-hits-window relative overflow-hidden">
+        <div
+          className="exact-hits-track flex w-max gap-3"
+          style={{
+            animationDuration: `${duration}s`,
+          }}
+        >
+          {repeatedHits.map((hit, index) => (
+            <div
+              key={`${hit.id}-${index}`}
+              className="whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-white md:text-sm"
+            >
+              <span className="font-black text-emerald-300">
+                {hit.userName}
+              </span>{" "}
+              جابها صح بالملي في مباراة{" "}
+              <span className="font-bold">
+                {hit.homeTeamEmoji} {hit.homeTeamName}
+              </span>{" "}
+              <span className="font-black text-amber-300">
+                {hit.homeScore} - {hit.awayScore}
+              </span>{" "}
+              <span className="font-bold">
+                {hit.awayTeamName} {hit.awayTeamEmoji}
+              </span>
+            </div>
+          ))}
         </div>
-      ) : (
-        <div className="exact-hits-window overflow-hidden">
-          <div className="exact-hits-track flex w-max gap-2">
-            {[...exactHits, ...exactHits].map((hit, index) => (
-              <ExactHitPill key={`${hit.id}-${index}`} hit={hit} />
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
 
       <style jsx>{`
-        .exact-hit-pill {
-          animation: glowPulse 2.4s ease-in-out infinite;
+        .exact-hits-window {
+          direction: rtl;
         }
 
         .exact-hits-track {
-          animation: exactHitsMove 22s linear infinite;
+          animation-name: exactHitsMove;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
         }
 
         .exact-hits-track:hover {
@@ -236,16 +253,6 @@ export function ExactHitsTicker() {
           }
           to {
             transform: translateX(50%);
-          }
-        }
-
-        @keyframes glowPulse {
-          0%,
-          100% {
-            box-shadow: 0 0 0 rgba(52, 211, 153, 0);
-          }
-          50% {
-            box-shadow: 0 0 14px rgba(52, 211, 153, 0.25);
           }
         }
       `}</style>

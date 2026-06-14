@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { getLatestPredictions, LatestPrediction } from "@/lib/predictions";
+import { getSiteSettings, getTickerDuration } from "@/lib/siteSettings";
 
 export default function LatestPredictionsTicker() {
   const [predictions, setPredictions] = useState<LatestPrediction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [duration, setDuration] = useState(28);
 
   useEffect(() => {
     async function loadLatestPredictions() {
@@ -19,11 +21,26 @@ export default function LatestPredictionsTicker() {
       }
     }
 
+    async function loadTickerSettings() {
+      try {
+        const settings = await getSiteSettings();
+        setDuration(getTickerDuration(settings.latestPredictionsSpeed));
+      } catch (error) {
+        console.error("فشل تحميل إعدادات سرعة آخر التوقعات:", error);
+        setDuration(28);
+      }
+    }
+
     loadLatestPredictions();
+    loadTickerSettings();
 
-    const interval = setInterval(loadLatestPredictions, 30000);
+    const predictionsInterval = setInterval(loadLatestPredictions, 30000);
+    const settingsInterval = setInterval(loadTickerSettings, 15000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(predictionsInterval);
+      clearInterval(settingsInterval);
+    };
   }, []);
 
   if (loading) {
@@ -63,7 +80,12 @@ export default function LatestPredictionsTicker() {
       </div>
 
       <div className="ticker-window relative overflow-hidden">
-        <div className="ticker-track flex w-max gap-3">
+        <div
+          className="ticker-track flex w-max gap-3"
+          style={{
+            animationDuration: `${duration}s`,
+          }}
+        >
           {repeatedPredictions.map((prediction, index) => (
             <div
               key={`${prediction.id}-${index}`}
@@ -93,7 +115,9 @@ export default function LatestPredictionsTicker() {
         }
 
         .ticker-track {
-          animation: tickerMove 28s linear infinite;
+          animation-name: tickerMove;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
         }
 
         .ticker-track:hover {
