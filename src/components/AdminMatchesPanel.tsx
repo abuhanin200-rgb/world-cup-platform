@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { Match } from "@/lib/matches";
 import { deleteAdminMatch, updateAdminMatch } from "@/lib/adminMatches";
 import { addAdminLog } from "@/lib/adminLogs";
+import { deleteTestMatch } from "@/lib/deleteTestMatch";
 
 type AdminMatchesPanelProps = {
   matches: Match[];
@@ -31,6 +32,7 @@ export default function AdminMatchesPanel({
 
   const [savingMatchId, setSavingMatchId] = useState("");
   const [deletingMatchId, setDeletingMatchId] = useState("");
+  const [deletingTestMatchId, setDeletingTestMatchId] = useState("");
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -121,7 +123,9 @@ export default function AdminMatchesPanel({
       await addAdminLog({
         action: "other",
         title: "تعديل مباراة",
-        description: `تم تعديل مباراة ${match.homeTeamName} ضد ${match.awayTeamName}. التاريخ الجديد: ${editDate}، الوقت الجديد: ${editTime}، الحالة: ${
+        description: `تم تعديل مباراة ${match.homeTeamName} ضد ${
+          match.awayTeamName
+        }. التاريخ الجديد: ${editDate}، الوقت الجديد: ${editTime}، الحالة: ${
           editIsActive ? "مفعلة" : "مخفية"
         }.`,
       });
@@ -173,6 +177,57 @@ export default function AdminMatchesPanel({
       setError(errorMessage);
     } finally {
       setDeletingMatchId("");
+    }
+  }
+
+  async function handleDeleteTestMatch(match: Match) {
+    setMessage("");
+    setError("");
+
+    if (match.isActive) {
+      setError("لا يمكن حذف مباراة اختبار إلا بعد إخفائها أولًا.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `تنبيه مهم جدًا:\n\nسيتم حذف مباراة ${match.homeTeamName} ضد ${match.awayTeamName} وكل التوقعات المرتبطة بها، ثم إعادة بناء نقاط الأعضاء ولوحة الصدارة.\n\nاستخدم هذا الخيار لمباريات الاختبار فقط.\n\nهل تريد المتابعة؟`
+    );
+
+    if (!confirmed) return;
+
+    const typedConfirm = window.prompt(
+      "للتأكيد اكتب بالضبط:\nحذف مباراة اختبار"
+    );
+
+    if (typedConfirm !== "حذف مباراة اختبار") {
+      setError("تم إلغاء العملية لأن عبارة التأكيد غير صحيحة.");
+      return;
+    }
+
+    setDeletingTestMatchId(match.id);
+
+    try {
+      const result = await deleteTestMatch(match.id);
+
+      await addAdminLog({
+        action: "other",
+        title: "حذف مباراة اختبار",
+        description: `تم حذف مباراة اختبار ${match.homeTeamName} ضد ${match.awayTeamName} وتنظيف الإحصائيات. التوقعات المحذوفة: ${result.deletedPredictionsCount}.`,
+      });
+
+      setMessage(
+        `تم حذف مباراة الاختبار بنجاح ✅ التوقعات المحذوفة: ${result.deletedPredictionsCount} — الأعضاء المعاد حسابهم: ${result.rebuiltUsersCount}`
+      );
+
+      if (onChanged) {
+        await onChanged();
+      }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "تعذر حذف مباراة الاختبار";
+      setError(errorMessage);
+    } finally {
+      setDeletingTestMatchId("");
     }
   }
 
@@ -281,6 +336,7 @@ export default function AdminMatchesPanel({
               const isEditing = editingMatchId === match.id;
               const isCalculated =
                 match.resultCalculated || match.status === "finished";
+              const isDeletingTest = deletingTestMatchId === match.id;
 
               return (
                 <div
@@ -376,7 +432,9 @@ export default function AdminMatchesPanel({
                       </div>
 
                       <label className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm">
-                        <span className="font-bold">تفعيل المباراة للجمهور</span>
+                        <span className="font-bold">
+                          تفعيل المباراة للجمهور
+                        </span>
                         <input
                           type="checkbox"
                           checked={editIsActive}
@@ -425,6 +483,19 @@ export default function AdminMatchesPanel({
                       >
                         {deletingMatchId === match.id ? "جاري الحذف..." : "حذف"}
                       </button>
+
+                      {!match.isActive && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTestMatch(match)}
+                          disabled={isDeletingTest}
+                          className="col-span-2 rounded-xl border border-red-400/50 bg-red-500/20 px-3 py-2 text-xs font-black text-red-100 hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isDeletingTest
+                            ? "جاري حذف مباراة الاختبار..."
+                            : "🧹 حذف اختبار وتنظيف الإحصائيات"}
+                        </button>
+                      )}
                     </div>
                   )}
 
@@ -432,6 +503,14 @@ export default function AdminMatchesPanel({
                     <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-slate-300">
                       لا يمكن حذف مباراة محتسبة. للتعديل الجذري استخدم تراجع عن
                       الحسبة أولًا.
+                    </div>
+                  )}
+
+                  {!match.isActive && (
+                    <div className="mt-3 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-[11px] leading-5 text-red-100">
+                      هذه المباراة مخفية. زر حذف الاختبار يحذف المباراة وكل
+                      توقعاتها ويعيد بناء الإحصائيات. استخدمه فقط لمباريات
+                      التجربة.
                     </div>
                   )}
                 </div>
