@@ -22,7 +22,7 @@ type SavedPredictions = Record<string, Prediction>;
 
 function formatDate(matchDate: string) {
   try {
-    return new Intl.DateTimeFormat("ar-SA-u-nu-latn", {
+    return new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
       weekday: "long",
       day: "2-digit",
       month: "2-digit",
