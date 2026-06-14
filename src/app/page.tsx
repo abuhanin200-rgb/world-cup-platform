@@ -1,125 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { getSiteSettings } from "@/lib/siteSettings";
 import TopCandidateTeams from "@/components/TopCandidateTeams";
 import LatestPredictionsTicker from "@/components/LatestPredictionsTicker";
 import MatchesPredictionBox from "@/components/MatchesPredictionBox";
 import LeaderboardTable from "@/components/LeaderboardTable";
 import HomeHighlights, { ExactHitsTicker } from "@/components/HomeHighlights";
 
-type MaintenanceState = {
-  loading: boolean;
-  enabled: boolean;
-  message: string;
-};
-
 export default function HomePage() {
   const router = useRouter();
   const { user, loading, isLoggedIn, logout } = useAuth();
-
-  const [maintenance, setMaintenance] = useState<MaintenanceState>({
-    loading: true,
-    enabled: false,
-    message: "",
-  });
-
-  useEffect(() => {
-    async function loadMaintenanceSettings() {
-      try {
-        const settings = await getSiteSettings();
-
-        setMaintenance({
-          loading: false,
-          enabled: settings.maintenanceMode,
-          message: settings.maintenanceMessage,
-        });
-      } catch (error) {
-        console.error("فشل تحميل إعدادات الصيانة:", error);
-
-        setMaintenance({
-          loading: false,
-          enabled: false,
-          message: "",
-        });
-      }
-    }
-
-    loadMaintenanceSettings();
-
-    const interval = setInterval(loadMaintenanceSettings, 15000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  if (maintenance.loading) {
-    return (
-      <main
-        dir="rtl"
-        className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
-      >
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl">
-          <div className="mx-auto mb-4 h-12 w-12 overflow-hidden rounded-2xl border border-white/20 bg-white/10">
-            <img
-              src="/wc2026-logo.png"
-              alt="شعار منصة توقعات كأس العالم 2026"
-              className="h-full w-full object-contain p-1"
-            />
-          </div>
-
-          <h1 className="text-xl font-black">جاري تحميل المنصة...</h1>
-          <p className="mt-2 text-sm text-slate-300">لحظات بسيطة</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (maintenance.enabled) {
-    return (
-      <main
-        dir="rtl"
-        className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
-      >
-        <section className="w-full max-w-xl rounded-[2rem] border border-red-400/20 bg-white/10 p-6 text-center shadow-2xl backdrop-blur-xl md:p-8">
-          <div className="mx-auto mb-5 h-20 w-20 overflow-hidden rounded-3xl border border-white/20 bg-white/10 md:h-24 md:w-24">
-            <img
-              src="/wc2026-logo.png"
-              alt="شعار منصة توقعات كأس العالم 2026"
-              className="h-full w-full object-contain p-2"
-            />
-          </div>
-
-          <div className="mx-auto mb-5 w-fit rounded-full border border-red-400/30 bg-red-500/15 px-4 py-2 text-sm font-black text-red-100">
-            الموقع مغلق مؤقتًا
-          </div>
-
-          <h1 className="text-2xl font-black leading-snug md:text-4xl">
-            نعتذر منكم يا أبطال
-          </h1>
-
-          <p className="mt-5 whitespace-pre-line rounded-3xl border border-white/10 bg-slate-950/60 p-5 text-sm leading-8 text-slate-100 md:text-base">
-            {maintenance.message ||
-              "الموقع مغلق مؤقتًا للصيانة بسبب بعض المشاكل التقنية وتضخم البيانات. نعتذر لكم، وراح نرجع لكم قريب بإذن الله."}
-          </p>
-
-          <div className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
-            شكرًا لصبركم، نشتغل على تحسين التجربة وترتيب البيانات عشان ترجع
-            المنصة بشكل أفضل.
-          </div>
-
-          <button
-            type="button"
-            onClick={() => router.push("/admin")}
-            className="mt-6 rounded-xl border border-white/10 bg-white/10 px-5 py-3 text-sm font-black text-white hover:bg-white/15"
-          >
-            دخول الأدمن
-          </button>
-        </section>
-      </main>
-    );
-  }
 
   return (
     <main
@@ -196,9 +87,9 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-3 py-5 md:px-4 md:py-8">
-        <div className="rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl md:p-6">
-          <h2 className="mb-3 text-2xl font-black leading-snug md:text-4xl">
+      <section className="mx-auto max-w-6xl px-3 py-4 md:px-4 md:py-6">
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl md:p-5">
+          <h2 className="mb-2 text-2xl font-black leading-snug md:text-4xl">
             تحدي توقعات كأس العالم 2026
           </h2>
 
@@ -208,7 +99,7 @@ export default function HomePage() {
           </p>
 
           {!isLoggedIn && !loading && (
-            <div className="mt-5 flex flex-row justify-center gap-2 md:mt-6 md:gap-3">
+            <div className="mt-4 flex flex-row justify-center gap-2 md:mt-5 md:gap-3">
               <button
                 onClick={() => router.push("/register")}
                 className="rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 md:px-6"
@@ -226,24 +117,24 @@ export default function HomePage() {
           )}
 
           {isLoggedIn && user && (
-            <div className="mt-5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100 md:mt-6 md:p-4 md:text-base">
+            <div className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100 md:mt-5 md:p-4 md:text-base">
               أهلًا بعودتك يا بطل {user.fullName}، نقاطك الحالية:{" "}
               <strong>{user.points}</strong>
             </div>
           )}
         </div>
 
-        <div className="mt-5 md:mt-6">
+        <div className="mt-4 md:mt-5">
           <TopCandidateTeams />
         </div>
 
-        <div className="mt-5 md:mt-6">
+        <div className="mt-4 md:mt-5">
           <LatestPredictionsTicker />
         </div>
 
         <HomeHighlights />
 
-        <div className="mt-5 md:mt-6">
+        <div className="mt-4 md:mt-5">
           <MatchesPredictionBox />
         </div>
 
