@@ -34,6 +34,25 @@ function formatDate(matchDate: string) {
   }
 }
 
+function formatMatchTimeOnly(startAt: string) {
+  try {
+    const date = new Date(startAt);
+
+    if (Number.isNaN(date.getTime())) return "";
+
+    const formatted = new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Riyadh",
+    }).format(date);
+
+    return formatted.replace(/\s/g, "");
+  } catch {
+    return "";
+  }
+}
+
 function getCountdownText(startAt: string) {
   const startTime = new Date(startAt).getTime();
 
@@ -266,6 +285,7 @@ export default function MatchesPredictionBox() {
             const savedPrediction = savedPredictions[match.id];
             const closed = isPredictionClosed(match.startAt);
             const countdownText = getCountdownText(match.startAt);
+            const matchTime = formatMatchTimeOnly(match.startAt);
 
             return (
               <article
@@ -273,8 +293,14 @@ export default function MatchesPredictionBox() {
                 className="rounded-3xl border border-white/10 bg-slate-950/60 p-4 shadow-xl"
               >
                 <div className="mb-4 space-y-2">
-                  <div className="text-right text-sm font-bold text-slate-200">
-                    {formatDate(match.matchDate)}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-left text-xs font-medium text-slate-300 md:text-sm">
+                      {matchTime}
+                    </div>
+
+                    <div className="text-right text-sm font-bold text-slate-200">
+                      {formatDate(match.matchDate)}
+                    </div>
                   </div>
 
                   <div
