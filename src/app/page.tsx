@@ -8,6 +8,7 @@ import MatchesPredictionBox from "@/components/MatchesPredictionBox";
 import LeaderboardTable from "@/components/LeaderboardTable";
 import HomeHighlights, { ExactHitsTicker } from "@/components/HomeHighlights";
 import ExactPredictionCelebration from "@/components/ExactPredictionCelebration";
+import HomeBanner from "@/components/HomeBanner";
 
 const forgotPasswordMessage = `السلام عليكم، نسيت الرقم السري في منصة توقعات كأس العالم 2026.
 
@@ -169,6 +170,8 @@ export default function HomePage() {
             </button>
           </div>
         </div>
+
+        <HomeBanner />
 
         <div className="mt-4 md:mt-5">
           <TopCandidateTeams />

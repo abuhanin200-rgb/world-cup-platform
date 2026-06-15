@@ -3,15 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { addMatch, getAllMatches, Match } from "@/lib/matches";
 import { getTeams, Team } from "@/lib/teams";
-import {
-  calculateMatchResult,
-  undoMatchCalculation,
-} from "@/lib/scoring";
-import {
-  isAdminUnlocked,
-  lockAdmin,
-  unlockAdmin,
-} from "@/lib/adminAuth";
+import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
+import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
 import { addAdminLog } from "@/lib/adminLogs";
 import AdminOverviewPanel from "@/components/AdminOverviewPanel";
 import AdminMembersPanel from "@/components/AdminMembersPanel";
@@ -19,12 +12,14 @@ import AdminSettingsPanel from "@/components/AdminSettingsPanel";
 import AdminMatchesPanel from "@/components/AdminMatchesPanel";
 import AdminLogsPanel from "@/components/AdminLogsPanel";
 import AdminPredictionsPanel from "@/components/AdminPredictionsPanel";
+import AdminHomeBannerPanel from "@/components/AdminHomeBannerPanel";
 
 type AdminTab =
   | "overview"
   | "add"
   | "calculate"
   | "settings"
+  | "banner"
   | "members"
   | "predictions"
   | "matches"
@@ -465,6 +460,18 @@ export default function AdminPage() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("banner")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "banner"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            🖼️ البانر
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("members")}
             className={`rounded-xl px-3 py-2 text-sm font-bold ${
               activeTab === "members"
@@ -751,6 +758,8 @@ export default function AdminPage() {
         )}
 
         {activeTab === "settings" && <AdminSettingsPanel />}
+
+        {activeTab === "banner" && <AdminHomeBannerPanel />}
 
         {activeTab === "members" && <AdminMembersPanel />}
 
