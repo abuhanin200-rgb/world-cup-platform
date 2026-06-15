@@ -9,6 +9,20 @@ import LeaderboardTable from "@/components/LeaderboardTable";
 import HomeHighlights, { ExactHitsTicker } from "@/components/HomeHighlights";
 import ExactPredictionCelebration from "@/components/ExactPredictionCelebration";
 
+const forgotPasswordMessage = `السلام عليكم، نسيت الرقم السري في منصة توقعات كأس العالم 2026.
+
+*بيانات التحقق*
+
+الاسم المسجل:
+رقم الجوال المسجل:
+المنتخب المرشح:
+
+أرجو إعادة تعيين كلمة المرور.`;
+
+const forgotPasswordWhatsappUrl = `https://wa.me/966542180200?text=${encodeURIComponent(
+  forgotPasswordMessage
+)}`;
+
 export default function HomePage() {
   const router = useRouter();
   const { user, loading, isLoggedIn, logout } = useAuth();
@@ -53,6 +67,7 @@ export default function HomePage() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => router.push("/account")}
                   className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
                 >
@@ -60,6 +75,7 @@ export default function HomePage() {
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => {
                     logout();
                     router.push("/");
@@ -72,6 +88,7 @@ export default function HomePage() {
             ) : (
               <>
                 <button
+                  type="button"
                   onClick={() => router.push("/login")}
                   className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
                 >
@@ -79,6 +96,7 @@ export default function HomePage() {
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => router.push("/register")}
                   className="rounded-xl bg-amber-400 px-2 py-2 text-xs font-black text-slate-950 hover:bg-amber-300 md:px-3 md:text-sm"
                 >
@@ -102,21 +120,36 @@ export default function HomePage() {
           </p>
 
           {!isLoggedIn && !loading && (
-            <div className="mt-4 flex flex-row justify-center gap-2 md:mt-5 md:gap-3">
-              <button
-                onClick={() => router.push("/register")}
-                className="rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 md:px-6"
-              >
-                ابدأ التحدي الآن
-              </button>
+            <>
+              <div className="mt-4 flex flex-row justify-center gap-2 md:mt-5 md:gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push("/register")}
+                  className="rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 md:px-6"
+                >
+                  ابدأ التحدي الآن
+                </button>
 
-              <button
-                onClick={() => router.push("/login")}
-                className="rounded-xl border border-white/10 px-4 py-3 text-sm font-bold hover:bg-white/10 md:px-6"
-              >
-                لدي حساب
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => router.push("/login")}
+                  className="rounded-xl border border-white/10 px-4 py-3 text-sm font-bold hover:bg-white/10 md:px-6"
+                >
+                  لدي حساب
+                </button>
+              </div>
+
+              <div className="mt-3">
+                <a
+                  href={forgotPasswordWhatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full max-w-sm items-center justify-center rounded-xl border border-red-300/40 bg-red-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-red-950/30 hover:bg-red-500 md:text-base"
+                >
+                  🔐 نسيت الرقم السري؟ تواصل معنا واتساب
+                </a>
+              </div>
+            </>
           )}
 
           {isLoggedIn && user && (
@@ -128,6 +161,7 @@ export default function HomePage() {
 
           <div className="mt-3">
             <button
+              type="button"
               onClick={() => router.push("/rules")}
               className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100 hover:bg-amber-400/20 md:text-sm"
             >
