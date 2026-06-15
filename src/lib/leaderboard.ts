@@ -19,11 +19,29 @@ export type LeaderboardUser = {
 
   currentStreak: number;
   bestStreak: number;
+
+  lastPredictionAt?: string;
 };
 
 function toNumber(value: unknown) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function toText(value: unknown) {
+  return String(value || "").trim();
+}
+
+function toTime(value: unknown) {
+  const text = toText(value);
+
+  if (!text) return Number.MAX_SAFE_INTEGER;
+
+  const time = new Date(text).getTime();
+
+  if (!Number.isFinite(time)) return Number.MAX_SAFE_INTEGER;
+
+  return time;
 }
 
 export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
@@ -57,6 +75,8 @@ export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
 
         currentStreak: toNumber(data.currentStreak),
         bestStreak: toNumber(data.bestStreak),
+
+        lastPredictionAt: toText(data.lastPredictionAt),
       } as LeaderboardUser;
     });
 
@@ -74,10 +94,29 @@ export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
         return aHasPredictions ? -1 : 1;
       }
 
+      /**
+       * ترتيب لوحة الصدارة:
+       * 1- النقاط الأعلى.
+       * 2- عدد التوقعات الصحيحة الأعلى.
+       * 3- عدد التوقعات الأعلى.
+       * 4- عدد الأخطاء الأقل.
+       * 5- الأسرع في إرسال آخر توقع عند التساوي الكامل.
+       * 6- الاسم أبجديًا فقط إذا لم يوجد وقت محفوظ.
+       *
+       * هذا الترتيب لا يغير الحسبة ولا النقاط.
+       * فقط يغير طريقة عرض الأعضاء في لوحة الصدارة.
+       */
       if (b.points !== a.points) return b.points - a.points;
       if (b.correct !== a.correct) return b.correct - a.correct;
+      if (b.total !== a.total) return b.total - a.total;
       if (a.wrong !== b.wrong) return a.wrong - b.wrong;
-      if (a.total !== b.total) return a.total - b.total;
+
+      const aPredictionTime = toTime(a.lastPredictionAt);
+      const bPredictionTime = toTime(b.lastPredictionAt);
+
+      if (aPredictionTime !== bPredictionTime) {
+        return aPredictionTime - bPredictionTime;
+      }
 
       return a.fullName.localeCompare(b.fullName, "ar");
     })
