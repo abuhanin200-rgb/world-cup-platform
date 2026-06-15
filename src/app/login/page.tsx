@@ -4,6 +4,20 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
+const forgotPasswordMessage = `السلام عليكم، نسيت الرقم السري في منصة توقعات كأس العالم 2026.
+
+*بيانات التحقق*
+
+الاسم المسجل:
+رقم الجوال المسجل:
+المنتخب المرشح:
+
+أرجو إعادة تعيين كلمة المرور.`;
+
+const forgotPasswordWhatsappUrl = `https://wa.me/966542180200?text=${encodeURIComponent(
+  forgotPasswordMessage
+)}`;
+
 export default function LoginPage() {
   const router = useRouter();
   const { login, isLoggedIn, loading: authLoading } = useAuth();
@@ -50,11 +64,11 @@ export default function LoginPage() {
   return (
     <main
       dir="rtl"
-      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white flex items-center justify-center p-4"
+      className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
     >
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 backdrop-blur-xl shadow-2xl p-6">
-        <div className="text-center mb-8">
-          <div className="mx-auto mb-4 h-20 w-20 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur-xl">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/10">
             <img
               src="/wc2026-logo.png"
               alt="شعار المنصة"
@@ -62,7 +76,8 @@ export default function LoginPage() {
             />
           </div>
 
-          <h1 className="text-2xl font-black mb-2">تسجيل الدخول</h1>
+          <h1 className="mb-2 text-2xl font-black">تسجيل الدخول</h1>
+
           <p className="text-sm text-slate-300">
             أدخل بياناتك للعودة إلى منصة توقعات كأس العالم 2026.
           </p>
@@ -71,6 +86,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-2 block text-sm font-bold">الاسم</label>
+
             <input
               type="text"
               value={fullName}
@@ -83,6 +99,7 @@ export default function LoginPage() {
 
           <div>
             <label className="mb-2 block text-sm font-bold">الرقم السري</label>
+
             <input
               type="password"
               value={password}
@@ -121,6 +138,15 @@ export default function LoginPage() {
         >
           ما عندك حساب؟ تسجيل جديد
         </button>
+
+        <a
+          href={forgotPasswordWhatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 flex w-full items-center justify-center rounded-xl border border-red-300/40 bg-red-600 px-4 py-3 text-center text-sm font-black text-white shadow-lg shadow-red-950/30 hover:bg-red-500"
+        >
+          🔐 نسيت الرقم السري؟ تواصل معنا واتساب
+        </a>
 
         <button
           type="button"
