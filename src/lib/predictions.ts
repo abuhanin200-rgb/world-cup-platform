@@ -1,11 +1,12 @@
 import {
-  addDoc,
   collection,
+  doc,
   getDocs,
   limit,
   query,
   serverTimestamp,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -232,10 +233,31 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     updatedAt: now,
   };
 
-  const docRef = await addDoc(collection(db, "predictions"), predictionData);
+  /**
+   * نحفظ التوقع ونحدث وقت آخر توقع للعضو في عملية واحدة.
+   * هذا لا يغير النقاط ولا الحسبة.
+   * فقط يساعد لوحة الصدارة على ترتيب المتساوين حسب الأسرع.
+   */
+  const predictionRef = doc(collection(db, "predictions"));
+  const userRef = doc(db, "users", input.userId);
+
+  const batch = writeBatch(db);
+
+  batch.set(predictionRef, predictionData);
+
+  batch.set(
+    userRef,
+    {
+      lastPredictionAt: now,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  await batch.commit();
 
   return {
-    id: docRef.id,
+    id: predictionRef.id,
     ...predictionData,
   } as Prediction;
 }
