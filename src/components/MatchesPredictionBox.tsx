@@ -113,7 +113,9 @@ export default function MatchesPredictionBox() {
   async function loadMatches() {
     try {
       setLoading(true);
+
       const data = await getVisibleMatches();
+
       setMatches(data);
     } catch (error) {
       console.error("Load matches error:", error);
@@ -294,12 +296,12 @@ export default function MatchesPredictionBox() {
               >
                 <div className="mb-4 space-y-2">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-left text-xs font-medium text-slate-300 md:text-sm">
-                      {matchTime}
+                    <div className="text-right text-sm font-black text-slate-200 md:text-base">
+                      {formatDate(match.matchDate)}
                     </div>
 
-                    <div className="text-right text-sm font-bold text-slate-200">
-                      {formatDate(match.matchDate)}
+                    <div className="text-left text-xs font-medium text-slate-300 md:text-sm">
+                      {matchTime}
                     </div>
                   </div>
 
