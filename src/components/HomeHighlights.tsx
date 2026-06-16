@@ -22,13 +22,13 @@ type ExtendedHighlightsResponse = {
 
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 text-center shadow-xl md:p-3">
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center shadow-xl">
       <div className="text-sm font-black text-slate-100 md:text-base">
         {title}
       </div>
 
-      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-3 py-4">
-        <p className="text-[11px] leading-5 text-slate-300 md:text-xs">
+      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-2 py-3">
+        <p className="text-[10px] leading-5 text-slate-300 md:text-xs">
           {text}
         </p>
       </div>
@@ -57,22 +57,22 @@ function HighlightCard({
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 text-center shadow-xl md:p-3">
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center shadow-xl">
       <h2 className="text-sm font-black text-white md:text-base">{title}</h2>
 
-      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-3 py-3 md:px-4 md:py-4">
-        <div className="text-xl md:text-2xl">{user.teamEmoji || "🏳️"}</div>
+      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-2 py-3">
+        <div className="text-lg md:text-xl">{user.teamEmoji || "🏳️"}</div>
 
-        <div className="mt-2 text-base font-black leading-6 text-white md:text-lg">
+        <div className="mt-1 text-sm font-black leading-5 text-white md:text-base">
           {user.fullName}
         </div>
 
-        <div className="mt-1 text-xs text-slate-300 md:text-sm">
+        <div className="mt-1 text-[10px] text-slate-300 md:text-xs">
           {user.favoriteTeam || "بدون منتخب"}
         </div>
 
         <div
-          className={`mt-3 rounded-xl px-3 py-2 text-sm font-black md:text-base ${accentClass}`}
+          className={`mt-2 rounded-xl px-2 py-2 text-xs font-black md:text-sm ${accentClass}`}
         >
           {badgeText}
         </div>
@@ -120,14 +120,14 @@ export default function HomeHighlights() {
   if (loading) {
     return (
       <section className="mt-4 md:mt-5">
-        <div className="mb-3 text-center md:mb-4">
-          <h2 className="text-2xl font-black md:text-3xl">🔥 أبطال التحدي الآن</h2>
-          <p className="mt-1 text-xs text-slate-300 md:text-sm">
+        <div className="mb-3 text-center">
+          <h2 className="text-xl font-black md:text-2xl">🔥 أبطال التحدي الآن</h2>
+          <p className="mt-1 text-[11px] text-slate-300 md:text-xs">
             أسماء تتغير تلقائيًا حسب التوقعات والنتائج.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <EmptyCard title="🏆 ملك التوقعات" text="جاري التحميل..." />
           <EmptyCard title="🔥 أفضل سلسلة" text="جاري التحميل..." />
           <EmptyCard title="⚡ أول الواصلين" text="جاري التحميل..." />
@@ -144,14 +144,14 @@ export default function HomeHighlights() {
 
   return (
     <section className="mt-4 md:mt-5">
-      <div className="mb-3 text-center md:mb-4">
-        <h2 className="text-2xl font-black md:text-3xl">🔥 أبطال التحدي الآن</h2>
-        <p className="mt-1 text-xs text-slate-300 md:text-sm">
+      <div className="mb-3 text-center">
+        <h2 className="text-xl font-black md:text-2xl">🔥 أبطال التحدي الآن</h2>
+        <p className="mt-1 text-[11px] text-slate-300 md:text-xs">
           أسماء تتغير تلقائيًا حسب التوقعات والنتائج.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <HighlightCard
           title="🏆 ملك التوقعات"
           user={predictionKing}
@@ -253,7 +253,6 @@ export function ExactHitsTicker() {
     <section className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 md:mt-6">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-black text-emerald-200">🎯 جابها صح</h2>
-
         <span className="text-[11px] text-emerald-100/80">آخر 24 ساعة</span>
       </div>
 
