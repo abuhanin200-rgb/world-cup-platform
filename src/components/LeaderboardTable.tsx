@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  getLeaderboardUsers,
-  LeaderboardUser,
-} from "@/lib/leaderboard";
+import { getLeaderboardUsers, LeaderboardUser } from "@/lib/leaderboard";
 
 const USERS_PER_PAGE = 20;
 
@@ -32,10 +29,60 @@ function RankMovement({ user }: { user: LeaderboardUser }) {
   );
 }
 
+function getTopRankStyle(rank: number) {
+  if (rank === 1) {
+    return {
+      rowClass:
+        "bg-gradient-to-l from-amber-400/20 via-amber-300/10 to-transparent",
+      badgeClass:
+        "bg-gradient-to-br from-amber-300 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/30 ring-2 ring-amber-200/40",
+      nameClass: "text-amber-100",
+      icon: "👑",
+      medal: "🥇",
+    };
+  }
+
+  if (rank === 2) {
+    return {
+      rowClass:
+        "bg-gradient-to-l from-slate-300/16 via-slate-200/8 to-transparent",
+      badgeClass:
+        "bg-gradient-to-br from-slate-100 to-slate-400 text-slate-950 shadow-lg shadow-slate-400/20 ring-2 ring-slate-100/30",
+      nameClass: "text-slate-100",
+      icon: "",
+      medal: "🥈",
+    };
+  }
+
+  if (rank === 3) {
+    return {
+      rowClass:
+        "bg-gradient-to-l from-orange-500/16 via-orange-300/8 to-transparent",
+      badgeClass:
+        "bg-gradient-to-br from-orange-300 to-orange-600 text-slate-950 shadow-lg shadow-orange-500/20 ring-2 ring-orange-200/30",
+      nameClass: "text-orange-100",
+      icon: "",
+      medal: "🥉",
+    };
+  }
+
+  return {
+    rowClass: "",
+    badgeClass: "bg-amber-400 text-slate-950 shadow-lg",
+    nameClass: "text-white",
+    icon: "",
+    medal: "",
+  };
+}
+
 function RankBadge({ rank }: { rank: number }) {
+  const style = getTopRankStyle(rank);
+
   return (
-    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[11px] font-black text-slate-950 shadow-lg md:h-9 md:w-9 md:text-sm">
-      {rank}
+    <span
+      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black md:h-9 md:w-9 md:text-sm ${style.badgeClass}`}
+    >
+      {rank <= 3 ? style.medal : rank}
     </span>
   );
 }
@@ -138,41 +185,61 @@ export default function LeaderboardTable() {
               </thead>
 
               <tbody>
-                {visibleUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-t border-white/10 text-[11px] md:text-sm"
-                  >
-                    <td className="px-1 py-3 md:px-4 md:py-4">
-                      <div className="flex items-center justify-center gap-1 md:gap-2">
-                        <RankBadge rank={user.currentRank} />
-                        <RankMovement user={user} />
-                      </div>
-                    </td>
+                {visibleUsers.map((user) => {
+                  const style = getTopRankStyle(user.currentRank);
 
-                    <td className="px-1 py-3 font-black md:px-4 md:py-4">
-                      <div className="truncate">{user.fullName}</div>
-                    </td>
+                  return (
+                    <tr
+                      key={user.id}
+                      className={`border-t border-white/10 text-[11px] transition md:text-sm ${style.rowClass}`}
+                    >
+                      <td className="px-1 py-3 md:px-4 md:py-4">
+                        <div className="flex items-center justify-center gap-1 md:gap-2">
+                          <RankBadge rank={user.currentRank} />
+                          <RankMovement user={user} />
+                        </div>
+                      </td>
 
-                    <td className="px-1 py-3 font-black text-slate-200 md:px-4 md:py-4">
-                      {user.total}
-                    </td>
+                      <td className="px-1 py-3 font-black md:px-4 md:py-4">
+                        <div
+                          className={`flex min-w-0 items-center justify-center gap-1 ${style.nameClass}`}
+                        >
+                          {style.icon && (
+                            <span className="shrink-0 text-sm md:text-base">
+                              {style.icon}
+                            </span>
+                          )}
 
-                    <td className="px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
-                      {user.correct}
-                    </td>
+                          <span className="truncate">{user.fullName}</span>
+                        </div>
+                      </td>
 
-                    <td className="px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
-                      {user.wrong}
-                    </td>
+                      <td className="px-1 py-3 font-black text-slate-200 md:px-4 md:py-4">
+                        {user.total}
+                      </td>
 
-                    <td className="px-1 py-3 md:px-4 md:py-4">
-                      <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-amber-400 px-2 text-[11px] font-black text-slate-950 md:h-8 md:min-w-8 md:px-3 md:text-sm">
-                        {user.points}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
+                        {user.correct}
+                      </td>
+
+                      <td className="px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
+                        {user.wrong}
+                      </td>
+
+                      <td className="px-1 py-3 md:px-4 md:py-4">
+                        <span
+                          className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[11px] font-black md:h-8 md:min-w-8 md:px-3 md:text-sm ${
+                            user.currentRank <= 3
+                              ? style.badgeClass
+                              : "bg-amber-400 text-slate-950"
+                          }`}
+                        >
+                          {user.points}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
