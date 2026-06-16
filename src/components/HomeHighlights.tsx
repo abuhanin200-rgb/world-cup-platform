@@ -137,7 +137,7 @@ export default function HomeHighlights() {
       <section className="mt-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-5 md:p-4">
         <div className="mb-3 text-center">
           <h2 className="text-base font-black md:text-xl">
-            🔥 أبطال التحدي الآن
+             أبطال التحدي الآن
           </h2>
 
           <p className="mt-1 text-[10px] text-slate-300 md:text-xs">
