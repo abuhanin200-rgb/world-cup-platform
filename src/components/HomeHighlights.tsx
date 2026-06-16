@@ -10,12 +10,12 @@ import { getSiteSettings, TickerSpeed } from "@/lib/siteSettings";
 
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center shadow-xl">
-      <div className="text-sm font-black text-slate-200 md:text-base">
+    <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-center shadow-xl">
+      <div className="text-xs font-black text-slate-100 md:text-sm">
         {title}
       </div>
 
-      <p className="mt-1 text-[11px] leading-5 text-slate-300 md:text-xs">
+      <p className="mt-2 text-[10px] leading-5 text-slate-300 md:text-xs">
         {text}
       </p>
     </div>
@@ -40,25 +40,27 @@ function HighlightCard({
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center shadow-xl">
-      <h2 className="text-sm font-black md:text-base">{title}</h2>
+    <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-center shadow-xl">
+      <div className="mb-2 text-xs font-black text-slate-100 md:text-sm">
+        {title}
+      </div>
 
-      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 p-3">
-        <div className="text-2xl">{user.teamEmoji || "🏳️"}</div>
+      <div className="text-xl leading-none md:text-2xl">
+        {user.teamEmoji || "🏳️"}
+      </div>
 
-        <div className="mt-1 break-words text-sm font-black leading-5 text-white md:text-base">
-          {user.fullName}
-        </div>
+      <div className="mt-2 min-h-[34px] text-[12px] font-black leading-4 text-white md:text-sm">
+        {user.fullName}
+      </div>
 
-        <div className="mt-0.5 break-words text-[10px] leading-5 text-slate-300 md:text-xs">
-          {user.favoriteTeam || "بدون منتخب"}
-        </div>
+      <div className="mt-1 truncate text-[10px] text-slate-300 md:text-xs">
+        {user.favoriteTeam || "بدون منتخب"}
+      </div>
 
-        <div
-          className={`mt-2 rounded-xl px-2 py-2 text-[11px] font-black leading-5 md:text-sm ${accentClass}`}
-        >
-          {valueText}
-        </div>
+      <div
+        className={`mt-3 rounded-xl px-2 py-1.5 text-[10px] font-black md:text-xs ${accentClass}`}
+      >
+        {valueText}
       </div>
     </div>
   );
@@ -134,18 +136,14 @@ export default function HomeHighlights() {
 
   if (loading) {
     return (
-      <section className="mt-4 md:mt-5">
+      <section className="mt-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-5 md:p-4">
         <div className="mb-3 text-center">
-          <h2 className="text-lg font-black md:text-2xl">
+          <h2 className="text-base font-black md:text-xl">
             🔥 أبطال التحدي الآن
           </h2>
-
-          <p className="mt-1 text-xs text-slate-300 md:text-sm">
-            تتحدث تلقائيًا حسب أداء الأعضاء.
-          </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <EmptyCard title="🏆 ملك التوقعات" text="جاري التحميل..." />
           <EmptyCard title="🔥 أفضل سلسلة" text="جاري التحميل..." />
           <EmptyCard title="🚀 أسرع صاعد" text="جاري التحميل..." />
@@ -156,24 +154,24 @@ export default function HomeHighlights() {
   }
 
   return (
-    <section className="mt-4 md:mt-5">
+    <section className="mt-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-5 md:p-4">
       <div className="mb-3 text-center">
-        <h2 className="text-lg font-black md:text-2xl">
+        <h2 className="text-base font-black md:text-xl">
           🔥 أبطال التحدي الآن
         </h2>
 
-        <p className="mt-1 text-xs text-slate-300 md:text-sm">
-          أسماء تتغير تلقائيًا حسب التوقعات والنتائج.
+        <p className="mt-1 text-[11px] text-slate-300 md:text-xs">
+          أسماء تتغير تلقائيًا حسب التوقعات والنتائج
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <HighlightCard
           title="🏆 ملك التوقعات"
           user={predictionKing}
-          valueText={`النقاط: ${predictionKing?.points || 0}`}
+          valueText={`${predictionKing?.points || 0} نقاط`}
           accentClass="bg-amber-400 text-slate-950"
-          emptyText="يظهر بعد تسجيل أول نقاط."
+          emptyText="يظهر بعد تسجيل أول نقاط"
         />
 
         <HighlightCard
@@ -181,7 +179,7 @@ export default function HomeHighlights() {
           user={bestStreakUser}
           valueText={`السلسلة: ${bestStreakUser?.bestStreak || 0}`}
           accentClass="bg-emerald-400 text-slate-950"
-          emptyText="تظهر بعد وجود سلسلة صحيحة."
+          emptyText="تظهر بعد وجود سلسلة صحيحة"
         />
 
         <HighlightCard
@@ -189,7 +187,7 @@ export default function HomeHighlights() {
           user={fastestRiserUser}
           valueText={`صعد ${fastestRiserUser?.rankChange || 0} مراكز`}
           accentClass="bg-sky-400 text-slate-950"
-          emptyText="تظهر بعد تغيّر ترتيب الأعضاء."
+          emptyText="تظهر بعد تغيّر ترتيب الأعضاء"
         />
 
         <HighlightCard
@@ -197,7 +195,7 @@ export default function HomeHighlights() {
           user={firstArriverUser}
           valueText="توقع قبل الجميع"
           accentClass="bg-violet-400 text-slate-950"
-          emptyText="تظهر بعد أول توقع في المنصة."
+          emptyText="تظهر بعد أول توقع"
         />
       </div>
     </section>
