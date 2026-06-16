@@ -1,37 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ExactHit,
   getHomeHighlights,
   HomeHighlightUser,
 } from "@/lib/highlights";
-import { getSiteSettings, getTickerDuration } from "@/lib/siteSettings";
-
-type HighlightUser = HomeHighlightUser & {
-  rankChange?: number;
-};
-
-type ExtendedHighlightsResponse = {
-  predictionKing: HighlightUser | null;
-  bestStreakUser: HighlightUser | null;
-  firstArrivalUser?: HighlightUser | null;
-  fastestClimberUser?: HighlightUser | null;
-  exactHits: ExactHit[];
-};
+import { getSiteSettings, TickerSpeed } from "@/lib/siteSettings";
 
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center shadow-xl">
-      <div className="text-sm font-black text-slate-100 md:text-base">
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center shadow-xl">
+      <div className="text-sm font-black text-slate-200 md:text-base">
         {title}
       </div>
 
-      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-2 py-3">
-        <p className="text-[10px] leading-5 text-slate-300 md:text-xs">
-          {text}
-        </p>
-      </div>
+      <p className="mt-1 text-[11px] leading-5 text-slate-300 md:text-xs">
+        {text}
+      </p>
     </div>
   );
 }
@@ -39,70 +25,89 @@ function EmptyCard({ title, text }: { title: string; text: string }) {
 function HighlightCard({
   title,
   user,
-  badgeText,
+  valueLabel,
+  value,
   accentClass,
 }: {
   title: string;
-  user: HighlightUser | null;
-  badgeText: string;
+  user: HomeHighlightUser | null;
+  valueLabel: string;
+  value: number;
   accentClass: string;
 }) {
   if (!user) {
-    return (
-      <EmptyCard
-        title={title}
-        text="تظهر بعد احتساب أول النتائج."
-      />
-    );
+    return <EmptyCard title={title} text="تظهر بعد احتساب أول النتائج." />;
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center shadow-xl">
-      <h2 className="text-sm font-black text-white md:text-base">{title}</h2>
+    <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center shadow-xl">
+      <h2 className="text-sm font-black md:text-base">{title}</h2>
 
-      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 px-2 py-3">
-        <div className="text-lg md:text-xl">{user.teamEmoji || "🏳️"}</div>
+      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 p-3">
+        <div className="text-2xl">{user.teamEmoji || "🏳️"}</div>
 
-        <div className="mt-1 text-sm font-black leading-5 text-white md:text-base">
+        <div className="mt-1 truncate text-sm font-black text-white md:text-base">
           {user.fullName}
         </div>
 
-        <div className="mt-1 text-[10px] text-slate-300 md:text-xs">
+        <div className="mt-0.5 truncate text-[10px] text-slate-300 md:text-xs">
           {user.favoriteTeam || "بدون منتخب"}
         </div>
 
         <div
-          className={`mt-2 rounded-xl px-2 py-2 text-xs font-black md:text-sm ${accentClass}`}
+          className={`mt-2 rounded-xl px-3 py-2 text-xs font-black md:text-sm ${accentClass}`}
         >
-          {badgeText}
+          {valueLabel}: {value}
         </div>
       </div>
     </div>
   );
 }
 
+function getPixelsPerSecond(speed: TickerSpeed) {
+  if (speed === "very_slow") return 16;
+  if (speed === "slow") return 24;
+  if (speed === "normal") return 34;
+  if (speed === "fast") return 48;
+  if (speed === "very_fast") return 64;
+
+  return 34;
+}
+
+function getRepeatCount(count: number) {
+  if (count <= 1) return 14;
+  if (count <= 3) return 10;
+  if (count <= 6) return 7;
+  if (count <= 12) return 4;
+  if (count <= 25) return 2;
+
+  return 1;
+}
+
+function getSpeedLabel(speed: string) {
+  if (speed === "very_slow") return "بطيء جدًا";
+  if (speed === "slow") return "بطيء";
+  if (speed === "normal") return "متوسط";
+  if (speed === "fast") return "سريع";
+  if (speed === "very_fast") return "سريع جدًا";
+
+  return "متوسط";
+}
+
 export default function HomeHighlights() {
-  const [predictionKing, setPredictionKing] = useState<HighlightUser | null>(
-    null
-  );
-  const [bestStreakUser, setBestStreakUser] = useState<HighlightUser | null>(
-    null
-  );
-  const [firstArrivalUser, setFirstArrivalUser] =
-    useState<HighlightUser | null>(null);
-  const [fastestClimberUser, setFastestClimberUser] =
-    useState<HighlightUser | null>(null);
+  const [predictionKing, setPredictionKing] =
+    useState<HomeHighlightUser | null>(null);
+  const [bestStreakUser, setBestStreakUser] =
+    useState<HomeHighlightUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadHighlights() {
       try {
-        const data = (await getHomeHighlights()) as ExtendedHighlightsResponse;
+        const data = await getHomeHighlights();
 
-        setPredictionKing(data.predictionKing ?? null);
-        setBestStreakUser(data.bestStreakUser ?? null);
-        setFirstArrivalUser(data.firstArrivalUser ?? null);
-        setFastestClimberUser(data.fastestClimberUser ?? null);
+        setPredictionKing(data.predictionKing);
+        setBestStreakUser(data.bestStreakUser);
       } catch (error) {
         console.error("فشل تحميل مميزات الصفحة الرئيسية:", error);
       } finally {
@@ -119,67 +124,30 @@ export default function HomeHighlights() {
 
   if (loading) {
     return (
-      <section className="mt-4 md:mt-5">
-        <div className="mb-3 text-center">
-          <h2 className="text-xl font-black md:text-2xl">🔥 أبطال التحدي الآن</h2>
-          <p className="mt-1 text-[11px] text-slate-300 md:text-xs">
-            أسماء تتغير تلقائيًا حسب التوقعات والنتائج.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <EmptyCard title="🏆 ملك التوقعات" text="جاري التحميل..." />
-          <EmptyCard title="🔥 أفضل سلسلة" text="جاري التحميل..." />
-          <EmptyCard title="⚡ أول الواصلين" text="جاري التحميل..." />
-          <EmptyCard title="🚀 أسرع صاعد" text="جاري التحميل..." />
-        </div>
+      <section className="mt-4 grid grid-cols-2 gap-3 md:mt-5 md:gap-4">
+        <EmptyCard title="🏆 ملك التوقعات" text="جاري التحميل..." />
+        <EmptyCard title="🔥 أفضل سلسلة" text="جاري التحميل..." />
       </section>
     );
   }
 
-  const fastestRiseText =
-    fastestClimberUser && (fastestClimberUser.rankChange ?? 0) > 0
-      ? `صعد ${fastestClimberUser.rankChange} مركز`
-      : "صعد بسرعة";
-
   return (
-    <section className="mt-4 md:mt-5">
-      <div className="mb-3 text-center">
-        <h2 className="text-xl font-black md:text-2xl">🔥 أبطال التحدي الآن</h2>
-        <p className="mt-1 text-[11px] text-slate-300 md:text-xs">
-          أسماء تتغير تلقائيًا حسب التوقعات والنتائج.
-        </p>
-      </div>
+    <section className="mt-4 grid grid-cols-2 gap-3 md:mt-5 md:gap-4">
+      <HighlightCard
+        title="🏆 ملك التوقعات"
+        user={predictionKing}
+        valueLabel="النقاط"
+        value={predictionKing?.points || 0}
+        accentClass="bg-amber-400 text-slate-950"
+      />
 
-      <div className="grid grid-cols-2 gap-3">
-        <HighlightCard
-          title="🏆 ملك التوقعات"
-          user={predictionKing}
-          badgeText={`النقاط: ${predictionKing?.points || 0}`}
-          accentClass="bg-amber-400 text-slate-950"
-        />
-
-        <HighlightCard
-          title="🔥 أفضل سلسلة"
-          user={bestStreakUser}
-          badgeText={`السلسلة: ${bestStreakUser?.bestStreak || 0}`}
-          accentClass="bg-emerald-400 text-slate-950"
-        />
-
-        <HighlightCard
-          title="⚡ أول الواصلين"
-          user={firstArrivalUser}
-          badgeText="توقع قبل الجميع"
-          accentClass="bg-violet-400 text-slate-950"
-        />
-
-        <HighlightCard
-          title="🚀 أسرع صاعد"
-          user={fastestClimberUser}
-          badgeText={fastestRiseText}
-          accentClass="bg-sky-400 text-slate-950"
-        />
-      </div>
+      <HighlightCard
+        title="🔥 أفضل سلسلة"
+        user={bestStreakUser}
+        valueLabel="السلسلة"
+        value={bestStreakUser?.bestStreak || 0}
+        accentClass="bg-emerald-400 text-slate-950"
+      />
     </section>
   );
 }
@@ -187,13 +155,17 @@ export default function HomeHighlights() {
 export function ExactHitsTicker() {
   const [exactHits, setExactHits] = useState<ExactHit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [duration, setDuration] = useState(22);
+  const [speed, setSpeed] = useState<TickerSpeed>("normal");
+  const [isPaused, setIsPaused] = useState(false);
+  const [groupWidth, setGroupWidth] = useState(0);
+
+  const groupRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     async function loadExactHits() {
       try {
-        const data = (await getHomeHighlights()) as ExtendedHighlightsResponse;
-        setExactHits(data.exactHits || []);
+        const data = await getHomeHighlights();
+        setExactHits(data.exactHits);
       } catch (error) {
         console.error("فشل تحميل شريط جابها صح:", error);
       } finally {
@@ -204,10 +176,10 @@ export function ExactHitsTicker() {
     async function loadTickerSettings() {
       try {
         const settings = await getSiteSettings();
-        setDuration(getTickerDuration(settings.exactHitsSpeed));
+        setSpeed(settings.exactHitsSpeed);
       } catch (error) {
         console.error("فشل تحميل إعدادات سرعة جابها صح:", error);
-        setDuration(22);
+        setSpeed("normal");
       }
     }
 
@@ -222,6 +194,78 @@ export function ExactHitsTicker() {
       clearInterval(settingsInterval);
     };
   }, []);
+
+  const repeatedHits = useMemo(() => {
+    if (exactHits.length === 0) return [];
+
+    const repeated: ExactHit[] = [];
+    const repeatCount = getRepeatCount(exactHits.length);
+
+    for (let i = 0; i < repeatCount; i += 1) {
+      repeated.push(...exactHits);
+    }
+
+    return repeated;
+  }, [exactHits]);
+
+  useEffect(() => {
+    function measureWidth() {
+      if (!groupRef.current) return;
+      setGroupWidth(groupRef.current.scrollWidth);
+    }
+
+    measureWidth();
+
+    const resizeObserver = new ResizeObserver(measureWidth);
+
+    if (groupRef.current) {
+      resizeObserver.observe(groupRef.current);
+    }
+
+    window.addEventListener("resize", measureWidth);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", measureWidth);
+    };
+  }, [repeatedHits]);
+
+  const pixelsPerSecond = getPixelsPerSecond(speed);
+
+  const duration = Math.max(
+    25,
+    Math.round((groupWidth || 1200) / pixelsPerSecond)
+  );
+
+  function pauseTicker() {
+    setIsPaused(true);
+  }
+
+  function resumeTicker() {
+    setIsPaused(false);
+  }
+
+  function renderExactHitCard(hit: ExactHit, index: number) {
+    return (
+      <div
+        key={`${hit.id}-${index}`}
+        dir="rtl"
+        className="whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-white md:text-sm"
+      >
+        <span className="font-black text-emerald-300">{hit.userName}</span>{" "}
+        جابها صح بالملي في مباراة{" "}
+        <span className="font-bold">
+          {hit.homeTeamEmoji} {hit.homeTeamName}
+        </span>{" "}
+        <span className="font-black text-amber-300">
+          {hit.homeScore} - {hit.awayScore}
+        </span>{" "}
+        <span className="font-bold">
+          {hit.awayTeamName} {hit.awayTeamEmoji}
+        </span>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -244,69 +288,72 @@ export function ExactHitsTicker() {
     );
   }
 
-  const repeatedHits =
-    exactHits.length === 1
-      ? Array(8).fill(exactHits[0])
-      : [...exactHits, ...exactHits, ...exactHits];
-
   return (
     <section className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 md:mt-6">
       <div className="mb-2 flex items-center justify-between gap-3">
         <h2 className="text-sm font-black text-emerald-200">🎯 جابها صح</h2>
-        <span className="text-[11px] text-emerald-100/80">آخر 24 ساعة</span>
+
+        <div className="flex items-center gap-2">
+          <span className="hidden text-[11px] text-emerald-100/80 md:inline">
+            السرعة: {getSpeedLabel(speed)}
+          </span>
+
+          <span className="text-[11px] text-emerald-100/80">آخر 24 ساعة</span>
+        </div>
       </div>
 
-      <div className="exact-hits-window relative overflow-hidden">
+      <div
+        dir="ltr"
+        className="exact-hits-window relative overflow-hidden"
+        onMouseEnter={pauseTicker}
+        onMouseLeave={resumeTicker}
+        onTouchStart={pauseTicker}
+        onTouchEnd={resumeTicker}
+        onTouchCancel={resumeTicker}
+        onPointerDown={pauseTicker}
+        onPointerUp={resumeTicker}
+        onPointerCancel={resumeTicker}
+      >
         <div
           className="exact-hits-track flex w-max gap-3"
           style={{
             animationDuration: `${duration}s`,
+            animationPlayState: isPaused ? "paused" : "running",
           }}
         >
-          {repeatedHits.map((hit, index) => (
-            <div
-              key={`${hit.id}-${index}`}
-              className="whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-white md:text-sm"
-            >
-              <span className="font-black text-emerald-300">
-                {hit.userName}
-              </span>{" "}
-              جابها صح بالملي في مباراة{" "}
-              <span className="font-bold">
-                {hit.homeTeamEmoji} {hit.homeTeamName}
-              </span>{" "}
-              <span className="font-black text-amber-300">
-                {hit.homeScore} - {hit.awayScore}
-              </span>{" "}
-              <span className="font-bold">
-                {hit.awayTeamName} {hit.awayTeamEmoji}
-              </span>
-            </div>
-          ))}
+          <div ref={groupRef} className="flex flex-none gap-3">
+            {repeatedHits.map((hit, index) => renderExactHitCard(hit, index))}
+          </div>
+
+          <div className="flex flex-none gap-3">
+            {repeatedHits.map((hit, index) =>
+              renderExactHitCard(hit, index + repeatedHits.length)
+            )}
+          </div>
         </div>
       </div>
 
       <style jsx>{`
-        .exact-hits-window {
-          direction: rtl;
-        }
-
         .exact-hits-track {
           animation-name: exactHitsMove;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
+          will-change: transform;
         }
 
-        .exact-hits-track:hover {
+        .exact-hits-window:hover .exact-hits-track,
+        .exact-hits-window:active .exact-hits-track,
+        .exact-hits-window:focus-within .exact-hits-track {
           animation-play-state: paused;
         }
 
         @keyframes exactHitsMove {
-          from {
-            transform: translateX(0);
+          0% {
+            transform: translateX(-50%);
           }
-          to {
-            transform: translateX(50%);
+
+          100% {
+            transform: translateX(0%);
           }
         }
       `}</style>
