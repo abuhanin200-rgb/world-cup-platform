@@ -14,6 +14,13 @@ const PREDICTIONS_PER_PAGE = 10;
 
 type AccountTab = "predictions" | "info";
 
+type Achievement = {
+  icon: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+};
+
 function StatCard({
   label,
   value,
@@ -108,6 +115,489 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
         </div>
       )}
     </div>
+  );
+}
+
+function getAccountTitle({
+  total,
+  correct,
+  currentRank,
+}: {
+  total: number;
+  correct: number;
+  currentRank: number;
+}) {
+  if (currentRank === 1 && total > 0) {
+    return {
+      icon: "🥇",
+      title: "متصدر التحدي",
+      className: "border-amber-400/30 bg-amber-400/10 text-amber-100",
+    };
+  }
+
+  if (currentRank > 1 && currentRank <= 3 && total > 0) {
+    return {
+      icon: "🏅",
+      title: "منافس شرس",
+      className: "border-orange-400/30 bg-orange-400/10 text-orange-100",
+    };
+  }
+
+  if (currentRank > 3 && currentRank <= 10 && total > 0) {
+    return {
+      icon: "💪",
+      title: "من النخبة",
+      className: "border-sky-400/30 bg-sky-400/10 text-sky-100",
+    };
+  }
+
+  if (correct >= 20) {
+    return {
+      icon: "⭐",
+      title: "أسطورة التوقعات",
+      className: "border-violet-400/30 bg-violet-400/10 text-violet-100",
+    };
+  }
+
+  if (correct >= 12) {
+    return {
+      icon: "🏆",
+      title: "محترف التوقعات",
+      className: "border-amber-400/30 bg-amber-400/10 text-amber-100",
+    };
+  }
+
+  if (correct >= 7) {
+    return {
+      icon: "🧠",
+      title: "خبير النتائج",
+      className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+    };
+  }
+
+  if (correct >= 3) {
+    return {
+      icon: "🎯",
+      title: "صياد النقاط",
+      className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+    };
+  }
+
+  if (total >= 40) {
+    return {
+      icon: "⚽",
+      title: "حاضر دائمًا",
+      className: "border-blue-400/30 bg-blue-400/10 text-blue-100",
+    };
+  }
+
+  if (total >= 20) {
+    return {
+      icon: "🔥",
+      title: "نشيط التوقعات",
+      className: "border-red-400/30 bg-red-400/10 text-red-100",
+    };
+  }
+
+  if (total >= 8) {
+    return {
+      icon: "📊",
+      title: "محلل واعد",
+      className: "border-cyan-400/30 bg-cyan-400/10 text-cyan-100",
+    };
+  }
+
+  if (total >= 1) {
+    return {
+      icon: "🔮",
+      title: "مبتدئ التوقعات",
+      className: "border-slate-400/30 bg-slate-400/10 text-slate-100",
+    };
+  }
+
+  return {
+    icon: "👋",
+    title: "مشجع جديد",
+    className: "border-slate-400/30 bg-slate-400/10 text-slate-100",
+  };
+}
+
+function getAccountTitleProgress({
+  total,
+  correct,
+  currentRank,
+}: {
+  total: number;
+  correct: number;
+  currentRank: number;
+}) {
+  if (currentRank === 1 && total > 0) {
+    return {
+      currentTitle: "🥇 متصدر التحدي",
+      nextTitle: "أنت وصلت لأعلى لقب حاليًا",
+      remainingText: "حافظ على الصدارة يا بطل 🔥",
+      progressPercent: 100,
+    };
+  }
+
+  if (currentRank > 1 && currentRank <= 3 && total > 0) {
+    return {
+      currentTitle: "🏅 منافس شرس",
+      nextTitle: "🥇 متصدر التحدي",
+      remainingText: "اقترب من المركز الأول",
+      progressPercent: 85,
+    };
+  }
+
+  if (currentRank > 3 && currentRank <= 10 && total > 0) {
+    return {
+      currentTitle: "💪 من النخبة",
+      nextTitle: "🏅 منافس شرس",
+      remainingText: "ادخل أول 3 مراكز",
+      progressPercent: 75,
+    };
+  }
+
+  if (correct >= 20) {
+    return {
+      currentTitle: "⭐ أسطورة التوقعات",
+      nextTitle: "💪 من النخبة",
+      remainingText: "ادخل أول 10 مراكز",
+      progressPercent: 70,
+    };
+  }
+
+  if (correct >= 12) {
+    return {
+      currentTitle: "🏆 محترف التوقعات",
+      nextTitle: "⭐ أسطورة التوقعات",
+      remainingText: `باقي لك ${Math.max(0, 20 - correct)} توقع صحيح`,
+      progressPercent: Math.min(100, Math.round((correct / 20) * 100)),
+    };
+  }
+
+  if (correct >= 7) {
+    return {
+      currentTitle: "🧠 خبير النتائج",
+      nextTitle: "🏆 محترف التوقعات",
+      remainingText: `باقي لك ${Math.max(0, 12 - correct)} توقع صحيح`,
+      progressPercent: Math.min(100, Math.round((correct / 12) * 100)),
+    };
+  }
+
+  if (correct >= 3) {
+    return {
+      currentTitle: "🎯 صياد النقاط",
+      nextTitle: "🧠 خبير النتائج",
+      remainingText: `باقي لك ${Math.max(0, 7 - correct)} توقعات صحيحة`,
+      progressPercent: Math.min(100, Math.round((correct / 7) * 100)),
+    };
+  }
+
+  if (total >= 40) {
+    return {
+      currentTitle: "⚽ حاضر دائمًا",
+      nextTitle: "🎯 صياد النقاط",
+      remainingText: `باقي لك ${Math.max(0, 3 - correct)} توقعات صحيحة`,
+      progressPercent: correct > 0 ? 45 : 25,
+    };
+  }
+
+  if (total >= 20) {
+    return {
+      currentTitle: "🔥 نشيط التوقعات",
+      nextTitle: "⚽ حاضر دائمًا",
+      remainingText: `باقي لك ${Math.max(0, 40 - total)} توقع`,
+      progressPercent: Math.min(100, Math.round((total / 40) * 100)),
+    };
+  }
+
+  if (total >= 8) {
+    return {
+      currentTitle: "📊 محلل واعد",
+      nextTitle: "🔥 نشيط التوقعات",
+      remainingText: `باقي لك ${Math.max(0, 20 - total)} توقع`,
+      progressPercent: Math.min(100, Math.round((total / 20) * 100)),
+    };
+  }
+
+  if (total >= 1) {
+    return {
+      currentTitle: "🔮 مبتدئ التوقعات",
+      nextTitle: "📊 محلل واعد",
+      remainingText: `باقي لك ${Math.max(0, 8 - total)} توقعات`,
+      progressPercent: Math.min(100, Math.round((total / 8) * 100)),
+    };
+  }
+
+  return {
+    currentTitle: "👋 مشجع جديد",
+    nextTitle: "🔮 مبتدئ التوقعات",
+    remainingText: "سجل أول توقع لك",
+    progressPercent: 0,
+  };
+}
+
+function getAccountAchievements({
+  total,
+  correct,
+  currentRank,
+  bestStreak,
+  predictions,
+}: {
+  total: number;
+  correct: number;
+  currentRank: number;
+  bestStreak: number;
+  predictions: AccountPrediction[];
+}): Achievement[] {
+  const exactHits = predictions.filter((prediction) => {
+    return prediction.isCalculated && prediction.resultType === "exact";
+  }).length;
+
+  const pendingPredictions = predictions.filter(
+    (prediction) => !prediction.isCalculated
+  ).length;
+
+  const calculatedPredictions = predictions.filter(
+    (prediction) => prediction.isCalculated
+  ).length;
+
+  return [
+    {
+      icon: "🔮",
+      title: "أول توقع",
+      description: "سجل أول توقع لك في المنصة",
+      unlocked: total >= 1,
+    },
+    {
+      icon: "📊",
+      title: "محلل واعد",
+      description: "شارك في 8 توقعات أو أكثر",
+      unlocked: total >= 8,
+    },
+    {
+      icon: "🔥",
+      title: "نشيط التوقعات",
+      description: "شارك في 20 توقع أو أكثر",
+      unlocked: total >= 20,
+    },
+    {
+      icon: "⚽",
+      title: "حاضر دائمًا",
+      description: "شارك في 40 توقع أو أكثر",
+      unlocked: total >= 40,
+    },
+    {
+      icon: "🎯",
+      title: "صياد النقاط",
+      description: "حقق 3 توقعات صحيحة",
+      unlocked: correct >= 3,
+    },
+    {
+      icon: "🧠",
+      title: "خبير النتائج",
+      description: "حقق 7 توقعات صحيحة",
+      unlocked: correct >= 7,
+    },
+    {
+      icon: "🏆",
+      title: "محترف التوقعات",
+      description: "حقق 12 توقع صحيح",
+      unlocked: correct >= 12,
+    },
+    {
+      icon: "⭐",
+      title: "أسطورة التوقعات",
+      description: "حقق 20 توقع صحيح",
+      unlocked: correct >= 20,
+    },
+    {
+      icon: "💎",
+      title: "جابها بالملي",
+      description: `حقق ${exactHits} توقع مطابق للنتيجة`,
+      unlocked: exactHits > 0,
+    },
+    {
+      icon: "⚡",
+      title: "سلسلة نارية",
+      description: "حقق 3 توقعات صحيحة متتالية",
+      unlocked: bestStreak >= 3,
+    },
+    {
+      icon: "🚀",
+      title: "لا يوقف",
+      description: "حقق 7 توقعات صحيحة متتالية",
+      unlocked: bestStreak >= 7,
+    },
+    {
+      icon: "💪",
+      title: "من النخبة",
+      description: "دخل قائمة أول 10 مراكز",
+      unlocked: currentRank > 0 && currentRank <= 10 && total > 0,
+    },
+    {
+      icon: "🏅",
+      title: "منافس شرس",
+      description: "وصل إلى أحد أول 3 مراكز",
+      unlocked: currentRank > 0 && currentRank <= 3 && total > 0,
+    },
+    {
+      icon: "🥇",
+      title: "متصدر التحدي",
+      description: "وصل إلى المركز الأول",
+      unlocked: currentRank === 1 && total > 0,
+    },
+    {
+      icon: "⏳",
+      title: "بانتظار الحسم",
+      description: `${pendingPredictions} توقع لم يُحتسب بعد`,
+      unlocked: pendingPredictions > 0,
+    },
+    {
+      icon: "✅",
+      title: "سجل محسوب",
+      description: `${calculatedPredictions} توقع تم احتسابه`,
+      unlocked: calculatedPredictions > 0,
+    },
+  ];
+}
+
+function AchievementCard({ achievement }: { achievement: Achievement }) {
+  return (
+    <div
+      className={`rounded-2xl border p-3 ${
+        achievement.unlocked
+          ? "border-amber-400/25 bg-amber-400/10"
+          : "border-white/10 bg-slate-950/40 opacity-60"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/70 text-xl">
+          {achievement.unlocked ? achievement.icon : "🔒"}
+        </div>
+
+        <div className="min-w-0">
+          <div
+            className={`text-sm font-black ${
+              achievement.unlocked ? "text-white" : "text-slate-400"
+            }`}
+          >
+            {achievement.title}
+          </div>
+
+          <div className="mt-1 text-[11px] leading-5 text-slate-300 md:text-xs">
+            {achievement.description}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MyAchievementsSection({
+  total,
+  correct,
+  currentRank,
+  bestStreak,
+  predictions,
+}: {
+  total: number;
+  correct: number;
+  currentRank: number;
+  bestStreak: number;
+  predictions: AccountPrediction[];
+}) {
+  const accountTitle = getAccountTitle({
+    total,
+    correct,
+    currentRank,
+  });
+
+  const progress = getAccountTitleProgress({
+    total,
+    correct,
+    currentRank,
+  });
+
+  const achievements = getAccountAchievements({
+    total,
+    correct,
+    currentRank,
+    bestStreak,
+    predictions,
+  });
+
+  const unlockedAchievements = achievements.filter(
+    (achievement) => achievement.unlocked
+  );
+
+  return (
+    <section className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black md:text-2xl">🏅 إنجازاتي</h2>
+
+          <p className="mt-1 text-xs text-slate-300 md:text-sm">
+            تابع لقبك الحالي والأوسمة اللي حققتها
+          </p>
+        </div>
+
+        <div className="rounded-full border border-white/10 bg-slate-950/60 px-3 py-1 text-[11px] font-bold text-slate-300 md:text-xs">
+          {unlockedAchievements.length} مكتسبة
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="text-center md:text-right">
+            <div
+              className={`inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-black ${accountTitle.className}`}
+            >
+              <span>{accountTitle.icon}</span>
+              <span>{accountTitle.title}</span>
+            </div>
+
+            <div className="mt-3 text-xs font-bold text-slate-300 md:text-sm">
+              لقبك الحالي داخل التحدي
+            </div>
+          </div>
+
+          <div className="flex-1 rounded-2xl border border-white/10 bg-white/5 p-3">
+            <div className="flex items-center justify-between gap-3 text-xs md:text-sm">
+              <span className="font-bold text-slate-300">اللقب الحالي</span>
+              <span className="font-black text-white">
+                {progress.currentTitle}
+              </span>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs md:text-sm">
+              <span className="font-bold text-slate-300">اللقب القادم</span>
+              <span className="font-black text-amber-300">
+                {progress.nextTitle}
+              </span>
+            </div>
+
+            <div className="mt-3 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className="h-2 rounded-full bg-amber-400"
+                style={{ width: `${progress.progressPercent}%` }}
+              />
+            </div>
+
+            <div className="mt-2 text-center text-[11px] font-bold text-slate-300 md:text-xs">
+              {progress.remainingText}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+        {achievements.map((achievement) => (
+          <AchievementCard key={achievement.title} achievement={achievement} />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -262,6 +752,11 @@ export default function AccountPage() {
     );
   }
 
+  const accountTotal = user.total || 0;
+  const accountCorrect = user.correct || 0;
+  const accountRank = user.currentRank || 0;
+  const accountBestStreak = user.bestStreak || 0;
+
   return (
     <main
       dir="rtl"
@@ -347,6 +842,14 @@ export default function AccountPage() {
           />
         </section>
 
+        <MyAchievementsSection
+          total={accountTotal}
+          correct={accountCorrect}
+          currentRank={accountRank}
+          bestStreak={accountBestStreak}
+          predictions={predictions}
+        />
+
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:p-5">
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-950/60 p-2">
             <button
@@ -421,7 +924,9 @@ export default function AccountPage() {
                       <button
                         type="button"
                         onClick={goToNextPredictionsPage}
-                        disabled={currentPredictionsPage === totalPredictionPages}
+                        disabled={
+                          currentPredictionsPage === totalPredictionPages
+                        }
                         className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40 md:text-sm"
                       >
                         التالي
