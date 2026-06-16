@@ -25,18 +25,18 @@ function EmptyCard({ title, text }: { title: string; text: string }) {
 function HighlightCard({
   title,
   user,
-  valueLabel,
-  value,
+  valueText,
   accentClass,
+  emptyText,
 }: {
   title: string;
   user: HomeHighlightUser | null;
-  valueLabel: string;
-  value: number;
+  valueText: string;
   accentClass: string;
+  emptyText: string;
 }) {
   if (!user) {
-    return <EmptyCard title={title} text="تظهر بعد احتساب أول النتائج." />;
+    return <EmptyCard title={title} text={emptyText} />;
   }
 
   return (
@@ -46,18 +46,18 @@ function HighlightCard({
       <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 p-3">
         <div className="text-2xl">{user.teamEmoji || "🏳️"}</div>
 
-        <div className="mt-1 truncate text-sm font-black text-white md:text-base">
+        <div className="mt-1 break-words text-sm font-black leading-5 text-white md:text-base">
           {user.fullName}
         </div>
 
-        <div className="mt-0.5 truncate text-[10px] text-slate-300 md:text-xs">
+        <div className="mt-0.5 break-words text-[10px] leading-5 text-slate-300 md:text-xs">
           {user.favoriteTeam || "بدون منتخب"}
         </div>
 
         <div
-          className={`mt-2 rounded-xl px-3 py-2 text-xs font-black md:text-sm ${accentClass}`}
+          className={`mt-2 rounded-xl px-2 py-2 text-[11px] font-black leading-5 md:text-sm ${accentClass}`}
         >
-          {valueLabel}: {value}
+          {valueText}
         </div>
       </div>
     </div>
@@ -97,8 +97,16 @@ function getSpeedLabel(speed: string) {
 export default function HomeHighlights() {
   const [predictionKing, setPredictionKing] =
     useState<HomeHighlightUser | null>(null);
+
   const [bestStreakUser, setBestStreakUser] =
     useState<HomeHighlightUser | null>(null);
+
+  const [fastestRiserUser, setFastestRiserUser] =
+    useState<HomeHighlightUser | null>(null);
+
+  const [firstArriverUser, setFirstArriverUser] =
+    useState<HomeHighlightUser | null>(null);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -108,6 +116,8 @@ export default function HomeHighlights() {
 
         setPredictionKing(data.predictionKing);
         setBestStreakUser(data.bestStreakUser);
+        setFastestRiserUser(data.fastestRiserUser);
+        setFirstArriverUser(data.firstArriverUser);
       } catch (error) {
         console.error("فشل تحميل مميزات الصفحة الرئيسية:", error);
       } finally {
@@ -124,30 +134,72 @@ export default function HomeHighlights() {
 
   if (loading) {
     return (
-      <section className="mt-4 grid grid-cols-2 gap-3 md:mt-5 md:gap-4">
-        <EmptyCard title="🏆 ملك التوقعات" text="جاري التحميل..." />
-        <EmptyCard title="🔥 أفضل سلسلة" text="جاري التحميل..." />
+      <section className="mt-4 md:mt-5">
+        <div className="mb-3 text-center">
+          <h2 className="text-lg font-black md:text-2xl">
+            🔥 أبطال التحدي الآن
+          </h2>
+
+          <p className="mt-1 text-xs text-slate-300 md:text-sm">
+            تتحدث تلقائيًا حسب أداء الأعضاء.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+          <EmptyCard title="🏆 ملك التوقعات" text="جاري التحميل..." />
+          <EmptyCard title="🔥 أفضل سلسلة" text="جاري التحميل..." />
+          <EmptyCard title="🚀 أسرع صاعد" text="جاري التحميل..." />
+          <EmptyCard title="⚡ أول الواصلين" text="جاري التحميل..." />
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="mt-4 grid grid-cols-2 gap-3 md:mt-5 md:gap-4">
-      <HighlightCard
-        title="🏆 ملك التوقعات"
-        user={predictionKing}
-        valueLabel="النقاط"
-        value={predictionKing?.points || 0}
-        accentClass="bg-amber-400 text-slate-950"
-      />
+    <section className="mt-4 md:mt-5">
+      <div className="mb-3 text-center">
+        <h2 className="text-lg font-black md:text-2xl">
+          🔥 أبطال التحدي الآن
+        </h2>
 
-      <HighlightCard
-        title="🔥 أفضل سلسلة"
-        user={bestStreakUser}
-        valueLabel="السلسلة"
-        value={bestStreakUser?.bestStreak || 0}
-        accentClass="bg-emerald-400 text-slate-950"
-      />
+        <p className="mt-1 text-xs text-slate-300 md:text-sm">
+          أسماء تتغير تلقائيًا حسب التوقعات والنتائج.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        <HighlightCard
+          title="🏆 ملك التوقعات"
+          user={predictionKing}
+          valueText={`النقاط: ${predictionKing?.points || 0}`}
+          accentClass="bg-amber-400 text-slate-950"
+          emptyText="يظهر بعد تسجيل أول نقاط."
+        />
+
+        <HighlightCard
+          title="🔥 أفضل سلسلة"
+          user={bestStreakUser}
+          valueText={`السلسلة: ${bestStreakUser?.bestStreak || 0}`}
+          accentClass="bg-emerald-400 text-slate-950"
+          emptyText="تظهر بعد وجود سلسلة صحيحة."
+        />
+
+        <HighlightCard
+          title="🚀 أسرع صاعد"
+          user={fastestRiserUser}
+          valueText={`صعد ${fastestRiserUser?.rankChange || 0} مراكز`}
+          accentClass="bg-sky-400 text-slate-950"
+          emptyText="تظهر بعد تغيّر ترتيب الأعضاء."
+        />
+
+        <HighlightCard
+          title="⚡ أول الواصلين"
+          user={firstArriverUser}
+          valueText="توقع قبل الجميع"
+          accentClass="bg-violet-400 text-slate-950"
+          emptyText="تظهر بعد أول توقع في المنصة."
+        />
+      </div>
     </section>
   );
 }
