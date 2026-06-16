@@ -219,6 +219,236 @@ function getMemberTitle(user: LeaderboardUser) {
   };
 }
 
+function getTitleProgress(user: LeaderboardUser) {
+  if (user.currentRank === 1 && user.total > 0) {
+    return {
+      currentTitle: "🥇 متصدر التحدي",
+      nextTitle: "أنت وصلت لأعلى لقب حاليًا",
+      remainingText: "حافظ على الصدارة يا بطل 🔥",
+      progressPercent: 100,
+    };
+  }
+
+  if (user.currentRank > 1 && user.currentRank <= 3 && user.total > 0) {
+    return {
+      currentTitle: "🏅 منافس شرس",
+      nextTitle: "🥇 متصدر التحدي",
+      remainingText: "اقترب من المركز الأول",
+      progressPercent: 85,
+    };
+  }
+
+  if (user.currentRank > 3 && user.currentRank <= 10 && user.total > 0) {
+    return {
+      currentTitle: "💪 من النخبة",
+      nextTitle: "🏅 منافس شرس",
+      remainingText: "ادخل أول 3 مراكز",
+      progressPercent: 75,
+    };
+  }
+
+  if (user.correct >= 20) {
+    return {
+      currentTitle: "⭐ أسطورة التوقعات",
+      nextTitle: "💪 من النخبة",
+      remainingText: "ادخل أول 10 مراكز",
+      progressPercent: 70,
+    };
+  }
+
+  if (user.correct >= 12) {
+    return {
+      currentTitle: "🏆 محترف التوقعات",
+      nextTitle: "⭐ أسطورة التوقعات",
+      remainingText: `باقي لك ${Math.max(0, 20 - user.correct)} توقع صحيح`,
+      progressPercent: Math.min(100, Math.round((user.correct / 20) * 100)),
+    };
+  }
+
+  if (user.correct >= 7) {
+    return {
+      currentTitle: "🧠 خبير النتائج",
+      nextTitle: "🏆 محترف التوقعات",
+      remainingText: `باقي لك ${Math.max(0, 12 - user.correct)} توقع صحيح`,
+      progressPercent: Math.min(100, Math.round((user.correct / 12) * 100)),
+    };
+  }
+
+  if (user.correct >= 3) {
+    return {
+      currentTitle: "🎯 صياد النقاط",
+      nextTitle: "🧠 خبير النتائج",
+      remainingText: `باقي لك ${Math.max(0, 7 - user.correct)} توقعات صحيحة`,
+      progressPercent: Math.min(100, Math.round((user.correct / 7) * 100)),
+    };
+  }
+
+  if (user.total >= 40) {
+    return {
+      currentTitle: "⚽ حاضر دائمًا",
+      nextTitle: "🎯 صياد النقاط",
+      remainingText: `باقي لك ${Math.max(0, 3 - user.correct)} توقعات صحيحة`,
+      progressPercent: user.correct > 0 ? 45 : 25,
+    };
+  }
+
+  if (user.total >= 20) {
+    return {
+      currentTitle: "🔥 نشيط التوقعات",
+      nextTitle: "⚽ حاضر دائمًا",
+      remainingText: `باقي لك ${Math.max(0, 40 - user.total)} توقع`,
+      progressPercent: Math.min(100, Math.round((user.total / 40) * 100)),
+    };
+  }
+
+  if (user.total >= 8) {
+    return {
+      currentTitle: "📊 محلل واعد",
+      nextTitle: "🔥 نشيط التوقعات",
+      remainingText: `باقي لك ${Math.max(0, 20 - user.total)} توقع`,
+      progressPercent: Math.min(100, Math.round((user.total / 20) * 100)),
+    };
+  }
+
+  if (user.total >= 1) {
+    return {
+      currentTitle: "🔮 مبتدئ التوقعات",
+      nextTitle: "📊 محلل واعد",
+      remainingText: `باقي لك ${Math.max(0, 8 - user.total)} توقعات`,
+      progressPercent: Math.min(100, Math.round((user.total / 8) * 100)),
+    };
+  }
+
+  return {
+    currentTitle: "👋 مشجع جديد",
+    nextTitle: "🔮 مبتدئ التوقعات",
+    remainingText: "سجل أول توقع لك",
+    progressPercent: 0,
+  };
+}
+
+function TitlesGuideModal({ onClose }: { onClose: () => void }) {
+  const titles = [
+    {
+      icon: "👋",
+      title: "مشجع جديد",
+      condition: "التسجيل في المنصة قبل أول توقع",
+    },
+    {
+      icon: "🔮",
+      title: "مبتدئ التوقعات",
+      condition: "شارك في توقع واحد أو أكثر",
+    },
+    {
+      icon: "📊",
+      title: "محلل واعد",
+      condition: "شارك في 8 توقعات أو أكثر",
+    },
+    {
+      icon: "🔥",
+      title: "نشيط التوقعات",
+      condition: "شارك في 20 توقع أو أكثر",
+    },
+    {
+      icon: "⚽",
+      title: "حاضر دائمًا",
+      condition: "شارك في 40 توقع أو أكثر",
+    },
+    {
+      icon: "🎯",
+      title: "صياد النقاط",
+      condition: "حقق 3 توقعات صحيحة",
+    },
+    {
+      icon: "🧠",
+      title: "خبير النتائج",
+      condition: "حقق 7 توقعات صحيحة",
+    },
+    {
+      icon: "🏆",
+      title: "محترف التوقعات",
+      condition: "حقق 12 توقع صحيح",
+    },
+    {
+      icon: "⭐",
+      title: "أسطورة التوقعات",
+      condition: "حقق 20 توقع صحيح",
+    },
+    {
+      icon: "💪",
+      title: "من النخبة",
+      condition: "ادخل أول 10 مراكز",
+    },
+    {
+      icon: "🏅",
+      title: "منافس شرس",
+      condition: "ادخل أول 3 مراكز",
+    },
+    {
+      icon: "🥇",
+      title: "متصدر التحدي",
+      condition: "وصل إلى المركز الأول",
+    },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm">
+      <div className="max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 text-white shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/10 p-4">
+          <div>
+            <h3 className="text-lg font-black md:text-xl">
+              🏅 دليل الألقاب والإنجازات
+            </h3>
+
+            <p className="mt-1 text-xs text-slate-300">
+              اعرف وش تحتاج عشان تطور لقبك في التحدي
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-red-500 px-3 py-2 text-xs font-black text-white hover:bg-red-400"
+          >
+            إغلاق
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto p-4">
+          <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
+            ارفع عدد توقعاتك، وحقق نتائج صحيحة، وخلّك من أبطال التحدي 🔥
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            {titles.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-white/10 bg-white/5 p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/70 text-xl">
+                    {item.icon}
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-black text-white">
+                      {item.title}
+                    </div>
+
+                    <div className="mt-1 text-[11px] leading-5 text-slate-300 md:text-xs">
+                      {item.condition}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getMemberAchievements(
   user: LeaderboardUser,
   predictions: Prediction[]
@@ -374,6 +604,7 @@ function PredictionDetailsModal({
   onClose: () => void;
 }) {
   const memberTitle = getMemberTitle(user);
+  const titleProgress = getTitleProgress(user);
   const achievements = getMemberAchievements(user, predictions);
   const unlockedAchievements = achievements.filter(
     (achievement) => achievement.unlocked
@@ -419,6 +650,35 @@ function PredictionDetailsModal({
 
             <div className="mt-3 text-xs text-slate-300">
               {user.favoriteTeam || "بدون منتخب مرشح"}
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-right">
+              <div className="flex items-center justify-between gap-3 text-xs md:text-sm">
+                <span className="font-bold text-slate-300">اللقب الحالي</span>
+
+                <span className="font-black text-white">
+                  {titleProgress.currentTitle}
+                </span>
+              </div>
+
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs md:text-sm">
+                <span className="font-bold text-slate-300">اللقب القادم</span>
+
+                <span className="font-black text-amber-300">
+                  {titleProgress.nextTitle}
+                </span>
+              </div>
+
+              <div className="mt-3 overflow-hidden rounded-full bg-slate-800">
+                <div
+                  className="h-2 rounded-full bg-amber-400"
+                  style={{ width: `${titleProgress.progressPercent}%` }}
+                />
+              </div>
+
+              <div className="mt-2 text-center text-[11px] font-bold text-slate-300 md:text-xs">
+                {titleProgress.remainingText}
+              </div>
             </div>
           </div>
 
@@ -603,6 +863,7 @@ export default function LeaderboardTable() {
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showTitlesGuide, setShowTitlesGuide] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(
     null
@@ -688,6 +949,14 @@ export default function LeaderboardTable() {
           <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
             ترتيب جميع الأعضاء حسب النقاط ثم عدد التوقعات الصحيحة.
           </p>
+
+          <button
+            type="button"
+            onClick={() => setShowTitlesGuide(true)}
+            className="mt-3 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100 transition hover:bg-amber-400/20 md:text-sm"
+          >
+            🏅 كيف أحصل على الألقاب؟
+          </button>
         </div>
 
         {loading ? (
@@ -827,6 +1096,10 @@ export default function LeaderboardTable() {
           </>
         )}
       </section>
+
+      {showTitlesGuide && (
+        <TitlesGuideModal onClose={() => setShowTitlesGuide(false)} />
+      )}
 
       {selectedUser && (
         <PredictionDetailsModal
