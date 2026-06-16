@@ -12,7 +12,7 @@ import { updateUserProfile } from "@/lib/users";
 
 const PREDICTIONS_PER_PAGE = 10;
 
-type AccountTab = "predictions" | "info";
+type AccountTab = "predictions" | "achievements" | "info";
 
 type Achievement = {
   icon: string;
@@ -533,7 +533,7 @@ function MyAchievementsSection({
   );
 
   return (
-    <section className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-6">
+    <section className="rounded-3xl border border-white/10 bg-slate-950/40 p-4 md:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black md:text-2xl">🏅 إنجازاتي</h2>
@@ -842,20 +842,12 @@ export default function AccountPage() {
           />
         </section>
 
-        <MyAchievementsSection
-          total={accountTotal}
-          correct={accountCorrect}
-          currentRank={accountRank}
-          bestStreak={accountBestStreak}
-          predictions={predictions}
-        />
-
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:p-5">
-          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-950/60 p-2">
+          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-950/60 p-2">
             <button
               type="button"
               onClick={() => setActiveTab("predictions")}
-              className={`rounded-xl px-4 py-3 text-sm font-black transition ${
+              className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
                 activeTab === "predictions"
                   ? "bg-amber-400 text-slate-950"
                   : "text-slate-300 hover:bg-white/10"
@@ -866,8 +858,20 @@ export default function AccountPage() {
 
             <button
               type="button"
+              onClick={() => setActiveTab("achievements")}
+              className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
+                activeTab === "achievements"
+                  ? "bg-amber-400 text-slate-950"
+                  : "text-slate-300 hover:bg-white/10"
+              }`}
+            >
+              إنجازاتي
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab("info")}
-              className={`rounded-xl px-4 py-3 text-sm font-black transition ${
+              className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
                 activeTab === "info"
                   ? "bg-amber-400 text-slate-950"
                   : "text-slate-300 hover:bg-white/10"
@@ -935,6 +939,18 @@ export default function AccountPage() {
                   )}
                 </>
               )}
+            </div>
+          )}
+
+          {activeTab === "achievements" && (
+            <div className="mt-5">
+              <MyAchievementsSection
+                total={accountTotal}
+                correct={accountCorrect}
+                currentRank={accountRank}
+                bestStreak={accountBestStreak}
+                predictions={predictions}
+              />
             </div>
           )}
 
