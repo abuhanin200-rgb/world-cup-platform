@@ -6,6 +6,13 @@ import { getPredictionsByUserId, Prediction } from "@/lib/predictions";
 
 const USERS_PER_PAGE = 20;
 
+type MemberAchievement = {
+  icon: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+};
+
 function RankMovement({ user }: { user: LeaderboardUser }) {
   if (user.rankDirection === "up") {
     return (
@@ -116,6 +123,245 @@ function getPredictionStatus(prediction: Prediction) {
   };
 }
 
+function getMemberTitle(user: LeaderboardUser) {
+  if (user.currentRank === 1 && user.total > 0) {
+    return {
+      title: "متصدر التحدي",
+      icon: "🥇",
+      className: "border-amber-400/30 bg-amber-400/10 text-amber-100",
+    };
+  }
+
+  if (user.currentRank > 1 && user.currentRank <= 3 && user.total > 0) {
+    return {
+      title: "منافس شرس",
+      icon: "🏅",
+      className: "border-orange-400/30 bg-orange-400/10 text-orange-100",
+    };
+  }
+
+  if (user.currentRank > 3 && user.currentRank <= 10 && user.total > 0) {
+    return {
+      title: "من النخبة",
+      icon: "💪",
+      className: "border-sky-400/30 bg-sky-400/10 text-sky-100",
+    };
+  }
+
+  if (user.correct >= 20) {
+    return {
+      title: "أسطورة التوقعات",
+      icon: "⭐",
+      className: "border-violet-400/30 bg-violet-400/10 text-violet-100",
+    };
+  }
+
+  if (user.correct >= 12) {
+    return {
+      title: "محترف التوقعات",
+      icon: "🏆",
+      className: "border-amber-400/30 bg-amber-400/10 text-amber-100",
+    };
+  }
+
+  if (user.correct >= 7) {
+    return {
+      title: "خبير النتائج",
+      icon: "🧠",
+      className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+    };
+  }
+
+  if (user.correct >= 3) {
+    return {
+      title: "صياد النقاط",
+      icon: "🎯",
+      className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-100",
+    };
+  }
+
+  if (user.total >= 40) {
+    return {
+      title: "حاضر دائمًا",
+      icon: "⚽",
+      className: "border-blue-400/30 bg-blue-400/10 text-blue-100",
+    };
+  }
+
+  if (user.total >= 20) {
+    return {
+      title: "نشيط التوقعات",
+      icon: "🔥",
+      className: "border-red-400/30 bg-red-400/10 text-red-100",
+    };
+  }
+
+  if (user.total >= 8) {
+    return {
+      title: "محلل واعد",
+      icon: "📊",
+      className: "border-cyan-400/30 bg-cyan-400/10 text-cyan-100",
+    };
+  }
+
+  if (user.total >= 1) {
+    return {
+      title: "مبتدئ التوقعات",
+      icon: "🔮",
+      className: "border-slate-400/30 bg-slate-400/10 text-slate-100",
+    };
+  }
+
+  return {
+    title: "مشجع جديد",
+    icon: "👋",
+    className: "border-slate-400/30 bg-slate-400/10 text-slate-100",
+  };
+}
+
+function getMemberAchievements(
+  user: LeaderboardUser,
+  predictions: Prediction[]
+): MemberAchievement[] {
+  const exactHits = predictions.filter((prediction) => {
+    return (
+      prediction.isCalculated &&
+      (prediction.points === 3 || prediction.resultType === "exact")
+    );
+  }).length;
+
+  const calculatedPredictions = predictions.filter(
+    (prediction) => prediction.isCalculated
+  ).length;
+
+  const pendingPredictions = predictions.filter(
+    (prediction) => !prediction.isCalculated
+  ).length;
+
+  return [
+    {
+      icon: "🎯",
+      title: "دقيق جدًا",
+      description: `حقق ${exactHits} توقع صح بالملي`,
+      unlocked: exactHits > 0,
+    },
+    {
+      icon: "🔥",
+      title: "نشيط التوقعات",
+      description: "شارك في 20 توقع أو أكثر",
+      unlocked: user.total >= 20,
+    },
+    {
+      icon: "⚽",
+      title: "حاضر دائمًا",
+      description: "شارك في 40 توقع أو أكثر",
+      unlocked: user.total >= 40,
+    },
+    {
+      icon: "⚡",
+      title: "سلسلة نارية",
+      description: "حقق 3 توقعات صحيحة متتالية",
+      unlocked: user.bestStreak >= 3,
+    },
+    {
+      icon: "🚀",
+      title: "لا يوقف",
+      description: "حقق 7 توقعات صحيحة متتالية",
+      unlocked: user.bestStreak >= 7,
+    },
+    {
+      icon: "📈",
+      title: "صاعد بقوة",
+      description: "تحسن ترتيبه في لوحة الصدارة",
+      unlocked: user.rankDirection === "up" && user.rankChange > 0,
+    },
+    {
+      icon: "💪",
+      title: "من النخبة",
+      description: "دخل قائمة أول 10 مراكز",
+      unlocked: user.currentRank > 0 && user.currentRank <= 10 && user.total > 0,
+    },
+    {
+      icon: "🏅",
+      title: "منافس شرس",
+      description: "وصل إلى أحد أول 3 مراكز",
+      unlocked: user.currentRank > 0 && user.currentRank <= 3 && user.total > 0,
+    },
+    {
+      icon: "🥇",
+      title: "متصدر التحدي",
+      description: "وصل إلى المركز الأول",
+      unlocked: user.currentRank === 1 && user.total > 0,
+    },
+    {
+      icon: "⏳",
+      title: "بانتظار الحسم",
+      description: `${pendingPredictions} توقع لم يُحتسب بعد`,
+      unlocked: pendingPredictions > 0,
+    },
+    {
+      icon: "✅",
+      title: "سجل محسوب",
+      description: `${calculatedPredictions} توقع تم احتسابه`,
+      unlocked: calculatedPredictions > 0,
+    },
+  ];
+}
+
+function MemberStatCard({
+  label,
+  value,
+  className = "text-white",
+}: {
+  label: string;
+  value: string | number;
+  className?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center">
+      <div className="text-[10px] font-bold text-slate-400 md:text-xs">
+        {label}
+      </div>
+
+      <div className={`mt-1 text-lg font-black md:text-xl ${className}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function AchievementCard({ achievement }: { achievement: MemberAchievement }) {
+  return (
+    <div
+      className={`rounded-2xl border p-3 ${
+        achievement.unlocked
+          ? "border-amber-400/25 bg-amber-400/10"
+          : "border-white/10 bg-white/5 opacity-55"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-xl">
+          {achievement.unlocked ? achievement.icon : "🔒"}
+        </span>
+
+        <div className="min-w-0">
+          <div
+            className={`text-xs font-black md:text-sm ${
+              achievement.unlocked ? "text-white" : "text-slate-400"
+            }`}
+          >
+            {achievement.title}
+          </div>
+
+          <div className="mt-1 text-[10px] leading-5 text-slate-300 md:text-xs">
+            {achievement.description}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PredictionDetailsModal({
   user,
   predictions,
@@ -127,17 +373,21 @@ function PredictionDetailsModal({
   loading: boolean;
   onClose: () => void;
 }) {
+  const memberTitle = getMemberTitle(user);
+  const achievements = getMemberAchievements(user, predictions);
+  const unlockedAchievements = achievements.filter(
+    (achievement) => achievement.unlocked
+  );
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm">
       <div className="max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 text-white shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/10 p-4">
           <div>
-            <h3 className="text-lg font-black md:text-xl">
-              توقعات {user.fullName}
-            </h3>
+            <h3 className="text-lg font-black md:text-xl">ملف العضو</h3>
 
             <p className="mt-1 text-xs text-slate-300">
-              مجموع التوقعات: {user.total} — النقاط: {user.points}
+              الإحصائيات، الإنجازات، وسجل التوقعات
             </p>
           </div>
 
@@ -151,82 +401,198 @@ function PredictionDetailsModal({
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto p-4">
-          {loading ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center text-sm text-slate-300">
-              جاري تحميل التوقعات...
+          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-4 text-center">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-slate-950/60 text-3xl">
+              {user.teamEmoji || "🏆"}
             </div>
-          ) : predictions.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center text-sm text-slate-300">
-              لا توجد توقعات لهذا العضو حتى الآن.
+
+            <h2 className="text-xl font-black leading-8 md:text-2xl">
+              {user.fullName}
+            </h2>
+
+            <div
+              className={`mx-auto mt-3 inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-black ${memberTitle.className}`}
+            >
+              <span>{memberTitle.icon}</span>
+              <span>{memberTitle.title}</span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {predictions.map((prediction) => {
-                const status = getPredictionStatus(prediction);
 
-                return (
-                  <div
-                    key={prediction.id}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <span
-                        className={`rounded-full border px-3 py-1 text-[11px] font-black ${status.className}`}
-                      >
-                        {status.text}
-                      </span>
+            <div className="mt-3 text-xs text-slate-300">
+              {user.favoriteTeam || "بدون منتخب مرشح"}
+            </div>
+          </div>
 
-                      <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
-                        {prediction.points} نقطة
-                      </span>
-                    </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <MemberStatCard
+              label="المركز"
+              value={user.currentRank || "-"}
+              className="text-amber-300"
+            />
 
-                    <div className="grid grid-cols-[1fr_52px_1fr] items-center gap-2 text-center">
-                      <div className="min-w-0">
-                        <div className="text-2xl">
-                          {prediction.homeTeamEmoji}
-                        </div>
+            <MemberStatCard
+              label="النقاط"
+              value={user.points}
+              className="text-amber-300"
+            />
 
-                        <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
-                          {prediction.homeTeamName}
-                        </div>
-                      </div>
+            <MemberStatCard
+              label="التوقعات"
+              value={user.total}
+              className="text-sky-300"
+            />
 
-                      <div className="rounded-xl border border-white/10 bg-slate-950/70 px-2 py-2 text-sm font-black text-white">
-                        {prediction.homeScore} - {prediction.awayScore}
-                      </div>
+            <MemberStatCard
+              label="أفضل سلسلة"
+              value={user.bestStreak}
+              className="text-emerald-300"
+            />
 
-                      <div className="min-w-0">
-                        <div className="text-2xl">
-                          {prediction.awayTeamEmoji}
-                        </div>
+            <MemberStatCard
+              label="الصحيح"
+              value={user.correct}
+              className="text-emerald-300"
+            />
 
-                        <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
-                          {prediction.awayTeamName}
-                        </div>
-                      </div>
-                    </div>
+            <MemberStatCard
+              label="الخطأ"
+              value={user.wrong}
+              className="text-red-300"
+            />
 
-                    {prediction.isCalculated && (
-                      <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-2 text-center text-xs font-bold text-slate-300">
-                        النتيجة الفعلية:{" "}
-                        <span className="text-white">
-                          {prediction.actualHomeScore} -{" "}
-                          {prediction.actualAwayScore}
+            <MemberStatCard
+              label="حركة الترتيب"
+              value={
+                user.rankDirection === "up"
+                  ? `صعد ${user.rankChange}`
+                  : user.rankDirection === "down"
+                    ? `نزل ${user.rankChange}`
+                    : "ثابت"
+              }
+              className={
+                user.rankDirection === "up"
+                  ? "text-emerald-300"
+                  : user.rankDirection === "down"
+                    ? "text-red-300"
+                    : "text-slate-300"
+              }
+            />
+
+            <MemberStatCard
+              label="الأوسمة"
+              value={unlockedAchievements.length}
+              className="text-violet-300"
+            />
+          </div>
+
+          <div className="mt-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-base font-black md:text-lg">
+                🏅 الأوسمة والإنجازات
+              </h3>
+
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold text-slate-300 md:text-xs">
+                {unlockedAchievements.length} مكتسبة
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {achievements.map((achievement) => (
+                <AchievementCard
+                  key={achievement.title}
+                  achievement={achievement}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-base font-black md:text-lg">
+                🔮 توقعات العضو
+              </h3>
+
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold text-slate-300 md:text-xs">
+                {predictions.length} توقع
+              </span>
+            </div>
+
+            {loading ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center text-sm text-slate-300">
+                جاري تحميل التوقعات...
+              </div>
+            ) : predictions.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center text-sm text-slate-300">
+                لا توجد توقعات لهذا العضو حتى الآن.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {predictions.map((prediction) => {
+                  const status = getPredictionStatus(prediction);
+
+                  return (
+                    <div
+                      key={prediction.id}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
+                    >
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <span
+                          className={`rounded-full border px-3 py-1 text-[11px] font-black ${status.className}`}
+                        >
+                          {status.text}
+                        </span>
+
+                        <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
+                          {prediction.points} نقطة
                         </span>
                       </div>
-                    )}
 
-                    {!prediction.isCalculated && (
-                      <div className="mt-3 rounded-xl border border-slate-400/20 bg-slate-400/10 p-2 text-center text-xs font-bold text-slate-300">
-                        هذا التوقع بانتظار احتساب نتيجة المباراة.
+                      <div className="grid grid-cols-[1fr_52px_1fr] items-center gap-2 text-center">
+                        <div className="min-w-0">
+                          <div className="text-2xl">
+                            {prediction.homeTeamEmoji}
+                          </div>
+
+                          <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
+                            {prediction.homeTeamName}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/10 bg-slate-950/70 px-2 py-2 text-sm font-black text-white">
+                          {prediction.homeScore} - {prediction.awayScore}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="text-2xl">
+                            {prediction.awayTeamEmoji}
+                          </div>
+
+                          <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
+                            {prediction.awayTeamName}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+
+                      {prediction.isCalculated && (
+                        <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-2 text-center text-xs font-bold text-slate-300">
+                          النتيجة الفعلية:{" "}
+                          <span className="text-white">
+                            {prediction.actualHomeScore} -{" "}
+                            {prediction.actualAwayScore}
+                          </span>
+                        </div>
+                      )}
+
+                      {!prediction.isCalculated && (
+                        <div className="mt-3 rounded-xl border border-slate-400/20 bg-slate-400/10 p-2 text-center text-xs font-bold text-slate-300">
+                          هذا التوقع بانتظار احتساب نتيجة المباراة.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
