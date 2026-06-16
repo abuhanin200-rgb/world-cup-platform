@@ -310,3 +310,20 @@ export async function getLatestPredictions(
       createdAt: prediction.createdAt,
     }));
 }
+
+export async function getPredictionsByUserId(
+  userId: string
+): Promise<Prediction[]> {
+  if (!userId) return [];
+
+  const predictionsRef = collection(db, "predictions");
+
+  const q = query(predictionsRef, where("userId", "==", userId));
+
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => mapPrediction(docSnap.id, docSnap.data()))
+    .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
+}
