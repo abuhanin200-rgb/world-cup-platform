@@ -38,7 +38,7 @@ function getTopRankStyle(rank: number) {
       badgeClass:
         "bg-gradient-to-br from-amber-300 to-yellow-500 text-slate-950 shadow-lg shadow-amber-500/30 ring-2 ring-amber-200/40",
       nameClass: "text-amber-100",
-      icon: "👑",
+      icon: "",
       medal: "🥇",
     };
   }
@@ -135,6 +135,7 @@ function PredictionDetailsModal({
             <h3 className="text-lg font-black md:text-xl">
               توقعات {user.fullName}
             </h3>
+
             <p className="mt-1 text-xs text-slate-300">
               مجموع التوقعات: {user.total} — النقاط: {user.points}
             </p>
@@ -185,7 +186,8 @@ function PredictionDetailsModal({
                         <div className="text-2xl">
                           {prediction.homeTeamEmoji}
                         </div>
-                        <div className="mt-1 truncate text-xs font-bold text-slate-200">
+
+                        <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
                           {prediction.homeTeamName}
                         </div>
                       </div>
@@ -198,7 +200,8 @@ function PredictionDetailsModal({
                         <div className="text-2xl">
                           {prediction.awayTeamEmoji}
                         </div>
-                        <div className="mt-1 truncate text-xs font-bold text-slate-200">
+
+                        <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
                           {prediction.awayTeamName}
                         </div>
                       </div>
@@ -315,6 +318,7 @@ export default function LeaderboardTable() {
       <section className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-8 md:p-6">
         <div className="mb-4 text-center md:mb-6">
           <h2 className="text-2xl font-black md:text-3xl">لوحة الصدارة</h2>
+
           <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
             ترتيب جميع الأعضاء حسب النقاط ثم عدد التوقعات الصحيحة.
           </p>
@@ -327,7 +331,9 @@ export default function LeaderboardTable() {
         ) : users.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-sm text-slate-300">
             <div className="mb-2 text-3xl">🏆</div>
+
             <div className="font-black">لا يوجد أعضاء حتى الآن</div>
+
             <p className="mt-2 text-xs leading-6 text-slate-300">
               ستظهر أسماء الأعضاء هنا بعد التسجيل.
             </p>
@@ -341,18 +347,23 @@ export default function LeaderboardTable() {
                     <th className="w-[20%] px-1 py-3 font-black md:px-4 md:py-4">
                       المركز
                     </th>
+
                     <th className="w-[28%] px-1 py-3 font-black md:px-4 md:py-4">
                       الاسم
                     </th>
+
                     <th className="w-[14%] px-1 py-3 font-black md:px-4 md:py-4">
                       التوقعات
                     </th>
+
                     <th className="w-[12%] px-1 py-3 font-black md:px-4 md:py-4">
                       الصح
                     </th>
+
                     <th className="w-[12%] px-1 py-3 font-black md:px-4 md:py-4">
                       الخطأ
                     </th>
+
                     <th className="w-[14%] px-1 py-3 font-black md:px-4 md:py-4">
                       النقاط
                     </th>
@@ -379,7 +390,7 @@ export default function LeaderboardTable() {
                           <button
                             type="button"
                             onClick={() => openUserPredictions(user)}
-                            className={`mx-auto flex min-w-0 max-w-full items-center justify-center gap-1 rounded-lg px-1 py-1 underline-offset-4 hover:underline ${style.nameClass}`}
+                            className={`mx-auto flex w-full min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1 text-center leading-5 underline-offset-4 hover:underline ${style.nameClass}`}
                             title="اضغط لعرض توقعات العضو"
                           >
                             {style.icon && (
@@ -388,7 +399,9 @@ export default function LeaderboardTable() {
                               </span>
                             )}
 
-                            <span className="truncate">{user.fullName}</span>
+                            <span className="whitespace-normal break-words leading-5">
+                              {user.fullName}
+                            </span>
                           </button>
                         </td>
 
