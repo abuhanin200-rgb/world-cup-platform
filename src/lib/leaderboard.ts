@@ -23,6 +23,11 @@ export type LeaderboardUser = {
   lastPredictionAt?: string;
 };
 
+type PredictionTieBreakData = {
+  lastCalculatedMatchId: string;
+  predictionTimesByUserId: Map<string, number>;
+};
+
 function toNumber(value: unknown) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : 0;
@@ -44,10 +49,88 @@ function toTime(value: unknown) {
   return time;
 }
 
-export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
-  const snapshot = await getDocs(collection(db, "users"));
+function toRealTime(value: unknown) {
+  const text = toText(value);
 
-  const users = snapshot.docs
+  if (!text) return 0;
+
+  const time = new Date(text).getTime();
+
+  if (!Number.isFinite(time)) return 0;
+
+  return time;
+}
+
+async function getLastCalculatedMatchTieBreakData(): Promise<PredictionTieBreakData> {
+  const snapshot = await getDocs(collection(db, "predictions"));
+
+  const predictions = snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => {
+      const data = docSnap.data();
+
+      return {
+        id: docSnap.id,
+        userId: toText(data.userId),
+        matchId: toText(data.matchId),
+        createdAt: toText(data.createdAt),
+        createdTimeValue: toRealTime(data.createdAt),
+        calculatedAt: toText(data.calculatedAt),
+        calculatedTimeValue: toRealTime(data.calculatedAt),
+        isCalculated: Boolean(data.isCalculated),
+      };
+    })
+    .filter((prediction) => {
+      return (
+        prediction.isCalculated &&
+        prediction.matchId &&
+        prediction.calculatedTimeValue > 0
+      );
+    });
+
+  if (predictions.length === 0) {
+    return {
+      lastCalculatedMatchId: "",
+      predictionTimesByUserId: new Map<string, number>(),
+    };
+  }
+
+  const latestCalculatedPrediction = predictions.sort((a, b) => {
+    return b.calculatedTimeValue - a.calculatedTimeValue;
+  })[0];
+
+  const lastCalculatedMatchId = latestCalculatedPrediction.matchId;
+
+  const predictionTimesByUserId = new Map<string, number>();
+
+  predictions
+    .filter((prediction) => prediction.matchId === lastCalculatedMatchId)
+    .forEach((prediction) => {
+      if (!prediction.userId || prediction.createdTimeValue <= 0) return;
+
+      const currentSavedTime = predictionTimesByUserId.get(prediction.userId);
+
+      if (!currentSavedTime || prediction.createdTimeValue < currentSavedTime) {
+        predictionTimesByUserId.set(
+          prediction.userId,
+          prediction.createdTimeValue
+        );
+      }
+    });
+
+  return {
+    lastCalculatedMatchId,
+    predictionTimesByUserId,
+  };
+}
+
+export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
+  const [usersSnapshot, tieBreakData] = await Promise.all([
+    getDocs(collection(db, "users")),
+    getLastCalculatedMatchTieBreakData(),
+  ]);
+
+  const users = usersSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => {
       const data = docSnap.data();
@@ -100,8 +183,8 @@ export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
        * 2- عدد التوقعات الصحيحة الأعلى.
        * 3- عدد التوقعات الأعلى.
        * 4- عدد الأخطاء الأقل.
-       * 5- الأسرع في إرسال آخر توقع عند التساوي الكامل.
-       * 6- الاسم أبجديًا فقط إذا لم يوجد وقت محفوظ.
+       * 5- الأسرع في توقع آخر مباراة تم احتساب نتيجتها عند التساوي الكامل.
+       * 6- الاسم أبجديًا فقط إذا لم توجد بيانات كافية.
        *
        * هذا الترتيب لا يغير الحسبة ولا النقاط.
        * فقط يغير طريقة عرض الأعضاء في لوحة الصدارة.
@@ -111,11 +194,51 @@ export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
       if (b.total !== a.total) return b.total - a.total;
       if (a.wrong !== b.wrong) return a.wrong - b.wrong;
 
-      const aPredictionTime = toTime(a.lastPredictionAt);
-      const bPredictionTime = toTime(b.lastPredictionAt);
+      const aLastCalculatedMatchPredictionTime =
+        tieBreakData.predictionTimesByUserId.get(a.id) ??
+        Number.MAX_SAFE_INTEGER;
 
-      if (aPredictionTime !== bPredictionTime) {
-        return aPredictionTime - bPredictionTime;
+      const bLastCalculatedMatchPredictionTime =
+        tieBreakData.predictionTimesByUserId.get(b.id) ??
+        Number.MAX_SAFE_INTEGER;
+
+      const aPredictedLastCalculatedMatch =
+        aLastCalculatedMatchPredictionTime !== Number.MAX_SAFE_INTEGER;
+
+      const bPredictedLastCalculatedMatch =
+        bLastCalculatedMatchPredictionTime !== Number.MAX_SAFE_INTEGER;
+
+      /**
+       * إذا واحد توقع آخر مباراة محسوبة والثاني ما توقعها،
+       * اللي توقعها يطلع فوق.
+       */
+      if (aPredictedLastCalculatedMatch !== bPredictedLastCalculatedMatch) {
+        return aPredictedLastCalculatedMatch ? -1 : 1;
+      }
+
+      /**
+       * إذا الاثنين توقعوا آخر مباراة محسوبة،
+       * الأسرع في إرسال التوقع يطلع فوق.
+       */
+      if (
+        aLastCalculatedMatchPredictionTime !==
+        bLastCalculatedMatchPredictionTime
+      ) {
+        return (
+          aLastCalculatedMatchPredictionTime -
+          bLastCalculatedMatchPredictionTime
+        );
+      }
+
+      /**
+       * احتياط أخير فقط:
+       * إذا ما فيه آخر مباراة محسوبة أو الاثنين ما توقعوا نفس المباراة.
+       */
+      const aFallbackTime = toTime(a.lastPredictionAt);
+      const bFallbackTime = toTime(b.lastPredictionAt);
+
+      if (aFallbackTime !== bFallbackTime) {
+        return aFallbackTime - bFallbackTime;
       }
 
       return a.fullName.localeCompare(b.fullName, "ar");
