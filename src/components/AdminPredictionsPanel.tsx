@@ -5,9 +5,23 @@ import {
   AdminPrediction,
   getAdminPredictions,
   getPredictionMatchOptions,
-  getPredictionResultClass,
-  getPredictionResultLabel,
 } from "@/lib/adminPredictions";
+
+type PredictionType = "normal" | "golden";
+
+type AdminPredictionWithType = AdminPrediction & {
+  predictionType?: PredictionType;
+};
+
+type PredictionStatus =
+  | "all"
+  | "pending"
+  | "exact"
+  | "winner"
+  | "wrong"
+  | "golden"
+  | "goldenExact"
+  | "goldenWinner";
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -23,7 +37,7 @@ function formatDate(value?: string | null) {
   }
 }
 
-function getActualResult(prediction: AdminPrediction) {
+function getActualResult(prediction: AdminPredictionWithType) {
   if (
     prediction.actualHomeScore === null ||
     prediction.actualHomeScore === undefined ||
@@ -36,12 +50,100 @@ function getActualResult(prediction: AdminPrediction) {
   return `${prediction.actualHomeScore} - ${prediction.actualAwayScore}`;
 }
 
+function isGoldenPrediction(prediction: AdminPredictionWithType) {
+  return prediction.predictionType === "golden";
+}
+
+function isExactPrediction(prediction: AdminPredictionWithType) {
+  return (
+    prediction.isCalculated &&
+    (prediction.resultType === "exact" ||
+      prediction.points === 3 ||
+      prediction.points === 6)
+  );
+}
+
+function isWinnerPrediction(prediction: AdminPredictionWithType) {
+  return (
+    prediction.isCalculated &&
+    (prediction.resultType === "winner" ||
+      prediction.points === 1 ||
+      prediction.points === 2)
+  );
+}
+
+function isWrongPrediction(prediction: AdminPredictionWithType) {
+  return prediction.isCalculated && prediction.points === 0;
+}
+
+function getPredictionResultLabel(prediction: AdminPredictionWithType) {
+  const golden = isGoldenPrediction(prediction);
+
+  if (!prediction.isCalculated) {
+    return "لم يُحتسب";
+  }
+
+  if (isExactPrediction(prediction)) {
+    return golden ? "ذهبي بالملي +6" : "بالملي +3";
+  }
+
+  if (isWinnerPrediction(prediction)) {
+    return golden ? "فائز ذهبي +2" : "الفائز +1";
+  }
+
+  return "خطأ +0";
+}
+
+function getPredictionResultClass(prediction: AdminPredictionWithType) {
+  const golden = isGoldenPrediction(prediction);
+
+  if (!prediction.isCalculated) {
+    return golden
+      ? "border-amber-300/30 bg-amber-400/10 text-amber-100"
+      : "border-slate-400/20 bg-slate-400/10 text-slate-200";
+  }
+
+  if (isExactPrediction(prediction)) {
+    return golden
+      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
+  }
+
+  if (isWinnerPrediction(prediction)) {
+    return golden
+      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      : "border-amber-400/30 bg-amber-400/10 text-amber-100";
+  }
+
+  return "border-red-400/30 bg-red-400/10 text-red-100";
+}
+
+function matchesStatusFilter(
+  prediction: AdminPredictionWithType,
+  status: PredictionStatus
+) {
+  const golden = isGoldenPrediction(prediction);
+
+  if (status === "all") return true;
+  if (status === "pending") return !prediction.isCalculated;
+  if (status === "exact") return isExactPrediction(prediction);
+  if (status === "winner") return isWinnerPrediction(prediction);
+  if (status === "wrong") return isWrongPrediction(prediction);
+  if (status === "golden") return golden;
+  if (status === "goldenExact") return golden && isExactPrediction(prediction);
+  if (status === "goldenWinner") {
+    return golden && isWinnerPrediction(prediction);
+  }
+
+  return true;
+}
+
 export default function AdminPredictionsPanel() {
-  const [predictions, setPredictions] = useState<AdminPrediction[]>([]);
+  const [predictions, setPredictions] = useState<AdminPredictionWithType[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [matchId, setMatchId] = useState("all");
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState<PredictionStatus>("all");
   const [page, setPage] = useState(1);
 
   const pageSize = 20;
@@ -50,7 +152,7 @@ export default function AdminPredictionsPanel() {
     try {
       setLoading(true);
       const data = await getAdminPredictions();
-      setPredictions(data);
+      setPredictions(data as AdminPredictionWithType[]);
     } catch (error) {
       console.error("Admin predictions error:", error);
       alert("تعذر تحميل توقعات الأعضاء");
@@ -71,26 +173,19 @@ export default function AdminPredictionsPanel() {
     const searchValue = search.trim().toLowerCase();
 
     return predictions.filter((prediction) => {
+      const predictionTypeText = isGoldenPrediction(prediction)
+        ? "ذهبي توقع ذهبي"
+        : "";
+
       const matchesSearch =
         !searchValue ||
         prediction.userName.toLowerCase().includes(searchValue) ||
         prediction.homeTeamName.toLowerCase().includes(searchValue) ||
-        prediction.awayTeamName.toLowerCase().includes(searchValue);
+        prediction.awayTeamName.toLowerCase().includes(searchValue) ||
+        predictionTypeText.includes(searchValue);
 
       const matchesMatch = matchId === "all" || prediction.matchId === matchId;
-
-      const matchesStatus =
-        status === "all" ||
-        (status === "pending" && !prediction.isCalculated) ||
-        (status === "exact" &&
-          prediction.isCalculated &&
-          (prediction.resultType === "exact" || prediction.points === 3)) ||
-        (status === "winner" &&
-          prediction.isCalculated &&
-          (prediction.resultType === "winner" || prediction.points === 1)) ||
-        (status === "wrong" &&
-          prediction.isCalculated &&
-          prediction.points === 0);
+      const matchesStatus = matchesStatusFilter(prediction, status);
 
       return matchesSearch && matchesMatch && matchesStatus;
     });
@@ -110,21 +205,29 @@ export default function AdminPredictionsPanel() {
     (prediction) => !prediction.isCalculated
   ).length;
 
-  const totalExact = predictions.filter(
-    (prediction) =>
-      prediction.isCalculated &&
-      (prediction.resultType === "exact" || prediction.points === 3)
+  const totalExact = predictions.filter((prediction) =>
+    isExactPrediction(prediction)
   ).length;
 
-  const totalWinner = predictions.filter(
-    (prediction) =>
-      prediction.isCalculated &&
-      (prediction.resultType === "winner" || prediction.points === 1)
+  const totalWinner = predictions.filter((prediction) =>
+    isWinnerPrediction(prediction)
   ).length;
 
-  const totalWrong = predictions.filter(
-    (prediction) => prediction.isCalculated && prediction.points === 0
+  const totalWrong = predictions.filter((prediction) =>
+    isWrongPrediction(prediction)
   ).length;
+
+  const totalGolden = predictions.filter((prediction) =>
+    isGoldenPrediction(prediction)
+  ).length;
+
+  const totalGoldenExact = predictions.filter((prediction) => {
+    return isGoldenPrediction(prediction) && isExactPrediction(prediction);
+  }).length;
+
+  const totalGoldenWinner = predictions.filter((prediction) => {
+    return isGoldenPrediction(prediction) && isWinnerPrediction(prediction);
+  }).length;
 
   return (
     <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
@@ -145,7 +248,7 @@ export default function AdminPredictionsPanel() {
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-center">
           <div className="text-[11px] text-slate-400">الإجمالي</div>
           <div className="mt-1 text-2xl font-black">{predictions.length}</div>
@@ -174,6 +277,27 @@ export default function AdminPredictionsPanel() {
           <div className="text-[11px] text-red-100">خطأ</div>
           <div className="mt-1 text-2xl font-black text-red-200">
             {totalWrong}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-amber-300/30 bg-amber-400/15 p-3 text-center">
+          <div className="text-[11px] text-amber-100">ذهبي</div>
+          <div className="mt-1 text-2xl font-black text-amber-200">
+            {totalGolden}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-amber-300/30 bg-amber-400/15 p-3 text-center">
+          <div className="text-[11px] text-amber-100">ذهبي بالملي</div>
+          <div className="mt-1 text-2xl font-black text-amber-200">
+            {totalGoldenExact}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-amber-300/30 bg-amber-400/15 p-3 text-center">
+          <div className="text-[11px] text-amber-100">فائز ذهبي</div>
+          <div className="mt-1 text-2xl font-black text-amber-200">
+            {totalGoldenWinner}
           </div>
         </div>
       </div>
@@ -208,16 +332,19 @@ export default function AdminPredictionsPanel() {
         <select
           value={status}
           onChange={(event) => {
-            setStatus(event.target.value);
+            setStatus(event.target.value as PredictionStatus);
             setPage(1);
           }}
           className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
         >
           <option value="all">كل الحالات</option>
           <option value="pending">لم يُحتسب</option>
-          <option value="exact">بالملي +3</option>
-          <option value="winner">الفائز +1</option>
+          <option value="exact">بالملي</option>
+          <option value="winner">الفائز</option>
           <option value="wrong">خطأ +0</option>
+          <option value="golden">التوقعات الذهبية</option>
+          <option value="goldenExact">ذهبي بالملي +6</option>
+          <option value="goldenWinner">فائز ذهبي +2</option>
         </select>
       </div>
 
@@ -232,13 +359,14 @@ export default function AdminPredictionsPanel() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] border-collapse text-sm">
+            <table className="w-full min-w-[980px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-white/10 bg-slate-950/80 text-[12px] text-slate-300">
                   <th className="px-3 py-3 text-right font-black">#</th>
                   <th className="px-3 py-3 text-right font-black">العضو</th>
                   <th className="px-3 py-3 text-right font-black">المباراة</th>
                   <th className="px-3 py-3 text-center font-black">التوقع</th>
+                  <th className="px-3 py-3 text-center font-black">النوع</th>
                   <th className="px-3 py-3 text-center font-black">
                     النتيجة الفعلية
                   </th>
@@ -254,72 +382,108 @@ export default function AdminPredictionsPanel() {
               </thead>
 
               <tbody>
-                {visiblePredictions.map((prediction, index) => (
-                  <tr
-                    key={prediction.id}
-                    className="border-b border-white/10 transition hover:bg-white/5"
-                  >
-                    <td className="px-3 py-3 text-slate-400">
-                      {(page - 1) * pageSize + index + 1}
-                    </td>
+                {visiblePredictions.map((prediction, index) => {
+                  const golden = isGoldenPrediction(prediction);
 
-                    <td className="px-3 py-3">
-                      <div className="font-black text-amber-300">
-                        {prediction.userName}
-                      </div>
-                    </td>
+                  return (
+                    <tr
+                      key={prediction.id}
+                      className={`border-b border-white/10 transition hover:bg-white/5 ${
+                        golden ? "bg-amber-400/5" : ""
+                      }`}
+                    >
+                      <td className="px-3 py-3 text-slate-400">
+                        {(page - 1) * pageSize + index + 1}
+                      </td>
 
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-bold">
-                          {prediction.homeTeamEmoji} {prediction.homeTeamName}
+                      <td className="px-3 py-3">
+                        <div
+                          className={
+                            golden
+                              ? "font-black text-amber-200"
+                              : "font-black text-amber-300"
+                          }
+                        >
+                          {prediction.userName}
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold">
+                            {prediction.homeTeamEmoji}{" "}
+                            {prediction.homeTeamName}
+                          </span>
+
+                          <span className="text-slate-500">×</span>
+
+                          <span className="font-bold">
+                            {prediction.awayTeamName}{" "}
+                            {prediction.awayTeamEmoji}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className={`inline-flex rounded-lg px-3 py-1 font-black ${
+                            golden
+                              ? "bg-amber-400 text-slate-950"
+                              : "bg-white/10 text-white"
+                          }`}
+                        >
+                          {prediction.homeScore} - {prediction.awayScore}
                         </span>
+                      </td>
 
-                        <span className="text-slate-500">×</span>
+                      <td className="px-3 py-3 text-center">
+                        {golden ? (
+                          <span className="inline-flex rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
+                            ⭐ ذهبي
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-500">—</span>
+                        )}
+                      </td>
 
-                        <span className="font-bold">
-                          {prediction.awayTeamName} {prediction.awayTeamEmoji}
+                      <td className="px-3 py-3 text-center">
+                        <span className="inline-flex rounded-lg bg-slate-900 px-3 py-1 font-black text-slate-200">
+                          {getActualResult(prediction)}
                         </span>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="px-3 py-3 text-center">
-                      <span className="inline-flex rounded-lg bg-white/10 px-3 py-1 font-black text-white">
-                        {prediction.homeScore} - {prediction.awayScore}
-                      </span>
-                    </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${getPredictionResultClass(
+                            prediction
+                          )}`}
+                        >
+                          {getPredictionResultLabel(prediction)}
+                        </span>
+                      </td>
 
-                    <td className="px-3 py-3 text-center">
-                      <span className="inline-flex rounded-lg bg-slate-900 px-3 py-1 font-black text-slate-200">
-                        {getActualResult(prediction)}
-                      </span>
-                    </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 font-black ${
+                            golden
+                              ? "bg-amber-400 text-slate-950"
+                              : "bg-white/10 text-white"
+                          }`}
+                        >
+                          {prediction.points}
+                        </span>
+                      </td>
 
-                    <td className="px-3 py-3 text-center">
-                      <span
-                        className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${getPredictionResultClass(
-                          prediction
-                        )}`}
-                      >
-                        {getPredictionResultLabel(prediction)}
-                      </span>
-                    </td>
+                      <td className="px-3 py-3 text-center text-[11px] text-slate-400">
+                        {formatDate(prediction.createdAt)}
+                      </td>
 
-                    <td className="px-3 py-3 text-center">
-                      <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-white/10 px-2 font-black">
-                        {prediction.points}
-                      </span>
-                    </td>
-
-                    <td className="px-3 py-3 text-center text-[11px] text-slate-400">
-                      {formatDate(prediction.createdAt)}
-                    </td>
-
-                    <td className="px-3 py-3 text-center text-[11px] text-slate-400">
-                      {formatDate(prediction.calculatedAt)}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-3 py-3 text-center text-[11px] text-slate-400">
+                        {formatDate(prediction.calculatedAt)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
