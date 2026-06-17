@@ -12,15 +12,15 @@ export type HomeHighlightUser = {
   correct: number;
   wrong: number;
 
-  currentStreak: number;
-  bestStreak: number;
-
   currentRank: number;
   previousRank: number;
   rankChange: number;
   rankDirection: "up" | "down" | "-";
 
-  lastPredictionAt: string;
+  currentStreak: number;
+  bestStreak: number;
+
+  lastPredictionAt?: string;
 };
 
 export type ExactHit = {
@@ -28,49 +28,47 @@ export type ExactHit = {
   userId: string;
   userName: string;
 
+  matchId: string;
+
   homeTeamName: string;
-  homeTeamEmoji: string;
   awayTeamName: string;
+  homeTeamEmoji: string;
   awayTeamEmoji: string;
 
   homeScore: number;
   awayScore: number;
 
+  createdAt: string;
   calculatedAt: string;
 };
 
 type HighlightPrediction = {
   id: string;
-
   userId: string;
   userName: string;
 
+  matchId: string;
+
   homeTeamName: string;
-  homeTeamEmoji: string;
   awayTeamName: string;
+  homeTeamEmoji: string;
   awayTeamEmoji: string;
 
   homeScore: number;
   awayScore: number;
+
+  actualHomeScore: number | null;
+  actualAwayScore: number | null;
 
   points: number;
   resultType: string;
   isCalculated: boolean;
 
   createdAt: string;
-  updatedAt: string;
-  calculatedAt: string;
-
   createdTimeValue: number;
-  calculatedTimeValue: number;
-};
 
-export type HomeHighlightsData = {
-  predictionKing: HomeHighlightUser | null;
-  bestStreakUser: HomeHighlightUser | null;
-  fastestRiserUser: HomeHighlightUser | null;
-  firstArriverUser: HomeHighlightUser | null;
-  exactHits: ExactHit[];
+  calculatedAt: string;
+  calculatedTimeValue: number;
 };
 
 function toNumber(value: unknown) {
@@ -82,99 +80,91 @@ function toText(value: unknown) {
   return String(value || "").trim();
 }
 
-function normalizeRankDirection(value: unknown): "up" | "down" | "-" {
-  if (value === "up" || value === "down" || value === "-") {
-    return value;
-  }
+function toTimeValue(value: unknown) {
+  const text = toText(value);
 
-  return "-";
+  if (!text) return 0;
+
+  const time = new Date(text).getTime();
+
+  if (!Number.isFinite(time)) return 0;
+
+  return time;
 }
 
-function getTimeValue(...dates: unknown[]) {
-  for (const dateValue of dates) {
-    const text = toText(dateValue);
+function getSaudiDateKey(value: string) {
+  const date = new Date(value);
 
-    if (!text) continue;
+  if (Number.isNaN(date.getTime())) return "";
 
-    const time = new Date(text).getTime();
-
-    if (Number.isFinite(time)) {
-      return time;
-    }
-  }
-
-  return 0;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
-function mapHighlightUser(
-  id: string,
-  data: Record<string, unknown>
-): HomeHighlightUser {
-  return {
-    id,
-    fullName: toText(data.fullName) || "عضو بدون اسم",
-    favoriteTeam: toText(data.favoriteTeam),
-    teamEmoji: toText(data.teamEmoji),
-
-    points: toNumber(data.points),
-    total: toNumber(data.total),
-    correct: toNumber(data.correct),
-    wrong: toNumber(data.wrong),
-
-    currentStreak: toNumber(data.currentStreak),
-    bestStreak: toNumber(data.bestStreak),
-
-    currentRank: toNumber(data.currentRank),
-    previousRank: toNumber(data.previousRank),
-    rankChange: toNumber(data.rankChange),
-    rankDirection: normalizeRankDirection(data.rankDirection),
-
-    lastPredictionAt: toText(data.lastPredictionAt),
-  };
+function getTodaySaudiDateKey() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
-function mapHighlightPrediction(
-  id: string,
-  data: Record<string, unknown>
-): HighlightPrediction {
-  const createdAt = toText(data.createdAt);
-  const updatedAt = toText(data.updatedAt);
-  const calculatedAt =
-    toText(data.calculatedAt) || toText(data.updatedAt) || toText(data.createdAt);
-
-  return {
-    id,
-
-    userId: toText(data.userId),
-    userName: toText(data.userName) || "عضو",
-
-    homeTeamName: toText(data.homeTeamName),
-    homeTeamEmoji: toText(data.homeTeamEmoji),
-    awayTeamName: toText(data.awayTeamName),
-    awayTeamEmoji: toText(data.awayTeamEmoji),
-
-    homeScore: toNumber(data.homeScore),
-    awayScore: toNumber(data.awayScore),
-
-    points: toNumber(data.points),
-    resultType: toText(data.resultType),
-    isCalculated: Boolean(data.isCalculated),
-
-    createdAt,
-    updatedAt,
-    calculatedAt,
-
-    createdTimeValue: getTimeValue(createdAt, updatedAt, calculatedAt),
-    calculatedTimeValue: getTimeValue(calculatedAt, updatedAt, createdAt),
-  };
-}
-
-async function getUsersForHighlights() {
+async function getUsersForHighlights(): Promise<HomeHighlightUser[]> {
   const snapshot = await getDocs(collection(db, "users"));
 
-  return snapshot.docs
+  const users = snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => mapHighlightUser(docSnap.id, docSnap.data()));
+    .map((docSnap) => {
+      const data = docSnap.data();
+
+      return {
+        id: docSnap.id,
+        fullName: toText(data.fullName) || "عضو بدون اسم",
+        favoriteTeam: toText(data.favoriteTeam),
+        teamEmoji: toText(data.teamEmoji),
+
+        points: toNumber(data.points),
+        total: toNumber(data.total),
+        correct: toNumber(data.correct),
+        wrong: toNumber(data.wrong),
+
+        currentRank: toNumber(data.currentRank),
+        previousRank: toNumber(data.previousRank),
+        rankChange: toNumber(data.rankChange),
+        rankDirection:
+          data.rankDirection === "up" ||
+          data.rankDirection === "down" ||
+          data.rankDirection === "-"
+            ? data.rankDirection
+            : "-",
+
+        currentStreak: toNumber(data.currentStreak),
+        bestStreak: toNumber(data.bestStreak),
+
+        lastPredictionAt: toText(data.lastPredictionAt),
+      } as HomeHighlightUser;
+    });
+
+  return users.sort((a, b) => {
+    const aHasPredictions = a.total > 0;
+    const bHasPredictions = b.total > 0;
+
+    if (aHasPredictions !== bHasPredictions) {
+      return aHasPredictions ? -1 : 1;
+    }
+
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.correct !== a.correct) return b.correct - a.correct;
+    if (b.total !== a.total) return b.total - a.total;
+    if (a.wrong !== b.wrong) return a.wrong - b.wrong;
+
+    return a.fullName.localeCompare(b.fullName, "ar");
+  });
 }
 
 async function getPredictionsForHighlights(): Promise<HighlightPrediction[]> {
@@ -182,153 +172,209 @@ async function getPredictionsForHighlights(): Promise<HighlightPrediction[]> {
 
   return snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => mapHighlightPrediction(docSnap.id, docSnap.data()));
+    .map((docSnap) => {
+      const data = docSnap.data();
+
+      const createdAt = toText(data.createdAt);
+      const calculatedAt = toText(data.calculatedAt);
+
+      return {
+        id: docSnap.id,
+        userId: toText(data.userId),
+        userName: toText(data.userName) || "عضو بدون اسم",
+
+        matchId: toText(data.matchId),
+
+        homeTeamName: toText(data.homeTeamName),
+        awayTeamName: toText(data.awayTeamName),
+        homeTeamEmoji: toText(data.homeTeamEmoji),
+        awayTeamEmoji: toText(data.awayTeamEmoji),
+
+        homeScore: toNumber(data.homeScore),
+        awayScore: toNumber(data.awayScore),
+
+        actualHomeScore:
+          data.actualHomeScore === undefined || data.actualHomeScore === null
+            ? null
+            : toNumber(data.actualHomeScore),
+
+        actualAwayScore:
+          data.actualAwayScore === undefined || data.actualAwayScore === null
+            ? null
+            : toNumber(data.actualAwayScore),
+
+        points: toNumber(data.points),
+        resultType: toText(data.resultType),
+        isCalculated: Boolean(data.isCalculated),
+
+        createdAt,
+        createdTimeValue: toTimeValue(createdAt),
+
+        calculatedAt,
+        calculatedTimeValue: toTimeValue(calculatedAt),
+      };
+    });
 }
 
-function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
-  return predictions
-    .filter((prediction) => {
-      const hasMatchData =
-        prediction.userName &&
-        prediction.homeTeamName &&
-        prediction.awayTeamName;
+function pickPredictionKing(users: HomeHighlightUser[]) {
+  return (
+    users.find((user) => {
+      return user.total > 0 && user.points > 0;
+    }) || null
+  );
+}
 
-      const isExact =
-        prediction.resultType === "exact" || prediction.points === 3;
+function pickBestStreakUser(
+  users: HomeHighlightUser[],
+  excludedUserIds: Set<string>
+) {
+  const usersWithStreak = users
+    .filter((user) => user.bestStreak > 0)
+    .sort((a, b) => {
+      if (b.bestStreak !== a.bestStreak) return b.bestStreak - a.bestStreak;
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.correct !== a.correct) return b.correct - a.correct;
 
-      return hasMatchData && prediction.isCalculated && isExact;
+      return a.fullName.localeCompare(b.fullName, "ar");
+    });
+
+  const differentUser = usersWithStreak.find(
+    (user) => !excludedUserIds.has(user.id)
+  );
+
+  return differentUser || usersWithStreak[0] || null;
+}
+
+function pickFastestRiserUser(
+  users: HomeHighlightUser[],
+  excludedUserIds: Set<string>
+) {
+  const risers = users
+    .filter((user) => {
+      return user.rankDirection === "up" && user.rankChange > 0;
     })
-    .sort((a, b) => b.calculatedTimeValue - a.calculatedTimeValue)
-    .slice(0, 12)
-    .map((prediction) => ({
-      id: prediction.id,
-      userId: prediction.userId,
-      userName: prediction.userName,
+    .sort((a, b) => {
+      if (b.rankChange !== a.rankChange) return b.rankChange - a.rankChange;
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.correct !== a.correct) return b.correct - a.correct;
 
-      homeTeamName: prediction.homeTeamName,
-      homeTeamEmoji: prediction.homeTeamEmoji,
-      awayTeamName: prediction.awayTeamName,
-      awayTeamEmoji: prediction.awayTeamEmoji,
+      return a.fullName.localeCompare(b.fullName, "ar");
+    });
 
-      homeScore: prediction.homeScore,
-      awayScore: prediction.awayScore,
+  const differentUser = risers.find((user) => !excludedUserIds.has(user.id));
 
-      calculatedAt: prediction.calculatedAt,
-    }));
+  return differentUser || risers[0] || null;
 }
 
-function pickFirstArriverUser({
-  users,
-  predictions,
-  excludedUserIds,
-}: {
-  users: HomeHighlightUser[];
-  predictions: HighlightPrediction[];
-  excludedUserIds: Set<string>;
-}) {
-  const usersMap = new Map(users.map((user) => [user.id, user]));
+function pickFirstArriverUser(
+  users: HomeHighlightUser[],
+  predictions: HighlightPrediction[],
+  excludedUserIds: Set<string>
+) {
+  const todaySaudiDateKey = getTodaySaudiDateKey();
 
-  const sortedPredictions = [...predictions]
+  const todayPredictions = predictions
     .filter((prediction) => {
-      return prediction.userId && prediction.createdTimeValue > 0;
+      if (!prediction.userId || !prediction.createdAt) return false;
+      if (prediction.createdTimeValue <= 0) return false;
+
+      return getSaudiDateKey(prediction.createdAt) === todaySaudiDateKey;
     })
     .sort((a, b) => a.createdTimeValue - b.createdTimeValue);
 
-  const firstDifferentUser = sortedPredictions.find((prediction) => {
-    return usersMap.has(prediction.userId) && !excludedUserIds.has(prediction.userId);
-  });
+  if (todayPredictions.length === 0) return null;
 
-  if (firstDifferentUser) {
-    return usersMap.get(firstDifferentUser.userId) || null;
-  }
+  const firstDifferentUserPrediction = todayPredictions.find(
+    (prediction) => !excludedUserIds.has(prediction.userId)
+  );
 
-  const firstAnyUser = sortedPredictions.find((prediction) => {
-    return usersMap.has(prediction.userId);
-  });
+  const selectedPrediction =
+    firstDifferentUserPrediction || todayPredictions[0];
 
-  if (!firstAnyUser) return null;
-
-  return usersMap.get(firstAnyUser.userId) || null;
+  return users.find((user) => user.id === selectedPrediction.userId) || null;
 }
 
-export async function getHomeHighlights(): Promise<HomeHighlightsData> {
+function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
+  const now = Date.now();
+  const twentyFourHours = 24 * 60 * 60 * 1000;
+
+  return predictions
+    .filter((prediction) => {
+      if (!prediction.isCalculated) return false;
+
+      const isExact =
+        prediction.points === 3 || prediction.resultType === "exact";
+
+      if (!isExact) return false;
+
+      const referenceTime =
+        prediction.calculatedTimeValue || prediction.createdTimeValue;
+
+      if (!referenceTime) return false;
+
+      return now - referenceTime <= twentyFourHours;
+    })
+    .sort((a, b) => {
+      const aTime = a.calculatedTimeValue || a.createdTimeValue;
+      const bTime = b.calculatedTimeValue || b.createdTimeValue;
+
+      return bTime - aTime;
+    })
+    .map((prediction) => {
+      return {
+        id: prediction.id,
+        userId: prediction.userId,
+        userName: prediction.userName,
+
+        matchId: prediction.matchId,
+
+        homeTeamName: prediction.homeTeamName,
+        awayTeamName: prediction.awayTeamName,
+        homeTeamEmoji: prediction.homeTeamEmoji,
+        awayTeamEmoji: prediction.awayTeamEmoji,
+
+        homeScore: prediction.homeScore,
+        awayScore: prediction.awayScore,
+
+        createdAt: prediction.createdAt,
+        calculatedAt: prediction.calculatedAt,
+      };
+    });
+}
+
+export async function getHomeHighlights() {
   const [users, predictions] = await Promise.all([
     getUsersForHighlights(),
     getPredictionsForHighlights(),
   ]);
 
-  const exactHits = getExactHits(predictions);
-
-  const activeUsers = users.filter((user) => {
-    return user.points > 0 || user.total > 0 || user.correct > 0;
-  });
-
-  const predictionKing =
-    [...activeUsers].sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.correct !== a.correct) return b.correct - a.correct;
-      if (b.total !== a.total) return b.total - a.total;
-      if (a.wrong !== b.wrong) return a.wrong - b.wrong;
-
-      return a.fullName.localeCompare(b.fullName, "ar");
-    })[0] || null;
-
   const excludedUserIds = new Set<string>();
+
+  const predictionKing = pickPredictionKing(users);
 
   if (predictionKing) {
     excludedUserIds.add(predictionKing.id);
   }
 
-  const bestStreakUser =
-    [...activeUsers]
-      .filter((user) => {
-        if (activeUsers.length <= 1) return true;
-        return !excludedUserIds.has(user.id);
-      })
-      .sort((a, b) => {
-        if (b.bestStreak !== a.bestStreak) return b.bestStreak - a.bestStreak;
-
-        if (b.currentStreak !== a.currentStreak) {
-          return b.currentStreak - a.currentStreak;
-        }
-
-        if (b.correct !== a.correct) return b.correct - a.correct;
-        if (b.points !== a.points) return b.points - a.points;
-
-        return a.fullName.localeCompare(b.fullName, "ar");
-      })[0] || null;
+  const bestStreakUser = pickBestStreakUser(users, excludedUserIds);
 
   if (bestStreakUser) {
     excludedUserIds.add(bestStreakUser.id);
   }
 
-  const fastestRiserUser =
-    [...activeUsers]
-      .filter((user) => {
-        if (activeUsers.length <= excludedUserIds.size + 1) return true;
-
-        return !excludedUserIds.has(user.id);
-      })
-      .filter((user) => {
-        return user.rankDirection === "up" && user.rankChange > 0;
-      })
-      .sort((a, b) => {
-        if (b.rankChange !== a.rankChange) return b.rankChange - a.rankChange;
-        if (b.points !== a.points) return b.points - a.points;
-        if (b.correct !== a.correct) return b.correct - a.correct;
-
-        return a.fullName.localeCompare(b.fullName, "ar");
-      })[0] || null;
+  const fastestRiserUser = pickFastestRiserUser(users, excludedUserIds);
 
   if (fastestRiserUser) {
     excludedUserIds.add(fastestRiserUser.id);
   }
 
-  const firstArriverUser = pickFirstArriverUser({
-    users: activeUsers.length > 0 ? activeUsers : users,
+  const firstArriverUser = pickFirstArriverUser(
+    users,
     predictions,
-    excludedUserIds,
-  });
+    excludedUserIds
+  );
+
+  const exactHits = getExactHits(predictions);
 
   return {
     predictionKing,
