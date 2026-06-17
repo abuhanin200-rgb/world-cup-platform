@@ -1,6 +1,8 @@
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 
+export type PredictionType = "normal" | "golden";
+
 export type AdminPrediction = {
   id: string;
 
@@ -8,6 +10,7 @@ export type AdminPrediction = {
   userName: string;
 
   matchId: string;
+  predictionType: PredictionType;
 
   homeTeamName: string;
   homeTeamEmoji: string;
@@ -50,6 +53,10 @@ function toNullableNumber(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function normalizePredictionType(value: unknown): PredictionType {
+  return value === "golden" ? "golden" : "normal";
+}
+
 function getTimeValue(value: unknown) {
   const text = toText(value);
   if (!text) return 0;
@@ -58,43 +65,93 @@ function getTimeValue(value: unknown) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function isGoldenPrediction(prediction: AdminPrediction) {
+  return prediction.predictionType === "golden";
+}
+
+function isExactPrediction(prediction: AdminPrediction) {
+  return (
+    prediction.isCalculated &&
+    (prediction.resultType === "exact" ||
+      prediction.points === 3 ||
+      prediction.points === 6)
+  );
+}
+
+function isWinnerPrediction(prediction: AdminPrediction) {
+  return (
+    prediction.isCalculated &&
+    (prediction.resultType === "winner" ||
+      prediction.points === 1 ||
+      prediction.points === 2)
+  );
+}
+
 export function getPredictionResultLabel(prediction: AdminPrediction) {
+  const golden = isGoldenPrediction(prediction);
+
   if (!prediction.isCalculated) return "لم يُحتسب";
 
-  if (prediction.resultType === "exact" || prediction.points === 3) {
-    return "بالملي +3";
+  if (isExactPrediction(prediction)) {
+    return golden ? "ذهبي بالملي +6" : "بالملي +3";
   }
 
-  if (prediction.resultType === "winner" || prediction.points === 1) {
-    return "الفائز +1";
+  if (isWinnerPrediction(prediction)) {
+    return golden ? "فائز ذهبي +2" : "الفائز +1";
   }
 
   return "خطأ +0";
 }
 
 export function getPredictionResultClass(prediction: AdminPrediction) {
+  const golden = isGoldenPrediction(prediction);
+
   if (!prediction.isCalculated) {
-    return "border-slate-400/20 bg-slate-400/10 text-slate-200";
+    return golden
+      ? "border-amber-300/30 bg-amber-400/10 text-amber-100"
+      : "border-slate-400/20 bg-slate-400/10 text-slate-200";
   }
 
-  if (prediction.resultType === "exact" || prediction.points === 3) {
-    return "border-emerald-400/20 bg-emerald-400/10 text-emerald-100";
+  if (isExactPrediction(prediction)) {
+    return golden
+      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      : "border-emerald-400/20 bg-emerald-400/10 text-emerald-100";
   }
 
-  if (prediction.resultType === "winner" || prediction.points === 1) {
-    return "border-amber-400/20 bg-amber-400/10 text-amber-100";
+  if (isWinnerPrediction(prediction)) {
+    return golden
+      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      : "border-amber-400/20 bg-amber-400/10 text-amber-100";
   }
 
   return "border-red-400/20 bg-red-500/10 text-red-100";
 }
 
-export async function getAdminPredictions(): Promise<AdminPrediction[]> {
-  const snapshot = await getDocs(collection(db, "predictions"));
+async function getMatchPredictionTypeMap() {
+  const snapshot = await getDocs(collection(db, "matches"));
+  const map = new Map<string, PredictionType>();
 
-  return snapshot.docs
+  snapshot.docs.forEach((docSnap) => {
+    if (docSnap.id === "_init") return;
+
+    const data = docSnap.data();
+    map.set(docSnap.id, normalizePredictionType(data.predictionType));
+  });
+
+  return map;
+}
+
+export async function getAdminPredictions(): Promise<AdminPrediction[]> {
+  const [predictionsSnapshot, matchPredictionTypeMap] = await Promise.all([
+    getDocs(collection(db, "predictions")),
+    getMatchPredictionTypeMap(),
+  ]);
+
+  return predictionsSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => {
       const data = docSnap.data();
+      const matchId = toText(data.matchId);
 
       return {
         id: docSnap.id,
@@ -102,7 +159,11 @@ export async function getAdminPredictions(): Promise<AdminPrediction[]> {
         userId: toText(data.userId),
         userName: toText(data.userName) || "عضو",
 
-        matchId: toText(data.matchId),
+        matchId,
+        predictionType:
+          normalizePredictionType(data.predictionType) ||
+          matchPredictionTypeMap.get(matchId) ||
+          "normal",
 
         homeTeamName: toText(data.homeTeamName),
         homeTeamEmoji: toText(data.homeTeamEmoji),
