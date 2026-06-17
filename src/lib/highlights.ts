@@ -92,6 +92,18 @@ function toTimeValue(value: unknown) {
   return time;
 }
 
+function toLeaderboardTimeValue(value: unknown) {
+  const text = toText(value);
+
+  if (!text) return Number.MAX_SAFE_INTEGER;
+
+  const time = new Date(text).getTime();
+
+  if (!Number.isFinite(time)) return Number.MAX_SAFE_INTEGER;
+
+  return time;
+}
+
 function getSaudiDateKey(value: string) {
   const date = new Date(value);
 
@@ -150,21 +162,35 @@ async function getUsersForHighlights(): Promise<HomeHighlightUser[]> {
       } as HomeHighlightUser;
     });
 
-  return users.sort((a, b) => {
-    const aHasPredictions = a.total > 0;
-    const bHasPredictions = b.total > 0;
+  return users
+    .sort((a, b) => {
+      const aHasPredictions = a.total > 0;
+      const bHasPredictions = b.total > 0;
 
-    if (aHasPredictions !== bHasPredictions) {
-      return aHasPredictions ? -1 : 1;
-    }
+      if (aHasPredictions !== bHasPredictions) {
+        return aHasPredictions ? -1 : 1;
+      }
 
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.correct !== a.correct) return b.correct - a.correct;
-    if (b.total !== a.total) return b.total - a.total;
-    if (a.wrong !== b.wrong) return a.wrong - b.wrong;
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.correct !== a.correct) return b.correct - a.correct;
+      if (b.total !== a.total) return b.total - a.total;
+      if (a.wrong !== b.wrong) return a.wrong - b.wrong;
 
-    return a.fullName.localeCompare(b.fullName, "ar");
-  });
+      const aPredictionTime = toLeaderboardTimeValue(a.lastPredictionAt);
+      const bPredictionTime = toLeaderboardTimeValue(b.lastPredictionAt);
+
+      if (aPredictionTime !== bPredictionTime) {
+        return aPredictionTime - bPredictionTime;
+      }
+
+      return a.fullName.localeCompare(b.fullName, "ar");
+    })
+    .map((user, index) => {
+      return {
+        ...user,
+        currentRank: index + 1,
+      };
+    });
 }
 
 async function getPredictionsForHighlights(): Promise<HighlightPrediction[]> {
@@ -234,6 +260,15 @@ function pickBestStreakUser(
       if (b.bestStreak !== a.bestStreak) return b.bestStreak - a.bestStreak;
       if (b.points !== a.points) return b.points - a.points;
       if (b.correct !== a.correct) return b.correct - a.correct;
+      if (b.total !== a.total) return b.total - a.total;
+      if (a.wrong !== b.wrong) return a.wrong - b.wrong;
+
+      const aPredictionTime = toLeaderboardTimeValue(a.lastPredictionAt);
+      const bPredictionTime = toLeaderboardTimeValue(b.lastPredictionAt);
+
+      if (aPredictionTime !== bPredictionTime) {
+        return aPredictionTime - bPredictionTime;
+      }
 
       return a.fullName.localeCompare(b.fullName, "ar");
     });
@@ -257,6 +292,15 @@ function pickFastestRiserUser(
       if (b.rankChange !== a.rankChange) return b.rankChange - a.rankChange;
       if (b.points !== a.points) return b.points - a.points;
       if (b.correct !== a.correct) return b.correct - a.correct;
+      if (b.total !== a.total) return b.total - a.total;
+      if (a.wrong !== b.wrong) return a.wrong - b.wrong;
+
+      const aPredictionTime = toLeaderboardTimeValue(a.lastPredictionAt);
+      const bPredictionTime = toLeaderboardTimeValue(b.lastPredictionAt);
+
+      if (aPredictionTime !== bPredictionTime) {
+        return aPredictionTime - bPredictionTime;
+      }
 
       return a.fullName.localeCompare(b.fullName, "ar");
     });
