@@ -97,6 +97,14 @@ function toNumber(value: string) {
   return Number.isInteger(numberValue) ? numberValue : null;
 }
 
+function isGoldenMatch(match: Match) {
+  return match.predictionType === "golden";
+}
+
+function isGoldenPrediction(prediction: Prediction) {
+  return prediction.predictionType === "golden";
+}
+
 export default function MatchesPredictionBox() {
   const router = useRouter();
   const { user, isLoggedIn, loading: authLoading } = useAuth();
@@ -288,19 +296,48 @@ export default function MatchesPredictionBox() {
             const closed = isPredictionClosed(match.startAt);
             const countdownText = getCountdownText(match.startAt);
             const matchTime = formatMatchTimeOnly(match.startAt);
+            const golden = isGoldenMatch(match);
 
             return (
               <article
                 key={match.id}
-                className="rounded-3xl border border-white/10 bg-slate-950/60 p-4 shadow-xl"
+                className={`rounded-3xl border p-4 shadow-xl transition ${
+                  golden
+                    ? "border-amber-300/40 bg-gradient-to-br from-amber-400/20 via-slate-950/80 to-yellow-500/10 shadow-amber-400/10"
+                    : "border-white/10 bg-slate-950/60"
+                }`}
               >
+                {golden && (
+                  <div className="mb-4 overflow-hidden rounded-2xl border border-amber-300/40 bg-slate-950/70">
+                    <div className="bg-amber-400 px-4 py-2 text-center text-sm font-black text-slate-950 md:text-base">
+                      ⭐ التوقع الذهبي
+                    </div>
+
+                    <div className="px-4 py-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
+                      فرصة مضاعفة للنقاط: إذا جبتها بالملي تحصل على{" "}
+                      <span className="font-black text-amber-300">+6</span>،
+                      وإذا توقعت الفائز الصحيح تحصل على{" "}
+                      <span className="font-black text-amber-300">+2</span>،
+                      والخطأ <span className="font-black">0</span>.
+                    </div>
+                  </div>
+                )}
+
                 <div className="mb-4 space-y-2">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-right text-sm font-black text-slate-200 md:text-base">
+                    <div
+                      className={`text-right text-sm font-black md:text-base ${
+                        golden ? "text-amber-100" : "text-slate-200"
+                      }`}
+                    >
                       {formatDate(match.matchDate)}
                     </div>
 
-                    <div className="text-left text-xs font-medium text-slate-300 md:text-sm">
+                    <div
+                      className={`text-left text-xs font-medium md:text-sm ${
+                        golden ? "text-amber-200" : "text-slate-300"
+                      }`}
+                    >
                       {matchTime}
                     </div>
                   </div>
@@ -309,6 +346,8 @@ export default function MatchesPredictionBox() {
                     className={`w-full rounded-full border px-3 py-1.5 text-center text-xs font-black ${
                       closed
                         ? "border-red-400/20 bg-red-500/10 text-red-100"
+                        : golden
+                        ? "border-amber-300/40 bg-amber-400/20 text-amber-100"
                         : "border-amber-400/20 bg-amber-400/10 text-amber-100"
                     }`}
                   >
@@ -333,7 +372,13 @@ export default function MatchesPredictionBox() {
                     </div>
                   </div>
 
-                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/10 text-xs font-black text-amber-300">
+                  <div
+                    className={`mx-auto flex h-11 w-11 items-center justify-center rounded-full border text-xs font-black ${
+                      golden
+                        ? "border-amber-300/40 bg-amber-400/20 text-amber-200"
+                        : "border-white/10 bg-white/10 text-amber-300"
+                    }`}
+                  >
                     VS
                   </div>
 
@@ -354,6 +399,12 @@ export default function MatchesPredictionBox() {
 
                 {savedPrediction ? (
                   <div className="mt-5 space-y-2">
+                    {isGoldenPrediction(savedPrediction) && (
+                      <div className="rounded-2xl border border-amber-300/40 bg-amber-400 px-3 py-2 text-center text-xs font-black text-slate-950">
+                        ⭐ تم اعتماد التوقع الذهبي
+                      </div>
+                    )}
+
                     <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-sm font-black text-emerald-100">
                       وصل توقعك واعتمدناه ✅
                     </div>
@@ -381,7 +432,11 @@ export default function MatchesPredictionBox() {
                           )
                         }
                         placeholder="0"
-                        className="h-14 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-3 text-center text-2xl font-black text-white outline-none focus:border-amber-400"
+                        className={`h-14 w-full rounded-2xl border px-3 text-center text-2xl font-black text-white outline-none ${
+                          golden
+                            ? "border-amber-300/30 bg-slate-950/90 focus:border-amber-300"
+                            : "border-white/10 bg-slate-950/80 focus:border-amber-400"
+                        }`}
                       />
 
                       <div className="text-center text-xl font-black text-slate-400">
@@ -399,7 +454,11 @@ export default function MatchesPredictionBox() {
                           )
                         }
                         placeholder="0"
-                        className="h-14 w-full rounded-2xl border border-white/10 bg-slate-950/80 px-3 text-center text-2xl font-black text-white outline-none focus:border-amber-400"
+                        className={`h-14 w-full rounded-2xl border px-3 text-center text-2xl font-black text-white outline-none ${
+                          golden
+                            ? "border-amber-300/30 bg-slate-950/90 focus:border-amber-300"
+                            : "border-white/10 bg-slate-950/80 focus:border-amber-400"
+                        }`}
                       />
                     </div>
 
@@ -407,13 +466,19 @@ export default function MatchesPredictionBox() {
                       type="button"
                       disabled={savingMatchId === match.id}
                       onClick={() => handleSubmitPrediction(match)}
-                      className="mt-3 w-full rounded-2xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                      className={`mt-3 w-full rounded-2xl px-4 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        golden
+                          ? "bg-amber-300 shadow-lg shadow-amber-400/10 hover:bg-amber-200"
+                          : "bg-amber-400 hover:bg-amber-300"
+                      }`}
                     >
                       {savingMatchId === match.id
                         ? "جاري الاعتماد..."
                         : isLoggedIn
-                          ? "اعتماد التوقع"
-                          : "سجّل الدخول لاعتماد التوقع"}
+                        ? golden
+                          ? "اعتماد التوقع الذهبي"
+                          : "اعتماد التوقع"
+                        : "سجّل الدخول لاعتماد التوقع"}
                     </button>
                   </div>
                 )}

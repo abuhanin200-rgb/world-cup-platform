@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { addMatch, getAllMatches, Match } from "@/lib/matches";
+import { addMatch, getAllMatches, type Match, type PredictionType } from "@/lib/matches";
 import { getTeams, Team } from "@/lib/teams";
 import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
 import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
@@ -43,6 +43,16 @@ function formatMatchLabel(match: Match) {
   return `${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamName} ${match.awayTeamEmoji}`;
 }
 
+function getPredictionTypeLabel(type?: PredictionType) {
+  return type === "golden" ? "توقع ذهبي" : "توقع عادي";
+}
+
+function getPredictionTypeHint(type?: PredictionType) {
+  return type === "golden"
+    ? "بالملي +6 | الفائز الصحيح +2 | الخطأ 0"
+    : "حسب نظام النقاط العادي الحالي";
+}
+
 export default function AdminPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
@@ -60,6 +70,8 @@ export default function AdminPage() {
   const [awayTeamCode, setAwayTeamCode] = useState("");
   const [matchDate, setMatchDate] = useState(toDateInputValue(new Date()));
   const [matchTime, setMatchTime] = useState(getDefaultTime());
+  const [predictionType, setPredictionType] =
+    useState<PredictionType>("normal");
   const [addingMatch, setAddingMatch] = useState(false);
 
   const [selectedMatchId, setSelectedMatchId] = useState("");
@@ -175,6 +187,7 @@ export default function AdminPage() {
         awayTeam,
         matchDate,
         matchTime,
+        predictionType,
       });
 
       await addAdminLog({
@@ -185,6 +198,7 @@ export default function AdminPage() {
           matchId: newMatch.id,
           matchDate,
           matchTime,
+          predictionType,
         },
       });
 
@@ -600,6 +614,29 @@ export default function AdminPage() {
                   </label>
                 </div>
 
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold">
+                    نوع التوقع
+                  </span>
+
+                  <select
+                    value={predictionType}
+                    onChange={(event) =>
+                      setPredictionType(event.target.value as PredictionType)
+                    }
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                  >
+                    <option value="normal">توقع عادي</option>
+                    <option value="golden">توقع ذهبي</option>
+                  </select>
+
+                  <div className="mt-2 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs leading-6 text-amber-100">
+                    {predictionType === "golden"
+                      ? "التوقع الذهبي: بالملي +6، الفائز الصحيح +2، الخطأ 0"
+                      : "التوقع العادي: يبقى على نظام النقاط الحالي بدون تغيير"}
+                  </div>
+                </label>
+
                 <button
                   type="submit"
                   disabled={addingMatch}
@@ -648,7 +685,8 @@ export default function AdminPage() {
                   >
                     {matches.map((match) => (
                       <option key={match.id} value={match.id}>
-                        {formatMatchLabel(match)}{" "}
+                        {formatMatchLabel(match)} —{" "}
+                        {getPredictionTypeLabel(match.predictionType)}{" "}
                         {match.resultCalculated ? "— محتسبة" : "— غير محتسبة"}
                       </option>
                     ))}
@@ -666,6 +704,17 @@ export default function AdminPage() {
                       {selectedMatch.resultCalculated
                         ? "محتسبة"
                         : "لم تُحتسب"}
+                    </div>
+
+                    <div className="mt-2 text-center text-sm text-amber-200">
+                      نوع التوقع:{" "}
+                      <strong>
+                        {getPredictionTypeLabel(selectedMatch.predictionType)}
+                      </strong>
+                    </div>
+
+                    <div className="mt-1 text-center text-xs text-slate-300">
+                      {getPredictionTypeHint(selectedMatch.predictionType)}
                     </div>
 
                     {selectedMatch.resultCalculated && (

@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   query,
   updateDoc,
@@ -10,11 +11,14 @@ import {
 import { db } from "./firebase";
 import { Match } from "./matches";
 
+export type PredictionType = "normal" | "golden";
+
 export type UpdateAdminMatchInput = {
   matchId: string;
   matchDate: string;
   matchTime: string;
   isActive: boolean;
+  predictionType?: PredictionType;
 };
 
 function getMatchDayArabic(dateText: string) {
@@ -30,6 +34,23 @@ function cleanText(value: string) {
   return value.trim();
 }
 
+function normalizePredictionType(value?: string): PredictionType {
+  return value === "golden" ? "golden" : "normal";
+}
+
+async function hasPredictionsForMatch(matchId: string) {
+  const predictionsRef = collection(db, "predictions");
+
+  const predictionsQuery = query(
+    predictionsRef,
+    where("matchId", "==", matchId)
+  );
+
+  const predictionsSnapshot = await getDocs(predictionsQuery);
+
+  return !predictionsSnapshot.empty;
+}
+
 export async function updateAdminMatch(input: UpdateAdminMatchInput) {
   const matchId = cleanText(input.matchId);
   const matchDate = cleanText(input.matchDate);
@@ -43,17 +64,61 @@ export async function updateAdminMatch(input: UpdateAdminMatchInput) {
     throw new Error("تاريخ ووقت المباراة مطلوبان");
   }
 
+  const matchRef = doc(db, "matches", matchId);
+  const matchSnap = await getDoc(matchRef);
+
+  if (!matchSnap.exists()) {
+    throw new Error("المباراة غير موجودة");
+  }
+
+  const currentMatchData = matchSnap.data();
+
+  const currentPredictionType = normalizePredictionType(
+    String(currentMatchData.predictionType || "normal")
+  );
+
+  const nextPredictionType = input.predictionType
+    ? normalizePredictionType(input.predictionType)
+    : undefined;
+
+  const shouldChangePredictionType =
+    Boolean(nextPredictionType) && nextPredictionType !== currentPredictionType;
+
+  if (shouldChangePredictionType) {
+    const isCalculated =
+      Boolean(currentMatchData.resultCalculated) ||
+      String(currentMatchData.status || "") === "finished";
+
+    if (isCalculated) {
+      throw new Error("لا يمكن تغيير نوع التوقع بعد احتساب المباراة.");
+    }
+
+    const hasPredictions = await hasPredictionsForMatch(matchId);
+
+    if (hasPredictions) {
+      throw new Error(
+        "لا يمكن تغيير نوع التوقع بعد تسجيل توقعات من الأعضاء على هذه المباراة."
+      );
+    }
+  }
+
   const startAt = `${matchDate}T${matchTime}:00+03:00`;
   const now = new Date().toISOString();
 
-  await updateDoc(doc(db, "matches", matchId), {
+  const updateData: Record<string, unknown> = {
     matchDate,
     matchTime,
     matchDay: getMatchDayArabic(matchDate),
     startAt,
     isActive: input.isActive,
     updatedAt: now,
-  });
+  };
+
+  if (nextPredictionType) {
+    updateData.predictionType = nextPredictionType;
+  }
+
+  await updateDoc(matchRef, updateData);
 
   return true;
 }

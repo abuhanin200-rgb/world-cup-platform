@@ -59,6 +59,12 @@ export type UpdateUserProfileInput = {
   teamEmoji: string;
 };
 
+export type UpdateUserPasswordInput = {
+  userId: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
 function cleanText(value: string) {
   return value.trim();
 }
@@ -293,6 +299,42 @@ export async function updateUserProfile(
 
   if (!updatedUser) {
     throw new Error("تعذر تحميل بيانات العضو بعد التعديل");
+  }
+
+  return updatedUser;
+}
+
+export async function updateUserPassword(
+  input: UpdateUserPasswordInput
+): Promise<AppUser> {
+  const userId = cleanText(input.userId);
+  const newPassword = cleanText(input.newPassword);
+  const confirmPassword = cleanText(input.confirmPassword);
+
+  if (!userId) {
+    throw new Error("معرّف العضو غير موجود");
+  }
+
+  if (!newPassword || newPassword.length < 4) {
+    throw new Error("كلمة المرور الجديدة يجب ألا تقل عن 4 أرقام أو أحرف");
+  }
+
+  if (newPassword !== confirmPassword) {
+    throw new Error("كلمة المرور وتأكيدها غير متطابقين");
+  }
+
+  const userRef = doc(db, "users", userId);
+  const now = new Date().toISOString();
+
+  await updateDoc(userRef, {
+    password: newPassword,
+    updatedAt: now,
+  });
+
+  const updatedUser = await getUserById(userId);
+
+  if (!updatedUser) {
+    throw new Error("تعذر تحميل بيانات العضو بعد تغيير كلمة المرور");
   }
 
   return updatedUser;

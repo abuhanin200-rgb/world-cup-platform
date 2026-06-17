@@ -8,6 +8,11 @@ import {
 } from "@/lib/highlights";
 import { getSiteSettings, TickerSpeed } from "@/lib/siteSettings";
 
+type ExactHitWithPredictionType = ExactHit & {
+  predictionType?: "normal" | "golden";
+  points?: number;
+};
+
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center shadow-xl md:p-3">
@@ -98,6 +103,10 @@ function getSpeedLabel(speed: string) {
   return "متوسط";
 }
 
+function isGoldenExactHit(hit: ExactHitWithPredictionType) {
+  return hit.predictionType === "golden";
+}
+
 export default function HomeHighlights() {
   const [predictionKing, setPredictionKing] =
     useState<HomeHighlightUser | null>(null);
@@ -137,7 +146,7 @@ export default function HomeHighlights() {
       <section className="mt-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-5 md:p-4">
         <div className="mb-3 text-center">
           <h2 className="text-base font-black md:text-xl">
-             أبطال التحدي الآن
+            أبطال التحدي الآن
           </h2>
 
           <p className="mt-1 text-[10px] text-slate-300 md:text-xs">
@@ -289,20 +298,39 @@ export function ExactHitsTicker() {
   }
 
   function renderExactHitCard(hit: ExactHit, index: number) {
+    const exactHit = hit as ExactHitWithPredictionType;
+    const golden = isGoldenExactHit(exactHit);
+
     return (
       <div
         key={`${hit.id}-${index}`}
         dir="rtl"
-        className="whitespace-nowrap rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-white md:text-sm"
+        className={`whitespace-nowrap rounded-xl border px-4 py-2 text-xs text-white md:text-sm ${
+          golden
+            ? "border-amber-300/40 bg-amber-400/15"
+            : "border-white/10 bg-slate-950/70"
+        }`}
       >
-        <span className="font-black text-emerald-300">{hit.userName}</span>{" "}
-        جابها صح بالملي في مباراة{" "}
+        {golden && (
+          <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 md:text-xs">
+            ⭐ ذهبي بالملي +6
+          </span>
+        )}
+
+        <span className={golden ? "font-black text-amber-300" : "font-black text-emerald-300"}>
+          {hit.userName}
+        </span>{" "}
+
+        {golden ? "جاب التوقع الذهبي بالملي في مباراة" : "جابها صح بالملي في مباراة"}{" "}
+
         <span className="font-bold">
           {hit.homeTeamEmoji} {hit.homeTeamName}
         </span>{" "}
+
         <span className="font-black text-amber-300">
           {hit.homeScore} - {hit.awayScore}
         </span>{" "}
+
         <span className="font-bold">
           {hit.awayTeamName} {hit.awayTeamEmoji}
         </span>

@@ -8,7 +8,7 @@ import {
   getAccountPredictions,
 } from "@/lib/accountPredictions";
 import { getTeams, Team } from "@/lib/teams";
-import { updateUserProfile } from "@/lib/users";
+import { updateUserPassword, updateUserProfile } from "@/lib/users";
 
 const PREDICTIONS_PER_PAGE = 10;
 
@@ -38,6 +38,18 @@ function StatCard({
   );
 }
 
+function isGoldenPrediction(prediction: AccountPrediction) {
+  return prediction.predictionType === "golden";
+}
+
+function getExactPoints(prediction: AccountPrediction) {
+  return isGoldenPrediction(prediction) ? 6 : 3;
+}
+
+function getWinnerPoints(prediction: AccountPrediction) {
+  return isGoldenPrediction(prediction) ? 2 : 1;
+}
+
 function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
   if (!prediction.isCalculated) {
     return (
@@ -50,7 +62,9 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
   if (prediction.resultType === "exact") {
     return (
       <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-black text-emerald-300">
-        جابها بالملي +3
+        {isGoldenPrediction(prediction)
+          ? `ذهبي بالملي +${getExactPoints(prediction)}`
+          : `جابها بالملي +${getExactPoints(prediction)}`}
       </span>
     );
   }
@@ -58,7 +72,9 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
   if (prediction.resultType === "winner") {
     return (
       <span className="rounded-full bg-amber-400/15 px-3 py-1 text-[11px] font-black text-amber-300">
-        توقع صحيح +1
+        {isGoldenPrediction(prediction)
+          ? `فائز ذهبي +${getWinnerPoints(prediction)}`
+          : `توقع صحيح +${getWinnerPoints(prediction)}`}
       </span>
     );
   }
@@ -71,10 +87,26 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
 }
 
 function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
+  const isGolden = prediction.predictionType === "golden";
+
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
+    <div
+      className={`rounded-2xl border p-4 ${
+        isGolden
+          ? "border-amber-400/30 bg-amber-400/10"
+          : "border-white/10 bg-slate-950/70"
+      }`}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
-        <ResultBadge prediction={prediction} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ResultBadge prediction={prediction} />
+
+          {isGolden && (
+            <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
+              ⭐ توقع ذهبي
+            </span>
+          )}
+        </div>
 
         <span className="rounded-full bg-amber-400 px-3 py-1 text-xs font-black text-slate-950">
           {prediction.points} نقطة
@@ -355,6 +387,14 @@ function getAccountAchievements({
     return prediction.isCalculated && prediction.resultType === "exact";
   }).length;
 
+  const goldenExactHits = predictions.filter((prediction) => {
+    return (
+      prediction.isCalculated &&
+      prediction.resultType === "exact" &&
+      prediction.predictionType === "golden"
+    );
+  }).length;
+
   const pendingPredictions = predictions.filter(
     (prediction) => !prediction.isCalculated
   ).length;
@@ -417,6 +457,12 @@ function getAccountAchievements({
       title: "جابها بالملي",
       description: `حقق ${exactHits} توقع مطابق للنتيجة`,
       unlocked: exactHits > 0,
+    },
+    {
+      icon: "🟡",
+      title: "ذهبي بالملي",
+      description: `حقق ${goldenExactHits} توقع ذهبي مطابق للنتيجة`,
+      unlocked: goldenExactHits > 0,
     },
     {
       icon: "⚡",
@@ -620,6 +666,12 @@ export default function AccountPage() {
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
 
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+
   const totalPredictionPages = Math.max(
     1,
     Math.ceil(predictions.length / PREDICTIONS_PER_PAGE)
@@ -736,6 +788,37 @@ export default function AccountPage() {
       setProfileError(errorMessage);
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  async function handleUpdatePassword(event: FormEvent) {
+    event.preventDefault();
+
+    if (!user) return;
+
+    setPasswordMessage("");
+    setPasswordError("");
+
+    setSavingPassword(true);
+
+    try {
+      await updateUserPassword({
+        userId: user.id,
+        newPassword,
+        confirmPassword,
+      });
+
+      await refreshUser();
+
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordMessage("تم تغيير الرقم السري بنجاح ✅");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "تعذر تغيير الرقم السري";
+      setPasswordError(errorMessage);
+    } finally {
+      setSavingPassword(false);
     }
   }
 
@@ -1033,6 +1116,76 @@ export default function AccountPage() {
 
               <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-xs leading-6 text-slate-300">
                 تعديل البيانات لا يؤثر على نقاطك أو توقعاتك السابقة.
+              </div>
+
+              <div className="mt-6 rounded-3xl border border-white/10 bg-slate-950/50 p-4 md:p-5">
+                <h3 className="mb-2 text-lg font-black">تغيير الرقم السري</h3>
+
+                <p className="mb-4 text-xs leading-6 text-slate-300 md:text-sm">
+                  يمكنك تغيير الرقم السري الخاص بحسابك من هنا. لن تتأثر نقاطك
+                  أو توقعاتك السابقة.
+                </p>
+
+                {(passwordMessage || passwordError) && (
+                  <div className="mb-4 space-y-2">
+                    {passwordMessage && (
+                      <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-xs text-emerald-100 md:text-sm">
+                        {passwordMessage}
+                      </div>
+                    )}
+
+                    {passwordError && (
+                      <div className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-center text-xs text-red-100 md:text-sm">
+                        {passwordError}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-bold">
+                      الرقم السري الجديد
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      minLength={4}
+                      onChange={(event) => setNewPassword(event.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
+                      required
+                    />
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      يجب ألا يقل عن 4 أرقام أو أحرف
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-bold">
+                      تأكيد الرقم السري الجديد
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      minLength={4}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
+                      className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingPassword}
+                    className="w-full rounded-xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingPassword
+                      ? "جاري تحديث الرقم السري..."
+                      : "تحديث الرقم السري"}
+                  </button>
+                </form>
               </div>
             </div>
           )}

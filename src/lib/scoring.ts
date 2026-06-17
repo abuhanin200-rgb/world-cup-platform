@@ -1,12 +1,16 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   where,
   writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import type { PredictionType } from "./matches";
+
+type ResultType = "exact" | "winner" | "wrong" | "";
 
 type PredictionDoc = {
   id: string;
@@ -24,7 +28,14 @@ type PredictionDoc = {
   actualHomeScore?: number | null;
   actualAwayScore?: number | null;
 
-  resultType?: "exact" | "winner" | "wrong" | "";
+  resultType?: ResultType;
+};
+
+type MatchDoc = {
+  id: string;
+  predictionType: PredictionType;
+  resultCalculated?: boolean;
+  status?: string;
 };
 
 type UserStats = {
@@ -53,6 +64,28 @@ function validateScore(score: number) {
   return Number.isInteger(score) && score >= 0 && score <= 30;
 }
 
+function normalizePredictionType(value: unknown): PredictionType {
+  return value === "golden" ? "golden" : "normal";
+}
+
+async function getMatchById(matchId: string): Promise<MatchDoc> {
+  const matchRef = doc(db, "matches", matchId);
+  const matchSnap = await getDoc(matchRef);
+
+  if (!matchSnap.exists()) {
+    throw new Error("المباراة غير موجودة");
+  }
+
+  const data = matchSnap.data();
+
+  return {
+    id: matchSnap.id,
+    predictionType: normalizePredictionType(data.predictionType),
+    resultCalculated: Boolean(data.resultCalculated),
+    status: String(data.status || "scheduled"),
+  };
+}
+
 function getOutcome(homeScore: number, awayScore: number) {
   if (homeScore > awayScore) return "home";
   if (homeScore < awayScore) return "away";
@@ -63,15 +96,19 @@ function calculatePredictionPoints(
   predictedHomeScore: number,
   predictedAwayScore: number,
   actualHomeScore: number,
-  actualAwayScore: number
+  actualAwayScore: number,
+  predictionType: PredictionType
 ) {
+  const exactPoints = predictionType === "golden" ? 6 : 3;
+  const winnerPoints = predictionType === "golden" ? 2 : 1;
+
   const exact =
     predictedHomeScore === actualHomeScore &&
     predictedAwayScore === actualAwayScore;
 
   if (exact) {
     return {
-      points: 3,
+      points: exactPoints,
       resultType: "exact" as const,
     };
   }
@@ -81,7 +118,7 @@ function calculatePredictionPoints(
 
   if (predictedOutcome === actualOutcome) {
     return {
-      points: 1,
+      points: winnerPoints,
       resultType: "winner" as const,
     };
   }
@@ -222,7 +259,10 @@ function getRankMovement(oldRank: number, newRank: number) {
   };
 }
 
-function buildRankedUsers(allUsers: UserDoc[], statsByUser: Record<string, UserStats>) {
+function buildRankedUsers(
+  allUsers: UserDoc[],
+  statsByUser: Record<string, UserStats>
+) {
   return allUsers
     .map((user) => {
       const stats = statsByUser[user.id] || {
@@ -259,15 +299,17 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
     throw new Error("أدخل نتيجة صحيحة من 0 إلى 30");
   }
 
+  const match = await getMatchById(input.matchId);
+
   const matchPredictions = await getMatchPredictions(input.matchId);
 
   if (matchPredictions.length === 0) {
     throw new Error("لا توجد توقعات لهذه المباراة");
   }
 
-  const alreadyCalculated = matchPredictions.some(
-    (prediction) => prediction.isCalculated
-  );
+  const alreadyCalculated =
+    match.resultCalculated ||
+    matchPredictions.some((prediction) => prediction.isCalculated);
 
   if (alreadyCalculated) {
     throw new Error("تم احتساب هذه المباراة مسبقًا ولا يمكن احتسابها مرة أخرى");
@@ -278,7 +320,8 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
       Number(prediction.homeScore),
       Number(prediction.awayScore),
       input.actualHomeScore,
-      input.actualAwayScore
+      input.actualAwayScore,
+      match.predictionType
     );
 
     return {
@@ -313,6 +356,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
       isCalculated: true,
       actualHomeScore: input.actualHomeScore,
       actualAwayScore: input.actualAwayScore,
+      predictionType: match.predictionType,
       calculatedAt: now,
       updatedAt: now,
     });
@@ -376,6 +420,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
     exactCount,
     winnerCount,
     wrongCount,
+    predictionType: match.predictionType,
   };
 }
 

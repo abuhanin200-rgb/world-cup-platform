@@ -28,6 +28,10 @@ function getPixelsPerSecond(speed: TickerSpeed) {
   return 34;
 }
 
+function isGoldenPrediction(prediction: LatestPrediction) {
+  return prediction.predictionType === "golden";
+}
+
 function getPredictionsSignature(predictions: LatestPrediction[]) {
   return predictions
     .map((prediction) => {
@@ -38,6 +42,7 @@ function getPredictionsSignature(predictions: LatestPrediction[]) {
         prediction.awayTeamName,
         prediction.homeScore,
         prediction.awayScore,
+        prediction.predictionType,
       ].join("-");
     })
     .join("|");
@@ -166,23 +171,47 @@ export default function LatestPredictionsTicker() {
   }
 
   function renderPredictionCard(prediction: LatestPrediction, index: number) {
+    const golden = isGoldenPrediction(prediction);
+
     return (
       <div
         key={`${prediction.id}-${index}`}
         dir="rtl"
-        className="inline-flex flex-none items-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm"
+        className={`inline-flex flex-none items-center gap-2 rounded-2xl border px-4 py-2 text-sm ${
+          golden
+            ? "border-amber-300/40 bg-amber-400/15 text-white"
+            : "border-white/10 bg-white/10 text-white"
+        }`}
       >
-        <span className="font-black text-amber-300">
+        {golden && (
+          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 md:text-xs">
+            ⭐ ذهبي
+          </span>
+        )}
+
+        <span
+          className={
+            golden ? "font-black text-amber-300" : "font-black text-amber-300"
+          }
+        >
           {prediction.userName}
         </span>
 
-        <span className="text-slate-400">توقع</span>
+        <span className={golden ? "text-amber-100/80" : "text-slate-400"}>
+          توقع
+        </span>
 
         <span className="font-bold">
           {prediction.homeTeamEmoji} {prediction.homeTeamName}
         </span>
 
-        <span className="rounded-lg bg-slate-950 px-2 py-1 font-black text-white">
+        <span
+          className={`rounded-lg px-2 py-1 font-black ${
+            golden
+              ? "bg-amber-400 text-slate-950"
+              : "bg-slate-950 text-white"
+          }`}
+        >
           {prediction.homeScore} - {prediction.awayScore}
         </span>
 

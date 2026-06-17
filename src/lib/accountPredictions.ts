@@ -1,5 +1,6 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "./firebase";
+import type { PredictionType } from "./matches";
 
 export type AccountPredictionResultType = "exact" | "winner" | "wrong" | "";
 
@@ -21,6 +22,8 @@ export type AccountPrediction = {
   points: number;
   resultType: AccountPredictionResultType;
   isCalculated: boolean;
+
+  predictionType: PredictionType;
 
   createdAt: string;
   calculatedAt: string;
@@ -50,6 +53,10 @@ function normalizeResultType(value: unknown): AccountPredictionResultType {
   }
 
   return "";
+}
+
+function normalizePredictionType(value: unknown): PredictionType {
+  return value === "golden" ? "golden" : "normal";
 }
 
 export async function getAccountPredictions(
@@ -84,6 +91,8 @@ export async function getAccountPredictions(
         points: toNumber(data.points),
         resultType: normalizeResultType(data.resultType),
         isCalculated: Boolean(data.isCalculated),
+
+        predictionType: normalizePredictionType(data.predictionType),
 
         createdAt: toText(data.createdAt),
         calculatedAt: toText(data.calculatedAt),

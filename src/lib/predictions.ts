@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   limit,
   query,
@@ -9,6 +10,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import type { PredictionType } from "./matches";
 
 export type Prediction = {
   id: string;
@@ -29,6 +31,8 @@ export type Prediction = {
   points: number;
   resultType?: string;
   isCalculated: boolean;
+
+  predictionType: PredictionType;
 
   actualHomeScore?: number | null;
   actualAwayScore?: number | null;
@@ -63,6 +67,7 @@ export type LatestPrediction = {
   awayTeamEmoji: string;
   homeScore: number;
   awayScore: number;
+  predictionType: PredictionType;
   createdAt?: string;
 };
 
@@ -84,6 +89,27 @@ function toText(value: unknown) {
 function toNumber(value: unknown) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function normalizePredictionType(value: unknown): PredictionType {
+  return value === "golden" ? "golden" : "normal";
+}
+
+async function getPredictionTypeForMatch(
+  matchId: string
+): Promise<PredictionType> {
+  if (!matchId) return "normal";
+
+  const matchRef = doc(db, "matches", matchId);
+  const matchSnap = await getDoc(matchRef);
+
+  if (!matchSnap.exists()) {
+    return "normal";
+  }
+
+  const data = matchSnap.data();
+
+  return normalizePredictionType(data.predictionType);
 }
 
 function getTimeValue(createdAt?: string) {
@@ -114,6 +140,8 @@ function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
     points: toNumber(data.points),
     resultType: toText(data.resultType),
     isCalculated: Boolean(data.isCalculated),
+
+    predictionType: normalizePredictionType(data.predictionType),
 
     actualHomeScore:
       data.actualHomeScore === null || data.actualHomeScore === undefined
@@ -204,6 +232,8 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     throw new Error("تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله");
   }
 
+  const predictionType = await getPredictionTypeForMatch(input.matchId);
+
   const now = new Date().toISOString();
 
   const predictionData = {
@@ -223,6 +253,8 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     points: 0,
     resultType: "",
     isCalculated: false,
+
+    predictionType,
 
     actualHomeScore: null,
     actualAwayScore: null,
@@ -307,6 +339,7 @@ export async function getLatestPredictions(
       awayTeamEmoji: prediction.awayTeamEmoji,
       homeScore: prediction.homeScore,
       awayScore: prediction.awayScore,
+      predictionType: prediction.predictionType,
       createdAt: prediction.createdAt,
     }));
 }

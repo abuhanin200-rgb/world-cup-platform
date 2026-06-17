@@ -5,6 +5,7 @@ import { getLeaderboardUsers, LeaderboardUser } from "@/lib/leaderboard";
 import { getPredictionsByUserId, Prediction } from "@/lib/predictions";
 
 const USERS_PER_PAGE = 20;
+const MEMBER_PREDICTIONS_PER_PAGE = 6;
 
 type MemberAchievement = {
   icon: string;
@@ -95,25 +96,37 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
+function isGoldenPrediction(prediction: Prediction) {
+  return prediction.predictionType === "golden";
+}
+
 function getPredictionStatus(prediction: Prediction) {
+  const golden = isGoldenPrediction(prediction);
+
   if (!prediction.isCalculated) {
     return {
       text: "لم تُحتسب",
-      className: "border-slate-400/20 bg-slate-400/10 text-slate-200",
+      className: golden
+        ? "border-amber-300/30 bg-amber-400/10 text-amber-100"
+        : "border-slate-400/20 bg-slate-400/10 text-slate-200",
     };
   }
 
-  if (prediction.points === 3 || prediction.resultType === "exact") {
+  if (prediction.resultType === "exact" || prediction.points === 3 || prediction.points === 6) {
     return {
-      text: "صح بالملي +3",
-      className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+      text: golden ? "ذهبي بالملي +6" : "صح بالملي +3",
+      className: golden
+        ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+        : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
     };
   }
 
-  if (prediction.points === 1 || prediction.resultType === "winner") {
+  if (prediction.resultType === "winner" || prediction.points === 1 || prediction.points === 2) {
     return {
-      text: "الفائز صحيح +1",
-      className: "border-amber-400/30 bg-amber-400/10 text-amber-100",
+      text: golden ? "فائز ذهبي +2" : "الفائز صحيح +1",
+      className: golden
+        ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+        : "border-amber-400/30 bg-amber-400/10 text-amber-100",
     };
   }
 
@@ -391,6 +404,39 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
     },
   ];
 
+  const achievements = [
+    {
+      icon: "💎",
+      title: "جابها بالملي",
+      condition: "حقق توقع مطابق للنتيجة",
+    },
+    {
+      icon: "⭐",
+      title: "ذهبي بالملي",
+      condition: "حقق توقع ذهبي مطابق للنتيجة ويحصل على +6",
+    },
+    {
+      icon: "🟡",
+      title: "فائز ذهبي",
+      condition: "توقع الفائز الصحيح في توقع ذهبي ويحصل على +2",
+    },
+    {
+      icon: "⚡",
+      title: "سلسلة نارية",
+      condition: "حقق 3 توقعات صحيحة متتالية",
+    },
+    {
+      icon: "🚀",
+      title: "لا يوقف",
+      condition: "حقق 7 توقعات صحيحة متتالية",
+    },
+    {
+      icon: "📈",
+      title: "صاعد بقوة",
+      condition: "تحسن ترتيبه في لوحة الصدارة",
+    },
+  ];
+
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm">
       <div className="max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 text-white shadow-2xl">
@@ -401,7 +447,7 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
             </h3>
 
             <p className="mt-1 text-xs text-slate-300">
-              اعرف وش تحتاج عشان تطور لقبك في التحدي
+              اعرف وش تحتاج عشان تطور لقبك وتفتح الأوسمة
             </p>
           </div>
 
@@ -416,11 +462,42 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
 
         <div className="max-h-[70vh] overflow-y-auto p-4">
           <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
-            ارفع عدد توقعاتك، وحقق نتائج صحيحة، وخلّك من أبطال التحدي 🔥
+            ارفع عدد توقعاتك، حقق نتائج صحيحة، واستغل التوقع الذهبي عشان تجمع نقاط أكثر 🔥
           </div>
+
+          <h4 className="mb-2 text-sm font-black text-white">الألقاب</h4>
 
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {titles.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-2xl border border-white/10 bg-white/5 p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/70 text-xl">
+                    {item.icon}
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-black text-white">
+                      {item.title}
+                    </div>
+
+                    <div className="mt-1 text-[11px] leading-5 text-slate-300 md:text-xs">
+                      {item.condition}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <h4 className="mb-2 mt-5 text-sm font-black text-white">
+            الأوسمة والإنجازات
+          </h4>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            {achievements.map((item) => (
               <div
                 key={item.title}
                 className="rounded-2xl border border-white/10 bg-white/5 p-3"
@@ -456,8 +533,30 @@ function getMemberAchievements(
   const exactHits = predictions.filter((prediction) => {
     return (
       prediction.isCalculated &&
-      (prediction.points === 3 || prediction.resultType === "exact")
+      (prediction.resultType === "exact" ||
+        prediction.points === 3 ||
+        prediction.points === 6)
     );
+  }).length;
+
+  const goldenExactHits = predictions.filter((prediction) => {
+    return (
+      prediction.isCalculated &&
+      prediction.predictionType === "golden" &&
+      (prediction.resultType === "exact" || prediction.points === 6)
+    );
+  }).length;
+
+  const goldenWinnerHits = predictions.filter((prediction) => {
+    return (
+      prediction.isCalculated &&
+      prediction.predictionType === "golden" &&
+      (prediction.resultType === "winner" || prediction.points === 2)
+    );
+  }).length;
+
+  const goldenPredictions = predictions.filter((prediction) => {
+    return prediction.predictionType === "golden";
   }).length;
 
   const calculatedPredictions = predictions.filter(
@@ -470,10 +569,28 @@ function getMemberAchievements(
 
   return [
     {
-      icon: "🎯",
-      title: "دقيق جدًا",
-      description: `حقق ${exactHits} توقع صح بالملي`,
+      icon: "💎",
+      title: "جابها بالملي",
+      description: `حقق ${exactHits} توقع مطابق للنتيجة`,
       unlocked: exactHits > 0,
+    },
+    {
+      icon: "⭐",
+      title: "ذهبي بالملي",
+      description: `حقق ${goldenExactHits} توقع ذهبي مطابق للنتيجة`,
+      unlocked: goldenExactHits > 0,
+    },
+    {
+      icon: "🟡",
+      title: "فائز ذهبي",
+      description: `حقق ${goldenWinnerHits} توقع ذهبي بالفائز الصحيح`,
+      unlocked: goldenWinnerHits > 0,
+    },
+    {
+      icon: "🏆",
+      title: "دخل الذهب",
+      description: `شارك في ${goldenPredictions} توقع ذهبي`,
+      unlocked: goldenPredictions > 0,
     },
     {
       icon: "🔥",
@@ -603,12 +720,41 @@ function PredictionDetailsModal({
   loading: boolean;
   onClose: () => void;
 }) {
+  const [currentPredictionPage, setCurrentPredictionPage] = useState(1);
+
   const memberTitle = getMemberTitle(user);
   const titleProgress = getTitleProgress(user);
   const achievements = getMemberAchievements(user, predictions);
   const unlockedAchievements = achievements.filter(
     (achievement) => achievement.unlocked
   );
+
+  const totalPredictionPages = Math.max(
+    1,
+    Math.ceil(predictions.length / MEMBER_PREDICTIONS_PER_PAGE)
+  );
+
+  const visiblePredictions = useMemo(() => {
+    const safePage = Math.min(currentPredictionPage, totalPredictionPages);
+    const startIndex = (safePage - 1) * MEMBER_PREDICTIONS_PER_PAGE;
+    const endIndex = startIndex + MEMBER_PREDICTIONS_PER_PAGE;
+
+    return predictions.slice(startIndex, endIndex);
+  }, [predictions, currentPredictionPage, totalPredictionPages]);
+
+  useEffect(() => {
+    setCurrentPredictionPage(1);
+  }, [user.id, predictions.length]);
+
+  function goToPreviousPredictionPage() {
+    setCurrentPredictionPage((page) => Math.max(1, page - 1));
+  }
+
+  function goToNextPredictionPage() {
+    setCurrentPredictionPage((page) =>
+      Math.min(totalPredictionPages, page + 1)
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm">
@@ -785,72 +931,126 @@ function PredictionDetailsModal({
                 لا توجد توقعات لهذا العضو حتى الآن.
               </div>
             ) : (
-              <div className="space-y-3">
-                {predictions.map((prediction) => {
-                  const status = getPredictionStatus(prediction);
+              <>
+                <div className="space-y-3">
+                  {visiblePredictions.map((prediction) => {
+                    const status = getPredictionStatus(prediction);
+                    const golden = isGoldenPrediction(prediction);
 
-                  return (
-                    <div
-                      key={prediction.id}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-3"
-                    >
-                      <div className="mb-3 flex items-center justify-between gap-2">
-                        <span
-                          className={`rounded-full border px-3 py-1 text-[11px] font-black ${status.className}`}
-                        >
-                          {status.text}
-                        </span>
+                    return (
+                      <div
+                        key={prediction.id}
+                        className={`rounded-2xl border p-3 ${
+                          golden
+                            ? "border-amber-300/30 bg-amber-400/10"
+                            : "border-white/10 bg-white/5"
+                        }`}
+                      >
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`rounded-full border px-3 py-1 text-[11px] font-black ${status.className}`}
+                            >
+                              {status.text}
+                            </span>
 
-                        <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
-                          {prediction.points} نقطة
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-[1fr_52px_1fr] items-center gap-2 text-center">
-                        <div className="min-w-0">
-                          <div className="text-2xl">
-                            {prediction.homeTeamEmoji}
+                            {golden && (
+                              <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
+                                ⭐ توقع ذهبي
+                              </span>
+                            )}
                           </div>
 
-                          <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
-                            {prediction.homeTeamName}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-white/10 bg-slate-950/70 px-2 py-2 text-sm font-black text-white">
-                          {prediction.homeScore} - {prediction.awayScore}
-                        </div>
-
-                        <div className="min-w-0">
-                          <div className="text-2xl">
-                            {prediction.awayTeamEmoji}
-                          </div>
-
-                          <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
-                            {prediction.awayTeamName}
-                          </div>
-                        </div>
-                      </div>
-
-                      {prediction.isCalculated && (
-                        <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-2 text-center text-xs font-bold text-slate-300">
-                          النتيجة الفعلية:{" "}
-                          <span className="text-white">
-                            {prediction.actualHomeScore} -{" "}
-                            {prediction.actualAwayScore}
+                          <span
+                            className={`rounded-full px-3 py-1 text-[11px] font-black ${
+                              golden
+                                ? "bg-amber-300 text-slate-950"
+                                : "bg-amber-400 text-slate-950"
+                            }`}
+                          >
+                            {prediction.points} نقطة
                           </span>
                         </div>
-                      )}
 
-                      {!prediction.isCalculated && (
-                        <div className="mt-3 rounded-xl border border-slate-400/20 bg-slate-400/10 p-2 text-center text-xs font-bold text-slate-300">
-                          هذا التوقع بانتظار احتساب نتيجة المباراة.
+                        <div className="grid grid-cols-[1fr_52px_1fr] items-center gap-2 text-center">
+                          <div className="min-w-0">
+                            <div className="text-2xl">
+                              {prediction.homeTeamEmoji}
+                            </div>
+
+                            <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
+                              {prediction.homeTeamName}
+                            </div>
+                          </div>
+
+                          <div
+                            className={`rounded-xl border px-2 py-2 text-sm font-black ${
+                              golden
+                                ? "border-amber-300/30 bg-slate-950/80 text-amber-200"
+                                : "border-white/10 bg-slate-950/70 text-white"
+                            }`}
+                          >
+                            {prediction.homeScore} - {prediction.awayScore}
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="text-2xl">
+                              {prediction.awayTeamEmoji}
+                            </div>
+
+                            <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
+                              {prediction.awayTeamName}
+                            </div>
+                          </div>
                         </div>
-                      )}
+
+                        {prediction.isCalculated && (
+                          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-2 text-center text-xs font-bold text-slate-300">
+                            النتيجة الفعلية:{" "}
+                            <span className="text-white">
+                              {prediction.actualHomeScore} -{" "}
+                              {prediction.actualAwayScore}
+                            </span>
+                          </div>
+                        )}
+
+                        {!prediction.isCalculated && (
+                          <div className="mt-3 rounded-xl border border-slate-400/20 bg-slate-400/10 p-2 text-center text-xs font-bold text-slate-300">
+                            هذا التوقع بانتظار احتساب نتيجة المباراة.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {predictions.length > MEMBER_PREDICTIONS_PER_PAGE && (
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={goToPreviousPredictionPage}
+                      disabled={currentPredictionPage === 1}
+                      className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      السابق
+                    </button>
+
+                    <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-2 text-xs font-bold text-slate-200">
+                      صفحة {Math.min(currentPredictionPage, totalPredictionPages)} من{" "}
+                      {totalPredictionPages}
                     </div>
-                  );
-                })}
-              </div>
+
+                    <button
+                      type="button"
+                      onClick={goToNextPredictionPage}
+                      disabled={currentPredictionPage === totalPredictionPages}
+                      className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      التالي
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

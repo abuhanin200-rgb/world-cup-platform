@@ -1,5 +1,6 @@
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
+import type { PredictionType } from "./matches";
 
 export type HomeHighlightUser = {
   id: string;
@@ -38,6 +39,9 @@ export type ExactHit = {
   homeScore: number;
   awayScore: number;
 
+  points: number;
+  predictionType: PredictionType;
+
   createdAt: string;
   calculatedAt: string;
 };
@@ -63,6 +67,7 @@ type HighlightPrediction = {
   points: number;
   resultType: string;
   isCalculated: boolean;
+  predictionType: PredictionType;
 
   createdAt: string;
   createdTimeValue: number;
@@ -78,6 +83,10 @@ function toNumber(value: unknown) {
 
 function toText(value: unknown) {
   return String(value || "").trim();
+}
+
+function normalizePredictionType(value: unknown): PredictionType {
+  return value === "golden" ? "golden" : "normal";
 }
 
 function toTimeValue(value: unknown) {
@@ -232,6 +241,7 @@ async function getPredictionsForHighlights(): Promise<HighlightPrediction[]> {
         points: toNumber(data.points),
         resultType: toText(data.resultType),
         isCalculated: Boolean(data.isCalculated),
+        predictionType: normalizePredictionType(data.predictionType),
 
         createdAt,
         createdTimeValue: toTimeValue(createdAt),
@@ -347,7 +357,9 @@ function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
       if (!prediction.isCalculated) return false;
 
       const isExact =
-        prediction.points === 3 || prediction.resultType === "exact";
+        prediction.resultType === "exact" ||
+        prediction.points === 3 ||
+        prediction.points === 6;
 
       if (!isExact) return false;
 
@@ -379,6 +391,9 @@ function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
 
         homeScore: prediction.homeScore,
         awayScore: prediction.awayScore,
+
+        points: prediction.points,
+        predictionType: prediction.predictionType,
 
         createdAt: prediction.createdAt,
         calculatedAt: prediction.calculatedAt,

@@ -10,6 +10,8 @@ import { Team } from "./teams";
 
 export type MatchStatus = "scheduled" | "finished";
 
+export type PredictionType = "normal" | "golden";
+
 export type Match = {
   id: string;
 
@@ -29,6 +31,8 @@ export type Match = {
   status: MatchStatus;
   isActive: boolean;
 
+  predictionType: PredictionType;
+
   actualHomeScore?: number | null;
   actualAwayScore?: number | null;
   resultCalculated?: boolean;
@@ -43,6 +47,7 @@ export type AddMatchInput = {
   awayTeam: Team;
   matchDate: string;
   matchTime: string;
+  predictionType?: PredictionType;
 };
 
 function toText(value: unknown) {
@@ -59,6 +64,10 @@ function toNumberOrNull(value: unknown) {
 function normalizeStatus(value: unknown): MatchStatus {
   if (value === "finished") return "finished";
   return "scheduled";
+}
+
+function normalizePredictionType(value: unknown): PredictionType {
+  return value === "golden" ? "golden" : "normal";
 }
 
 function getMakkahStartAt(matchDate: string, matchTime: string) {
@@ -95,6 +104,8 @@ function mapMatch(id: string, data: Record<string, unknown>): Match {
 
     status: normalizeStatus(data.status),
     isActive: Boolean(data.isActive),
+
+    predictionType: normalizePredictionType(data.predictionType),
 
     actualHomeScore: toNumberOrNull(data.actualHomeScore),
     actualAwayScore: toNumberOrNull(data.actualAwayScore),
@@ -169,7 +180,7 @@ export async function getVisibleMatches(): Promise<Match[]> {
 }
 
 export async function addMatch(input: AddMatchInput) {
-  const { homeTeam, awayTeam, matchDate, matchTime } = input;
+  const { homeTeam, awayTeam, matchDate, matchTime, predictionType } = input;
 
   if (!homeTeam || !awayTeam) {
     throw new Error("بيانات المنتخبين غير مكتملة");
@@ -202,6 +213,8 @@ export async function addMatch(input: AddMatchInput) {
 
     status: "scheduled" as MatchStatus,
     isActive: true,
+
+    predictionType: normalizePredictionType(predictionType),
 
     actualHomeScore: null,
     actualAwayScore: null,

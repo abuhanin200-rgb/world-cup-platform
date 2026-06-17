@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Match } from "@/lib/matches";
+import type { Match, PredictionType } from "@/lib/matches";
 import { deleteAdminMatch, updateAdminMatch } from "@/lib/adminMatches";
 import { addAdminLog } from "@/lib/adminLogs";
 import { deleteTestMatch } from "@/lib/deleteTestMatch";
@@ -16,6 +16,30 @@ const MATCHES_PER_PAGE = 12;
 
 type MatchFilter = "all" | "scheduled" | "hidden";
 
+function normalizePredictionType(value?: PredictionType): PredictionType {
+  return value === "golden" ? "golden" : "normal";
+}
+
+function getPredictionTypeLabel(type?: PredictionType) {
+  return type === "golden" ? "توقع ذهبي" : "توقع عادي";
+}
+
+function getPredictionTypeHint(type?: PredictionType) {
+  return type === "golden"
+    ? "بالملي +6 | الفائز الصحيح +2 | الخطأ 0"
+    : "بالملي +3 | الفائز الصحيح +1 | الخطأ 0";
+}
+
+function getPredictionTypeBadgeClass(type?: PredictionType) {
+  return type === "golden"
+    ? "rounded-full bg-amber-400 px-3 py-1 text-slate-950"
+    : "rounded-full bg-white/10 px-3 py-1 text-slate-300";
+}
+
+function isMatchCalculated(match: Match) {
+  return Boolean(match.resultCalculated || match.status === "finished");
+}
+
 export default function AdminMatchesPanel({
   matches,
   loading,
@@ -29,6 +53,8 @@ export default function AdminMatchesPanel({
   const [editDate, setEditDate] = useState("");
   const [editTime, setEditTime] = useState("");
   const [editIsActive, setEditIsActive] = useState(true);
+  const [editPredictionType, setEditPredictionType] =
+    useState<PredictionType>("normal");
 
   const [savingMatchId, setSavingMatchId] = useState("");
   const [deletingMatchId, setDeletingMatchId] = useState("");
@@ -41,12 +67,17 @@ export default function AdminMatchesPanel({
     const search = searchTerm.trim().toLowerCase();
 
     return matches.filter((match) => {
+      const predictionTypeLabel = getPredictionTypeLabel(
+        match.predictionType
+      ).toLowerCase();
+
       const matchesSearch =
         !search ||
         match.homeTeamName.toLowerCase().includes(search) ||
         match.awayTeamName.toLowerCase().includes(search) ||
         match.matchDate.toLowerCase().includes(search) ||
-        match.matchTime.toLowerCase().includes(search);
+        match.matchTime.toLowerCase().includes(search) ||
+        predictionTypeLabel.includes(search);
 
       const matchesFilter =
         filter === "all" ||
@@ -98,6 +129,7 @@ export default function AdminMatchesPanel({
     setEditDate(match.matchDate);
     setEditTime(match.matchTime);
     setEditIsActive(Boolean(match.isActive));
+    setEditPredictionType(normalizePredictionType(match.predictionType));
   }
 
   function cancelEdit() {
@@ -105,6 +137,7 @@ export default function AdminMatchesPanel({
     setEditDate("");
     setEditTime("");
     setEditIsActive(true);
+    setEditPredictionType("normal");
   }
 
   async function handleSaveMatch(event: FormEvent, match: Match) {
@@ -114,13 +147,20 @@ export default function AdminMatchesPanel({
     setError("");
     setSavingMatchId(match.id);
 
+    const calculated = isMatchCalculated(match);
+
     try {
       await updateAdminMatch({
         matchId: match.id,
         matchDate: editDate,
         matchTime: editTime,
         isActive: editIsActive,
+        predictionType: calculated ? undefined : editPredictionType,
       });
+
+      const predictionTypeText = calculated
+        ? getPredictionTypeLabel(match.predictionType)
+        : getPredictionTypeLabel(editPredictionType);
 
       await addAdminLog({
         action: "other",
@@ -129,7 +169,7 @@ export default function AdminMatchesPanel({
           match.awayTeamName
         }. التاريخ الجديد: ${editDate}، الوقت الجديد: ${editTime}، الحالة: ${
           editIsActive ? "مفعلة" : "مخفية"
-        }.`,
+        }، نوع التوقع: ${predictionTypeText}.`,
       });
 
       setMessage("تم تعديل المباراة بنجاح ✅");
@@ -314,7 +354,7 @@ export default function AdminMatchesPanel({
             value={searchTerm}
             onChange={(event) => handleSearch(event.target.value)}
             className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-            placeholder="ابحث باسم المنتخب أو التاريخ أو الوقت"
+            placeholder="ابحث باسم المنتخب أو التاريخ أو الوقت أو نوع التوقع"
           />
         </div>
 
@@ -373,14 +413,20 @@ export default function AdminMatchesPanel({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {visibleMatches.map((match) => {
               const isEditing = editingMatchId === match.id;
-              const isCalculated =
-                match.resultCalculated || match.status === "finished";
+              const isCalculated = isMatchCalculated(match);
               const isDeletingTest = deletingTestMatchId === match.id;
+              const predictionType = normalizePredictionType(
+                match.predictionType
+              );
 
               return (
                 <div
                   key={match.id}
-                  className="rounded-2xl border border-white/10 bg-slate-950/70 p-4"
+                  className={`rounded-2xl border p-4 ${
+                    predictionType === "golden"
+                      ? "border-amber-400/30 bg-slate-950/80"
+                      : "border-white/10 bg-slate-950/70"
+                  }`}
                 >
                   <div className="mb-3 flex items-center justify-between gap-2 text-xs">
                     <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
@@ -413,6 +459,12 @@ export default function AdminMatchesPanel({
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                    <span
+                      className={getPredictionTypeBadgeClass(predictionType)}
+                    >
+                      {getPredictionTypeLabel(predictionType)}
+                    </span>
+
                     {match.status === "finished" ? (
                       <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-emerald-300">
                         تم الاحتساب
@@ -435,6 +487,10 @@ export default function AdminMatchesPanel({
                         مخفية
                       </span>
                     )}
+                  </div>
+
+                  <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-slate-300">
+                    {getPredictionTypeHint(predictionType)}
                   </div>
 
                   {isEditing ? (
@@ -468,6 +524,35 @@ export default function AdminMatchesPanel({
                             required
                           />
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-xs font-bold">
+                          نوع التوقع
+                        </label>
+                        <select
+                          value={editPredictionType}
+                          onChange={(event) =>
+                            setEditPredictionType(
+                              event.target.value as PredictionType
+                            )
+                          }
+                          disabled={isCalculated}
+                          className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-slate-950 outline-none focus:border-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="normal">توقع عادي</option>
+                          <option value="golden">توقع ذهبي</option>
+                        </select>
+
+                        <div className="mt-2 rounded-xl border border-white/10 bg-slate-950/60 p-3 text-[11px] leading-5 text-slate-200">
+                          {getPredictionTypeHint(editPredictionType)}
+                        </div>
+
+                        {isCalculated && (
+                          <div className="mt-2 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-[11px] leading-5 text-red-100">
+                            لا يمكن تغيير نوع التوقع بعد احتساب المباراة.
+                          </div>
+                        )}
                       </div>
 
                       <label className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm">
@@ -534,7 +619,7 @@ export default function AdminMatchesPanel({
                         onClick={() => startEdit(match)}
                         className="col-span-2 rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/15"
                       >
-                        تعديل التاريخ والوقت
+                        تعديل المباراة
                       </button>
 
                       {!match.isActive && (
