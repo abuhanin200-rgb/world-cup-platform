@@ -1,6 +1,8 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "./firebase";
 
+export type PredictionType = "normal" | "golden";
+
 export type CelebrationPrediction = {
   id: string;
   userId: string;
@@ -18,6 +20,7 @@ export type CelebrationPrediction = {
 
   points: number;
   resultType: string;
+  predictionType: PredictionType;
   isCalculated: boolean;
 
   calculatedAt?: string | null;
@@ -33,6 +36,10 @@ function toNumber(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : 0;
 }
 
+function normalizePredictionType(value: unknown): PredictionType {
+  return value === "golden" ? "golden" : "normal";
+}
+
 function getTimeValue(value: unknown) {
   const text = toText(value);
 
@@ -41,6 +48,15 @@ function getTimeValue(value: unknown) {
   const time = new Date(text).getTime();
 
   return Number.isFinite(time) ? time : 0;
+}
+
+function isExactCelebration(prediction: CelebrationPrediction) {
+  return (
+    prediction.isCalculated &&
+    (prediction.resultType === "exact" ||
+      prediction.points === 3 ||
+      prediction.points === 6)
+  );
 }
 
 export async function getExactCelebrationsForUser(
@@ -75,6 +91,7 @@ export async function getExactCelebrationsForUser(
 
         points: toNumber(data.points),
         resultType: toText(data.resultType),
+        predictionType: normalizePredictionType(data.predictionType),
         isCalculated: Boolean(data.isCalculated),
 
         calculatedAt:
@@ -89,10 +106,7 @@ export async function getExactCelebrationsForUser(
       };
     })
     .filter((prediction) => {
-      return (
-        prediction.isCalculated &&
-        (prediction.resultType === "exact" || prediction.points === 3)
-      );
+      return isExactCelebration(prediction);
     })
     .sort((a, b) => {
       return (

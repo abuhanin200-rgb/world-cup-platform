@@ -9,6 +9,10 @@ import {
 
 const STORAGE_PREFIX = "worldcup_2026_exact_celebration_seen_";
 
+type CelebrationPredictionWithType = CelebrationPrediction & {
+  predictionType?: "normal" | "golden";
+};
+
 function getStorageKey(predictionId: string) {
   return `${STORAGE_PREFIX}${predictionId}`;
 }
@@ -44,12 +48,16 @@ function buildConfettiPieces() {
   });
 }
 
+function isGoldenPrediction(prediction: CelebrationPredictionWithType) {
+  return prediction.predictionType === "golden";
+}
+
 export default function ExactPredictionCelebration() {
   const { user, isLoggedIn, loading } = useAuth();
 
-  const [prediction, setPrediction] = useState<CelebrationPrediction | null>(
-    null
-  );
+  const [prediction, setPrediction] =
+    useState<CelebrationPredictionWithType | null>(null);
+
   const [visible, setVisible] = useState(false);
   const [checking, setChecking] = useState(false);
 
@@ -66,7 +74,7 @@ export default function ExactPredictionCelebration() {
 
         const unseenPrediction = exactPredictions.find((item) => {
           return !hasSeenCelebration(item.id);
-        });
+        }) as CelebrationPredictionWithType | undefined;
 
         if (!unseenPrediction) return;
 
@@ -90,6 +98,9 @@ export default function ExactPredictionCelebration() {
 
   if (!visible || !prediction) return null;
 
+  const golden = isGoldenPrediction(prediction);
+  const points = golden ? 6 : 3;
+
   return (
     <div
       dir="rtl"
@@ -99,7 +110,9 @@ export default function ExactPredictionCelebration() {
         {confettiPieces.map((piece) => (
           <span
             key={piece.id}
-            className="celebration-confetti absolute top-[-20px] rounded-sm"
+            className={`celebration-confetti absolute top-[-20px] rounded-sm ${
+              golden ? "golden-confetti" : ""
+            }`}
             style={{
               left: `${piece.left}%`,
               width: `${piece.size}px`,
@@ -112,30 +125,75 @@ export default function ExactPredictionCelebration() {
         ))}
       </div>
 
-      <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-amber-300/30 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-950 p-5 text-center text-white shadow-2xl">
-        <div className="absolute -top-16 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full bg-amber-300/20 blur-3xl" />
+      <div
+        className={`relative w-full max-w-md overflow-hidden rounded-[2rem] p-5 text-center text-white shadow-2xl ${
+          golden
+            ? "border border-amber-300/50 bg-gradient-to-br from-amber-500/20 via-slate-950 to-yellow-700/20 shadow-amber-500/20"
+            : "border border-amber-300/30 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-950"
+        }`}
+      >
+        <div
+          className={`absolute -top-16 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full blur-3xl ${
+            golden ? "bg-amber-300/35" : "bg-amber-300/20"
+          }`}
+        />
+
+        {golden && (
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-yellow-300 via-amber-400 to-yellow-600" />
+        )}
 
         <div className="relative">
-          <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full border border-amber-300/40 bg-amber-300/15 text-5xl shadow-xl">
-            🎉
+          <div
+            className={`mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full border text-5xl shadow-xl ${
+              golden
+                ? "border-amber-200/70 bg-amber-300/25 shadow-amber-400/30"
+                : "border-amber-300/40 bg-amber-300/15"
+            }`}
+          >
+            {golden ? "🏆" : "🎉"}
           </div>
 
-          <h2 className="text-2xl font-black text-amber-300">
-            جبتها بالملي!
+          {golden && (
+            <div className="mx-auto mb-3 inline-flex rounded-full border border-amber-300/40 bg-amber-400 px-4 py-1 text-xs font-black text-slate-950">
+              ⭐ التوقع الذهبي
+            </div>
+          )}
+
+          <h2
+            className={`text-2xl font-black ${
+              golden ? "text-amber-200" : "text-amber-300"
+            }`}
+          >
+            {golden ? "جبتها ذهبية بالملي!" : "جبتها بالملي!"}
           </h2>
 
           <p className="mt-2 text-sm leading-7 text-slate-200">
-            مبروك يا {prediction.userName || user?.fullName}، توقّعك طلع صحيح
-            بالملي وحصلت على 3 نقاط.
+            مبروك يا {prediction.userName || user?.fullName}،{" "}
+            {golden
+              ? "توقّعك الذهبي طلع صحيح بالملي"
+              : "توقّعك طلع صحيح بالملي"}{" "}
+            وحصلت على {points} نقاط.
           </p>
 
-          <div className="mt-5 rounded-3xl border border-white/10 bg-white/10 p-4">
+          <div
+            className={`mt-5 rounded-3xl border p-4 ${
+              golden
+                ? "border-amber-300/30 bg-amber-400/10"
+                : "border-white/10 bg-white/10"
+            }`}
+          >
             <div className="flex items-center justify-center gap-2 text-sm font-bold text-slate-200">
               <span>
                 {prediction.homeTeamEmoji} {prediction.homeTeamName}
               </span>
 
-              <span className="rounded-xl bg-slate-950 px-3 py-1 text-lg font-black text-amber-300">
+              <span
+                className={`rounded-xl px-3 py-1 text-lg font-black ${
+                  golden
+                    ? "bg-amber-400 text-slate-950"
+                    : "bg-slate-950 text-amber-300"
+                }`}
+              >
                 {prediction.homeScore} - {prediction.awayScore}
               </span>
 
@@ -145,14 +203,24 @@ export default function ExactPredictionCelebration() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm font-black text-emerald-100">
-            +3 نقاط تمت إضافتها لرصيدك ✅
+          <div
+            className={`mt-4 rounded-2xl border p-3 text-sm font-black ${
+              golden
+                ? "border-amber-300/30 bg-amber-400/15 text-amber-100"
+                : "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+            }`}
+          >
+            +{points} نقاط تمت إضافتها لرصيدك ✅
           </div>
 
           <button
             type="button"
             onClick={closeCelebration}
-            className="mt-5 w-full rounded-2xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300"
+            className={`mt-5 w-full rounded-2xl px-4 py-3 text-sm font-black text-slate-950 ${
+              golden
+                ? "bg-amber-300 hover:bg-amber-200"
+                : "bg-amber-400 hover:bg-amber-300"
+            }`}
           >
             يلا نكمل التحدي
           </button>
@@ -178,6 +246,26 @@ export default function ExactPredictionCelebration() {
 
         .celebration-confetti:nth-child(5n + 5) {
           background: #fb7185;
+        }
+
+        .celebration-confetti.golden-confetti:nth-child(5n + 1) {
+          background: #fbbf24;
+        }
+
+        .celebration-confetti.golden-confetti:nth-child(5n + 2) {
+          background: #f59e0b;
+        }
+
+        .celebration-confetti.golden-confetti:nth-child(5n + 3) {
+          background: #fde68a;
+        }
+
+        .celebration-confetti.golden-confetti:nth-child(5n + 4) {
+          background: #facc15;
+        }
+
+        .celebration-confetti.golden-confetti:nth-child(5n + 5) {
+          background: #fff7ed;
         }
 
         .celebration-confetti {
