@@ -17,23 +17,45 @@ type MemberAchievement = {
 function RankMovement({ user }: { user: LeaderboardUser }) {
   if (user.rankDirection === "up") {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/15 text-sm font-black text-emerald-300 md:h-8 md:w-8">
-        ⬆️
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 md:h-6 md:w-6">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-3 w-3 md:h-3.5 md:w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="4.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 19V5" />
+          <path d="M6 11l6-6 6 6" />
+        </svg>
       </span>
     );
   }
 
   if (user.rankDirection === "down") {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-red-400/15 text-sm font-black text-red-300 md:h-8 md:w-8">
-        ⬇️
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm shadow-red-500/20 md:h-6 md:w-6">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-3 w-3 md:h-3.5 md:w-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="4.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 5v14" />
+          <path d="M18 13l-6 6-6-6" />
+        </svg>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-400/15 text-sm font-black text-slate-300 md:h-8 md:w-8">
-      ➖
+    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-600 text-white shadow-sm shadow-slate-700/20 md:h-6 md:w-6">
+      <span className="block h-[2.5px] w-3 rounded-full bg-white md:w-3.5" />
     </span>
   );
 }
@@ -112,7 +134,11 @@ function getPredictionStatus(prediction: Prediction) {
     };
   }
 
-  if (prediction.resultType === "exact" || prediction.points === 3 || prediction.points === 6) {
+  if (
+    prediction.resultType === "exact" ||
+    prediction.points === 3 ||
+    prediction.points === 6
+  ) {
     return {
       text: golden ? "ذهبي بالملي +6" : "صح بالملي +3",
       className: golden
@@ -121,7 +147,11 @@ function getPredictionStatus(prediction: Prediction) {
     };
   }
 
-  if (prediction.resultType === "winner" || prediction.points === 1 || prediction.points === 2) {
+  if (
+    prediction.resultType === "winner" ||
+    prediction.points === 1 ||
+    prediction.points === 2
+  ) {
     return {
       text: golden ? "فائز ذهبي +2" : "الفائز صحيح +1",
       className: golden
@@ -342,66 +372,18 @@ function getTitleProgress(user: LeaderboardUser) {
 
 function TitlesGuideModal({ onClose }: { onClose: () => void }) {
   const titles = [
-    {
-      icon: "👋",
-      title: "مشجع جديد",
-      condition: "التسجيل في المنصة قبل أول توقع",
-    },
-    {
-      icon: "🔮",
-      title: "مبتدئ التوقعات",
-      condition: "شارك في توقع واحد أو أكثر",
-    },
-    {
-      icon: "📊",
-      title: "محلل واعد",
-      condition: "شارك في 8 توقعات أو أكثر",
-    },
-    {
-      icon: "🔥",
-      title: "نشيط التوقعات",
-      condition: "شارك في 20 توقع أو أكثر",
-    },
-    {
-      icon: "⚽",
-      title: "حاضر دائمًا",
-      condition: "شارك في 40 توقع أو أكثر",
-    },
-    {
-      icon: "🎯",
-      title: "صياد النقاط",
-      condition: "حقق 3 توقعات صحيحة",
-    },
-    {
-      icon: "🧠",
-      title: "خبير النتائج",
-      condition: "حقق 7 توقعات صحيحة",
-    },
-    {
-      icon: "🏆",
-      title: "محترف التوقعات",
-      condition: "حقق 12 توقع صحيح",
-    },
-    {
-      icon: "⭐",
-      title: "أسطورة التوقعات",
-      condition: "حقق 20 توقع صحيح",
-    },
-    {
-      icon: "💪",
-      title: "من النخبة",
-      condition: "ادخل أول 10 مراكز",
-    },
-    {
-      icon: "🏅",
-      title: "منافس شرس",
-      condition: "ادخل أول 3 مراكز",
-    },
-    {
-      icon: "🥇",
-      title: "متصدر التحدي",
-      condition: "وصل إلى المركز الأول",
-    },
+    { icon: "👋", title: "مشجع جديد", condition: "التسجيل في المنصة قبل أول توقع" },
+    { icon: "🔮", title: "مبتدئ التوقعات", condition: "شارك في توقع واحد أو أكثر" },
+    { icon: "📊", title: "محلل واعد", condition: "شارك في 8 توقعات أو أكثر" },
+    { icon: "🔥", title: "نشيط التوقعات", condition: "شارك في 20 توقع أو أكثر" },
+    { icon: "⚽", title: "حاضر دائمًا", condition: "شارك في 40 توقع أو أكثر" },
+    { icon: "🎯", title: "صياد النقاط", condition: "حقق 3 توقعات صحيحة" },
+    { icon: "🧠", title: "خبير النتائج", condition: "حقق 7 توقعات صحيحة" },
+    { icon: "🏆", title: "محترف التوقعات", condition: "حقق 12 توقع صحيح" },
+    { icon: "⭐", title: "أسطورة التوقعات", condition: "حقق 20 توقع صحيح" },
+    { icon: "💪", title: "من النخبة", condition: "ادخل أول 10 مراكز" },
+    { icon: "🏅", title: "منافس شرس", condition: "ادخل أول 3 مراكز" },
+    { icon: "🥇", title: "متصدر التحدي", condition: "وصل إلى المركز الأول" },
   ];
 
   const achievements = [
@@ -462,7 +444,8 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
 
         <div className="max-h-[70vh] overflow-y-auto p-4">
           <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
-            ارفع عدد توقعاتك، حقق نتائج صحيحة، واستغل التوقع الذهبي عشان تجمع نقاط أكثر 🔥
+            ارفع عدد توقعاتك، حقق نتائج صحيحة، واستغل التوقع الذهبي عشان تجمع
+            نقاط أكثر 🔥
           </div>
 
           <h4 className="mb-2 text-sm font-black text-white">الألقاب</h4>
@@ -854,9 +837,15 @@ function PredictionDetailsModal({
             />
 
             <MemberStatCard
-              label="الصحيح"
-              value={user.correct}
+              label="ص بالملي"
+              value={user.exact}
               className="text-emerald-300"
+            />
+
+            <MemberStatCard
+              label="الفائز"
+              value={user.winner}
+              className="text-amber-200"
             />
 
             <MemberStatCard
@@ -1036,7 +1025,8 @@ function PredictionDetailsModal({
                     </button>
 
                     <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-2 text-xs font-bold text-slate-200">
-                      صفحة {Math.min(currentPredictionPage, totalPredictionPages)} من{" "}
+                      صفحة{" "}
+                      {Math.min(currentPredictionPage, totalPredictionPages)} من{" "}
                       {totalPredictionPages}
                     </div>
 
@@ -1157,6 +1147,12 @@ export default function LeaderboardTable() {
           >
             🏅 كيف أحصل على الألقاب؟
           </button>
+
+          <div className="mx-auto mt-3 max-w-md rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
+            <span className="text-emerald-300">ص</span> = النتيجة بالملي،{" "}
+            <span className="text-amber-200">ف</span> = الفائز الصحيح،{" "}
+            <span className="text-red-300">خ</span> = الخطأ
+          </div>
         </div>
 
         {loading ? (
@@ -1179,27 +1175,31 @@ export default function LeaderboardTable() {
               <table className="w-full table-fixed text-center">
                 <thead className="bg-slate-950">
                   <tr className="text-[10px] md:text-sm">
-                    <th className="w-[20%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th className="w-[18%] px-1 py-3 font-black md:px-4 md:py-4">
                       المركز
                     </th>
 
-                    <th className="w-[28%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th className="w-[27%] px-1 py-3 font-black md:px-4 md:py-4">
                       الاسم
                     </th>
 
-                    <th className="w-[14%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th className="w-[13%] px-1 py-3 font-black md:px-4 md:py-4">
                       التوقعات
                     </th>
 
-                    <th className="w-[12%] px-1 py-3 font-black md:px-4 md:py-4">
-                      الصح
+                    <th className="w-[8%] px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
+                      ص
                     </th>
 
-                    <th className="w-[12%] px-1 py-3 font-black md:px-4 md:py-4">
-                      الخطأ
+                    <th className="w-[8%] px-1 py-3 font-black text-amber-200 md:px-4 md:py-4">
+                      ف
                     </th>
 
-                    <th className="w-[14%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th className="w-[8%] px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
+                      خ
+                    </th>
+
+                    <th className="w-[18%] px-1 py-3 font-black md:px-4 md:py-4">
                       النقاط
                     </th>
                   </tr>
@@ -1245,7 +1245,11 @@ export default function LeaderboardTable() {
                         </td>
 
                         <td className="px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
-                          {user.correct}
+                          {user.exact}
+                        </td>
+
+                        <td className="px-1 py-3 font-black text-amber-200 md:px-4 md:py-4">
+                          {user.winner}
                         </td>
 
                         <td className="px-1 py-3 font-black text-red-300 md:px-4 md:py-4">

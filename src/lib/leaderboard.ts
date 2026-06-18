@@ -9,7 +9,10 @@ export type LeaderboardUser = {
 
   points: number;
   total: number;
+
   correct: number;
+  exact: number;
+  winner: number;
   wrong: number;
 
   currentRank: number;
@@ -26,6 +29,13 @@ export type LeaderboardUser = {
 type PredictionTieBreakData = {
   lastCalculatedMatchId: string;
   predictionTimesByUserId: Map<string, number>;
+};
+
+type PredictionStats = {
+  exact: number;
+  winner: number;
+  wrong: number;
+  correct: number;
 };
 
 function toNumber(value: unknown) {
@@ -59,6 +69,57 @@ function toRealTime(value: unknown) {
   if (!Number.isFinite(time)) return 0;
 
   return time;
+}
+
+function isExactPrediction(data: Record<string, unknown>) {
+  const points = toNumber(data.points);
+  const resultType = toText(data.resultType);
+
+  return resultType === "exact" || points === 3 || points === 6;
+}
+
+function isWinnerPrediction(data: Record<string, unknown>) {
+  const points = toNumber(data.points);
+  const resultType = toText(data.resultType);
+
+  return resultType === "winner" || points === 1 || points === 2;
+}
+
+async function getPredictionStatsByUserId(): Promise<
+  Map<string, PredictionStats>
+> {
+  const snapshot = await getDocs(collection(db, "predictions"));
+  const map = new Map<string, PredictionStats>();
+
+  snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .forEach((docSnap) => {
+      const data = docSnap.data();
+      const userId = toText(data.userId);
+
+      if (!userId || !Boolean(data.isCalculated)) return;
+
+      const current = map.get(userId) || {
+        exact: 0,
+        winner: 0,
+        wrong: 0,
+        correct: 0,
+      };
+
+      if (isExactPrediction(data)) {
+        current.exact += 1;
+        current.correct += 1;
+      } else if (isWinnerPrediction(data)) {
+        current.winner += 1;
+        current.correct += 1;
+      } else if (toNumber(data.points) === 0) {
+        current.wrong += 1;
+      }
+
+      map.set(userId, current);
+    });
+
+  return map;
 }
 
 async function getLastCalculatedMatchTieBreakData(): Promise<PredictionTieBreakData> {
@@ -125,26 +186,38 @@ async function getLastCalculatedMatchTieBreakData(): Promise<PredictionTieBreakD
 }
 
 export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
-  const [usersSnapshot, tieBreakData] = await Promise.all([
-    getDocs(collection(db, "users")),
-    getLastCalculatedMatchTieBreakData(),
-  ]);
+  const [usersSnapshot, tieBreakData, predictionStatsByUserId] =
+    await Promise.all([
+      getDocs(collection(db, "users")),
+      getLastCalculatedMatchTieBreakData(),
+      getPredictionStatsByUserId(),
+    ]);
 
   const users = usersSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => {
       const data = docSnap.data();
+      const userId = docSnap.id;
+      const predictionStats = predictionStatsByUserId.get(userId);
+
+      const exact = predictionStats?.exact ?? 0;
+      const winner = predictionStats?.winner ?? 0;
+      const wrong = predictionStats?.wrong ?? toNumber(data.wrong);
+      const correct = predictionStats?.correct ?? toNumber(data.correct);
 
       return {
-        id: docSnap.id,
+        id: userId,
         fullName: String(data.fullName || "عضو بدون اسم"),
         favoriteTeam: String(data.favoriteTeam || ""),
         teamEmoji: String(data.teamEmoji || ""),
 
         points: toNumber(data.points),
         total: toNumber(data.total),
-        correct: toNumber(data.correct),
-        wrong: toNumber(data.wrong),
+
+        correct,
+        exact,
+        winner,
+        wrong,
 
         currentRank: toNumber(data.currentRank),
         previousRank: toNumber(data.previousRank),
@@ -168,29 +241,14 @@ export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
       const aHasPredictions = a.total > 0;
       const bHasPredictions = b.total > 0;
 
-      /**
-       * الأعضاء الذين لديهم توقعات يظهرون أولًا،
-       * حتى لو كانت توقعاتهم خاطئة.
-       * الأعضاء بدون أي توقعات يذهبون لآخر الجدول.
-       */
       if (aHasPredictions !== bHasPredictions) {
         return aHasPredictions ? -1 : 1;
       }
 
-      /**
-       * ترتيب لوحة الصدارة:
-       * 1- النقاط الأعلى.
-       * 2- عدد التوقعات الصحيحة الأعلى.
-       * 3- عدد التوقعات الأعلى.
-       * 4- عدد الأخطاء الأقل.
-       * 5- الأسرع في توقع آخر مباراة تم احتساب نتيجتها عند التساوي الكامل.
-       * 6- الاسم أبجديًا فقط إذا لم توجد بيانات كافية.
-       *
-       * هذا الترتيب لا يغير الحسبة ولا النقاط.
-       * فقط يغير طريقة عرض الأعضاء في لوحة الصدارة.
-       */
       if (b.points !== a.points) return b.points - a.points;
       if (b.correct !== a.correct) return b.correct - a.correct;
+      if (b.exact !== a.exact) return b.exact - a.exact;
+      if (b.winner !== a.winner) return b.winner - a.winner;
       if (b.total !== a.total) return b.total - a.total;
       if (a.wrong !== b.wrong) return a.wrong - b.wrong;
 
@@ -208,18 +266,10 @@ export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
       const bPredictedLastCalculatedMatch =
         bLastCalculatedMatchPredictionTime !== Number.MAX_SAFE_INTEGER;
 
-      /**
-       * إذا واحد توقع آخر مباراة محسوبة والثاني ما توقعها،
-       * اللي توقعها يطلع فوق.
-       */
       if (aPredictedLastCalculatedMatch !== bPredictedLastCalculatedMatch) {
         return aPredictedLastCalculatedMatch ? -1 : 1;
       }
 
-      /**
-       * إذا الاثنين توقعوا آخر مباراة محسوبة،
-       * الأسرع في إرسال التوقع يطلع فوق.
-       */
       if (
         aLastCalculatedMatchPredictionTime !==
         bLastCalculatedMatchPredictionTime
@@ -230,10 +280,6 @@ export async function getLeaderboardUsers(): Promise<LeaderboardUser[]> {
         );
       }
 
-      /**
-       * احتياط أخير فقط:
-       * إذا ما فيه آخر مباراة محسوبة أو الاثنين ما توقعوا نفس المباراة.
-       */
       const aFallbackTime = toTime(a.lastPredictionAt);
       const bFallbackTime = toTime(b.lastPredictionAt);
 
