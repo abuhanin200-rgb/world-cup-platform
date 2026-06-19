@@ -13,6 +13,7 @@ import AdminMatchesPanel from "@/components/AdminMatchesPanel";
 import AdminLogsPanel from "@/components/AdminLogsPanel";
 import AdminPredictionsPanel from "@/components/AdminPredictionsPanel";
 import AdminHomeBannerPanel from "@/components/AdminHomeBannerPanel";
+import AdminWordGamePanel from "@/components/AdminWordGamePanel";
 
 type AdminTab =
   | "overview"
@@ -23,6 +24,7 @@ type AdminTab =
   | "members"
   | "predictions"
   | "matches"
+  | "wordGame"
   | "logs";
 
 function toDateInputValue(date: Date) {
@@ -522,6 +524,18 @@ export default function AdminPage() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("wordGame")}
+            className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              activeTab === "wordGame"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            🎮 لعبة الكلمة
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("logs")}
             className={`rounded-xl px-3 py-2 text-sm font-bold ${
               activeTab === "logs"
@@ -821,6 +835,8 @@ export default function AdminPage() {
             onChanged={loadData}
           />
         )}
+
+        {activeTab === "wordGame" && <AdminWordGamePanel />}
 
         {activeTab === "logs" && <AdminLogsPanel />}
       </div>
