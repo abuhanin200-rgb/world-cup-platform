@@ -190,7 +190,17 @@ export default function HomePage() {
 
         <ExactHitsTicker />
 
-        <OnlineMembersCounter />
+        <div className="mt-4 flex flex-row items-center justify-center gap-2 md:gap-3">
+          <button
+            type="button"
+            onClick={() => router.push("/word-game")}
+            className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs font-black text-amber-100 shadow-lg shadow-slate-950/20 hover:bg-amber-400/20 md:px-5 md:text-sm"
+          >
+            🎮 خمن كلمة اليوم
+          </button>
+
+          <OnlineMembersCounter />
+        </div>
 
         <LeaderboardTable />
       </section>
