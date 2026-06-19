@@ -49,11 +49,14 @@ export default function WordKeyboard({
   const isGuessComplete = [...currentGuess].length === 5;
 
   return (
-    <div className="mx-auto mt-4 w-full max-w-2xl space-y-2" dir="rtl">
+    <div
+      className="mx-auto mt-3 w-full max-w-[330px] space-y-1.5 sm:max-w-2xl sm:space-y-2"
+      dir="rtl"
+    >
       {KEYBOARD_ROWS.map((row, rowIndex) => (
         <div
           key={rowIndex}
-          className="flex flex-wrap items-center justify-center gap-1.5 md:gap-2"
+          className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 md:gap-2"
         >
           {row.map((letter) => {
             const normalizedLetter = letter === "ة" ? "ه" : letter;
@@ -67,7 +70,9 @@ export default function WordKeyboard({
                 disabled={keyDisabled}
                 onClick={() => onLetterClick(letter)}
                 className={[
-                  "flex h-11 min-w-9 items-center justify-center rounded-xl border px-2 text-sm font-black shadow-sm transition md:h-12 md:min-w-[44px] md:px-3 md:text-base",
+                  "flex h-9 min-w-8 items-center justify-center rounded-lg border px-1.5 text-sm font-black shadow-sm transition",
+                  "sm:h-10 sm:min-w-9 sm:rounded-xl sm:px-2 sm:text-sm",
+                  "md:h-12 md:min-w-[44px] md:px-3 md:text-base",
                   "disabled:cursor-not-allowed",
                   getKeyClass(status, keyDisabled),
                 ].join(" ")}
@@ -79,12 +84,12 @@ export default function WordKeyboard({
         </div>
       ))}
 
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <button
           type="button"
           disabled={disabled}
           onClick={onBackspace}
-          className="h-12 rounded-xl border border-red-300/30 bg-red-500 text-sm font-black text-white shadow-lg shadow-red-950/20 transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+          className="h-10 rounded-xl border border-red-300/30 bg-red-500 text-sm font-black text-white shadow-lg shadow-red-950/20 transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 sm:h-12"
         >
           حذف
         </button>
@@ -93,7 +98,7 @@ export default function WordKeyboard({
           type="button"
           disabled={disabled || !isGuessComplete}
           onClick={onEnter}
-          className="h-12 rounded-xl border border-emerald-300/30 bg-emerald-500 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+          className="h-10 rounded-xl border border-emerald-300/30 bg-emerald-500 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 sm:h-12"
         >
           تأكيد
         </button>

@@ -30,12 +30,15 @@ export default function GameBoard({
   const rows = Array.from({ length: maxAttempts });
 
   return (
-    <div className="mx-auto w-full max-w-sm space-y-2" dir="rtl">
+    <div
+      className="mx-auto w-full max-w-[310px] space-y-1.5 sm:max-w-sm sm:space-y-2"
+      dir="rtl"
+    >
       {rows.map((_, rowIndex) => {
         const row = guessesResults[rowIndex];
 
         return (
-          <div key={rowIndex} className="grid grid-cols-5 gap-2">
+          <div key={rowIndex} className="grid grid-cols-5 gap-1.5 sm:gap-2">
             {Array.from({ length: wordLength }).map((_, cellIndex) => {
               const cell = row?.[cellIndex];
 
@@ -44,8 +47,8 @@ export default function GameBoard({
                   key={cellIndex}
                   className={[
                     "flex aspect-square items-center justify-center rounded-xl border-2",
-                    "text-2xl font-black shadow-lg transition-all duration-300",
-                    "md:text-3xl",
+                    "text-xl font-black shadow-md transition-all duration-300",
+                    "sm:text-2xl md:text-3xl",
                     getCellClass(cell?.status),
                   ].join(" ")}
                 >
