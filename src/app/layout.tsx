@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import MaintenanceGate from "@/components/MaintenanceGate";
+import PresenceTracker from "@/components/PresenceTracker";
 
 const siteUrl = "https://world-cup-platform.vercel.app";
 
@@ -64,6 +65,7 @@ export default function RootLayout({
     <html lang="ar" dir="rtl">
       <body>
         <AuthProvider>
+          <PresenceTracker />
           <MaintenanceGate>{children}</MaintenanceGate>
         </AuthProvider>
       </body>

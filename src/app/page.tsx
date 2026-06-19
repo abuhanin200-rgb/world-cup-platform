@@ -9,6 +9,7 @@ import LeaderboardTable from "@/components/LeaderboardTable";
 import HomeHighlights, { ExactHitsTicker } from "@/components/HomeHighlights";
 import ExactPredictionCelebration from "@/components/ExactPredictionCelebration";
 import HomeBanner from "@/components/HomeBanner";
+import OnlineMembersCounter from "@/components/OnlineMembersCounter";
 
 const forgotPasswordMessage = `السلام عليكم، نسيت الرقم السري في منصة توقعات كأس العالم 2026.
 
@@ -188,6 +189,8 @@ export default function HomePage() {
         </div>
 
         <ExactHitsTicker />
+
+        <OnlineMembersCounter />
 
         <LeaderboardTable />
       </section>
