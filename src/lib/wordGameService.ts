@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -31,6 +32,15 @@ import {
 const gamesCollection = "wordGameDailyGames";
 const resultsCollection = "wordGameDailyResults";
 const statsCollection = "wordGameUserStats";
+
+export type WordGameAdminGameItem = {
+  userId: string;
+  targetWord: string;
+  status: WordGameDailyGame["status"];
+  attemptsUsed: number;
+  durationMs: number | null;
+  won: boolean;
+};
 
 export async function getOrCreateTodayWordGame(params: {
   userId: string;
@@ -147,7 +157,8 @@ export async function saveWordGameProgress(params: {
 
   await runTransaction(db, async (transaction) => {
     const isFinished =
-      params.updatedGame.status === "won" || params.updatedGame.status === "lost";
+      params.updatedGame.status === "won" ||
+      params.updatedGame.status === "lost";
 
     const resultSnap = isFinished ? await transaction.get(resultRef) : null;
     const statsSnap = isFinished ? await transaction.get(statsRef) : null;
@@ -275,6 +286,133 @@ export async function getTodayWordGameLeaderboard(): Promise<
       finishedAt: item.finishedAt,
       rank: index + 1,
     }));
+}
+
+export async function getTodayWordGameAdminGames(): Promise<
+  WordGameAdminGameItem[]
+> {
+  const dateKey = getMakkahDateKey();
+
+  const gamesQuery = query(
+    collection(db, gamesCollection),
+    where("dateKey", "==", dateKey)
+  );
+
+  const snapshot = await getDocs(gamesQuery);
+
+  return snapshot.docs.map((docItem) => {
+    const game = docItem.data() as WordGameDailyGame;
+
+    return {
+      userId: game.userId,
+      targetWord: game.targetWord,
+      status: game.status,
+      attemptsUsed: game.attemptsUsed,
+      durationMs: game.durationMs,
+      won: game.won,
+    };
+  });
+}
+
+async function rebuildWordGameUserStats(userId: string) {
+  const resultsQuery = query(
+    collection(db, resultsCollection),
+    where("userId", "==", userId)
+  );
+
+  const snapshot = await getDocs(resultsQuery);
+  const results = snapshot.docs
+    .map((item) => item.data() as WordGameDailyResult)
+    .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+
+  const statsRef = doc(db, statsCollection, userId);
+
+  if (results.length === 0) {
+    await deleteDoc(statsRef);
+    return;
+  }
+
+  let gamesWon = 0;
+  let currentWinStreak = 0;
+  let bestWinStreak = 0;
+
+  results.forEach((result) => {
+    if (result.won) {
+      gamesWon += 1;
+      currentWinStreak += 1;
+      bestWinStreak = Math.max(bestWinStreak, currentWinStreak);
+    } else {
+      currentWinStreak = 0;
+    }
+  });
+
+  const gamesPlayed = results.length;
+
+  const updatedStats: WordGameUserStats = {
+    userId,
+    gamesPlayed,
+    gamesWon,
+    winRate:
+      gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0,
+    currentWinStreak,
+    bestWinStreak,
+    lastPlayedDateKey: results[results.length - 1]?.dateKey ?? null,
+  };
+
+  await setDoc(statsRef, updatedStats, { merge: true });
+}
+
+export async function adminDeleteUserTodayWordGameResult(userId: string) {
+  const dateKey = getMakkahDateKey();
+  const gameId = `${userId}_${dateKey}`;
+
+  await Promise.all([
+    deleteDoc(doc(db, gamesCollection, gameId)),
+    deleteDoc(doc(db, resultsCollection, gameId)),
+  ]);
+
+  await rebuildWordGameUserStats(userId);
+}
+
+export async function adminDeleteTodayWordGameResults() {
+  const dateKey = getMakkahDateKey();
+
+  const [gamesSnapshot, resultsSnapshot] = await Promise.all([
+    getDocs(
+      query(collection(db, gamesCollection), where("dateKey", "==", dateKey))
+    ),
+    getDocs(
+      query(collection(db, resultsCollection), where("dateKey", "==", dateKey))
+    ),
+  ]);
+
+  const affectedUserIds = new Set<string>();
+
+  gamesSnapshot.docs.forEach((item) => {
+    const game = item.data() as WordGameDailyGame;
+    affectedUserIds.add(game.userId);
+  });
+
+  resultsSnapshot.docs.forEach((item) => {
+    const result = item.data() as WordGameDailyResult;
+    affectedUserIds.add(result.userId);
+  });
+
+  await Promise.all([
+    ...gamesSnapshot.docs.map((item) => deleteDoc(item.ref)),
+    ...resultsSnapshot.docs.map((item) => deleteDoc(item.ref)),
+  ]);
+
+  await Promise.all(
+    Array.from(affectedUserIds).map((userId) =>
+      rebuildWordGameUserStats(userId)
+    )
+  );
+
+  return {
+    deletedGames: gamesSnapshot.size,
+    deletedResults: resultsSnapshot.size,
+  };
 }
 
 export async function getWordGameUserStats(
