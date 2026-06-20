@@ -124,8 +124,9 @@ export default function AdminWordGamePanel() {
             <h2 className="text-xl font-black md:text-2xl">
               🎮 إدارة خمن كلمة اليوم
             </h2>
+
             <p className="mt-1 text-sm leading-6 text-slate-300">
-              عرض إحصائيات وترتيب لعبة اليوم مع إمكانية حذف نتائج الاختبار.
+              عرض إحصائيات وترتيب لعبة اليوم مع إظهار كلمة العضو داخل الأدمن فقط.
             </p>
           </div>
 
@@ -200,8 +201,9 @@ export default function AdminWordGamePanel() {
           <h3 className="text-xl font-black md:text-2xl">
             🏆 ترتيب اليوم داخل الأدمن
           </h3>
+
           <p className="mt-1 text-sm leading-6 text-slate-300">
-            يظهر عمود الكلمة للأدمن فقط، ولا يظهر للعضو أو في صفحة اللعبة.
+            عمود الكلمة يظهر هنا فقط للأدمن ولا يظهر للعضو في صفحة اللعبة.
           </p>
         </div>
 
@@ -216,7 +218,7 @@ export default function AdminWordGamePanel() {
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-white/10">
             <div className="min-w-[760px]">
-              <div className="grid grid-cols-[44px_1fr_90px_76px_76px_76px_90px] bg-white/10 text-[12px] font-black text-slate-300 md:text-sm">
+              <div className="grid grid-cols-[44px_1fr_92px_76px_76px_76px_86px] bg-white/10 text-[12px] font-black text-slate-300 md:text-sm">
                 <div className="px-2 py-3 text-center">#</div>
                 <div className="px-2 py-3 text-right">الاسم</div>
                 <div className="px-2 py-3 text-center">الكلمة</div>
@@ -232,7 +234,7 @@ export default function AdminWordGamePanel() {
                 return (
                   <div
                     key={item.userId}
-                    className="grid grid-cols-[44px_1fr_90px_76px_76px_76px_90px] items-center border-t border-white/10 text-[12px] md:text-sm"
+                    className="grid grid-cols-[44px_1fr_92px_76px_76px_76px_86px] items-center border-t border-white/10 text-[12px] md:text-sm"
                   >
                     <div className="px-2 py-3 text-center font-bold text-white">
                       {getRankLabel(item.rank)}
@@ -242,7 +244,7 @@ export default function AdminWordGamePanel() {
                       {item.userName}
                     </div>
 
-                    <div className="px-2 py-3 text-center font-black text-amber-300">
+                    <div className="px-2 py-3 text-center text-base font-black text-amber-300">
                       {game?.targetWord ?? "-"}
                     </div>
 
