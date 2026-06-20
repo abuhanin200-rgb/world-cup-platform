@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { updateMemberLastSeen } from "@/lib/presence";
+import { updateOnlinePresence } from "@/lib/presenceService";
 
 const UPDATE_INTERVAL_MS = 60 * 1000;
 const MIN_EVENT_UPDATE_GAP_MS = 30 * 1000;
 
 export default function PresenceTracker() {
+  const pathname = usePathname();
   const { user, isLoggedIn, loading } = useAuth();
   const lastUpdateRef = useRef(0);
 
@@ -28,7 +31,14 @@ export default function PresenceTracker() {
       lastUpdateRef.current = now;
 
       try {
-        await updateMemberLastSeen(user.id);
+        await Promise.all([
+          updateMemberLastSeen(user.id),
+          updateOnlinePresence({
+            userId: user.id,
+            fullName: user.fullName || "عضو",
+            path: pathname || "/",
+          }),
+        ]);
       } catch (error) {
         console.error("Presence update error:", error);
       }
@@ -57,7 +67,7 @@ export default function PresenceTracker() {
       window.removeEventListener("scroll", handleActivity);
       window.removeEventListener("touchstart", handleActivity);
     };
-  }, [loading, isLoggedIn, user?.id]);
+  }, [loading, isLoggedIn, user?.id, user?.fullName, pathname]);
 
   return null;
 }
