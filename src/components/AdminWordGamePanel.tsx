@@ -3,15 +3,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTodayWordGameLeaderboard } from "@/lib/wordGameService";
 import type { WordGameLeaderboardItem } from "@/types/wordGame";
-import { formatDurationMs } from "@/lib/wordGameLogic";
+import { formatDurationMs, getMakkahDateKey } from "@/lib/wordGameLogic";
+
+function getRankLabel(rank: number) {
+  if (rank === 1) return "🥇";
+  if (rank === 2) return "🥈";
+  if (rank === 3) return "🥉";
+  return rank;
+}
 
 export default function AdminWordGamePanel() {
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<WordGameLeaderboardItem[]>([]);
 
+  const todayKey = getMakkahDateKey();
+
   async function loadData() {
     try {
       setLoading(true);
+
       const data = await getTodayWordGameLeaderboard();
       setLeaderboard(data);
     } catch (error) {
@@ -31,9 +41,10 @@ export default function AdminWordGamePanel() {
     [leaderboard]
   );
 
-  const fastestPlayer = useMemo(() => {
-    return leaderboard.find((item) => item.won) ?? null;
-  }, [leaderboard]);
+  const fastestPlayer = useMemo(
+    () => leaderboard.find((item) => item.won) ?? null,
+    [leaderboard]
+  );
 
   return (
     <section className="space-y-5" dir="rtl">
@@ -43,8 +54,8 @@ export default function AdminWordGamePanel() {
             <h2 className="text-xl font-black md:text-2xl">
               🎮 إدارة خمن كلمة اليوم
             </h2>
-            <p className="mt-1 text-sm text-slate-300">
-              عرض إحصائيات وترتيب لعبة اليوم بدون إظهار الكلمات السرية.
+            <p className="mt-1 text-sm leading-6 text-slate-300">
+              عرض إحصائيات وترتيب لعبة اليوم فقط، بدون إظهار كلمة أي عضو.
             </p>
           </div>
 
@@ -63,25 +74,34 @@ export default function AdminWordGamePanel() {
             جاري تحميل بيانات اللعبة...
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+              <div className="text-sm text-slate-300">تاريخ اليوم</div>
+              <div className="mt-1 text-2xl font-black text-white" dir="ltr">
+                {todayKey}
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
               <div className="text-sm text-slate-300">عدد المشاركين اليوم</div>
-              <div className="mt-1 text-3xl font-black">
+              <div className="mt-1 text-3xl font-black text-white">
                 {leaderboard.length}
               </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
               <div className="text-sm text-slate-300">عدد الفائزين اليوم</div>
-              <div className="mt-1 text-3xl font-black">{winnersCount}</div>
+              <div className="mt-1 text-3xl font-black text-emerald-300">
+                {winnersCount}
+              </div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
               <div className="text-sm text-slate-300">أسرع عضو اليوم</div>
-              <div className="mt-1 truncate text-xl font-black">
+              <div className="mt-1 truncate text-lg font-black text-white">
                 {fastestPlayer ? fastestPlayer.userName : "لا يوجد"}
               </div>
-              <div className="mt-1 text-sm text-slate-300" dir="ltr">
+              <div className="mt-1 text-sm font-semibold text-amber-300" dir="ltr">
                 {fastestPlayer ? formatDurationMs(fastestPlayer.durationMs) : "-"}
               </div>
             </div>
@@ -90,35 +110,67 @@ export default function AdminWordGamePanel() {
       </div>
 
       <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
-        <h3 className="mb-4 text-lg font-black">🏆 ترتيب اليوم</h3>
+        <div className="mb-4">
+          <h3 className="text-xl font-black md:text-2xl">
+            🏆 ترتيب اليوم داخل الأدمن
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-slate-300">
+            الترتيب حسب الفوز، ثم الأقل محاولات، ثم الأسرع وقتًا، ثم الأسبق إنهاءً.
+          </p>
+        </div>
 
-        {leaderboard.length === 0 ? (
+        {loading ? (
+          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300">
+            جاري تحميل الترتيب...
+          </div>
+        ) : leaderboard.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300">
             لا توجد نتائج مكتملة اليوم.
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-white/10">
-            <div className="grid grid-cols-[50px_1fr_80px_90px] bg-white/10 text-xs font-black text-slate-300">
-              <div className="p-3 text-center">#</div>
-              <div className="p-3">الاسم</div>
-              <div className="p-3 text-center">الحالة</div>
-              <div className="p-3 text-center">الوقت</div>
+            <div className="grid grid-cols-[44px_1fr_76px_76px_76px] bg-white/10 text-[12px] font-black text-slate-300 md:text-sm">
+              <div className="px-2 py-3 text-center">#</div>
+              <div className="px-2 py-3 text-right">الاسم</div>
+              <div className="px-2 py-3 text-center">الحالة</div>
+              <div className="px-2 py-3 text-center">محاولات</div>
+              <div className="px-2 py-3 text-center">الوقت</div>
             </div>
 
             {leaderboard.map((item) => (
               <div
                 key={item.userId}
-                className="grid grid-cols-[50px_1fr_80px_90px] items-center border-t border-white/10 text-sm"
+                className="grid grid-cols-[44px_1fr_76px_76px_76px] items-center border-t border-white/10 text-[12px] md:text-sm"
               >
-                <div className="p-3 text-center font-black">{item.rank}</div>
-
-                <div className="truncate p-3 font-black">{item.userName}</div>
-
-                <div className="p-3 text-center">
-                  {item.won ? `${item.attemptsUsed}/6` : "خسر"}
+                <div className="px-2 py-3 text-center font-bold text-white">
+                  {getRankLabel(item.rank)}
                 </div>
 
-                <div className="p-3 text-center font-bold" dir="ltr">
+                <div className="truncate px-2 py-3 text-right font-semibold text-white">
+                  {item.userName}
+                </div>
+
+                <div className="px-2 py-3 text-center">
+                  <span
+                    className={[
+                      "inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[11px] font-bold",
+                      item.won
+                        ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+                        : "border border-red-400/20 bg-red-500/10 text-red-200",
+                    ].join(" ")}
+                  >
+                    {item.won ? "فاز" : "خسر"}
+                  </span>
+                </div>
+
+                <div className="px-2 py-3 text-center font-semibold text-slate-200 tabular-nums">
+                  {item.attemptsUsed}/6
+                </div>
+
+                <div
+                  className="px-2 py-3 text-center font-semibold text-slate-200 tabular-nums"
+                  dir="ltr"
+                >
                   {formatDurationMs(item.durationMs)}
                 </div>
               </div>
