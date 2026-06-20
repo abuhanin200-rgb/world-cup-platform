@@ -1,80 +1,63 @@
-"use client";
-
-import type { LetterStatus } from "@/lib/wordGameLogic";
-
-const KEYBOARD_ROWS = [
-  ["ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ"],
-  ["ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ"],
-  ["ع", "غ", "ف", "ق", "ك", "ل", "م"],
-  ["ن", "ه", "ة", "و", "ي", "ء"],
-];
+import type { WordGameTileStatus } from "@/types/wordGame";
 
 type WordKeyboardProps = {
-  disabled?: boolean;
-  currentGuess: string;
-  letterStatuses: Record<string, LetterStatus | undefined>;
+  disabled: boolean;
+  letterStatuses: Record<string, WordGameTileStatus>;
   onLetterClick: (letter: string) => void;
   onBackspace: () => void;
   onEnter: () => void;
 };
 
-function getKeyClass(status?: LetterStatus, isDisabled?: boolean) {
+const KEYBOARD_ROWS = [
+  ["ض", "ص", "ث", "ق", "ف", "غ", "ع", "ه", "خ", "ح", "ج"],
+  ["ش", "س", "ي", "ب", "ل", "ا", "ت", "ن", "م", "ك", "ط"],
+  ["ة", "ئ", "ء", "ؤ", "ر", "ى", "ز", "و", "ظ", "د", "ذ"],
+];
+
+function getKeyClass(status: WordGameTileStatus | undefined) {
   if (status === "correct") {
-    return "border-emerald-400 bg-emerald-500 text-white shadow-emerald-950/30";
+    return "border-emerald-400 bg-emerald-500 text-white hover:bg-emerald-400";
   }
 
   if (status === "present") {
-    return "border-amber-300 bg-amber-400 text-slate-950 shadow-amber-950/30";
+    return "border-amber-300 bg-amber-400 text-slate-950 hover:bg-amber-300";
   }
 
   if (status === "absent") {
-    return "border-slate-600 bg-slate-700 text-slate-400 opacity-60";
+    return "cursor-not-allowed border-slate-600 bg-slate-700/70 text-slate-500 opacity-50";
   }
 
-  if (isDisabled) {
-    return "border-white/10 bg-white/5 text-slate-500 opacity-60";
-  }
-
-  return "border-white/10 bg-white/10 text-white hover:bg-white/15";
+  return "border-white/10 bg-slate-950/70 text-white hover:border-emerald-400/40 hover:bg-white/10";
 }
 
 export default function WordKeyboard({
-  disabled = false,
-  currentGuess,
+  disabled,
   letterStatuses,
   onLetterClick,
   onBackspace,
   onEnter,
 }: WordKeyboardProps) {
-  const isGuessComplete = [...currentGuess].length === 5;
-
   return (
-    <div
-      className="mx-auto mt-3 w-full max-w-[330px] space-y-1.5 sm:max-w-2xl sm:space-y-2"
-      dir="rtl"
-    >
+    <div className="mx-auto grid w-full max-w-xl gap-2" dir="rtl">
       {KEYBOARD_ROWS.map((row, rowIndex) => (
-        <div
-          key={rowIndex}
-          className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 md:gap-2"
-        >
+        <div key={rowIndex} className="flex justify-center gap-1">
           {row.map((letter) => {
-            const normalizedLetter = letter === "ة" ? "ه" : letter;
-            const status = letterStatuses[normalizedLetter];
-            const keyDisabled = disabled || status === "absent";
+            const status = letterStatuses[letter];
+            const isAbsent = status === "absent";
+            const keyDisabled = disabled || isAbsent;
 
             return (
               <button
                 key={letter}
                 type="button"
                 disabled={keyDisabled}
-                onClick={() => onLetterClick(letter)}
+                onClick={() => {
+                  if (isAbsent) return;
+                  onLetterClick(letter);
+                }}
                 className={[
-                  "flex h-9 min-w-8 items-center justify-center rounded-lg border px-1.5 text-sm font-black shadow-sm transition",
-                  "sm:h-10 sm:min-w-9 sm:rounded-xl sm:px-2 sm:text-sm",
-                  "md:h-12 md:min-w-[44px] md:px-3 md:text-base",
-                  "disabled:cursor-not-allowed",
-                  getKeyClass(status, keyDisabled),
+                  "min-h-11 flex-1 rounded-xl border px-2 text-base font-black shadow-lg transition disabled:cursor-not-allowed",
+                  getKeyClass(status),
                 ].join(" ")}
               >
                 {letter}
@@ -84,23 +67,23 @@ export default function WordKeyboard({
         </div>
       ))}
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           disabled={disabled}
-          onClick={onBackspace}
-          className="h-10 rounded-xl border border-red-300/30 bg-red-500 text-sm font-black text-white shadow-lg shadow-red-950/20 transition hover:bg-red-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 sm:h-12"
+          onClick={onEnter}
+          className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          حذف
+          إدخال
         </button>
 
         <button
           type="button"
-          disabled={disabled || !isGuessComplete}
-          onClick={onEnter}
-          className="h-10 rounded-xl border border-emerald-300/30 bg-emerald-500 text-sm font-black text-white shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 sm:h-12"
+          disabled={disabled}
+          onClick={onBackspace}
+          className="rounded-2xl border border-red-300/20 bg-white/10 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          تأكيد
+          حذف
         </button>
       </div>
     </div>

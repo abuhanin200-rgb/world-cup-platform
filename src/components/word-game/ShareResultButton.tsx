@@ -1,68 +1,63 @@
-"use client";
-
-import { getShareSquares } from "@/lib/wordGameLogic";
-import type { LetterResult } from "@/lib/wordGameLogic";
+import type { WordGameGuess } from "@/types/wordGame";
+import { formatDurationMs } from "@/lib/wordGameLogic";
 
 type ShareResultButtonProps = {
   won: boolean;
-  attempts: number;
-  maxAttempts?: number;
-  durationSeconds: number;
-  streak?: number;
-  guessesResults: LetterResult[][];
+  attemptsUsed: number;
+  maxAttempts: number;
+  durationMs: number | null;
+  guesses: WordGameGuess[];
+  disabled?: boolean;
 };
 
-function formatDuration(seconds: number) {
-  const safeSeconds = Math.max(0, seconds);
-  const minutes = Math.floor(safeSeconds / 60);
-  const remainingSeconds = safeSeconds % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(
-    remainingSeconds
-  ).padStart(2, "0")}`;
+function getShareSquare(status: string) {
+  if (status === "correct") return "🟩";
+  if (status === "present") return "🟨";
+  return "⬛";
 }
 
 export default function ShareResultButton({
   won,
-  attempts,
-  maxAttempts = 6,
-  durationSeconds,
-  streak = 0,
-  guessesResults,
+  attemptsUsed,
+  maxAttempts,
+  durationMs,
+  guesses,
+  disabled = false,
 }: ShareResultButtonProps) {
+  const guessSquares = guesses
+    .map((guess) => guess.letters.map((letter) => getShareSquare(letter.status)).join(""))
+    .join("\n");
+
+  const shareText = [
+    "🎮 خمن كلمة اليوم",
+    "",
+    won
+      ? `✅ النتيجة: ${attemptsUsed}/${maxAttempts}`
+      : `❌ النتيجة: ${attemptsUsed}/${maxAttempts}`,
+    `⏱️ الوقت: ${formatDurationMs(durationMs)}`,
+    "",
+    guessSquares,
+    "",
+    "👇 جربها بدون ما نحرق الكلمة",
+    "https://world-cup-platform.vercel.app/word-game",
+  ].join("\n");
+
   function handleShare() {
-    const siteUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/word-game`
-        : "";
+    if (disabled) return;
 
-    const resultText = won ? `${attempts}/${maxAttempts}` : "خسرت";
-
-    const message = [
-      "🎮 خمن كلمة اليوم",
-      "",
-      won ? `✅ النتيجة: ${resultText}` : "❌ انتهت المحاولات",
-      `⏱️ الوقت: ${formatDuration(durationSeconds)}`,
-      `🔥 السلسلة: ${streak} ${streak === 1 ? "يوم" : "أيام"}`,
-      "",
-      getShareSquares(guessesResults),
-      "",
-      "جربها بدون ما نحرق الكلمة 👇",
-      siteUrl,
-    ].join("\n");
-
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
   }
 
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={handleShare}
-      className="mx-auto flex h-12 w-full max-w-sm items-center justify-center rounded-xl border border-emerald-300/30 bg-emerald-500 px-4 font-black text-white shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400"
+      className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      مشاركة النتيجة في واتساب
+      <span className="text-lg leading-none"></span>
+      <span>مشاركة النتيجة واتساب</span>
     </button>
   );
 }

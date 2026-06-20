@@ -1,40 +1,79 @@
-import type { Timestamp } from "firebase/firestore";
+export type WordGameTileStatus = "correct" | "present" | "absent" | "empty";
 
-export type WordGameLetterStatus = "correct" | "present" | "absent";
+export type WordGameStatus = "playing" | "won" | "lost";
 
-export type WordGameLetterResult = {
+export type WordGameGuessLetter = {
   letter: string;
-  status: WordGameLetterStatus;
+  status: WordGameTileStatus;
 };
 
-export type WordGameDailyWord = {
-  date: string;
+export type WordGameGuess = {
   word: string;
-  cycle: number;
-  createdAt?: Timestamp;
+  letters: WordGameGuessLetter[];
 };
 
-export type WordGameMetaState = {
-  usedWords: string[];
-  lastWord: string | null;
-  cycle: number;
-  updatedAt?: Timestamp;
-};
-
-export type WordGameResult = {
+export type WordGameDailyGame = {
+  id: string;
   userId: string;
-  fullName: string;
-  date: string;
+  dateKey: string;
+  targetWord: string;
+  guesses: WordGameGuess[];
+  status: WordGameStatus;
+  attemptsUsed: number;
+  startedAt: number;
+  finishedAt: number | null;
+  durationMs: number | null;
   won: boolean;
-  attempts: number;
-  durationSeconds: number;
-  guesses: string[];
-  createdAt?: Timestamp;
-  completedAt?: Timestamp;
 };
 
-export type WordGameLeaderboardItem = WordGameResult & {
+export type WordGameDailyResult = {
+  id: string;
+  userId: string;
+  userName: string;
+  dateKey: string;
+  won: boolean;
+  attemptsUsed: number;
+  durationMs: number | null;
+  finishedAt: number;
+};
+
+export type WordGameUserStats = {
+  userId: string;
+  gamesPlayed: number;
+  gamesWon: number;
+  winRate: number;
+  currentWinStreak: number;
+  bestWinStreak: number;
+  lastPlayedDateKey: string | null;
+};
+
+export type WordGameLeaderboardItem = {
+  userId: string;
+  userName: string;
+  won: boolean;
+  attemptsUsed: number;
+  durationMs: number | null;
+  finishedAt: number;
   rank: number;
 };
 
-export type WordGameStatus = "playing" | "won" | "lost" | "already_completed";
+export type WordGameAdminDailyStats = {
+  dateKey: string;
+  totalPlayers: number;
+  totalWinners: number;
+  fastestPlayer: WordGameLeaderboardItem | null;
+  leaderboard: WordGameLeaderboardItem[];
+};
+
+export type WordGameWord = {
+  word: string;
+  category:
+    | "sports"
+    | "player"
+    | "club"
+    | "national"
+    | "person"
+    | "car"
+    | "month"
+    | "general";
+};

@@ -1,31 +1,33 @@
-"use client";
+import { WORD_GAME_WORD_LENGTH } from "@/lib/wordGameLogic";
 
 type GuessInputProps = {
   value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
 };
 
-export default function GuessInput({ value }: GuessInputProps) {
+export default function GuessInput({
+  value,
+  disabled,
+  onChange,
+  onSubmit,
+}: GuessInputProps) {
   return (
-    <div className="mx-auto mt-3 w-full max-w-[310px] sm:max-w-sm" dir="rtl">
-      <div className="rounded-2xl border border-white/10 bg-white/10 p-2.5 shadow-lg sm:p-3">
-        <label className="mb-1.5 block text-sm font-bold text-slate-200">
-          التخمين الحالي
-        </label>
-
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 sm:py-3">
-          <span className="text-lg font-black text-white sm:text-xl">
-            {value || "—"}
-          </span>
-
-          <span className="text-xs font-bold text-slate-400 sm:text-sm">
-            {[...value].length}/5
-          </span>
-        </div>
-
-        <p className="mt-1.5 text-[11px] font-semibold text-slate-400 sm:text-xs">
-          استخدم الكيبورد بالأسفل لاختيار الحروف
-        </p>
-      </div>
+    <div className="mx-auto w-full max-w-xs" dir="rtl">
+      <input
+        value={value}
+        disabled={disabled}
+        maxLength={WORD_GAME_WORD_LENGTH}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            onSubmit();
+          }
+        }}
+        placeholder="اكتب كلمة"
+        className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-xl font-black text-white outline-none placeholder:text-slate-500 focus:border-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+      />
     </div>
   );
 }
