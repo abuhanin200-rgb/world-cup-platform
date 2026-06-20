@@ -45,10 +45,6 @@ export default function AdminOnlinePresencePanel() {
 
   useEffect(() => {
     loadData();
-
-    const intervalId = window.setInterval(loadData, 15000);
-
-    return () => window.clearInterval(intervalId);
   }, []);
 
   return (
@@ -59,7 +55,7 @@ export default function AdminOnlinePresencePanel() {
             🟢 المتواجدون الآن
           </h2>
           <p className="mt-1 text-sm text-slate-300">
-            يعرض الأعضاء النشطين خلال آخر دقيقة والصفحة الحالية داخل الموقع.
+            يعرض الأعضاء النشطين خلال آخر دقيقة. التحديث يدوي فقط.
           </p>
         </div>
 
@@ -69,7 +65,7 @@ export default function AdminOnlinePresencePanel() {
           disabled={loading}
           className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          تحديث
+          {loading ? "جاري التحديث..." : "تحديث"}
         </button>
       </div>
 
@@ -82,41 +78,43 @@ export default function AdminOnlinePresencePanel() {
           لا يوجد أعضاء متواجدون الآن.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-white/10">
-          <div className="grid grid-cols-[44px_1fr_140px_1fr_110px] bg-white/10 text-[12px] font-black text-slate-300 md:text-sm">
-            <div className="px-2 py-3 text-center">#</div>
-            <div className="px-2 py-3 text-right">العضو</div>
-            <div className="px-2 py-3 text-center">الصفحة</div>
-            <div className="px-2 py-3 text-right">النشاط</div>
-            <div className="px-2 py-3 text-center">آخر ظهور</div>
-          </div>
-
-          {members.map((member, index) => (
-            <div
-              key={member.userId}
-              className="grid grid-cols-[44px_1fr_140px_1fr_110px] items-center border-t border-white/10 text-[12px] md:text-sm"
-            >
-              <div className="px-2 py-3 text-center font-bold text-emerald-300">
-                {index + 1}
-              </div>
-
-              <div className="truncate px-2 py-3 text-right font-semibold text-white">
-                {member.fullName}
-              </div>
-
-              <div className="px-2 py-3 text-center font-bold text-amber-300">
-                {getPageLabel(member.path)}
-              </div>
-
-              <div className="truncate px-2 py-3 text-right text-slate-200">
-                {member.activity}
-              </div>
-
-              <div className="px-2 py-3 text-center text-slate-300">
-                {formatLastSeen(member.lastSeen)}
-              </div>
+        <div className="overflow-x-auto rounded-2xl border border-white/10">
+          <div className="min-w-[720px]">
+            <div className="grid grid-cols-[44px_1fr_140px_1fr_110px] bg-white/10 text-[12px] font-black text-slate-300 md:text-sm">
+              <div className="px-2 py-3 text-center">#</div>
+              <div className="px-2 py-3 text-right">العضو</div>
+              <div className="px-2 py-3 text-center">الصفحة</div>
+              <div className="px-2 py-3 text-right">النشاط</div>
+              <div className="px-2 py-3 text-center">آخر ظهور</div>
             </div>
-          ))}
+
+            {members.map((member, index) => (
+              <div
+                key={member.userId}
+                className="grid grid-cols-[44px_1fr_140px_1fr_110px] items-center border-t border-white/10 text-[12px] md:text-sm"
+              >
+                <div className="px-2 py-3 text-center font-bold text-emerald-300">
+                  {index + 1}
+                </div>
+
+                <div className="truncate px-2 py-3 text-right font-semibold text-white">
+                  {member.fullName}
+                </div>
+
+                <div className="px-2 py-3 text-center font-bold text-amber-300">
+                  {getPageLabel(member.path)}
+                </div>
+
+                <div className="truncate px-2 py-3 text-right text-slate-200">
+                  {member.activity}
+                </div>
+
+                <div className="px-2 py-3 text-center text-slate-300">
+                  {formatLastSeen(member.lastSeen)}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>
