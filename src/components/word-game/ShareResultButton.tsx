@@ -13,7 +13,7 @@ type ShareResultButtonProps = {
 function getShareSquare(status: string) {
   if (status === "correct") return "🟩";
   if (status === "present") return "🟨";
-  return "⬛";
+  return "⬜";
 }
 
 export default function ShareResultButton({
@@ -25,7 +25,9 @@ export default function ShareResultButton({
   disabled = false,
 }: ShareResultButtonProps) {
   const guessSquares = guesses
-    .map((guess) => guess.letters.map((letter) => getShareSquare(letter.status)).join(""))
+    .map((guess) =>
+      guess.letters.map((letter) => getShareSquare(letter.status)).join("")
+    )
     .join("\n");
 
   const shareText = [
@@ -44,9 +46,11 @@ export default function ShareResultButton({
 
   function handleShare() {
     if (disabled) return;
-
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(shareText)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   return (
@@ -54,9 +58,9 @@ export default function ShareResultButton({
       type="button"
       disabled={disabled}
       onClick={handleShare}
-      className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+      className="mx-auto inline-flex w-full max-w-[300px] items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <span className="text-lg leading-none"></span>
+      <span className="text-base leading-none"></span>
       <span>مشاركة النتيجة واتساب</span>
     </button>
   );

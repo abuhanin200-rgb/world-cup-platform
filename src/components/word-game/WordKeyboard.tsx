@@ -16,15 +16,15 @@ const KEYBOARD_ROWS = [
 
 function getKeyClass(status: WordGameTileStatus | undefined) {
   if (status === "correct") {
-    return "border-emerald-400 bg-emerald-500 text-white hover:bg-emerald-400";
+    return "border-emerald-400 bg-emerald-500 text-white";
   }
 
   if (status === "present") {
-    return "border-amber-300 bg-amber-400 text-slate-950 hover:bg-amber-300";
+    return "border-amber-300 bg-amber-400 text-slate-950";
   }
 
   if (status === "absent") {
-    return "cursor-not-allowed border-slate-600 bg-slate-700/70 text-slate-500 opacity-50";
+    return "border-slate-700 bg-slate-800/60 text-slate-500 opacity-45";
   }
 
   return "border-white/10 bg-slate-950/70 text-white hover:border-emerald-400/40 hover:bg-white/10";
@@ -38,25 +38,23 @@ export default function WordKeyboard({
   onEnter,
 }: WordKeyboardProps) {
   return (
-    <div className="mx-auto grid w-full max-w-xl gap-2" dir="rtl">
+    <div className="mx-auto w-full max-w-[360px] space-y-2" dir="rtl">
       {KEYBOARD_ROWS.map((row, rowIndex) => (
-        <div key={rowIndex} className="flex justify-center gap-1">
+        <div key={rowIndex} className="grid grid-cols-11 gap-1">
           {row.map((letter) => {
             const status = letterStatuses[letter];
             const isAbsent = status === "absent";
-            const keyDisabled = disabled || isAbsent;
 
             return (
               <button
                 key={letter}
                 type="button"
-                disabled={keyDisabled}
+                disabled={disabled || isAbsent}
                 onClick={() => {
-                  if (isAbsent) return;
-                  onLetterClick(letter);
+                  if (!isAbsent) onLetterClick(letter);
                 }}
                 className={[
-                  "min-h-11 flex-1 rounded-xl border px-2 text-base font-black shadow-lg transition disabled:cursor-not-allowed",
+                  "flex h-8 items-center justify-center rounded-lg border text-sm font-black shadow-sm transition disabled:cursor-not-allowed md:h-9 md:text-base",
                   getKeyClass(status),
                 ].join(" ")}
               >
@@ -67,12 +65,12 @@ export default function WordKeyboard({
         </div>
       ))}
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 pt-1">
         <button
           type="button"
           disabled={disabled}
           onClick={onEnter}
-          className="rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-11 rounded-2xl bg-emerald-500 px-4 text-sm font-black text-white shadow-lg transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           إدخال
         </button>
@@ -81,7 +79,7 @@ export default function WordKeyboard({
           type="button"
           disabled={disabled}
           onClick={onBackspace}
-          className="rounded-2xl border border-red-300/20 bg-white/10 px-4 py-3 text-sm font-black text-white shadow-lg transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-11 rounded-2xl border border-red-300/20 bg-white/10 px-4 text-sm font-black text-white shadow-lg transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
         >
           حذف
         </button>
