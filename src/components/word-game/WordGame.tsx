@@ -188,7 +188,9 @@ export default function WordGame() {
       setMessage("مبروك! جبت الكلمة صح 🎉");
       window.setTimeout(() => setShowCelebration(false), 2500);
     } else if (updatedGame.status === "lost") {
-      setMessage("انتهت محاولاتك لهذا اليوم.");
+      setMessage(
+        `انتهت محاولاتك لهذا اليوم. كلمتك اليوم: ${updatedGame.targetWord}`
+      );
     } else {
       setMessage("");
     }
