@@ -8,7 +8,6 @@ export function normalizeWordGameText(value: string): string {
   return value
     .trim()
     .replace(/[إأآ]/g, "ا")
-    .replace(/ى/g, "ي")
     .replace(/[^\u0621-\u064A]/g, "");
 }
 

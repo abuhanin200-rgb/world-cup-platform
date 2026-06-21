@@ -30,9 +30,9 @@ export default function WordKeyboard({
   onEnter,
 }: WordKeyboardProps) {
   return (
-    <div className="mx-auto w-full max-w-[360px] space-y-2" dir="rtl">
+    <div className="mx-auto w-full max-w-[390px] space-y-2.5" dir="rtl">
       {KEYBOARD_ROWS.map((row, rowIndex) => (
-        <div key={rowIndex} className="grid grid-cols-11 gap-1">
+        <div key={rowIndex} className="grid grid-cols-11 gap-1.5">
           {row.map((letter) => {
             const status = letterStatuses[letter];
             const isAbsent = status === "absent";
@@ -46,7 +46,7 @@ export default function WordKeyboard({
                   if (!isAbsent) onLetterClick(letter);
                 }}
                 className={[
-                  "flex h-8 items-center justify-center rounded-lg border text-sm font-black shadow-sm transition active:scale-95 active:brightness-90 disabled:cursor-not-allowed md:h-9 md:text-base",
+                  "flex h-9 items-center justify-center rounded-xl border text-base font-black shadow-sm transition active:scale-95 active:brightness-90 disabled:cursor-not-allowed md:h-10 md:text-lg",
                   getKeyClass(status),
                 ].join(" ")}
               >
@@ -57,12 +57,12 @@ export default function WordKeyboard({
         </div>
       ))}
 
-      <div className="grid grid-cols-2 gap-2 pt-1">
+      <div className="grid grid-cols-2 gap-2.5 pt-1">
         <button
           type="button"
           disabled={disabled}
           onClick={onEnter}
-          className="h-11 rounded-2xl bg-emerald-500 px-4 text-sm font-black text-white shadow-lg transition active:scale-95 active:brightness-90 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-12 rounded-2xl bg-emerald-500 px-4 text-base font-black text-white shadow-lg transition active:scale-95 active:brightness-90 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
         >
           إدخال
         </button>
@@ -71,7 +71,7 @@ export default function WordKeyboard({
           type="button"
           disabled={disabled}
           onClick={onBackspace}
-          className="h-11 rounded-2xl border border-red-300/20 bg-white/10 px-4 text-sm font-black text-white shadow-lg transition active:scale-95 active:brightness-90 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-12 rounded-2xl border border-red-300/20 bg-white/10 px-4 text-base font-black text-white shadow-lg transition active:scale-95 active:brightness-90 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
         >
           حذف
         </button>
