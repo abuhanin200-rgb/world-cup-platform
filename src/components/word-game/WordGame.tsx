@@ -32,12 +32,23 @@ import {
   WORD_GAME_WORD_LENGTH,
 } from "@/lib/wordGameLogic";
 
+import {
+  getWordGameCategoryLabel,
+  getWordGameWordCategory,
+} from "@/lib/wordGameWords";
+
 const STATUS_PRIORITY: Record<WordGameTileStatus, number> = {
   empty: 0,
   absent: 1,
   present: 2,
   correct: 3,
 };
+
+function getCategoryIcon(label: string) {
+  if (label === "رياضية") return "⚽";
+  if (label === "لهجة سعودية") return "🇸🇦";
+  return "📚";
+}
 
 export default function WordGame() {
   const { user, loading, isLoggedIn } = useAuth();
@@ -56,6 +67,12 @@ export default function WordGame() {
 
   const gameFinished = game?.status === "won" || game?.status === "lost";
   const inputDisabled = saving || !game || gameFinished;
+
+  const categoryLabel = game
+    ? getWordGameCategoryLabel(getWordGameWordCategory(game.targetWord))
+    : "عامة";
+
+  const categoryIcon = getCategoryIcon(categoryLabel);
 
   const letterStatuses = useMemo(() => {
     const statuses: Record<string, WordGameTileStatus> = {};
@@ -225,6 +242,13 @@ export default function WordGame() {
       )}
 
       <div className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl">
+        <div className="mb-4 flex justify-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-4 py-2 text-sm font-black text-amber-100">
+            <span>{categoryIcon}</span>
+            <span>كلمة اليوم: {categoryLabel}</span>
+          </div>
+        </div>
+
         <GameBoard guesses={game?.guesses ?? []} currentGuess={currentGuess} />
 
         <div className="mt-5 space-y-4">

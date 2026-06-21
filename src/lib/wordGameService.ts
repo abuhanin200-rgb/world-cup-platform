@@ -62,15 +62,30 @@ export async function getOrCreateTodayWordGame(params: {
     limit(1)
   );
 
-  const previousGamesSnapshot = await getDocs(previousDateResultsQuery);
+  const todayGamesQuery = query(
+    collection(db, gamesCollection),
+    where("dateKey", "==", dateKey)
+  );
+
+  const [previousGamesSnapshot, todayGamesSnapshot] = await Promise.all([
+    getDocs(previousDateResultsQuery),
+    getDocs(todayGamesQuery),
+  ]);
+
   const previousGame = previousGamesSnapshot.docs[0]?.data() as
     | WordGameDailyGame
     | undefined;
+
+  const usedWordsToday = todayGamesSnapshot.docs
+    .map((docItem) => docItem.data() as WordGameDailyGame)
+    .filter((game) => game.userId !== params.userId)
+    .map((game) => game.targetWord);
 
   const targetWord = getWordForUserByDate({
     userId: params.userId,
     dateKey,
     previousWord: previousGame?.targetWord ?? null,
+    usedWordsToday,
   });
 
   const newGame: WordGameDailyGame = {

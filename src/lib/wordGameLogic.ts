@@ -41,8 +41,9 @@ export function getWordForUserByDate(params: {
   userId: string;
   dateKey: string;
   previousWord?: string | null;
+  usedWordsToday?: string[];
 }): string {
-  const { userId, dateKey, previousWord } = params;
+  const { userId, dateKey, previousWord, usedWordsToday = [] } = params;
 
   const cleanWords = WORD_GAME_WORDS.filter(
     (word) => normalizeWordGameText(word).length === WORD_GAME_WORD_LENGTH
@@ -52,14 +53,33 @@ export function getWordForUserByDate(params: {
     throw new Error("لا توجد كلمات صالحة للعبة خمن كلمة اليوم.");
   }
 
-  const baseIndex = hashString(`${userId}-${dateKey}`) % cleanWords.length;
-  let selectedWord = cleanWords[baseIndex];
+  const usedWordsSet = new Set(usedWordsToday.map(normalizeWordGameText));
+  const previousNormalizedWord = previousWord
+    ? normalizeWordGameText(previousWord)
+    : null;
 
-  if (previousWord && cleanWords.length > 1 && selectedWord === previousWord) {
-    selectedWord = cleanWords[(baseIndex + 1) % cleanWords.length];
+  let availableWords = cleanWords.filter((word) => {
+    const normalizedWord = normalizeWordGameText(word);
+
+    return (
+      !usedWordsSet.has(normalizedWord) &&
+      normalizedWord !== previousNormalizedWord
+    );
+  });
+
+  if (availableWords.length === 0) {
+    availableWords = cleanWords.filter(
+      (word) => normalizeWordGameText(word) !== previousNormalizedWord
+    );
   }
 
-  return selectedWord;
+  if (availableWords.length === 0) {
+    availableWords = cleanWords;
+  }
+
+  const baseIndex = hashString(`${userId}-${dateKey}`) % availableWords.length;
+
+  return availableWords[baseIndex];
 }
 
 export function evaluateWordGameGuess(
