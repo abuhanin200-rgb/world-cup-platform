@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AdminPrediction,
+  UserStatsAuditItem,
+  auditUserStats,
   deleteAdminPredictionAndFixUserStats,
   getAdminPredictions,
   getPredictionMatchOptions,
@@ -81,8 +83,13 @@ function getPredictionResultLabel(prediction: AdminPredictionWithType) {
   const golden = isGoldenPrediction(prediction);
 
   if (!prediction.isCalculated) return "لم يُحتسب";
-  if (isExactPrediction(prediction)) return golden ? "ذهبي بالملي +6" : "بالملي +3";
-  if (isWinnerPrediction(prediction)) return golden ? "فائز ذهبي +2" : "الفائز +1";
+  if (isExactPrediction(prediction)) {
+    return golden ? "ذهبي بالملي +6" : "بالملي +3";
+  }
+  if (isWinnerPrediction(prediction)) {
+    return golden ? "فائز ذهبي +2" : "الفائز +1";
+  }
+
   return "خطأ +0";
 }
 
@@ -123,7 +130,9 @@ function matchesStatusFilter(
   if (status === "wrong") return isWrongPrediction(prediction);
   if (status === "golden") return golden;
   if (status === "goldenExact") return golden && isExactPrediction(prediction);
-  if (status === "goldenWinner") return golden && isWinnerPrediction(prediction);
+  if (status === "goldenWinner") {
+    return golden && isWinnerPrediction(prediction);
+  }
 
   return true;
 }
@@ -132,6 +141,9 @@ export default function AdminPredictionsPanel() {
   const [predictions, setPredictions] = useState<AdminPredictionWithType[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState("");
+  const [auditing, setAuditing] = useState(false);
+  const [auditItems, setAuditItems] = useState<UserStatsAuditItem[]>([]);
+
   const [search, setSearch] = useState("");
   const [matchId, setMatchId] = useState("all");
   const [status, setStatus] = useState<PredictionStatus>("all");
@@ -152,6 +164,25 @@ export default function AdminPredictionsPanel() {
     }
   }
 
+  async function handleAuditStats() {
+    try {
+      setAuditing(true);
+      const items = await auditUserStats();
+      setAuditItems(items);
+
+      if (items.length === 0) {
+        alert("فحص النقاط مكتمل: لا توجد فروقات ✅");
+      } else {
+        alert(`فحص النقاط مكتمل: يوجد ${items.length} عضو عنده فرق`);
+      }
+    } catch (error) {
+      console.error("Audit stats error:", error);
+      alert("تعذر فحص النقاط");
+    } finally {
+      setAuditing(false);
+    }
+  }
+
   async function handleDeletePrediction(prediction: AdminPredictionWithType) {
     const confirmMessage = prediction.isCalculated
       ? `تنبيه مهم:\nسيتم حذف توقع ${prediction.userName} وتصحيح نقاطه تلقائيًا.\n\nالمباراة: ${prediction.homeTeamName} × ${prediction.awayTeamName}\nالتوقع: ${prediction.homeScore} - ${prediction.awayScore}\nالنقاط المحسوبة: ${prediction.points}\n\nهل أنت متأكد؟`
@@ -164,6 +195,7 @@ export default function AdminPredictionsPanel() {
       setDeletingId(prediction.id);
       await deleteAdminPredictionAndFixUserStats(prediction.id);
       await loadPredictions();
+      setAuditItems([]);
       alert("تم حذف التوقع وتصحيح نقاط العضو");
     } catch (error) {
       console.error("Delete prediction error:", error);
@@ -235,12 +267,29 @@ export default function AdminPredictionsPanel() {
     page * pageSize
   );
 
-  const totalPending = predictions.filter((prediction) => !prediction.isCalculated).length;
-  const totalExact = predictions.filter((prediction) => isExactPrediction(prediction)).length;
-  const totalWinner = predictions.filter((prediction) => isWinnerPrediction(prediction)).length;
-  const totalWrong = predictions.filter((prediction) => isWrongPrediction(prediction)).length;
-  const totalGolden = predictions.filter((prediction) => isGoldenPrediction(prediction)).length;
-  const totalDuplicates = predictions.filter((prediction) => isDuplicatePrediction(prediction)).length;
+  const totalPending = predictions.filter(
+    (prediction) => !prediction.isCalculated
+  ).length;
+
+  const totalExact = predictions.filter((prediction) =>
+    isExactPrediction(prediction)
+  ).length;
+
+  const totalWinner = predictions.filter((prediction) =>
+    isWinnerPrediction(prediction)
+  ).length;
+
+  const totalWrong = predictions.filter((prediction) =>
+    isWrongPrediction(prediction)
+  ).length;
+
+  const totalGolden = predictions.filter((prediction) =>
+    isGoldenPrediction(prediction)
+  ).length;
+
+  const totalDuplicates = predictions.filter((prediction) =>
+    isDuplicatePrediction(prediction)
+  ).length;
 
   const totalGoldenExact = predictions.filter((prediction) => {
     return isGoldenPrediction(prediction) && isExactPrediction(prediction);
@@ -260,13 +309,24 @@ export default function AdminPredictionsPanel() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={loadPredictions}
-          className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-black text-slate-950 hover:bg-amber-300"
-        >
-          تحديث البيانات
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleAuditStats}
+            disabled={auditing}
+            className="rounded-xl bg-sky-400 px-4 py-2 text-sm font-black text-slate-950 hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {auditing ? "جاري الفحص..." : "فحص النقاط"}
+          </button>
+
+          <button
+            type="button"
+            onClick={loadPredictions}
+            className="rounded-xl bg-amber-400 px-4 py-2 text-sm font-black text-slate-950 hover:bg-amber-300"
+          >
+            تحديث البيانات
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-9">
@@ -376,6 +436,102 @@ export default function AdminPredictionsPanel() {
         </select>
       </div>
 
+      {auditItems.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-sky-400/30 bg-sky-500/10 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-lg font-black text-sky-100">
+              تقرير فحص النقاط
+            </h3>
+
+            <button
+              type="button"
+              onClick={() => setAuditItems([])}
+              className="rounded-lg border border-white/10 px-3 py-1 text-[11px] font-bold text-slate-200 hover:bg-white/10"
+            >
+              إخفاء التقرير
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-[12px] text-slate-300">
+                  <th className="px-3 py-2 text-right">العضو</th>
+                  <th className="px-3 py-2 text-center">النقاط الحالية</th>
+                  <th className="px-3 py-2 text-center">النقاط الصحيحة</th>
+                  <th className="px-3 py-2 text-center">فرق النقاط</th>
+                  <th className="px-3 py-2 text-center">التوقعات الحالية</th>
+                  <th className="px-3 py-2 text-center">التوقعات الصحيحة</th>
+                  <th className="px-3 py-2 text-center">الصح الحالي</th>
+                  <th className="px-3 py-2 text-center">الصح الصحيح</th>
+                  <th className="px-3 py-2 text-center">الخطأ الحالي</th>
+                  <th className="px-3 py-2 text-center">الخطأ الصحيح</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {auditItems.map((item) => (
+                  <tr key={item.userId} className="border-b border-white/10">
+                    <td className="px-3 py-2 font-black text-amber-200">
+                      {item.userName}
+                    </td>
+
+                    <td className="px-3 py-2 text-center">
+                      {item.savedPoints}
+                    </td>
+
+                    <td className="px-3 py-2 text-center">
+                      {item.realPoints}
+                    </td>
+
+                    <td
+                      className={`px-3 py-2 text-center font-black ${
+                        item.pointsDiff > 0
+                          ? "text-red-300"
+                          : item.pointsDiff < 0
+                          ? "text-emerald-300"
+                          : "text-slate-300"
+                      }`}
+                    >
+                      {item.pointsDiff > 0 ? "+" : ""}
+                      {item.pointsDiff}
+                    </td>
+
+                    <td className="px-3 py-2 text-center">
+                      {item.savedTotal}
+                    </td>
+
+                    <td className="px-3 py-2 text-center">
+                      {item.realTotal}
+                    </td>
+
+                    <td className="px-3 py-2 text-center">
+                      {item.savedCorrect}
+                    </td>
+
+                    <td className="px-3 py-2 text-center">
+                      {item.realCorrect}
+                    </td>
+
+                    <td className="px-3 py-2 text-center">
+                      {item.savedWrong}
+                    </td>
+
+                    <td className="px-3 py-2 text-center">
+                      {item.realWrong}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-3 text-xs text-slate-300">
+            هذا التقرير للعرض فقط ولا يعدل أي بيانات.
+          </p>
+        </div>
+      )}
+
       {loading ? (
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300">
           جاري تحميل توقعات الأعضاء...
@@ -395,11 +551,17 @@ export default function AdminPredictionsPanel() {
                   <th className="px-3 py-3 text-right font-black">المباراة</th>
                   <th className="px-3 py-3 text-center font-black">التوقع</th>
                   <th className="px-3 py-3 text-center font-black">النوع</th>
-                  <th className="px-3 py-3 text-center font-black">النتيجة الفعلية</th>
+                  <th className="px-3 py-3 text-center font-black">
+                    النتيجة الفعلية
+                  </th>
                   <th className="px-3 py-3 text-center font-black">الحالة</th>
                   <th className="px-3 py-3 text-center font-black">النقاط</th>
-                  <th className="px-3 py-3 text-center font-black">وقت التوقع</th>
-                  <th className="px-3 py-3 text-center font-black">وقت الاحتساب</th>
+                  <th className="px-3 py-3 text-center font-black">
+                    وقت التوقع
+                  </th>
+                  <th className="px-3 py-3 text-center font-black">
+                    وقت الاحتساب
+                  </th>
                   <th className="px-3 py-3 text-center font-black">إجراء</th>
                 </tr>
               </thead>
@@ -422,7 +584,13 @@ export default function AdminPredictionsPanel() {
                       </td>
 
                       <td className="px-3 py-3">
-                        <div className={golden ? "font-black text-amber-200" : "font-black text-amber-300"}>
+                        <div
+                          className={
+                            golden
+                              ? "font-black text-amber-200"
+                              : "font-black text-amber-300"
+                          }
+                        >
                           {prediction.userName}
                         </div>
 
@@ -436,11 +604,15 @@ export default function AdminPredictionsPanel() {
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold">
-                            {prediction.homeTeamEmoji} {prediction.homeTeamName}
+                            {prediction.homeTeamEmoji}{" "}
+                            {prediction.homeTeamName}
                           </span>
+
                           <span className="text-slate-500">×</span>
+
                           <span className="font-bold">
-                            {prediction.awayTeamName} {prediction.awayTeamEmoji}
+                            {prediction.awayTeamName}{" "}
+                            {prediction.awayTeamEmoji}
                           </span>
                         </div>
                       </td>
@@ -448,7 +620,9 @@ export default function AdminPredictionsPanel() {
                       <td className="px-3 py-3 text-center">
                         <span
                           className={`inline-flex rounded-lg px-3 py-1 font-black ${
-                            golden ? "bg-amber-400 text-slate-950" : "bg-white/10 text-white"
+                            golden
+                              ? "bg-amber-400 text-slate-950"
+                              : "bg-white/10 text-white"
                           }`}
                         >
                           {prediction.homeScore} - {prediction.awayScore}
@@ -484,7 +658,9 @@ export default function AdminPredictionsPanel() {
                       <td className="px-3 py-3 text-center">
                         <span
                           className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 font-black ${
-                            golden ? "bg-amber-400 text-slate-950" : "bg-white/10 text-white"
+                            golden
+                              ? "bg-amber-400 text-slate-950"
+                              : "bg-white/10 text-white"
                           }`}
                         >
                           {prediction.points}
@@ -529,7 +705,8 @@ export default function AdminPredictionsPanel() {
         </button>
 
         <div className="text-center text-sm text-slate-300">
-          صفحة {page} من {totalPages} — عدد النتائج {filteredPredictions.length}
+          صفحة {page} من {totalPages} — عدد النتائج{" "}
+          {filteredPredictions.length}
         </div>
 
         <button

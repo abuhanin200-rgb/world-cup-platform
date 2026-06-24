@@ -342,3 +342,99 @@ export async function deleteAdminPredictionAndFixUserStats(
 
   return stats;
 }
+export type UserStatsAuditItem = {
+  userId: string;
+  userName: string;
+
+  savedPoints: number;
+  realPoints: number;
+  pointsDiff: number;
+
+  savedTotal: number;
+  realTotal: number;
+  totalDiff: number;
+
+  savedCorrect: number;
+  realCorrect: number;
+  correctDiff: number;
+
+  savedWrong: number;
+  realWrong: number;
+  wrongDiff: number;
+};
+
+export async function auditUserStats(): Promise<UserStatsAuditItem[]> {
+  const [usersSnapshot, predictionsSnapshot] = await Promise.all([
+    getDocs(collection(db, "users")),
+    getDocs(collection(db, "predictions")),
+  ]);
+
+  const calculatedPredictionsByUser = new Map<string, RebuildPrediction[]>();
+
+  predictionsSnapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .forEach((docSnap) => {
+      const data = docSnap.data();
+
+      if (!Boolean(data.isCalculated)) return;
+
+      const userId = toText(data.userId);
+      if (!userId) return;
+
+      const list = calculatedPredictionsByUser.get(userId) || [];
+
+      list.push({
+        id: docSnap.id,
+        points: toNumber(data.points),
+        isCalculated: Boolean(data.isCalculated),
+        createdAt: toText(data.createdAt),
+      });
+
+      calculatedPredictionsByUser.set(userId, list);
+    });
+
+  return usersSnapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => {
+      const data = docSnap.data();
+      const userId = docSnap.id;
+
+      const realStats = buildSingleUserStats(
+        calculatedPredictionsByUser.get(userId) || []
+      );
+
+      const savedPoints = toNumber(data.points);
+      const savedTotal = toNumber(data.total);
+      const savedCorrect = toNumber(data.correct);
+      const savedWrong = toNumber(data.wrong);
+
+      return {
+        userId,
+        userName: toText(data.fullName) || "عضو بدون اسم",
+
+        savedPoints,
+        realPoints: realStats.points,
+        pointsDiff: savedPoints - realStats.points,
+
+        savedTotal,
+        realTotal: realStats.total,
+        totalDiff: savedTotal - realStats.total,
+
+        savedCorrect,
+        realCorrect: realStats.correct,
+        correctDiff: savedCorrect - realStats.correct,
+
+        savedWrong,
+        realWrong: realStats.wrong,
+        wrongDiff: savedWrong - realStats.wrong,
+      };
+    })
+    .filter((item) => {
+      return (
+        item.pointsDiff !== 0 ||
+        item.totalDiff !== 0 ||
+        item.correctDiff !== 0 ||
+        item.wrongDiff !== 0
+      );
+    });
+}
