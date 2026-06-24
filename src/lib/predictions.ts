@@ -95,6 +95,10 @@ function normalizePredictionType(value: unknown): PredictionType {
   return value === "golden" ? "golden" : "normal";
 }
 
+function getPredictionDocId(userId: string, matchId: string) {
+  return `${userId}_${matchId}`;
+}
+
 async function getPredictionTypeForMatch(
   matchId: string
 ): Promise<PredictionType> {
@@ -192,6 +196,18 @@ export async function getUserPredictionForMatch(
 ): Promise<Prediction | null> {
   if (!userId || !matchId) return null;
 
+  const fixedPredictionRef = doc(
+    db,
+    "predictions",
+    getPredictionDocId(userId, matchId)
+  );
+
+  const fixedPredictionSnap = await getDoc(fixedPredictionRef);
+
+  if (fixedPredictionSnap.exists()) {
+    return mapPrediction(fixedPredictionSnap.id, fixedPredictionSnap.data());
+  }
+
   const predictionsRef = collection(db, "predictions");
 
   const q = query(
@@ -221,6 +237,15 @@ export async function submitPrediction(input: SubmitPredictionInput) {
 
   if (!validateScore(input.homeScore) || !validateScore(input.awayScore)) {
     throw new Error("أدخل نتيجة صحيحة من 0 إلى 30");
+  }
+
+  const predictionDocId = getPredictionDocId(input.userId, input.matchId);
+  const predictionRef = doc(db, "predictions", predictionDocId);
+
+  const existingFixedPrediction = await getDoc(predictionRef);
+
+  if (existingFixedPrediction.exists()) {
+    throw new Error("تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله");
   }
 
   const existingPrediction = await getUserPredictionForMatch(
@@ -265,12 +290,6 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     updatedAt: now,
   };
 
-  /**
-   * نحفظ التوقع ونحدث وقت آخر توقع للعضو في عملية واحدة.
-   * هذا لا يغير النقاط ولا الحسبة.
-   * فقط يساعد لوحة الصدارة على ترتيب المتساوين حسب الأسرع.
-   */
-  const predictionRef = doc(collection(db, "predictions"));
   const userRef = doc(db, "users", input.userId);
 
   const batch = writeBatch(db);

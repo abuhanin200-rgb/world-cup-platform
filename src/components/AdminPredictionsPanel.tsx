@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AdminPrediction,
+  deleteAdminPredictionAndFixUserStats,
   getAdminPredictions,
   getPredictionMatchOptions,
 } from "@/lib/adminPredictions";
@@ -79,18 +80,9 @@ function isWrongPrediction(prediction: AdminPredictionWithType) {
 function getPredictionResultLabel(prediction: AdminPredictionWithType) {
   const golden = isGoldenPrediction(prediction);
 
-  if (!prediction.isCalculated) {
-    return "لم يُحتسب";
-  }
-
-  if (isExactPrediction(prediction)) {
-    return golden ? "ذهبي بالملي +6" : "بالملي +3";
-  }
-
-  if (isWinnerPrediction(prediction)) {
-    return golden ? "فائز ذهبي +2" : "الفائز +1";
-  }
-
+  if (!prediction.isCalculated) return "لم يُحتسب";
+  if (isExactPrediction(prediction)) return golden ? "ذهبي بالملي +6" : "بالملي +3";
+  if (isWinnerPrediction(prediction)) return golden ? "فائز ذهبي +2" : "الفائز +1";
   return "خطأ +0";
 }
 
@@ -131,9 +123,7 @@ function matchesStatusFilter(
   if (status === "wrong") return isWrongPrediction(prediction);
   if (status === "golden") return golden;
   if (status === "goldenExact") return golden && isExactPrediction(prediction);
-  if (status === "goldenWinner") {
-    return golden && isWinnerPrediction(prediction);
-  }
+  if (status === "goldenWinner") return golden && isWinnerPrediction(prediction);
 
   return true;
 }
@@ -141,6 +131,7 @@ function matchesStatusFilter(
 export default function AdminPredictionsPanel() {
   const [predictions, setPredictions] = useState<AdminPredictionWithType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState("");
   const [search, setSearch] = useState("");
   const [matchId, setMatchId] = useState("all");
   const [status, setStatus] = useState<PredictionStatus>("all");
@@ -161,6 +152,27 @@ export default function AdminPredictionsPanel() {
     }
   }
 
+  async function handleDeletePrediction(prediction: AdminPredictionWithType) {
+    const confirmMessage = prediction.isCalculated
+      ? `تنبيه مهم:\nسيتم حذف توقع ${prediction.userName} وتصحيح نقاطه تلقائيًا.\n\nالمباراة: ${prediction.homeTeamName} × ${prediction.awayTeamName}\nالتوقع: ${prediction.homeScore} - ${prediction.awayScore}\nالنقاط المحسوبة: ${prediction.points}\n\nهل أنت متأكد؟`
+      : `سيتم حذف توقع ${prediction.userName}.\n\nهل أنت متأكد؟`;
+
+    const ok = window.confirm(confirmMessage);
+    if (!ok) return;
+
+    try {
+      setDeletingId(prediction.id);
+      await deleteAdminPredictionAndFixUserStats(prediction.id);
+      await loadPredictions();
+      alert("تم حذف التوقع وتصحيح نقاط العضو");
+    } catch (error) {
+      console.error("Delete prediction error:", error);
+      alert(error instanceof Error ? error.message : "تعذر حذف التوقع");
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   useEffect(() => {
     loadPredictions();
   }, []);
@@ -168,6 +180,24 @@ export default function AdminPredictionsPanel() {
   const matchOptions = useMemo(() => {
     return getPredictionMatchOptions(predictions);
   }, [predictions]);
+
+  const duplicateKeys = useMemo(() => {
+    const map = new Map<string, number>();
+
+    predictions.forEach((prediction) => {
+      if (!prediction.userId || !prediction.matchId) return;
+      const key = `${prediction.userId}_${prediction.matchId}`;
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+
+    return map;
+  }, [predictions]);
+
+  function isDuplicatePrediction(prediction: AdminPredictionWithType) {
+    if (!prediction.userId || !prediction.matchId) return false;
+    const key = `${prediction.userId}_${prediction.matchId}`;
+    return (duplicateKeys.get(key) || 0) > 1;
+  }
 
   const filteredPredictions = useMemo(() => {
     const searchValue = search.trim().toLowerCase();
@@ -177,19 +207,23 @@ export default function AdminPredictionsPanel() {
         ? "ذهبي توقع ذهبي"
         : "";
 
+      const duplicateText = isDuplicatePrediction(prediction) ? "مكرر" : "";
+
       const matchesSearch =
         !searchValue ||
         prediction.userName.toLowerCase().includes(searchValue) ||
         prediction.homeTeamName.toLowerCase().includes(searchValue) ||
         prediction.awayTeamName.toLowerCase().includes(searchValue) ||
-        predictionTypeText.includes(searchValue);
+        prediction.id.toLowerCase().includes(searchValue) ||
+        predictionTypeText.includes(searchValue) ||
+        duplicateText.includes(searchValue);
 
       const matchesMatch = matchId === "all" || prediction.matchId === matchId;
       const matchesStatus = matchesStatusFilter(prediction, status);
 
       return matchesSearch && matchesMatch && matchesStatus;
     });
-  }, [predictions, search, matchId, status]);
+  }, [predictions, search, matchId, status, duplicateKeys]);
 
   const totalPages = Math.max(
     1,
@@ -201,25 +235,12 @@ export default function AdminPredictionsPanel() {
     page * pageSize
   );
 
-  const totalPending = predictions.filter(
-    (prediction) => !prediction.isCalculated
-  ).length;
-
-  const totalExact = predictions.filter((prediction) =>
-    isExactPrediction(prediction)
-  ).length;
-
-  const totalWinner = predictions.filter((prediction) =>
-    isWinnerPrediction(prediction)
-  ).length;
-
-  const totalWrong = predictions.filter((prediction) =>
-    isWrongPrediction(prediction)
-  ).length;
-
-  const totalGolden = predictions.filter((prediction) =>
-    isGoldenPrediction(prediction)
-  ).length;
+  const totalPending = predictions.filter((prediction) => !prediction.isCalculated).length;
+  const totalExact = predictions.filter((prediction) => isExactPrediction(prediction)).length;
+  const totalWinner = predictions.filter((prediction) => isWinnerPrediction(prediction)).length;
+  const totalWrong = predictions.filter((prediction) => isWrongPrediction(prediction)).length;
+  const totalGolden = predictions.filter((prediction) => isGoldenPrediction(prediction)).length;
+  const totalDuplicates = predictions.filter((prediction) => isDuplicatePrediction(prediction)).length;
 
   const totalGoldenExact = predictions.filter((prediction) => {
     return isGoldenPrediction(prediction) && isExactPrediction(prediction);
@@ -248,10 +269,17 @@ export default function AdminPredictionsPanel() {
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-9">
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-center">
           <div className="text-[11px] text-slate-400">الإجمالي</div>
           <div className="mt-1 text-2xl font-black">{predictions.length}</div>
+        </div>
+
+        <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-3 text-center">
+          <div className="text-[11px] text-red-100">مكرر</div>
+          <div className="mt-1 text-2xl font-black text-red-200">
+            {totalDuplicates}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-400/20 bg-slate-400/10 p-3 text-center">
@@ -309,7 +337,7 @@ export default function AdminPredictionsPanel() {
             setSearch(event.target.value);
             setPage(1);
           }}
-          placeholder="ابحث باسم العضو أو المنتخب..."
+          placeholder="ابحث باسم العضو أو المنتخب أو اكتب مكرر..."
           className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
         />
 
@@ -359,7 +387,7 @@ export default function AdminPredictionsPanel() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-collapse text-sm">
+            <table className="w-full min-w-[1120px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-white/10 bg-slate-950/80 text-[12px] text-slate-300">
                   <th className="px-3 py-3 text-right font-black">#</th>
@@ -367,59 +395,52 @@ export default function AdminPredictionsPanel() {
                   <th className="px-3 py-3 text-right font-black">المباراة</th>
                   <th className="px-3 py-3 text-center font-black">التوقع</th>
                   <th className="px-3 py-3 text-center font-black">النوع</th>
-                  <th className="px-3 py-3 text-center font-black">
-                    النتيجة الفعلية
-                  </th>
+                  <th className="px-3 py-3 text-center font-black">النتيجة الفعلية</th>
                   <th className="px-3 py-3 text-center font-black">الحالة</th>
                   <th className="px-3 py-3 text-center font-black">النقاط</th>
-                  <th className="px-3 py-3 text-center font-black">
-                    وقت التوقع
-                  </th>
-                  <th className="px-3 py-3 text-center font-black">
-                    وقت الاحتساب
-                  </th>
+                  <th className="px-3 py-3 text-center font-black">وقت التوقع</th>
+                  <th className="px-3 py-3 text-center font-black">وقت الاحتساب</th>
+                  <th className="px-3 py-3 text-center font-black">إجراء</th>
                 </tr>
               </thead>
 
               <tbody>
                 {visiblePredictions.map((prediction, index) => {
                   const golden = isGoldenPrediction(prediction);
+                  const duplicate = isDuplicatePrediction(prediction);
+                  const deleting = deletingId === prediction.id;
 
                   return (
                     <tr
                       key={prediction.id}
                       className={`border-b border-white/10 transition hover:bg-white/5 ${
                         golden ? "bg-amber-400/5" : ""
-                      }`}
+                      } ${duplicate ? "bg-red-500/5" : ""}`}
                     >
                       <td className="px-3 py-3 text-slate-400">
                         {(page - 1) * pageSize + index + 1}
                       </td>
 
                       <td className="px-3 py-3">
-                        <div
-                          className={
-                            golden
-                              ? "font-black text-amber-200"
-                              : "font-black text-amber-300"
-                          }
-                        >
+                        <div className={golden ? "font-black text-amber-200" : "font-black text-amber-300"}>
                           {prediction.userName}
                         </div>
+
+                        {duplicate && (
+                          <div className="mt-1 inline-flex rounded-full border border-red-400/30 bg-red-500/10 px-2 py-1 text-[10px] font-black text-red-100">
+                            مكرر
+                          </div>
+                        )}
                       </td>
 
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold">
-                            {prediction.homeTeamEmoji}{" "}
-                            {prediction.homeTeamName}
+                            {prediction.homeTeamEmoji} {prediction.homeTeamName}
                           </span>
-
                           <span className="text-slate-500">×</span>
-
                           <span className="font-bold">
-                            {prediction.awayTeamName}{" "}
-                            {prediction.awayTeamEmoji}
+                            {prediction.awayTeamName} {prediction.awayTeamEmoji}
                           </span>
                         </div>
                       </td>
@@ -427,9 +448,7 @@ export default function AdminPredictionsPanel() {
                       <td className="px-3 py-3 text-center">
                         <span
                           className={`inline-flex rounded-lg px-3 py-1 font-black ${
-                            golden
-                              ? "bg-amber-400 text-slate-950"
-                              : "bg-white/10 text-white"
+                            golden ? "bg-amber-400 text-slate-950" : "bg-white/10 text-white"
                           }`}
                         >
                           {prediction.homeScore} - {prediction.awayScore}
@@ -465,9 +484,7 @@ export default function AdminPredictionsPanel() {
                       <td className="px-3 py-3 text-center">
                         <span
                           className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 font-black ${
-                            golden
-                              ? "bg-amber-400 text-slate-950"
-                              : "bg-white/10 text-white"
+                            golden ? "bg-amber-400 text-slate-950" : "bg-white/10 text-white"
                           }`}
                         >
                           {prediction.points}
@@ -480,6 +497,17 @@ export default function AdminPredictionsPanel() {
 
                       <td className="px-3 py-3 text-center text-[11px] text-slate-400">
                         {formatDate(prediction.calculatedAt)}
+                      </td>
+
+                      <td className="px-3 py-3 text-center">
+                        <button
+                          type="button"
+                          disabled={deleting}
+                          onClick={() => handleDeletePrediction(prediction)}
+                          className="rounded-lg bg-red-600 px-3 py-2 text-[11px] font-black text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {deleting ? "جاري..." : "حذف"}
+                        </button>
                       </td>
                     </tr>
                   );
@@ -501,8 +529,7 @@ export default function AdminPredictionsPanel() {
         </button>
 
         <div className="text-center text-sm text-slate-300">
-          صفحة {page} من {totalPages} — عدد النتائج{" "}
-          {filteredPredictions.length}
+          صفحة {page} من {totalPages} — عدد النتائج {filteredPredictions.length}
         </div>
 
         <button

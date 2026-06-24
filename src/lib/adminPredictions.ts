@@ -1,4 +1,12 @@
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  writeBatch,
+} from "firebase/firestore";
 import { db } from "./firebase";
 
 export type PredictionType = "normal" | "golden";
@@ -35,6 +43,13 @@ export type PredictionMatchOption = {
   matchId: string;
   label: string;
   count: number;
+};
+
+type RebuildPrediction = {
+  id: string;
+  points: number;
+  isCalculated: boolean;
+  createdAt: string;
 };
 
 function toText(value: unknown) {
@@ -141,6 +156,46 @@ async function getMatchPredictionTypeMap() {
   return map;
 }
 
+function buildSingleUserStats(predictions: RebuildPrediction[]) {
+  const sorted = [...predictions].sort(
+    (a, b) => getTimeValue(a.createdAt) - getTimeValue(b.createdAt)
+  );
+
+  let points = 0;
+  let total = 0;
+  let correct = 0;
+  let wrong = 0;
+  let currentStreak = 0;
+  let bestStreak = 0;
+
+  sorted.forEach((prediction) => {
+    if (!prediction.isCalculated) return;
+
+    const predictionPoints = Number(prediction.points || 0);
+
+    total += 1;
+    points += predictionPoints;
+
+    if (predictionPoints > 0) {
+      correct += 1;
+      currentStreak += 1;
+      bestStreak = Math.max(bestStreak, currentStreak);
+    } else {
+      wrong += 1;
+      currentStreak = 0;
+    }
+  });
+
+  return {
+    points,
+    total,
+    correct,
+    wrong,
+    currentStreak,
+    bestStreak,
+  };
+}
+
 export async function getAdminPredictions(): Promise<AdminPrediction[]> {
   const [predictionsSnapshot, matchPredictionTypeMap] = await Promise.all([
     getDocs(collection(db, "predictions")),
@@ -217,4 +272,73 @@ export function getPredictionMatchOptions(
   });
 
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}
+
+export async function deleteAdminPredictionAndFixUserStats(
+  predictionId: string
+) {
+  if (!predictionId) {
+    throw new Error("معرف التوقع غير موجود");
+  }
+
+  const predictionRef = doc(db, "predictions", predictionId);
+  const predictionSnap = await getDoc(predictionRef);
+
+  if (!predictionSnap.exists()) {
+    throw new Error("التوقع غير موجود أو تم حذفه مسبقًا");
+  }
+
+  const predictionData = predictionSnap.data();
+  const userId = toText(predictionData.userId);
+
+  if (!userId) {
+    throw new Error("معرف العضو غير موجود في التوقع");
+  }
+
+  const userPredictionsQuery = query(
+    collection(db, "predictions"),
+    where("userId", "==", userId)
+  );
+
+  const userPredictionsSnapshot = await getDocs(userPredictionsQuery);
+
+  const remainingCalculatedPredictions = userPredictionsSnapshot.docs
+    .filter((docSnap) => docSnap.id !== predictionId)
+    .filter((docSnap) => Boolean(docSnap.data().isCalculated))
+    .map((docSnap) => {
+      const data = docSnap.data();
+
+      return {
+        id: docSnap.id,
+        points: toNumber(data.points),
+        isCalculated: Boolean(data.isCalculated),
+        createdAt: toText(data.createdAt),
+      };
+    });
+
+  const stats = buildSingleUserStats(remainingCalculatedPredictions);
+
+  const now = new Date().toISOString();
+
+  const batch = writeBatch(db);
+
+  batch.delete(predictionRef);
+
+  batch.set(
+    doc(db, "users", userId),
+    {
+      points: stats.points,
+      total: stats.total,
+      correct: stats.correct,
+      wrong: stats.wrong,
+      currentStreak: stats.currentStreak,
+      bestStreak: stats.bestStreak,
+      lastUpdated: now,
+    },
+    { merge: true }
+  );
+
+  await batch.commit();
+
+  return stats;
 }
