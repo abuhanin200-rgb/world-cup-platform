@@ -10,10 +10,11 @@ import {
 import { getTeams, Team } from "@/lib/teams";
 import { updateUserPassword, updateUserProfile } from "@/lib/users";
 import AchievementUnlockModal from "@/components/AchievementUnlockModal";
+import NotificationsPreview from "@/components/NotificationsPreview";
 
 const PREDICTIONS_PER_PAGE = 10;
 
-type AccountTab = "predictions" | "achievements" | "info";
+type AccountTab = "predictions" | "achievements" | "notifications" | "info";
 
 type Achievement = {
   icon: string;
@@ -978,7 +979,7 @@ const seenTitles: string[] = JSON.parse(storedValue);
         </section>
 
         <section className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:p-5">
-          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-slate-950/60 p-2">
+          <div className="grid grid-cols-4 gap-2 rounded-2xl bg-slate-950/60 p-2">
             <button
               type="button"
               onClick={() => setActiveTab("predictions")}
@@ -1004,6 +1005,18 @@ const seenTitles: string[] = JSON.parse(storedValue);
             </button>
 
             <button
+  type="button"
+  onClick={() => setActiveTab("notifications")}
+  className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
+    activeTab === "notifications"
+      ? "bg-amber-400 text-slate-950"
+      : "text-slate-300 hover:bg-white/10"
+  }`}
+>
+  🔔 الإشعارات
+</button>
+
+            <button
               type="button"
               onClick={() => setActiveTab("info")}
               className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
@@ -1015,6 +1028,12 @@ const seenTitles: string[] = JSON.parse(storedValue);
               معلومات حسابي
             </button>
           </div>
+
+          {activeTab === "notifications" && (
+  <div className="mt-5">
+    <NotificationsPreview />
+  </div>
+)}
 
           {activeTab === "predictions" && (
             <div className="mt-5">
