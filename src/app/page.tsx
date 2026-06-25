@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import TopCandidateTeams from "@/components/TopCandidateTeams";
+import HomeStats from "@/components/HomeStats";
 import LatestPredictionsTicker from "@/components/LatestPredictionsTicker";
 import MatchesPredictionBox from "@/components/MatchesPredictionBox";
 import LeaderboardTable from "@/components/LeaderboardTable";
@@ -175,7 +175,7 @@ export default function HomePage() {
         <HomeBanner />
 
         <div className="mt-4 md:mt-5">
-          <TopCandidateTeams />
+          <HomeStats />
         </div>
 
         <div className="mt-4 md:mt-5">
