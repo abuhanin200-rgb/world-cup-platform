@@ -9,6 +9,7 @@ import {
 } from "@/lib/accountPredictions";
 import { getTeams, Team } from "@/lib/teams";
 import { updateUserPassword, updateUserProfile } from "@/lib/users";
+import AchievementUnlockModal from "@/components/AchievementUnlockModal";
 
 const PREDICTIONS_PER_PAGE = 10;
 
@@ -671,6 +672,8 @@ export default function AccountPage() {
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [unlockedAchievementModal, setUnlockedAchievementModal] =
+  useState<Achievement | null>(null);
 
   const totalPredictionPages = Math.max(
     1,
@@ -689,6 +692,47 @@ export default function AccountPage() {
       router.push("/login");
     }
   }, [loading, isLoggedIn, router]);
+  useEffect(() => {
+  if (!user || predictionsLoading) return;
+
+  const achievements = getAccountAchievements({
+    total: user.total || 0,
+    correct: user.correct || 0,
+    currentRank: user.currentRank || 0,
+    bestStreak: user.bestStreak || 0,
+    predictions,
+  });
+
+  const unlockedAchievements = achievements.filter(
+    (achievement) => achievement.unlocked
+  );
+
+  const storageKey = `worldcup_2026_seen_achievements_${user.id}`;
+  const storedValue = localStorage.getItem(storageKey);
+
+  if (!storedValue) {
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify(unlockedAchievements.map((achievement) => achievement.title))
+  );
+  return;
+}
+
+const seenTitles: string[] = JSON.parse(storedValue);
+
+  const newAchievement = unlockedAchievements.find(
+    (achievement) => !seenTitles.includes(achievement.title)
+  );
+
+  if (!newAchievement) return;
+
+  setUnlockedAchievementModal(newAchievement);
+
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify([...seenTitles, newAchievement.title])
+  );
+}, [user, predictions, predictionsLoading]);
 
   useEffect(() => {
     async function loadTeams() {
@@ -845,6 +889,14 @@ export default function AccountPage() {
       dir="rtl"
       className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
     >
+      {unlockedAchievementModal && (
+  <AchievementUnlockModal
+    icon={unlockedAchievementModal.icon}
+    title={unlockedAchievementModal.title}
+    description={unlockedAchievementModal.description}
+    onClose={() => setUnlockedAchievementModal(null)}
+  />
+)}
       <div className="mx-auto max-w-5xl">
         <header className="mb-6 flex items-center justify-between gap-3">
           <button
