@@ -112,31 +112,31 @@ export default function HomeStats() {
 
   const cards = [
     {
-      title: "إجمالي التوقعات",
+      titleLines: ["إجمالي", "التوقعات"],
       value: stats.totalPredictions,
       icon: "🎯",
       valueClass: "text-white",
     },
     {
-      title: "الفائز الصحيح",
+      titleLines: ["الفائز", "الصحيح"],
       value: stats.winnerCorrect,
       icon: "🏆",
       valueClass: "text-amber-300",
     },
     {
-      title: "التوقع بالملي",
+      titleLines: ["التوقع", "بالملي"],
       value: stats.exactCorrect,
       icon: "🔥",
       valueClass: "text-emerald-300",
     },
     {
-      title: "نسبة النجاح",
+      titleLines: ["نسبة", "النجاح"],
       value: `${stats.successRate.toFixed(1)}%`,
       icon: "📊",
       valueClass: "text-sky-300",
     },
     {
-      title: "المباريات المحتسبة",
+      titleLines: ["المباريات", "المحتسبة"],
       value: stats.calculatedMatches,
       icon: "🏟️",
       valueClass: "text-white",
@@ -155,19 +155,24 @@ export default function HomeStats() {
       <div className="grid grid-cols-5 gap-2">
         {cards.map((card) => (
           <div
-            key={card.title}
-            className="flex min-h-[112px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/50 p-2 text-center shadow-lg md:min-h-[140px] md:p-3"
+            key={card.titleLines.join("-")}
+            className="flex min-h-[118px] flex-col items-center rounded-2xl border border-white/10 bg-slate-950/50 px-1.5 py-2 text-center shadow-lg md:min-h-[145px] md:px-3 md:py-3"
           >
-            <div className="mb-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg md:h-10 md:w-10 md:text-xl">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg md:h-10 md:w-10 md:text-xl">
               {card.icon}
             </div>
 
-            <div className="w-full whitespace-nowrap text-center text-[8px] font-bold leading-none text-slate-300 md:text-xs">
-              {card.title}
+            <div className="mt-2 flex h-[30px] w-full flex-col items-center justify-center gap-0.5 text-center text-[9px] font-bold leading-none text-slate-300 md:h-[36px] md:text-xs">
+              <span className="block w-full text-center whitespace-nowrap">
+                {card.titleLines[0]}
+              </span>
+              <span className="block w-full text-center whitespace-nowrap">
+                {card.titleLines[1]}
+              </span>
             </div>
 
             <div
-              className={`mt-3 w-full whitespace-nowrap text-center text-[17px] font-black leading-none md:text-3xl ${card.valueClass}`}
+              className={`mt-auto w-full text-center text-[16px] font-black leading-none md:text-3xl ${card.valueClass}`}
             >
               {loading ? "..." : card.value}
             </div>
