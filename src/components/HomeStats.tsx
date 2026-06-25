@@ -114,35 +114,30 @@ export default function HomeStats() {
     {
       title: "إجمالي التوقعات",
       value: stats.totalPredictions,
-      description: "جميع التوقعات المسجلة من الأعضاء",
       icon: "🎯",
       valueClass: "text-white",
     },
     {
-      title: "توقع الفائز الصحيح",
+      title: "الفائز الصحيح",
       value: stats.winnerCorrect,
-      description: "توقعات أصابت الفائز الصحيح",
       icon: "🏆",
       valueClass: "text-amber-300",
     },
     {
-      title: "التوقع الصحيح بالملي",
+      title: "التوقع بالملي",
       value: stats.exactCorrect,
-      description: "أصابت النتيجة الصحيحة",
       icon: "🔥",
       valueClass: "text-emerald-300",
     },
     {
       title: "نسبة النجاح",
       value: `${stats.successRate.toFixed(1)}%`,
-      description: "من التوقعات التي تم احتسابها",
       icon: "📊",
       valueClass: "text-sky-300",
     },
     {
       title: "المباريات المحتسبة",
       value: stats.calculatedMatches,
-      description: "مباريات تم احتساب نتائجها وتوزيع نقاطها",
       icon: "🏟️",
       valueClass: "text-white",
     },
@@ -161,22 +156,20 @@ export default function HomeStats() {
         {cards.map((card) => (
           <div
             key={card.title}
-            className="rounded-2xl border border-white/10 bg-slate-950/50 p-2 text-center shadow-lg"
+            className="flex min-h-[112px] flex-col items-center justify-center rounded-2xl border border-white/10 bg-slate-950/50 p-2 text-center shadow-lg md:min-h-[140px] md:p-3"
           >
-            <div className="mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-base md:h-10 md:w-10 md:text-xl">
+            <div className="mb-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg md:h-10 md:w-10 md:text-xl">
               {card.icon}
             </div>
 
-            <div className="min-h-[30px] text-[9px] font-bold leading-4 text-slate-300 md:text-xs">
+            <div className="w-full whitespace-nowrap text-center text-[8px] font-bold leading-none text-slate-300 md:text-xs">
               {card.title}
             </div>
 
-            <div className={`mt-1 text-lg font-black md:text-3xl ${card.valueClass}`}>
+            <div
+              className={`mt-3 w-full whitespace-nowrap text-center text-[17px] font-black leading-none md:text-3xl ${card.valueClass}`}
+            >
               {loading ? "..." : card.value}
-            </div>
-
-            <div className="mt-1 hidden text-[10px] leading-5 text-slate-400 md:block md:text-[11px]">
-              {card.description}
             </div>
           </div>
         ))}
