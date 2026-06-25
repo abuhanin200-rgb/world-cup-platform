@@ -11,6 +11,8 @@ import { getSiteSettings, TickerSpeed } from "@/lib/siteSettings";
 type ExactHitWithPredictionType = ExactHit & {
   predictionType?: "normal" | "golden";
   points?: number;
+  createdAt?: string;
+  calculatedAt?: string;
 };
 
 function EmptyCard({ title, text }: { title: string; text: string }) {
@@ -101,6 +103,38 @@ function getSpeedLabel(speed: string) {
   if (speed === "very_fast") return "سريع جدًا";
 
   return "متوسط";
+}
+
+function getTimeValue(value?: string) {
+  if (!value) return 0;
+
+  const time = new Date(value).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+}
+
+function formatRelativeHitTime(hit: ExactHitWithPredictionType) {
+  const value = hit.calculatedAt || hit.createdAt;
+
+  if (!value) return "—";
+
+  const time = new Date(value).getTime();
+
+  if (!Number.isFinite(time)) return "—";
+
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - time) / 60000));
+
+  if (diffMinutes < 1) return "الآن";
+  if (diffMinutes < 60) return `قبل ${diffMinutes} دقيقة`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+
+  if (diffHours === 1) return "قبل ساعة";
+  if (diffHours === 2) return "قبل ساعتين";
+  if (diffHours <= 10) return `قبل ${diffHours} ساعات`;
+  if (diffHours < 24) return `قبل ${diffHours} ساعة`;
+
+  return "قبل أكثر من يوم";
 }
 
 function isGoldenExactHit(hit: ExactHitWithPredictionType) {
@@ -210,6 +244,7 @@ export function ExactHitsTicker() {
   const [speed, setSpeed] = useState<TickerSpeed>("normal");
   const [isPaused, setIsPaused] = useState(false);
   const [groupWidth, setGroupWidth] = useState(0);
+  const [isListOpen, setIsListOpen] = useState(false);
 
   const groupRef = useRef<HTMLDivElement | null>(null);
 
@@ -246,6 +281,18 @@ export function ExactHitsTicker() {
       clearInterval(settingsInterval);
     };
   }, []);
+
+  const sortedExactHits = useMemo(() => {
+    return [...exactHits].sort((a, b) => {
+      const aHit = a as ExactHitWithPredictionType;
+      const bHit = b as ExactHitWithPredictionType;
+
+      const aTime = getTimeValue(aHit.calculatedAt || aHit.createdAt);
+      const bTime = getTimeValue(bHit.calculatedAt || bHit.createdAt);
+
+      return bTime - aTime;
+    });
+  }, [exactHits]);
 
   const repeatedHits = useMemo(() => {
     if (exactHits.length === 0) return [];
@@ -317,23 +364,81 @@ export function ExactHitsTicker() {
           </span>
         )}
 
-        <span className={golden ? "font-black text-amber-300" : "font-black text-emerald-300"}>
+        <span
+          className={
+            golden ? "font-black text-amber-300" : "font-black text-emerald-300"
+          }
+        >
           {hit.userName}
         </span>{" "}
-
-        {golden ? "جاب التوقع الذهبي بالملي في مباراة" : "جابها صح بالملي في مباراة"}{" "}
-
+        {golden
+          ? "جاب التوقع الذهبي بالملي في مباراة"
+          : "جابها صح بالملي في مباراة"}{" "}
         <span className="font-bold">
           {hit.homeTeamEmoji} {hit.homeTeamName}
         </span>{" "}
-
         <span className="font-black text-amber-300">
           {hit.homeScore} - {hit.awayScore}
         </span>{" "}
-
         <span className="font-bold">
           {hit.awayTeamName} {hit.awayTeamEmoji}
         </span>
+      </div>
+    );
+  }
+
+  function renderExactHitListItem(hit: ExactHit) {
+    const exactHit = hit as ExactHitWithPredictionType;
+    const golden = isGoldenExactHit(exactHit);
+
+    return (
+      <div
+        key={hit.id}
+        className={`rounded-2xl border p-3 ${
+          golden
+            ? "border-amber-300/40 bg-amber-400/10"
+            : "border-white/10 bg-slate-950/60"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div
+              className={`text-sm font-black ${
+                golden ? "text-amber-200" : "text-emerald-200"
+              }`}
+            >
+              {hit.userName}
+            </div>
+
+            <div className="mt-1 text-[11px] leading-5 text-slate-300">
+              {golden ? "جاب التوقع الذهبي بالملي" : "جابها صح بالملي"}
+            </div>
+          </div>
+
+          <div className="shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-bold text-slate-200">
+            {formatRelativeHitTime(exactHit)}
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-slate-950/70 px-3 py-2 text-xs font-black text-white">
+          <span>
+            {hit.homeTeamEmoji} {hit.homeTeamName}
+          </span>
+
+          <span className="rounded-lg bg-amber-400 px-2 py-1 text-slate-950">
+            {hit.homeScore} - {hit.awayScore}
+          </span>
+
+          <span>
+            {hit.awayTeamName} {hit.awayTeamEmoji}
+          </span>
+        </div>
+
+        {golden && (
+          <div className="mt-2 inline-flex rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950">
+            ⭐ ذهبي بالملي +6
+          </div>
+        )}
       </div>
     );
   }
@@ -362,7 +467,13 @@ export function ExactHitsTicker() {
   return (
     <section className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 md:mt-6">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-black text-emerald-200">🎯 جابها صح</h2>
+        <button
+          type="button"
+          onClick={() => setIsListOpen(true)}
+          className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-sm font-black text-emerald-200 transition hover:bg-emerald-400/20"
+        >
+          🎯 جابها صح
+        </button>
 
         <div className="flex items-center gap-2">
           <span className="hidden text-[11px] text-emerald-100/80 md:inline">
@@ -403,6 +514,49 @@ export function ExactHitsTicker() {
           </div>
         </div>
       </div>
+
+      {isListOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+          onClick={() => setIsListOpen(false)}
+        >
+          <div
+            dir="rtl"
+            className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-3xl border border-emerald-400/30 bg-slate-950 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-emerald-400/10 px-4 py-3">
+              <div>
+                <h3 className="text-lg font-black text-emerald-100">
+                  🎯 قائمة جابها صح
+                </h3>
+
+                <p className="mt-1 text-[11px] text-emerald-100/70">
+                  الأحدث أولاً — آخر 24 ساعة
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsListOpen(false)}
+                className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/20"
+              >
+                إغلاق
+              </button>
+            </div>
+
+            <div className="max-h-[65vh] space-y-3 overflow-y-auto p-4">
+              {sortedExactHits.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-300">
+                  لا توجد توقعات صحيحة خلال آخر 24 ساعة.
+                </div>
+              ) : (
+                sortedExactHits.map((hit) => renderExactHitListItem(hit))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .exact-hits-track {
