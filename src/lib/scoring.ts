@@ -8,6 +8,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { sendMatchCalculationNotifications } from "./matchNotifications";
 import type { PredictionType } from "./matches";
 
 type ResultType = "exact" | "winner" | "wrong" | "";
@@ -402,6 +403,11 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
   });
 
   await batch.commit();
+
+  await sendMatchCalculationNotifications({
+  predictions: calculatedMatchPredictions,
+  rankedUsers,
+});
 
   const exactCount = calculatedMatchPredictions.filter(
     (prediction) => prediction.resultType === "exact"

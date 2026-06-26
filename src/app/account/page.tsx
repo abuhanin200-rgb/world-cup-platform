@@ -11,6 +11,7 @@ import { getTeams, Team } from "@/lib/teams";
 import { updateUserPassword, updateUserProfile } from "@/lib/users";
 import AchievementUnlockModal from "@/components/AchievementUnlockModal";
 import NotificationsPreview from "@/components/NotificationsPreview";
+import { createUserNotification } from "@/lib/notifications";
 
 const PREDICTIONS_PER_PAGE = 10;
 
@@ -728,6 +729,14 @@ const seenTitles: string[] = JSON.parse(storedValue);
   if (!newAchievement) return;
 
   setUnlockedAchievementModal(newAchievement);
+  createUserNotification({
+  userId: user.id,
+  type: "achievement",
+  title: `🏅 وسام جديد: ${newAchievement.title}`,
+  message: newAchievement.description,
+}).catch((error) => {
+  console.error("فشل إنشاء إشعار الوسام:", error);
+});
 
   localStorage.setItem(
     storageKey,
