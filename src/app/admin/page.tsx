@@ -1,7 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { addMatch, getAllMatches, type Match, type PredictionType } from "@/lib/matches";
+import {
+  addMatch,
+  getAllMatches,
+  type Match,
+  type MatchStage,
+  type PredictionType,
+} from "@/lib/matches";
 import { getTeams, Team } from "@/lib/teams";
 import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
 import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
@@ -27,6 +33,8 @@ type AdminTab =
   | "wordGame"
   | "logs";
 
+type CalculateFilter = "pending" | "calculated" | "all";
+
 function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -45,6 +53,14 @@ function formatMatchLabel(match: Match) {
   return `${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamName} ${match.awayTeamEmoji}`;
 }
 
+function formatCalculateMatchLabel(match: Match) {
+  const statusText = match.resultCalculated ? "محتسبة" : "غير محتسبة";
+
+  return `${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamEmoji} ${match.awayTeamName} — ${getMatchStageLabel(
+    match.matchStage
+  )} — ${getPredictionTypeLabel(match.predictionType)} — ${statusText}`;
+}
+
 function getPredictionTypeLabel(type?: PredictionType) {
   return type === "golden" ? "توقع ذهبي" : "توقع عادي";
 }
@@ -53,6 +69,21 @@ function getPredictionTypeHint(type?: PredictionType) {
   return type === "golden"
     ? "بالملي +6 | الفائز الصحيح +2 | الخطأ 0"
     : "حسب نظام النقاط العادي الحالي";
+}
+
+function getMatchStageLabel(stage?: MatchStage) {
+  return stage === "knockout" ? "خروج مغلوب" : "دور المجموعات";
+}
+
+function getMatchStageHint(stage?: MatchStage) {
+  return stage === "knockout"
+    ? "خروج المغلوب: عند التعادل يظهر اختيار المتأهل وطريقة التأهل."
+    : "دور المجموعات: توقع نتيجة المباراة فقط.";
+}
+
+function getMatchTimeValue(match: Match) {
+  const time = new Date(match.startAt).getTime();
+  return Number.isFinite(time) ? time : 0;
 }
 
 export default function AdminPage() {
@@ -74,11 +105,18 @@ export default function AdminPage() {
   const [matchTime, setMatchTime] = useState(getDefaultTime());
   const [predictionType, setPredictionType] =
     useState<PredictionType>("normal");
+  const [matchStage, setMatchStage] = useState<MatchStage>("group");
   const [addingMatch, setAddingMatch] = useState(false);
 
   const [selectedMatchId, setSelectedMatchId] = useState("");
   const [actualHomeScore, setActualHomeScore] = useState("");
   const [actualAwayScore, setActualAwayScore] = useState("");
+  const [actualQualifiedTeamCode, setActualQualifiedTeamCode] = useState("");
+  const [actualQualificationMethod, setActualQualificationMethod] =
+    useState("");
+  const [calculateFilter, setCalculateFilter] =
+    useState<CalculateFilter>("pending");
+  const [calculateSearchTerm, setCalculateSearchTerm] = useState("");
   const [calculating, setCalculating] = useState(false);
   const [undoing, setUndoing] = useState(false);
 
@@ -93,6 +131,62 @@ export default function AdminPage() {
   const calculatedMatches = useMemo(() => {
     return matches.filter((match) => match.resultCalculated);
   }, [matches]);
+
+  const calculateMatches = useMemo(() => {
+    const search = calculateSearchTerm.trim().toLowerCase();
+
+    return [...matches]
+      .filter((match) => {
+        if (calculateFilter === "pending" && match.resultCalculated) {
+          return false;
+        }
+
+        if (calculateFilter === "calculated" && !match.resultCalculated) {
+          return false;
+        }
+
+        if (!search) return true;
+
+        const searchableText = [
+          match.homeTeamName,
+          match.homeTeamCode,
+          match.awayTeamName,
+          match.awayTeamCode,
+          getPredictionTypeLabel(match.predictionType),
+          getMatchStageLabel(match.matchStage),
+          match.resultCalculated ? "محتسبة" : "غير محتسبة",
+          match.matchDate,
+          match.matchTime,
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return searchableText.includes(search);
+      })
+      .sort((a, b) => {
+        if (a.resultCalculated !== b.resultCalculated) {
+          return a.resultCalculated ? 1 : -1;
+        }
+
+        return getMatchTimeValue(a) - getMatchTimeValue(b);
+      });
+  }, [matches, calculateFilter, calculateSearchTerm]);
+
+  const isSelectedKnockoutDraw = useMemo(() => {
+    if (!selectedMatch) return false;
+
+    const homeScore = Number(actualHomeScore);
+    const awayScore = Number(actualAwayScore);
+
+    return (
+      selectedMatch.matchStage === "knockout" &&
+      Number.isInteger(homeScore) &&
+      Number.isInteger(awayScore) &&
+      actualHomeScore !== "" &&
+      actualAwayScore !== "" &&
+      homeScore === awayScore
+    );
+  }, [selectedMatch, actualHomeScore, actualAwayScore]);
 
   async function loadData() {
     try {
@@ -114,8 +208,14 @@ export default function AdminPage() {
         setAwayTeamCode(teamsData[1].code);
       }
 
-      if (!selectedMatchId && matchesData[0]) {
-        setSelectedMatchId(matchesData[0].id);
+      if (!selectedMatchId) {
+        const firstPendingMatch =
+          matchesData.find((match) => !match.resultCalculated) ||
+          matchesData[0];
+
+        if (firstPendingMatch) {
+          setSelectedMatchId(firstPendingMatch.id);
+        }
       }
     } catch (error) {
       console.error("Admin load data error:", error);
@@ -136,6 +236,23 @@ export default function AdminPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlocked]);
+
+  useEffect(() => {
+    if (activeTab !== "calculate") return;
+    if (calculateMatches.length === 0) return;
+
+    const selectedExists = calculateMatches.some(
+      (match) => match.id === selectedMatchId
+    );
+
+    if (!selectedExists) {
+      setSelectedMatchId(calculateMatches[0].id);
+      setActualHomeScore("");
+      setActualAwayScore("");
+      setActualQualifiedTeamCode("");
+      setActualQualificationMethod("");
+    }
+  }, [activeTab, calculateMatches, selectedMatchId]);
 
   function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -190,6 +307,7 @@ export default function AdminPage() {
         matchDate,
         matchTime,
         predictionType,
+        matchStage,
       });
 
       await addAdminLog({
@@ -201,6 +319,7 @@ export default function AdminPage() {
           matchDate,
           matchTime,
           predictionType,
+          matchStage,
         },
       });
 
@@ -239,6 +358,19 @@ export default function AdminPage() {
       return;
     }
 
+    const knockoutDraw =
+      selectedMatch?.matchStage === "knockout" && homeScore === awayScore;
+
+    if (knockoutDraw && !actualQualifiedTeamCode) {
+      alert("اختر المنتخب المتأهل");
+      return;
+    }
+
+    if (knockoutDraw && !actualQualificationMethod) {
+      alert("اختر طريقة التأهل");
+      return;
+    }
+
     try {
       setCalculating(true);
 
@@ -246,6 +378,12 @@ export default function AdminPage() {
         matchId: selectedMatchId,
         actualHomeScore: homeScore,
         actualAwayScore: awayScore,
+        actualQualifiedTeamCode: knockoutDraw
+          ? actualQualifiedTeamCode
+          : undefined,
+        actualQualificationMethod: knockoutDraw
+          ? (actualQualificationMethod as "extraTime" | "penalties")
+          : undefined,
       });
 
       const match = matches.find((item) => item.id === selectedMatchId);
@@ -260,6 +398,12 @@ export default function AdminPage() {
           matchId: selectedMatchId,
           actualHomeScore: homeScore,
           actualAwayScore: awayScore,
+          actualQualifiedTeamCode: knockoutDraw
+            ? actualQualifiedTeamCode
+            : undefined,
+          actualQualificationMethod: knockoutDraw
+            ? actualQualificationMethod
+            : undefined,
         },
       });
 
@@ -267,6 +411,10 @@ export default function AdminPage() {
 
       setActualHomeScore("");
       setActualAwayScore("");
+      setActualQualifiedTeamCode("");
+      setActualQualificationMethod("");
+      setCalculateFilter("pending");
+      setCalculateSearchTerm("");
       setActiveTab("matches");
 
       await loadData();
@@ -312,6 +460,8 @@ export default function AdminPage() {
 
       setActualHomeScore("");
       setActualAwayScore("");
+      setActualQualifiedTeamCode("");
+      setActualQualificationMethod("");
 
       await loadData();
     } catch (error) {
@@ -426,125 +576,31 @@ export default function AdminPage() {
         </header>
 
         <nav className="mb-5 flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl">
-          <button
-            type="button"
-            onClick={() => setActiveTab("overview")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "overview"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            📊 نظرة عامة
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("add")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "add"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            ➕ إضافة مباراة
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("calculate")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "calculate"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            🧮 احتساب النتائج
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("settings")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "settings"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            ⚙️ إعدادات الشرائط
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("banner")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "banner"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            🖼️ البانر
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("members")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "members"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            👥 إدارة الأعضاء
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("predictions")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "predictions"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            🔮 توقعات الأعضاء
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("matches")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "matches"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            📅 المباريات
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("wordGame")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "wordGame"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            🎮 لعبة الكلمة
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("logs")}
-            className={`rounded-xl px-3 py-2 text-sm font-bold ${
-              activeTab === "logs"
-                ? "bg-amber-400 text-slate-950"
-                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
-            }`}
-          >
-            📝 السجل
-          </button>
+          {[
+            ["overview", "📊 نظرة عامة"],
+            ["add", "➕ إضافة مباراة"],
+            ["calculate", "🧮 احتساب النتائج"],
+            ["settings", "⚙️ إعدادات الشرائط"],
+            ["banner", "🖼️ البانر"],
+            ["members", "👥 إدارة الأعضاء"],
+            ["predictions", "🔮 توقعات الأعضاء"],
+            ["matches", "📅 المباريات"],
+            ["wordGame", "🎮 لعبة الكلمة"],
+            ["logs", "📝 السجل"],
+          ].map(([tab, label]) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab as AdminTab)}
+              className={`rounded-xl px-3 py-2 text-sm font-bold ${
+                activeTab === tab
+                  ? "bg-amber-400 text-slate-950"
+                  : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </nav>
 
         {activeTab === "overview" && <AdminOverviewPanel />}
@@ -651,6 +707,27 @@ export default function AdminPage() {
                   </div>
                 </label>
 
+                <label className="block">
+                  <span className="mb-2 block text-sm font-bold">
+                    نوع المرحلة
+                  </span>
+
+                  <select
+                    value={matchStage}
+                    onChange={(event) =>
+                      setMatchStage(event.target.value as MatchStage)
+                    }
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                  >
+                    <option value="group">دور المجموعات</option>
+                    <option value="knockout">خروج مغلوب</option>
+                  </select>
+
+                  <div className="mt-2 rounded-2xl border border-blue-400/20 bg-blue-400/10 p-3 text-xs leading-6 text-blue-100">
+                    {getMatchStageHint(matchStage)}
+                  </div>
+                </label>
+
                 <button
                   type="submit"
                   disabled={addingMatch}
@@ -684,115 +761,233 @@ export default function AdminPage() {
               </div>
             ) : (
               <form onSubmit={handleCalculate} className="space-y-4">
-                <label className="block">
-                  <span className="mb-2 block text-sm font-bold">
-                    اختر المباراة
-                  </span>
-                  <select
-                    value={selectedMatchId}
-                    onChange={(event) => {
-                      setSelectedMatchId(event.target.value);
-                      setActualHomeScore("");
-                      setActualAwayScore("");
-                    }}
-                    className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
-                  >
-                    {matches.map((match) => (
-                      <option key={match.id} value={match.id}>
-                        {formatMatchLabel(match)} —{" "}
-                        {getPredictionTypeLabel(match.predictionType)}{" "}
-                        {match.resultCalculated ? "— محتسبة" : "— غير محتسبة"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto]">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      بحث سريع
+                    </span>
+                    <input
+                      type="text"
+                      value={calculateSearchTerm}
+                      onChange={(event) =>
+                        setCalculateSearchTerm(event.target.value)
+                      }
+                      placeholder="ابحث باسم المنتخب أو الكود أو نوع المباراة"
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                    />
+                  </label>
 
-                {selectedMatch && (
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                    <div className="text-center text-lg font-black">
-                      {formatMatchLabel(selectedMatch)}
-                    </div>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      عرض المباريات
+                    </span>
+                    <select
+                      value={calculateFilter}
+                      onChange={(event) =>
+                        setCalculateFilter(event.target.value as CalculateFilter)
+                      }
+                      className="w-full min-w-[220px] rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                    >
+                      <option value="pending">غير المحتسبة فقط</option>
+                      <option value="calculated">المحتسبة فقط</option>
+                      <option value="all">كل المباريات</option>
+                    </select>
+                  </label>
+                </div>
 
-                    <div className="mt-2 text-center text-sm text-slate-300">
-                      الحالة:{" "}
-                      {selectedMatch.resultCalculated
-                        ? "محتسبة"
-                        : "لم تُحتسب"}
-                    </div>
+                <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-xs leading-6 text-slate-200">
+                  المعروض الآن:{" "}
+                  <span className="font-black text-amber-300">
+                    {calculateMatches.length}
+                  </span>{" "}
+                  مباراة
+                  {calculateFilter === "pending" &&
+                    " — يتم عرض غير المحتسبة أولًا لتسريع الاحتساب."}
+                </div>
 
-                    <div className="mt-2 text-center text-sm text-amber-200">
-                      نوع التوقع:{" "}
-                      <strong>
-                        {getPredictionTypeLabel(selectedMatch.predictionType)}
-                      </strong>
-                    </div>
+                {calculateMatches.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/60 p-6 text-center text-sm text-slate-300">
+                    لا توجد مباريات مطابقة للبحث أو الفلتر الحالي.
+                  </div>
+                ) : (
+                  <>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-bold">
+                        اختر المباراة
+                      </span>
+                      <select
+                        value={selectedMatchId}
+                        onChange={(event) => {
+                          setSelectedMatchId(event.target.value);
+                          setActualHomeScore("");
+                          setActualAwayScore("");
+                          setActualQualifiedTeamCode("");
+                          setActualQualificationMethod("");
+                        }}
+                        className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                      >
+                        {calculateMatches.map((match) => (
+                          <option key={match.id} value={match.id}>
+                            {formatCalculateMatchLabel(match)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
 
-                    <div className="mt-1 text-center text-xs text-slate-300">
-                      {getPredictionTypeHint(selectedMatch.predictionType)}
-                    </div>
+                    {selectedMatch && (
+                      <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                        <div className="text-center text-lg font-black">
+                          {formatMatchLabel(selectedMatch)}
+                        </div>
 
-                    {selectedMatch.resultCalculated && (
-                      <div className="mt-2 text-center text-sm text-emerald-200">
-                        النتيجة الحالية:{" "}
-                        <strong>
-                          {selectedMatch.actualHomeScore} -{" "}
-                          {selectedMatch.actualAwayScore}
-                        </strong>
+                        <div className="mt-2 text-center text-sm text-slate-300">
+                          الحالة:{" "}
+                          {selectedMatch.resultCalculated
+                            ? "محتسبة"
+                            : "لم تُحتسب"}
+                        </div>
+
+                        <div className="mt-2 text-center text-sm text-amber-200">
+                          نوع التوقع:{" "}
+                          <strong>
+                            {getPredictionTypeLabel(
+                              selectedMatch.predictionType
+                            )}
+                          </strong>
+                        </div>
+
+                        <div className="mt-2 text-center text-sm text-blue-200">
+                          نوع المرحلة:{" "}
+                          <strong>
+                            {getMatchStageLabel(selectedMatch.matchStage)}
+                          </strong>
+                        </div>
+
+                        <div className="mt-1 text-center text-xs text-slate-300">
+                          {getPredictionTypeHint(selectedMatch.predictionType)}
+                        </div>
+
+                        <div className="mt-1 text-center text-xs text-slate-300">
+                          {getMatchStageHint(selectedMatch.matchStage)}
+                        </div>
+
+                        {selectedMatch.resultCalculated && (
+                          <div className="mt-2 text-center text-sm text-emerald-200">
+                            النتيجة الحالية:{" "}
+                            <strong>
+                              {selectedMatch.actualHomeScore} -{" "}
+                              {selectedMatch.actualAwayScore}
+                            </strong>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-bold">
+                          نتيجة المنتخب الأول
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={actualHomeScore}
+                          onChange={(event) =>
+                            setActualHomeScore(event.target.value)
+                          }
+                          className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black outline-none focus:border-amber-400"
+                        />
+                      </label>
+
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-bold">
+                          نتيجة المنتخب الثاني
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={actualAwayScore}
+                          onChange={(event) =>
+                            setActualAwayScore(event.target.value)
+                          }
+                          className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black outline-none focus:border-amber-400"
+                        />
+                      </label>
+                    </div>
+
+                    {isSelectedKnockoutDraw && selectedMatch && (
+                      <div className="rounded-2xl border border-blue-400/20 bg-blue-400/10 p-4">
+                        <div className="mb-3 text-sm font-black text-blue-100">
+                          نتيجة تعادل في خروج المغلوب: اختر المتأهل وطريقة
+                          التأهل
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <label className="block">
+                            <span className="mb-2 block text-sm font-bold">
+                              المنتخب المتأهل
+                            </span>
+
+                            <select
+                              value={actualQualifiedTeamCode}
+                              onChange={(event) =>
+                                setActualQualifiedTeamCode(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-blue-400"
+                            >
+                              <option value="">اختر المتأهل</option>
+                              <option value={selectedMatch.homeTeamCode}>
+                                {selectedMatch.homeTeamEmoji}{" "}
+                                {selectedMatch.homeTeamName}
+                              </option>
+                              <option value={selectedMatch.awayTeamCode}>
+                                {selectedMatch.awayTeamEmoji}{" "}
+                                {selectedMatch.awayTeamName}
+                              </option>
+                            </select>
+                          </label>
+
+                          <label className="block">
+                            <span className="mb-2 block text-sm font-bold">
+                              طريقة التأهل
+                            </span>
+
+                            <select
+                              value={actualQualificationMethod}
+                              onChange={(event) =>
+                                setActualQualificationMethod(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-blue-400"
+                            >
+                              <option value="">اختر الطريقة</option>
+                              <option value="extraTime">أشواط إضافية</option>
+                              <option value="penalties">ركلات ترجيح</option>
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <button
+                        type="submit"
+                        disabled={calculating}
+                        className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {calculating ? "جاري الاحتساب..." : "احتساب النتيجة"}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={undoing || !selectedMatch?.resultCalculated}
+                        onClick={handleUndoCalculation}
+                        className="rounded-2xl bg-red-500 px-4 py-3 text-sm font-black text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {undoing ? "جاري التراجع..." : "تراجع عن الاحتساب"}
+                      </button>
+                    </div>
+                  </>
                 )}
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-bold">
-                      نتيجة المنتخب الأول
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={actualHomeScore}
-                      onChange={(event) =>
-                        setActualHomeScore(event.target.value)
-                      }
-                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black outline-none focus:border-amber-400"
-                    />
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-bold">
-                      نتيجة المنتخب الثاني
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={actualAwayScore}
-                      onChange={(event) =>
-                        setActualAwayScore(event.target.value)
-                      }
-                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black outline-none focus:border-amber-400"
-                    />
-                  </label>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <button
-                    type="submit"
-                    disabled={calculating}
-                    className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {calculating ? "جاري الاحتساب..." : "احتساب النتيجة"}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={undoing || !selectedMatch?.resultCalculated}
-                    onClick={handleUndoCalculation}
-                    className="rounded-2xl bg-red-500 px-4 py-3 text-sm font-black text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {undoing ? "جاري التراجع..." : "تراجع عن الاحتساب"}
-                  </button>
-                </div>
 
                 <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
                   <strong>تنبيه:</strong> عند احتساب النتيجة سيتم تحديث كل
@@ -821,13 +1016,9 @@ export default function AdminPage() {
         )}
 
         {activeTab === "settings" && <AdminSettingsPanel />}
-
         {activeTab === "banner" && <AdminHomeBannerPanel />}
-
         {activeTab === "members" && <AdminMembersPanel />}
-
         {activeTab === "predictions" && <AdminPredictionsPanel />}
-
         {activeTab === "matches" && (
           <AdminMatchesPanel
             matches={matches}
@@ -835,9 +1026,7 @@ export default function AdminPage() {
             onChanged={loadData}
           />
         )}
-
         {activeTab === "wordGame" && <AdminWordGamePanel />}
-
         {activeTab === "logs" && <AdminLogsPanel />}
       </div>
     </main>

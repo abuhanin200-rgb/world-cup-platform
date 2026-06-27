@@ -12,6 +12,10 @@ export type MatchStatus = "scheduled" | "finished";
 
 export type PredictionType = "normal" | "golden";
 
+export type MatchStage = "group" | "knockout";
+
+export type QualificationMethod = "extraTime" | "penalties";
+
 export type Match = {
   id: string;
 
@@ -32,9 +36,14 @@ export type Match = {
   isActive: boolean;
 
   predictionType: PredictionType;
+  matchStage: MatchStage;
 
   actualHomeScore?: number | null;
   actualAwayScore?: number | null;
+
+  actualQualifiedTeamCode?: string | null;
+  actualQualificationMethod?: QualificationMethod | null;
+
   resultCalculated?: boolean;
   calculatedAt?: string | null;
 
@@ -48,6 +57,7 @@ export type AddMatchInput = {
   matchDate: string;
   matchTime: string;
   predictionType?: PredictionType;
+  matchStage?: MatchStage;
 };
 
 function toText(value: unknown) {
@@ -68,6 +78,20 @@ function normalizeStatus(value: unknown): MatchStatus {
 
 function normalizePredictionType(value: unknown): PredictionType {
   return value === "golden" ? "golden" : "normal";
+}
+
+function normalizeMatchStage(value: unknown): MatchStage {
+  return value === "knockout" ? "knockout" : "group";
+}
+
+function normalizeQualificationMethod(
+  value: unknown
+): QualificationMethod | null {
+  if (value === "extraTime" || value === "penalties") {
+    return value;
+  }
+
+  return null;
 }
 
 function getMakkahStartAt(matchDate: string, matchTime: string) {
@@ -106,9 +130,21 @@ function mapMatch(id: string, data: Record<string, unknown>): Match {
     isActive: Boolean(data.isActive),
 
     predictionType: normalizePredictionType(data.predictionType),
+    matchStage: normalizeMatchStage(data.matchStage),
 
     actualHomeScore: toNumberOrNull(data.actualHomeScore),
     actualAwayScore: toNumberOrNull(data.actualAwayScore),
+
+    actualQualifiedTeamCode:
+      data.actualQualifiedTeamCode === null ||
+      data.actualQualifiedTeamCode === undefined
+        ? null
+        : toText(data.actualQualifiedTeamCode),
+
+    actualQualificationMethod: normalizeQualificationMethod(
+      data.actualQualificationMethod
+    ),
+
     resultCalculated: Boolean(data.resultCalculated),
     calculatedAt:
       data.calculatedAt === null || data.calculatedAt === undefined
@@ -180,7 +216,14 @@ export async function getVisibleMatches(): Promise<Match[]> {
 }
 
 export async function addMatch(input: AddMatchInput) {
-  const { homeTeam, awayTeam, matchDate, matchTime, predictionType } = input;
+  const {
+    homeTeam,
+    awayTeam,
+    matchDate,
+    matchTime,
+    predictionType,
+    matchStage,
+  } = input;
 
   if (!homeTeam || !awayTeam) {
     throw new Error("بيانات المنتخبين غير مكتملة");
@@ -215,9 +258,14 @@ export async function addMatch(input: AddMatchInput) {
     isActive: true,
 
     predictionType: normalizePredictionType(predictionType),
+    matchStage: normalizeMatchStage(matchStage),
 
     actualHomeScore: null,
     actualAwayScore: null,
+
+    actualQualifiedTeamCode: null,
+    actualQualificationMethod: null,
+
     resultCalculated: false,
     calculatedAt: null,
 

@@ -10,7 +10,11 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { PredictionType } from "./matches";
+import type {
+  MatchStage,
+  PredictionType,
+  QualificationMethod,
+} from "./matches";
 
 export type Prediction = {
   id: string;
@@ -28,14 +32,20 @@ export type Prediction = {
   homeScore: number;
   awayScore: number;
 
+  qualifiedTeamCode?: string | null;
+  qualificationMethod?: QualificationMethod | null;
+
   points: number;
   resultType?: string;
   isCalculated: boolean;
 
   predictionType: PredictionType;
+  matchStage: MatchStage;
 
   actualHomeScore?: number | null;
   actualAwayScore?: number | null;
+  actualQualifiedTeamCode?: string | null;
+  actualQualificationMethod?: QualificationMethod | null;
   calculatedAt?: string | null;
 
   createdAt?: string;
@@ -56,6 +66,9 @@ export type SubmitPredictionInput = {
 
   homeScore: number;
   awayScore: number;
+
+  qualifiedTeamCode?: string;
+  qualificationMethod?: QualificationMethod;
 };
 
 export type LatestPrediction = {
@@ -68,6 +81,7 @@ export type LatestPrediction = {
   homeScore: number;
   awayScore: number;
   predictionType: PredictionType;
+  matchStage: MatchStage;
   createdAt?: string;
 };
 
@@ -76,6 +90,13 @@ type MatchForTicker = {
   startAt: string;
   status: string;
   isActive: boolean;
+};
+
+type PredictionMatchInfo = {
+  predictionType: PredictionType;
+  matchStage: MatchStage;
+  homeTeamCode: string;
+  awayTeamCode: string;
 };
 
 function validateScore(score: number) {
@@ -95,25 +116,56 @@ function normalizePredictionType(value: unknown): PredictionType {
   return value === "golden" ? "golden" : "normal";
 }
 
+function normalizeMatchStage(value: unknown): MatchStage {
+  return value === "knockout" ? "knockout" : "group";
+}
+
+function normalizeQualificationMethod(
+  value: unknown
+): QualificationMethod | null {
+  if (value === "extraTime" || value === "penalties") {
+    return value;
+  }
+
+  return null;
+}
+
 function getPredictionDocId(userId: string, matchId: string) {
   return `${userId}_${matchId}`;
 }
 
-async function getPredictionTypeForMatch(
+async function getPredictionMatchInfo(
   matchId: string
-): Promise<PredictionType> {
-  if (!matchId) return "normal";
+): Promise<PredictionMatchInfo> {
+  if (!matchId) {
+    return {
+      predictionType: "normal",
+      matchStage: "group",
+      homeTeamCode: "",
+      awayTeamCode: "",
+    };
+  }
 
   const matchRef = doc(db, "matches", matchId);
   const matchSnap = await getDoc(matchRef);
 
   if (!matchSnap.exists()) {
-    return "normal";
+    return {
+      predictionType: "normal",
+      matchStage: "group",
+      homeTeamCode: "",
+      awayTeamCode: "",
+    };
   }
 
   const data = matchSnap.data();
 
-  return normalizePredictionType(data.predictionType);
+  return {
+    predictionType: normalizePredictionType(data.predictionType),
+    matchStage: normalizeMatchStage(data.matchStage),
+    homeTeamCode: toText(data.homeTeamCode),
+    awayTeamCode: toText(data.awayTeamCode),
+  };
 }
 
 function getTimeValue(createdAt?: string) {
@@ -141,11 +193,19 @@ function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
     homeScore: toNumber(data.homeScore),
     awayScore: toNumber(data.awayScore),
 
+    qualifiedTeamCode:
+      data.qualifiedTeamCode === null || data.qualifiedTeamCode === undefined
+        ? null
+        : toText(data.qualifiedTeamCode),
+
+    qualificationMethod: normalizeQualificationMethod(data.qualificationMethod),
+
     points: toNumber(data.points),
     resultType: toText(data.resultType),
     isCalculated: Boolean(data.isCalculated),
 
     predictionType: normalizePredictionType(data.predictionType),
+    matchStage: normalizeMatchStage(data.matchStage),
 
     actualHomeScore:
       data.actualHomeScore === null || data.actualHomeScore === undefined
@@ -156,6 +216,16 @@ function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
       data.actualAwayScore === null || data.actualAwayScore === undefined
         ? null
         : toNumber(data.actualAwayScore),
+
+    actualQualifiedTeamCode:
+      data.actualQualifiedTeamCode === null ||
+      data.actualQualifiedTeamCode === undefined
+        ? null
+        : toText(data.actualQualifiedTeamCode),
+
+    actualQualificationMethod: normalizeQualificationMethod(
+      data.actualQualificationMethod
+    ),
 
     calculatedAt:
       data.calculatedAt === null || data.calculatedAt === undefined
@@ -257,7 +327,31 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     throw new Error("تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله");
   }
 
-  const predictionType = await getPredictionTypeForMatch(input.matchId);
+  const matchInfo = await getPredictionMatchInfo(input.matchId);
+  const isKnockoutDrawPrediction =
+    matchInfo.matchStage === "knockout" && input.homeScore === input.awayScore;
+
+  const qualifiedTeamCode = isKnockoutDrawPrediction
+    ? toText(input.qualifiedTeamCode)
+    : "";
+
+  const qualificationMethod = isKnockoutDrawPrediction
+    ? normalizeQualificationMethod(input.qualificationMethod)
+    : null;
+
+  if (isKnockoutDrawPrediction) {
+    const validQualifiedTeam =
+      qualifiedTeamCode === matchInfo.homeTeamCode ||
+      qualifiedTeamCode === matchInfo.awayTeamCode;
+
+    if (!validQualifiedTeam) {
+      throw new Error("اختر المنتخب المتأهل");
+    }
+
+    if (!qualificationMethod) {
+      throw new Error("اختر طريقة التأهل");
+    }
+  }
 
   const now = new Date().toISOString();
 
@@ -275,14 +369,20 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     homeScore: input.homeScore,
     awayScore: input.awayScore,
 
+    qualifiedTeamCode: isKnockoutDrawPrediction ? qualifiedTeamCode : null,
+    qualificationMethod: isKnockoutDrawPrediction ? qualificationMethod : null,
+
     points: 0,
     resultType: "",
     isCalculated: false,
 
-    predictionType,
+    predictionType: matchInfo.predictionType,
+    matchStage: matchInfo.matchStage,
 
     actualHomeScore: null,
     actualAwayScore: null,
+    actualQualifiedTeamCode: null,
+    actualQualificationMethod: null,
     calculatedAt: null,
 
     createdAt: now,
@@ -359,6 +459,7 @@ export async function getLatestPredictions(
       homeScore: prediction.homeScore,
       awayScore: prediction.awayScore,
       predictionType: prediction.predictionType,
+      matchStage: prediction.matchStage,
       createdAt: prediction.createdAt,
     }));
 }

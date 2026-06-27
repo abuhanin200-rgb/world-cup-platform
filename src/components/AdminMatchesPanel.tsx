@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import type { Match, PredictionType } from "@/lib/matches";
+import type { Match, MatchStage, PredictionType } from "@/lib/matches";
 import { deleteAdminMatch, updateAdminMatch } from "@/lib/adminMatches";
 import { addAdminLog } from "@/lib/adminLogs";
 import { deleteTestMatch } from "@/lib/deleteTestMatch";
@@ -20,8 +20,16 @@ function normalizePredictionType(value?: PredictionType): PredictionType {
   return value === "golden" ? "golden" : "normal";
 }
 
+function normalizeMatchStage(value?: MatchStage): MatchStage {
+  return value === "knockout" ? "knockout" : "group";
+}
+
 function getPredictionTypeLabel(type?: PredictionType) {
   return type === "golden" ? "توقع ذهبي" : "توقع عادي";
+}
+
+function getMatchStageLabel(stage?: MatchStage) {
+  return stage === "knockout" ? "خروج مغلوب" : "دور المجموعات";
 }
 
 function getPredictionTypeHint(type?: PredictionType) {
@@ -30,9 +38,21 @@ function getPredictionTypeHint(type?: PredictionType) {
     : "بالملي +3 | الفائز الصحيح +1 | الخطأ 0";
 }
 
+function getMatchStageHint(stage?: MatchStage) {
+  return stage === "knockout"
+    ? "عند تعادل التوقع يظهر اختيار المتأهل وطريقة التأهل."
+    : "توقع نتيجة المباراة فقط بدون اختيارات تأهل.";
+}
+
 function getPredictionTypeBadgeClass(type?: PredictionType) {
   return type === "golden"
     ? "rounded-full bg-amber-400 px-3 py-1 text-slate-950"
+    : "rounded-full bg-white/10 px-3 py-1 text-slate-300";
+}
+
+function getMatchStageBadgeClass(stage?: MatchStage) {
+  return stage === "knockout"
+    ? "rounded-full bg-blue-400 px-3 py-1 text-slate-950"
     : "rounded-full bg-white/10 px-3 py-1 text-slate-300";
 }
 
@@ -55,6 +75,7 @@ export default function AdminMatchesPanel({
   const [editIsActive, setEditIsActive] = useState(true);
   const [editPredictionType, setEditPredictionType] =
     useState<PredictionType>("normal");
+  const [editMatchStage, setEditMatchStage] = useState<MatchStage>("group");
 
   const [savingMatchId, setSavingMatchId] = useState("");
   const [deletingMatchId, setDeletingMatchId] = useState("");
@@ -71,13 +92,16 @@ export default function AdminMatchesPanel({
         match.predictionType
       ).toLowerCase();
 
+      const matchStageLabel = getMatchStageLabel(match.matchStage).toLowerCase();
+
       const matchesSearch =
         !search ||
         match.homeTeamName.toLowerCase().includes(search) ||
         match.awayTeamName.toLowerCase().includes(search) ||
         match.matchDate.toLowerCase().includes(search) ||
         match.matchTime.toLowerCase().includes(search) ||
-        predictionTypeLabel.includes(search);
+        predictionTypeLabel.includes(search) ||
+        matchStageLabel.includes(search);
 
       const matchesFilter =
         filter === "all" ||
@@ -130,6 +154,7 @@ export default function AdminMatchesPanel({
     setEditTime(match.matchTime);
     setEditIsActive(Boolean(match.isActive));
     setEditPredictionType(normalizePredictionType(match.predictionType));
+    setEditMatchStage(normalizeMatchStage(match.matchStage));
   }
 
   function cancelEdit() {
@@ -138,6 +163,7 @@ export default function AdminMatchesPanel({
     setEditTime("");
     setEditIsActive(true);
     setEditPredictionType("normal");
+    setEditMatchStage("group");
   }
 
   async function handleSaveMatch(event: FormEvent, match: Match) {
@@ -156,11 +182,16 @@ export default function AdminMatchesPanel({
         matchTime: editTime,
         isActive: editIsActive,
         predictionType: calculated ? undefined : editPredictionType,
+        matchStage: calculated ? undefined : editMatchStage,
       });
 
       const predictionTypeText = calculated
         ? getPredictionTypeLabel(match.predictionType)
         : getPredictionTypeLabel(editPredictionType);
+
+      const matchStageText = calculated
+        ? getMatchStageLabel(match.matchStage)
+        : getMatchStageLabel(editMatchStage);
 
       await addAdminLog({
         action: "other",
@@ -169,7 +200,7 @@ export default function AdminMatchesPanel({
           match.awayTeamName
         }. التاريخ الجديد: ${editDate}، الوقت الجديد: ${editTime}، الحالة: ${
           editIsActive ? "مفعلة" : "مخفية"
-        }، نوع التوقع: ${predictionTypeText}.`,
+        }، نوع التوقع: ${predictionTypeText}، نوع المرحلة: ${matchStageText}.`,
       });
 
       setMessage("تم تعديل المباراة بنجاح ✅");
@@ -354,7 +385,7 @@ export default function AdminMatchesPanel({
             value={searchTerm}
             onChange={(event) => handleSearch(event.target.value)}
             className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-            placeholder="ابحث باسم المنتخب أو التاريخ أو الوقت أو نوع التوقع"
+            placeholder="ابحث باسم المنتخب أو التاريخ أو الوقت أو نوع التوقع أو المرحلة"
           />
         </div>
 
@@ -418,6 +449,7 @@ export default function AdminMatchesPanel({
               const predictionType = normalizePredictionType(
                 match.predictionType
               );
+              const matchStage = normalizeMatchStage(match.matchStage);
 
               return (
                 <div
@@ -465,6 +497,10 @@ export default function AdminMatchesPanel({
                       {getPredictionTypeLabel(predictionType)}
                     </span>
 
+                    <span className={getMatchStageBadgeClass(matchStage)}>
+                      {getMatchStageLabel(matchStage)}
+                    </span>
+
                     {match.status === "finished" ? (
                       <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-emerald-300">
                         تم الاحتساب
@@ -489,8 +525,14 @@ export default function AdminMatchesPanel({
                     )}
                   </div>
 
-                  <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-slate-300">
-                    {getPredictionTypeHint(predictionType)}
+                  <div className="mt-3 space-y-2">
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-slate-300">
+                      {getPredictionTypeHint(predictionType)}
+                    </div>
+
+                    <div className="rounded-xl border border-blue-400/20 bg-blue-400/10 p-3 text-[11px] leading-5 text-blue-100">
+                      {getMatchStageHint(matchStage)}
+                    </div>
                   </div>
 
                   {isEditing ? (
@@ -547,10 +589,34 @@ export default function AdminMatchesPanel({
                         <div className="mt-2 rounded-xl border border-white/10 bg-slate-950/60 p-3 text-[11px] leading-5 text-slate-200">
                           {getPredictionTypeHint(editPredictionType)}
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-xs font-bold">
+                          نوع المرحلة
+                        </label>
+                        <select
+                          value={editMatchStage}
+                          onChange={(event) =>
+                            setEditMatchStage(
+                              event.target.value as MatchStage
+                            )
+                          }
+                          disabled={isCalculated}
+                          className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-slate-950 outline-none focus:border-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="group">دور المجموعات</option>
+                          <option value="knockout">خروج مغلوب</option>
+                        </select>
+
+                        <div className="mt-2 rounded-xl border border-blue-400/20 bg-blue-400/10 p-3 text-[11px] leading-5 text-blue-100">
+                          {getMatchStageHint(editMatchStage)}
+                        </div>
 
                         {isCalculated && (
                           <div className="mt-2 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-[11px] leading-5 text-red-100">
-                            لا يمكن تغيير نوع التوقع بعد احتساب المباراة.
+                            لا يمكن تغيير نوع التوقع أو نوع المرحلة بعد احتساب
+                            المباراة.
                           </div>
                         )}
                       </div>

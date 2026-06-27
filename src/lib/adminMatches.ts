@@ -9,7 +9,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { Match } from "./matches";
+import { Match, MatchStage } from "./matches";
 
 export type PredictionType = "normal" | "golden";
 
@@ -19,6 +19,7 @@ export type UpdateAdminMatchInput = {
   matchTime: string;
   isActive: boolean;
   predictionType?: PredictionType;
+  matchStage?: MatchStage;
 };
 
 function getMatchDayArabic(dateText: string) {
@@ -36,6 +37,10 @@ function cleanText(value: string) {
 
 function normalizePredictionType(value?: string): PredictionType {
   return value === "golden" ? "golden" : "normal";
+}
+
+function normalizeMatchStage(value?: string): MatchStage {
+  return value === "knockout" ? "knockout" : "group";
 }
 
 async function hasPredictionsForMatch(matchId: string) {
@@ -77,27 +82,38 @@ export async function updateAdminMatch(input: UpdateAdminMatchInput) {
     String(currentMatchData.predictionType || "normal")
   );
 
+  const currentMatchStage = normalizeMatchStage(
+    String(currentMatchData.matchStage || "group")
+  );
+
   const nextPredictionType = input.predictionType
     ? normalizePredictionType(input.predictionType)
+    : undefined;
+
+  const nextMatchStage = input.matchStage
+    ? normalizeMatchStage(input.matchStage)
     : undefined;
 
   const shouldChangePredictionType =
     Boolean(nextPredictionType) && nextPredictionType !== currentPredictionType;
 
-  if (shouldChangePredictionType) {
+  const shouldChangeMatchStage =
+    Boolean(nextMatchStage) && nextMatchStage !== currentMatchStage;
+
+  if (shouldChangePredictionType || shouldChangeMatchStage) {
     const isCalculated =
       Boolean(currentMatchData.resultCalculated) ||
       String(currentMatchData.status || "") === "finished";
 
     if (isCalculated) {
-      throw new Error("لا يمكن تغيير نوع التوقع بعد احتساب المباراة.");
+      throw new Error("لا يمكن تغيير نوع المباراة أو نوع التوقع بعد الاحتساب.");
     }
 
     const hasPredictions = await hasPredictionsForMatch(matchId);
 
     if (hasPredictions) {
       throw new Error(
-        "لا يمكن تغيير نوع التوقع بعد تسجيل توقعات من الأعضاء على هذه المباراة."
+        "لا يمكن تغيير نوع المباراة أو نوع التوقع بعد تسجيل توقعات من الأعضاء."
       );
     }
   }
@@ -116,6 +132,10 @@ export async function updateAdminMatch(input: UpdateAdminMatchInput) {
 
   if (nextPredictionType) {
     updateData.predictionType = nextPredictionType;
+  }
+
+  if (nextMatchStage) {
+    updateData.matchStage = nextMatchStage;
   }
 
   await updateDoc(matchRef, updateData);

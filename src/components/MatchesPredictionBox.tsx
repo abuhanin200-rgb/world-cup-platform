@@ -15,6 +15,8 @@ type PredictionInputs = Record<
   {
     homeScore: string;
     awayScore: string;
+    qualifiedTeamCode: string;
+    qualificationMethod: string;
   }
 >;
 
@@ -105,6 +107,35 @@ function isGoldenPrediction(prediction: Prediction) {
   return prediction.predictionType === "golden";
 }
 
+function isKnockoutMatch(match: Match) {
+  return match.matchStage === "knockout";
+}
+
+function getInputValue(
+  inputs: PredictionInputs,
+  matchId: string
+): PredictionInputs[string] {
+  return (
+    inputs[matchId] || {
+      homeScore: "",
+      awayScore: "",
+      qualifiedTeamCode: "",
+      qualificationMethod: "",
+    }
+  );
+}
+
+function isDrawInput(input: PredictionInputs[string]) {
+  if (input.homeScore === "" || input.awayScore === "") return false;
+  return input.homeScore === input.awayScore;
+}
+
+function getQualificationMethodLabel(value?: string | null) {
+  if (value === "extraTime") return "أشواط إضافية";
+  if (value === "penalties") return "ركلات ترجيح";
+  return "";
+}
+
 export default function MatchesPredictionBox() {
   const router = useRouter();
   const { user, isLoggedIn, loading: authLoading } = useAuth();
@@ -188,19 +219,24 @@ export default function MatchesPredictionBox() {
 
   function updateInput(
     matchId: string,
-    key: "homeScore" | "awayScore",
+    key: "homeScore" | "awayScore" | "qualifiedTeamCode" | "qualificationMethod",
     value: string
   ) {
-    if (value !== "" && !/^\d{0,2}$/.test(value)) return;
+    if ((key === "homeScore" || key === "awayScore") && value !== "") {
+      if (!/^\d{0,2}$/.test(value)) return;
+    }
 
-    setInputs((current) => ({
-      ...current,
-      [matchId]: {
-        homeScore: current[matchId]?.homeScore || "",
-        awayScore: current[matchId]?.awayScore || "",
-        [key]: value,
-      },
-    }));
+    setInputs((current) => {
+      const currentInput = getInputValue(current, matchId);
+
+      return {
+        ...current,
+        [matchId]: {
+          ...currentInput,
+          [key]: value,
+        },
+      };
+    });
   }
 
   async function handleSubmitPrediction(match: Match) {
@@ -214,8 +250,10 @@ export default function MatchesPredictionBox() {
       return;
     }
 
-    const homeScore = toNumber(inputs[match.id]?.homeScore || "");
-    const awayScore = toNumber(inputs[match.id]?.awayScore || "");
+    const input = getInputValue(inputs, match.id);
+
+    const homeScore = toNumber(input.homeScore);
+    const awayScore = toNumber(input.awayScore);
 
     if (homeScore === null || awayScore === null) {
       alert("أدخل نتيجة التوقع كاملة");
@@ -224,6 +262,19 @@ export default function MatchesPredictionBox() {
 
     if (homeScore < 0 || awayScore < 0 || homeScore > 30 || awayScore > 30) {
       alert("أدخل نتيجة صحيحة من 0 إلى 30");
+      return;
+    }
+
+    const knockoutDrawPrediction =
+      isKnockoutMatch(match) && homeScore === awayScore;
+
+    if (knockoutDrawPrediction && !input.qualifiedTeamCode) {
+      alert("اختر المنتخب المتأهل");
+      return;
+    }
+
+    if (knockoutDrawPrediction && !input.qualificationMethod) {
+      alert("اختر طريقة التأهل");
       return;
     }
 
@@ -243,6 +294,14 @@ export default function MatchesPredictionBox() {
 
         homeScore,
         awayScore,
+
+        qualifiedTeamCode: knockoutDrawPrediction
+          ? input.qualifiedTeamCode
+          : undefined,
+
+        qualificationMethod: knockoutDrawPrediction
+          ? (input.qualificationMethod as "extraTime" | "penalties")
+          : undefined,
       });
 
       setSavedPredictions((current) => ({
@@ -255,6 +314,8 @@ export default function MatchesPredictionBox() {
         [match.id]: {
           homeScore: "",
           awayScore: "",
+          qualifiedTeamCode: "",
+          qualificationMethod: "",
         },
       }));
 
@@ -297,6 +358,9 @@ export default function MatchesPredictionBox() {
             const countdownText = getCountdownText(match.startAt);
             const matchTime = formatMatchTimeOnly(match.startAt);
             const golden = isGoldenMatch(match);
+            const knockout = isKnockoutMatch(match);
+            const input = getInputValue(inputs, match.id);
+            const showQualificationOptions = knockout && isDrawInput(input);
 
             return (
               <article
@@ -320,6 +384,13 @@ export default function MatchesPredictionBox() {
                       <span className="font-black text-amber-300">+2</span>،
                       والخطأ <span className="font-black">0</span>.
                     </div>
+                  </div>
+                )}
+
+                {knockout && (
+                  <div className="mb-4 rounded-2xl border border-blue-300/30 bg-blue-400/10 px-4 py-3 text-center text-xs font-bold leading-6 text-blue-100 md:text-sm">
+                    مباراة خروج مغلوب: إذا توقعت تعادل راح تختار المتأهل وطريقة
+                    التأهل.
                   </div>
                 )}
 
@@ -413,6 +484,25 @@ export default function MatchesPredictionBox() {
                       توقعك المعتمد: {savedPrediction.homeScore} -{" "}
                       {savedPrediction.awayScore}
                     </div>
+
+                    {savedPrediction.qualifiedTeamCode && (
+                      <div className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-sm font-bold text-blue-100">
+                        المتأهل المختار:{" "}
+                        {savedPrediction.qualifiedTeamCode ===
+                        match.homeTeamCode
+                          ? match.homeTeamName
+                          : match.awayTeamName}
+                        {savedPrediction.qualificationMethod && (
+                          <>
+                            {" "}
+                            • طريقة التأهل:{" "}
+                            {getQualificationMethodLabel(
+                              savedPrediction.qualificationMethod
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : closed ? (
                   <div className="mt-5 rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-center text-sm font-bold text-red-100">
@@ -423,7 +513,7 @@ export default function MatchesPredictionBox() {
                     <div className="grid grid-cols-[1fr_28px_1fr] items-center gap-2">
                       <input
                         inputMode="numeric"
-                        value={inputs[match.id]?.homeScore || ""}
+                        value={input.homeScore}
                         onChange={(event) =>
                           updateInput(
                             match.id,
@@ -445,7 +535,7 @@ export default function MatchesPredictionBox() {
 
                       <input
                         inputMode="numeric"
-                        value={inputs[match.id]?.awayScore || ""}
+                        value={input.awayScore}
                         onChange={(event) =>
                           updateInput(
                             match.id,
@@ -461,6 +551,58 @@ export default function MatchesPredictionBox() {
                         }`}
                       />
                     </div>
+
+                    {showQualificationOptions && (
+                      <div className="mt-3 space-y-3 rounded-2xl border border-blue-300/20 bg-blue-400/10 p-3">
+                        <div>
+                          <label className="mb-2 block text-xs font-black text-blue-100">
+                            اختر المنتخب المتأهل
+                          </label>
+
+                          <select
+                            value={input.qualifiedTeamCode}
+                            onChange={(event) =>
+                              updateInput(
+                                match.id,
+                                "qualifiedTeamCode",
+                                event.target.value
+                              )
+                            }
+                            className="w-full rounded-xl border border-white/10 bg-white px-3 py-3 text-sm font-bold text-slate-950 outline-none focus:border-blue-400"
+                          >
+                            <option value="">اختر المتأهل</option>
+                            <option value={match.homeTeamCode}>
+                              {match.homeTeamEmoji} {match.homeTeamName}
+                            </option>
+                            <option value={match.awayTeamCode}>
+                              {match.awayTeamEmoji} {match.awayTeamName}
+                            </option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-xs font-black text-blue-100">
+                            اختر طريقة التأهل
+                          </label>
+
+                          <select
+                            value={input.qualificationMethod}
+                            onChange={(event) =>
+                              updateInput(
+                                match.id,
+                                "qualificationMethod",
+                                event.target.value
+                              )
+                            }
+                            className="w-full rounded-xl border border-white/10 bg-white px-3 py-3 text-sm font-bold text-slate-950 outline-none focus:border-blue-400"
+                          >
+                            <option value="">اختر طريقة التأهل</option>
+                            <option value="extraTime">أشواط إضافية</option>
+                            <option value="penalties">ركلات ترجيح</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
 
                     <button
                       type="button"

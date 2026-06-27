@@ -9,9 +9,11 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { sendMatchCalculationNotifications } from "./matchNotifications";
-import type { PredictionType } from "./matches";
+import type { MatchStage, PredictionType, QualificationMethod } from "./matches";
 
 type ResultType = "exact" | "winner" | "wrong" | "";
+
+type Outcome = "home" | "away" | "draw";
 
 type PredictionDoc = {
   id: string;
@@ -22,19 +24,29 @@ type PredictionDoc = {
   homeScore: number;
   awayScore: number;
 
+  qualifiedTeamCode?: string | null;
+  qualificationMethod?: QualificationMethod | null;
+
   points?: number;
   isCalculated?: boolean;
   createdAt?: string;
 
   actualHomeScore?: number | null;
   actualAwayScore?: number | null;
+  actualQualifiedTeamCode?: string | null;
+  actualQualificationMethod?: QualificationMethod | null;
 
+  predictionType?: PredictionType;
+  matchStage?: MatchStage;
   resultType?: ResultType;
 };
 
 type MatchDoc = {
   id: string;
+  homeTeamCode: string;
+  awayTeamCode: string;
   predictionType: PredictionType;
+  matchStage: MatchStage;
   resultCalculated?: boolean;
   status?: string;
 };
@@ -59,6 +71,8 @@ export type CalculateMatchInput = {
   matchId: string;
   actualHomeScore: number;
   actualAwayScore: number;
+  actualQualifiedTeamCode?: string;
+  actualQualificationMethod?: QualificationMethod;
 };
 
 function validateScore(score: number) {
@@ -67,6 +81,24 @@ function validateScore(score: number) {
 
 function normalizePredictionType(value: unknown): PredictionType {
   return value === "golden" ? "golden" : "normal";
+}
+
+function normalizeMatchStage(value: unknown): MatchStage {
+  return value === "knockout" ? "knockout" : "group";
+}
+
+function normalizeQualificationMethod(
+  value: unknown
+): QualificationMethod | null {
+  if (value === "extraTime" || value === "penalties") {
+    return value;
+  }
+
+  return null;
+}
+
+function toText(value: unknown) {
+  return String(value || "").trim();
 }
 
 async function getMatchById(matchId: string): Promise<MatchDoc> {
@@ -81,27 +113,46 @@ async function getMatchById(matchId: string): Promise<MatchDoc> {
 
   return {
     id: matchSnap.id,
+    homeTeamCode: toText(data.homeTeamCode),
+    awayTeamCode: toText(data.awayTeamCode),
     predictionType: normalizePredictionType(data.predictionType),
+    matchStage: normalizeMatchStage(data.matchStage),
     resultCalculated: Boolean(data.resultCalculated),
     status: String(data.status || "scheduled"),
   };
 }
 
-function getOutcome(homeScore: number, awayScore: number) {
+function getOutcome(homeScore: number, awayScore: number): Outcome {
   if (homeScore > awayScore) return "home";
   if (homeScore < awayScore) return "away";
   return "draw";
 }
 
-function calculatePredictionPoints(
+function getOutcomeTeamCode(match: MatchDoc, outcome: Outcome) {
+  if (outcome === "home") return match.homeTeamCode;
+  if (outcome === "away") return match.awayTeamCode;
+  return "";
+}
+
+function getPointValues(predictionType: PredictionType) {
+  const multiplier = predictionType === "golden" ? 2 : 1;
+
+  return {
+    exact: 3 * multiplier,
+    winner: 1 * multiplier,
+    qualified: 2 * multiplier,
+    method: 1 * multiplier,
+  };
+}
+
+function calculateGroupPredictionPoints(
   predictedHomeScore: number,
   predictedAwayScore: number,
   actualHomeScore: number,
   actualAwayScore: number,
   predictionType: PredictionType
 ) {
-  const exactPoints = predictionType === "golden" ? 6 : 3;
-  const winnerPoints = predictionType === "golden" ? 2 : 1;
+  const pointsValue = getPointValues(predictionType);
 
   const exact =
     predictedHomeScore === actualHomeScore &&
@@ -109,7 +160,7 @@ function calculatePredictionPoints(
 
   if (exact) {
     return {
-      points: exactPoints,
+      points: pointsValue.exact,
       resultType: "exact" as const,
     };
   }
@@ -119,7 +170,113 @@ function calculatePredictionPoints(
 
   if (predictedOutcome === actualOutcome) {
     return {
-      points: winnerPoints,
+      points: pointsValue.winner,
+      resultType: "winner" as const,
+    };
+  }
+
+  return {
+    points: 0,
+    resultType: "wrong" as const,
+  };
+}
+
+function calculateKnockoutPredictionPoints(params: {
+  prediction: PredictionDoc;
+  match: MatchDoc;
+  actualHomeScore: number;
+  actualAwayScore: number;
+  actualQualifiedTeamCode: string | null;
+  actualQualificationMethod: QualificationMethod | null;
+}) {
+  const {
+    prediction,
+    match,
+    actualHomeScore,
+    actualAwayScore,
+    actualQualifiedTeamCode,
+    actualQualificationMethod,
+  } = params;
+
+  const predictionType = normalizePredictionType(prediction.predictionType);
+  const pointsValue = getPointValues(predictionType);
+
+  const predictedHomeScore = Number(prediction.homeScore);
+  const predictedAwayScore = Number(prediction.awayScore);
+
+  const predictedOutcome = getOutcome(predictedHomeScore, predictedAwayScore);
+  const actualOutcome = getOutcome(actualHomeScore, actualAwayScore);
+
+  const exact =
+    predictedHomeScore === actualHomeScore &&
+    predictedAwayScore === actualAwayScore;
+
+  if (predictedOutcome !== "draw") {
+    if (exact) {
+      return {
+        points: pointsValue.exact,
+        resultType: "exact" as const,
+      };
+    }
+
+    if (predictedOutcome === actualOutcome) {
+      return {
+        points: pointsValue.winner,
+        resultType: "winner" as const,
+      };
+    }
+
+    return {
+      points: 0,
+      resultType: "wrong" as const,
+    };
+  }
+
+  let points = 0;
+  let resultType: ResultType = "wrong";
+
+  if (actualOutcome === "draw") {
+    if (exact) {
+      points += pointsValue.exact;
+      resultType = "exact";
+    } else {
+      points += pointsValue.winner;
+      resultType = "winner";
+    }
+
+    if (
+      prediction.qualifiedTeamCode &&
+      actualQualifiedTeamCode &&
+      prediction.qualifiedTeamCode === actualQualifiedTeamCode
+    ) {
+      points += pointsValue.qualified;
+      if (resultType !== "exact") resultType = "winner";
+    }
+
+    if (
+      prediction.qualificationMethod &&
+      actualQualificationMethod &&
+      prediction.qualificationMethod === actualQualificationMethod
+    ) {
+      points += pointsValue.method;
+      if (resultType !== "exact") resultType = "winner";
+    }
+
+    return {
+      points,
+      resultType: points > 0 ? resultType : ("wrong" as const),
+    };
+  }
+
+  const actualWinnerTeamCode = getOutcomeTeamCode(match, actualOutcome);
+
+  if (
+    prediction.qualifiedTeamCode &&
+    actualWinnerTeamCode &&
+    prediction.qualifiedTeamCode === actualWinnerTeamCode
+  ) {
+    return {
+      points: pointsValue.winner,
       resultType: "winner" as const,
     };
   }
@@ -203,17 +360,21 @@ function buildUserStats(predictions: PredictionDoc[]) {
 
     for (const prediction of sortedPredictions) {
       const predictionPoints = Number(prediction.points || 0);
+      const resultType = prediction.resultType || "";
 
       total += 1;
       points += predictionPoints;
 
-      if (predictionPoints > 0) {
+      if (resultType === "exact") {
         correct += 1;
-        currentStreak += 1;
-        bestStreak = Math.max(bestStreak, currentStreak);
-      } else {
+      }
+
+      if (predictionPoints === 0 || resultType === "wrong") {
         wrong += 1;
         currentStreak = 0;
+      } else {
+        currentStreak += 1;
+        bestStreak = Math.max(bestStreak, currentStreak);
       }
     }
 
@@ -240,24 +401,6 @@ function mergeCalculatedPredictions(
   );
 
   return [...otherPredictions, ...updatedMatchPredictions];
-}
-
-function getRankMovement(oldRank: number, newRank: number) {
-  let rankDirection: "up" | "down" | "-" = "-";
-  let rankChange = 0;
-
-  if (oldRank > newRank) {
-    rankDirection = "up";
-    rankChange = oldRank - newRank;
-  } else if (oldRank < newRank) {
-    rankDirection = "down";
-    rankChange = newRank - oldRank;
-  }
-
-  return {
-    rankDirection,
-    rankChange,
-  };
 }
 
 function buildRankedUsers(
@@ -288,6 +431,24 @@ function buildRankedUsers(
     });
 }
 
+function getRankMovement(oldRank: number, newRank: number) {
+  let rankDirection: "up" | "down" | "-" = "-";
+  let rankChange = 0;
+
+  if (oldRank > newRank) {
+    rankDirection = "up";
+    rankChange = oldRank - newRank;
+  } else if (oldRank < newRank) {
+    rankDirection = "down";
+    rankChange = newRank - oldRank;
+  }
+
+  return {
+    rankDirection,
+    rankChange,
+  };
+}
+
 export async function calculateMatchResult(input: CalculateMatchInput) {
   if (!input.matchId) {
     throw new Error("اختر المباراة أولًا");
@@ -301,6 +462,35 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
   }
 
   const match = await getMatchById(input.matchId);
+  const actualOutcome = getOutcome(input.actualHomeScore, input.actualAwayScore);
+
+  const actualQualifiedTeamCode =
+    match.matchStage === "knockout" && actualOutcome === "draw"
+      ? toText(input.actualQualifiedTeamCode)
+      : actualOutcome === "home"
+      ? match.homeTeamCode
+      : actualOutcome === "away"
+      ? match.awayTeamCode
+      : null;
+
+  const actualQualificationMethod =
+    match.matchStage === "knockout" && actualOutcome === "draw"
+      ? normalizeQualificationMethod(input.actualQualificationMethod)
+      : null;
+
+  if (match.matchStage === "knockout" && actualOutcome === "draw") {
+    const validQualifiedTeam =
+      actualQualifiedTeamCode === match.homeTeamCode ||
+      actualQualifiedTeamCode === match.awayTeamCode;
+
+    if (!validQualifiedTeam) {
+      throw new Error("اختر المنتخب المتأهل");
+    }
+
+    if (!actualQualificationMethod) {
+      throw new Error("اختر طريقة التأهل");
+    }
+  }
 
   const matchPredictions = await getMatchPredictions(input.matchId);
 
@@ -317,19 +507,39 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
   }
 
   const calculatedMatchPredictions = matchPredictions.map((prediction) => {
-    const result = calculatePredictionPoints(
-      Number(prediction.homeScore),
-      Number(prediction.awayScore),
-      input.actualHomeScore,
-      input.actualAwayScore,
-      match.predictionType
+    const predictionType = normalizePredictionType(
+      prediction.predictionType || match.predictionType
     );
+
+    const result =
+      match.matchStage === "knockout"
+        ? calculateKnockoutPredictionPoints({
+            prediction: {
+              ...prediction,
+              predictionType,
+              matchStage: match.matchStage,
+            },
+            match,
+            actualHomeScore: input.actualHomeScore,
+            actualAwayScore: input.actualAwayScore,
+            actualQualifiedTeamCode,
+            actualQualificationMethod,
+          })
+        : calculateGroupPredictionPoints(
+            Number(prediction.homeScore),
+            Number(prediction.awayScore),
+            input.actualHomeScore,
+            input.actualAwayScore,
+            predictionType
+          );
 
     return {
       ...prediction,
       points: result.points,
       resultType: result.resultType,
       isCalculated: true,
+      predictionType,
+      matchStage: match.matchStage,
     };
   });
 
@@ -357,7 +567,10 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
       isCalculated: true,
       actualHomeScore: input.actualHomeScore,
       actualAwayScore: input.actualAwayScore,
-      predictionType: match.predictionType,
+      actualQualifiedTeamCode,
+      actualQualificationMethod,
+      predictionType: prediction.predictionType,
+      matchStage: match.matchStage,
       calculatedAt: now,
       updatedAt: now,
     });
@@ -397,6 +610,8 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
     status: "finished",
     actualHomeScore: input.actualHomeScore,
     actualAwayScore: input.actualAwayScore,
+    actualQualifiedTeamCode,
+    actualQualificationMethod,
     resultCalculated: true,
     calculatedAt: now,
     updatedAt: now,
@@ -405,9 +620,9 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
   await batch.commit();
 
   await sendMatchCalculationNotifications({
-  predictions: calculatedMatchPredictions,
-  rankedUsers,
-});
+    predictions: calculatedMatchPredictions,
+    rankedUsers,
+  });
 
   const exactCount = calculatedMatchPredictions.filter(
     (prediction) => prediction.resultType === "exact"
@@ -427,6 +642,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
     winnerCount,
     wrongCount,
     predictionType: match.predictionType,
+    matchStage: match.matchStage,
   };
 }
 
@@ -471,6 +687,8 @@ export async function undoMatchCalculation(matchId: string) {
       isCalculated: false,
       actualHomeScore: null,
       actualAwayScore: null,
+      actualQualifiedTeamCode: null,
+      actualQualificationMethod: null,
       calculatedAt: null,
       updatedAt: now,
     });
@@ -510,6 +728,8 @@ export async function undoMatchCalculation(matchId: string) {
     status: "scheduled",
     actualHomeScore: null,
     actualAwayScore: null,
+    actualQualifiedTeamCode: null,
+    actualQualificationMethod: null,
     resultCalculated: false,
     calculatedAt: null,
     updatedAt: now,
