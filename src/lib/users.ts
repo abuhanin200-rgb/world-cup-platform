@@ -36,6 +36,10 @@ export type AppUser = {
   createdAt?: string;
   updatedAt?: string;
   lastUpdated?: string;
+
+  seenNotices?: {
+    knockoutRulesV1?: boolean;
+  };
 };
 
 export type RegisterUserInput = {
@@ -82,6 +86,18 @@ function normalizeRankDirection(value: unknown): "up" | "down" | "-" {
   return "-";
 }
 
+function normalizeSeenNotices(value: unknown): AppUser["seenNotices"] {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const notices = value as Record<string, unknown>;
+
+  return {
+    knockoutRulesV1: notices.knockoutRulesV1 === true,
+  };
+}
+
 function mapUserDoc(id: string, data: Record<string, unknown>): AppUser {
   return {
     id,
@@ -108,6 +124,8 @@ function mapUserDoc(id: string, data: Record<string, unknown>): AppUser {
     createdAt: data.createdAt ? String(data.createdAt) : undefined,
     updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
     lastUpdated: data.lastUpdated ? String(data.lastUpdated) : undefined,
+
+    seenNotices: normalizeSeenNotices(data.seenNotices),
   };
 }
 
@@ -210,6 +228,10 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
 
     createdAt: now,
     updatedAt: now,
+
+    seenNotices: {
+      knockoutRulesV1: false,
+    },
   };
 
   const userRef = await addDoc(collection(db, "users"), userData);
@@ -338,4 +360,19 @@ export async function updateUserPassword(
   }
 
   return updatedUser;
+}
+
+export async function markKnockoutRulesNoticeSeen(userId: string) {
+  const cleanUserId = cleanText(userId);
+
+  if (!cleanUserId) {
+    throw new Error("معرّف العضو غير موجود");
+  }
+
+  const userRef = doc(db, "users", cleanUserId);
+
+  await updateDoc(userRef, {
+    "seenNotices.knockoutRulesV1": true,
+    updatedAt: new Date().toISOString(),
+  });
 }
