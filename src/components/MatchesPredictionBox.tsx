@@ -388,11 +388,12 @@ export default function MatchesPredictionBox() {
                 )}
 
                 {knockout && (
-                  <div className="mb-4 rounded-2xl border border-blue-300/30 bg-blue-400/10 px-4 py-3 text-center text-xs font-bold leading-6 text-blue-100 md:text-sm">
-                    مباراة خروج مغلوب: إذا توقعت تعادل راح تختار المتأهل وطريقة
-                    التأهل.
-                  </div>
-                )}
+  <div className="mb-4 flex justify-center">
+    <span className="inline-flex rounded-full border border-amber-300/40 bg-amber-400/15 px-4 py-1.5 text-xs font-black text-amber-100 md:text-sm">
+      خروج المغلوب
+    </span>
+  </div>
+)}
 
                 <div className="mb-4 space-y-2">
                   <div className="flex items-center justify-between gap-3">
