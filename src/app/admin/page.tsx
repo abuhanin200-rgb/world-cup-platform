@@ -400,10 +400,10 @@ export default function AdminPage() {
           actualAwayScore: awayScore,
           actualQualifiedTeamCode: knockoutDraw
             ? actualQualifiedTeamCode
-            : undefined,
+            : null,
           actualQualificationMethod: knockoutDraw
             ? actualQualificationMethod
-            : undefined,
+            : null,
         },
       });
 
