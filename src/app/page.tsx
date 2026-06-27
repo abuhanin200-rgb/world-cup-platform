@@ -41,7 +41,7 @@ export default function HomePage() {
       return;
     }
 
-    setShowKnockoutRulesNotice(user.seenNotices?.knockoutRulesV1 !== true);
+    setShowKnockoutRulesNotice(user.seenNotices?.knockoutRulesV2 !== true);
   }, [loading, isLoggedIn, user]);
 
   async function handleConfirmKnockoutRulesNotice() {

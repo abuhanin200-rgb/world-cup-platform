@@ -39,6 +39,7 @@ export type AppUser = {
 
   seenNotices?: {
     knockoutRulesV1?: boolean;
+    knockoutRulesV2?: boolean;
   };
 };
 
@@ -95,6 +96,7 @@ function normalizeSeenNotices(value: unknown): AppUser["seenNotices"] {
 
   return {
     knockoutRulesV1: notices.knockoutRulesV1 === true,
+    knockoutRulesV2: notices.knockoutRulesV2 === true,
   };
 }
 
@@ -231,6 +233,7 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
 
     seenNotices: {
       knockoutRulesV1: false,
+      knockoutRulesV2: false,
     },
   };
 
@@ -306,7 +309,6 @@ export async function updateUserProfile(
   }
 
   const now = new Date().toISOString();
-
   const userRef = doc(db, "users", userId);
 
   await updateDoc(userRef, {
@@ -372,7 +374,7 @@ export async function markKnockoutRulesNoticeSeen(userId: string) {
   const userRef = doc(db, "users", cleanUserId);
 
   await updateDoc(userRef, {
-    "seenNotices.knockoutRulesV1": true,
+    "seenNotices.knockoutRulesV2": true,
     updatedAt: new Date().toISOString(),
   });
 }
