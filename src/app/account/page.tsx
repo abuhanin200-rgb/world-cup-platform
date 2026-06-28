@@ -53,6 +53,34 @@ function getWinnerPoints(prediction: AccountPrediction) {
   return isGoldenPrediction(prediction) ? 2 : 1;
 }
 
+function getQualificationMethodLabel(value?: string | null) {
+  if (value === "extraTime") return "أشواط إضافية";
+  if (value === "penalties") return "ركلات ترجيح";
+  return "";
+}
+
+function getQualifiedTeamName(
+  prediction: AccountPrediction,
+  qualifiedTeamCode?: string | null
+) {
+  if (!qualifiedTeamCode) return "";
+
+  const predictionWithCodes = prediction as AccountPrediction & {
+    homeTeamCode?: string | null;
+    awayTeamCode?: string | null;
+  };
+
+  if (qualifiedTeamCode === predictionWithCodes.homeTeamCode) {
+    return prediction.homeTeamName;
+  }
+
+  if (qualifiedTeamCode === predictionWithCodes.awayTeamCode) {
+    return prediction.awayTeamName;
+  }
+
+  return qualifiedTeamCode;
+}
+
 function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
   if (!prediction.isCalculated) {
     return (
@@ -91,6 +119,10 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
 
 function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
   const isGolden = prediction.predictionType === "golden";
+  const knockoutPrediction = prediction as AccountPrediction & {
+    qualifiedTeamCode?: string | null;
+    qualificationMethod?: string | null;
+  };
 
   return (
     <div
@@ -140,6 +172,29 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
           </div>
         </div>
       </div>
+
+      {knockoutPrediction.qualifiedTeamCode && (
+        <div className="mt-4 rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-xs font-bold leading-6 text-blue-100 md:text-sm">
+          المتأهل:{" "}
+          <span className="font-black text-white">
+            {getQualifiedTeamName(
+              prediction,
+              knockoutPrediction.qualifiedTeamCode
+            )}
+          </span>
+          {knockoutPrediction.qualificationMethod && (
+            <>
+              {" "}
+              • الطريقة:{" "}
+              <span className="font-black text-white">
+                {getQualificationMethodLabel(
+                  knockoutPrediction.qualificationMethod
+                )}
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {prediction.isCalculated && (
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/10 p-3 text-center text-sm text-slate-200">

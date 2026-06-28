@@ -28,6 +28,8 @@ export type Prediction = {
   homeTeamEmoji: string;
   awayTeamName: string;
   awayTeamEmoji: string;
+  homeTeamCode: string;
+  awayTeamCode: string;
 
   homeScore: number;
   awayScore: number;
@@ -189,6 +191,8 @@ function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
     homeTeamEmoji: toText(data.homeTeamEmoji),
     awayTeamName: toText(data.awayTeamName),
     awayTeamEmoji: toText(data.awayTeamEmoji),
+    homeTeamCode: toText(data.homeTeamCode),
+    awayTeamCode: toText(data.awayTeamCode),
 
     homeScore: toNumber(data.homeScore),
     awayScore: toNumber(data.awayScore),
@@ -365,6 +369,8 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     homeTeamEmoji: input.homeTeamEmoji,
     awayTeamName: input.awayTeamName,
     awayTeamEmoji: input.awayTeamEmoji,
+    homeTeamCode: matchInfo.homeTeamCode,
+    awayTeamCode: matchInfo.awayTeamCode,
 
     homeScore: input.homeScore,
     awayScore: input.awayScore,
