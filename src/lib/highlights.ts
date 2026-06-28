@@ -1,6 +1,6 @@
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
-import type { PredictionType } from "./matches";
+import type { PredictionType, QualificationMethod } from "./matches";
 
 export type HomeHighlightUser = {
   id: string;
@@ -35,9 +35,14 @@ export type ExactHit = {
   awayTeamName: string;
   homeTeamEmoji: string;
   awayTeamEmoji: string;
+  homeTeamCode: string;
+  awayTeamCode: string;
 
   homeScore: number;
   awayScore: number;
+
+  qualifiedTeamCode?: string | null;
+  qualificationMethod?: QualificationMethod | null;
 
   points: number;
   predictionType: PredictionType;
@@ -46,33 +51,14 @@ export type ExactHit = {
   calculatedAt: string;
 };
 
-type HighlightPrediction = {
-  id: string;
-  userId: string;
-  userName: string;
-
-  matchId: string;
-
-  homeTeamName: string;
-  awayTeamName: string;
-  homeTeamEmoji: string;
-  awayTeamEmoji: string;
-
-  homeScore: number;
-  awayScore: number;
-
+type HighlightPrediction = ExactHit & {
   actualHomeScore: number | null;
   actualAwayScore: number | null;
 
-  points: number;
   resultType: string;
   isCalculated: boolean;
-  predictionType: PredictionType;
 
-  createdAt: string;
   createdTimeValue: number;
-
-  calculatedAt: string;
   calculatedTimeValue: number;
 };
 
@@ -85,8 +71,26 @@ function toText(value: unknown) {
   return String(value || "").trim();
 }
 
+function toNullableText(value: unknown) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  return toText(value);
+}
+
 function normalizePredictionType(value: unknown): PredictionType {
   return value === "golden" ? "golden" : "normal";
+}
+
+function normalizeQualificationMethod(
+  value: unknown
+): QualificationMethod | null {
+  if (value === "extraTime" || value === "penalties") {
+    return value;
+  }
+
+  return null;
 }
 
 function toTimeValue(value: unknown) {
@@ -224,9 +228,16 @@ async function getPredictionsForHighlights(): Promise<HighlightPrediction[]> {
         awayTeamName: toText(data.awayTeamName),
         homeTeamEmoji: toText(data.homeTeamEmoji),
         awayTeamEmoji: toText(data.awayTeamEmoji),
+        homeTeamCode: toText(data.homeTeamCode),
+        awayTeamCode: toText(data.awayTeamCode),
 
         homeScore: toNumber(data.homeScore),
         awayScore: toNumber(data.awayScore),
+
+        qualifiedTeamCode: toNullableText(data.qualifiedTeamCode),
+        qualificationMethod: normalizeQualificationMethod(
+          data.qualificationMethod
+        ),
 
         actualHomeScore:
           data.actualHomeScore === undefined || data.actualHomeScore === null
@@ -388,9 +399,14 @@ function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
         awayTeamName: prediction.awayTeamName,
         homeTeamEmoji: prediction.homeTeamEmoji,
         awayTeamEmoji: prediction.awayTeamEmoji,
+        homeTeamCode: prediction.homeTeamCode,
+        awayTeamCode: prediction.awayTeamCode,
 
         homeScore: prediction.homeScore,
         awayScore: prediction.awayScore,
+
+        qualifiedTeamCode: prediction.qualifiedTeamCode,
+        qualificationMethod: prediction.qualificationMethod,
 
         points: prediction.points,
         predictionType: prediction.predictionType,

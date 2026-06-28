@@ -141,6 +141,26 @@ function isGoldenExactHit(hit: ExactHitWithPredictionType) {
   return hit.predictionType === "golden";
 }
 
+function getQualificationMethodLabel(value?: string | null) {
+  if (value === "extraTime") return "أشواط إضافية";
+  if (value === "penalties") return "ركلات ترجيح";
+  return "";
+}
+
+function getQualifiedTeamLabel(hit: ExactHitWithPredictionType) {
+  if (!hit.qualifiedTeamCode) return "";
+
+  if (hit.qualifiedTeamCode === hit.homeTeamCode) {
+    return `${hit.homeTeamEmoji} ${hit.homeTeamName}`;
+  }
+
+  if (hit.qualifiedTeamCode === hit.awayTeamCode) {
+    return `${hit.awayTeamEmoji} ${hit.awayTeamName}`;
+  }
+
+  return hit.qualifiedTeamCode;
+}
+
 export default function HomeHighlights() {
   const [predictionKing, setPredictionKing] =
     useState<HomeHighlightUser | null>(null);
@@ -383,6 +403,21 @@ export function ExactHitsTicker() {
         <span className="font-bold">
           {hit.awayTeamName} {hit.awayTeamEmoji}
         </span>
+
+        {exactHit.qualifiedTeamCode && (
+  <>
+    {" "}
+    <span className="font-black text-blue-200">
+      • المتأهل {getQualifiedTeamLabel(exactHit)}
+    </span>
+    {exactHit.qualificationMethod && (
+      <span className="font-black text-blue-200">
+        {" "}
+        • {getQualificationMethodLabel(exactHit.qualificationMethod)}
+      </span>
+    )}
+  </>
+)}
       </div>
     );
   }
@@ -433,6 +468,15 @@ export function ExactHitsTicker() {
             {hit.awayTeamName} {hit.awayTeamEmoji}
           </span>
         </div>
+
+        {exactHit.qualifiedTeamCode && (
+  <div className="mt-2 rounded-xl border border-blue-400/30 bg-blue-400/10 px-3 py-2 text-center text-xs font-black text-blue-100">
+    المتأهل {getQualifiedTeamLabel(exactHit)}
+    {exactHit.qualificationMethod && (
+      <> • {getQualificationMethodLabel(exactHit.qualificationMethod)}</>
+    )}
+  </div>
+)}
 
         {golden && (
           <div className="mt-2 inline-flex rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950">
