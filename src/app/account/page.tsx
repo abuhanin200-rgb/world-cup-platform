@@ -104,8 +104,8 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
     return (
       <span className="rounded-full bg-amber-400/15 px-3 py-1 text-[11px] font-black text-amber-300">
         {isGoldenPrediction(prediction)
-          ? `فائز ذهبي +${getWinnerPoints(prediction)}`
-          : `توقع صحيح +${getWinnerPoints(prediction)}`}
+          ? `الفائز صحيح ذهبي +${getWinnerPoints(prediction)}`
+          : `الفائز صحيح +${getWinnerPoints(prediction)}`}
       </span>
     );
   }

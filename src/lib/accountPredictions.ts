@@ -1,6 +1,6 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "./firebase";
-import type { PredictionType } from "./matches";
+import type { PredictionType, QualificationMethod } from "./matches";
 
 export type AccountPredictionResultType = "exact" | "winner" | "wrong" | "";
 
@@ -10,11 +10,17 @@ export type AccountPrediction = {
 
   homeTeamName: string;
   homeTeamEmoji: string;
+  homeTeamCode: string;
+
   awayTeamName: string;
   awayTeamEmoji: string;
+  awayTeamCode: string;
 
   homeScore: number;
   awayScore: number;
+
+  qualifiedTeamCode?: string | null;
+  qualificationMethod?: QualificationMethod | null;
 
   actualHomeScore: number | null;
   actualAwayScore: number | null;
@@ -38,6 +44,14 @@ function toText(value: unknown) {
   return String(value || "").trim();
 }
 
+function toNullableText(value: unknown) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  return toText(value);
+}
+
 function toNullableNumber(value: unknown) {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -57,6 +71,16 @@ function normalizeResultType(value: unknown): AccountPredictionResultType {
 
 function normalizePredictionType(value: unknown): PredictionType {
   return value === "golden" ? "golden" : "normal";
+}
+
+function normalizeQualificationMethod(
+  value: unknown
+): QualificationMethod | null {
+  if (value === "extraTime" || value === "penalties") {
+    return value;
+  }
+
+  return null;
 }
 
 export async function getAccountPredictions(
@@ -79,11 +103,19 @@ export async function getAccountPredictions(
 
         homeTeamName: toText(data.homeTeamName),
         homeTeamEmoji: toText(data.homeTeamEmoji),
+        homeTeamCode: toText(data.homeTeamCode),
+
         awayTeamName: toText(data.awayTeamName),
         awayTeamEmoji: toText(data.awayTeamEmoji),
+        awayTeamCode: toText(data.awayTeamCode),
 
         homeScore: toNumber(data.homeScore),
         awayScore: toNumber(data.awayScore),
+
+        qualifiedTeamCode: toNullableText(data.qualifiedTeamCode),
+        qualificationMethod: normalizeQualificationMethod(
+          data.qualificationMethod
+        ),
 
         actualHomeScore: toNullableNumber(data.actualHomeScore),
         actualAwayScore: toNullableNumber(data.actualAwayScore),
