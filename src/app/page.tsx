@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import HomeStats from "@/components/HomeStats";
@@ -11,8 +10,7 @@ import HomeHighlights, { ExactHitsTicker } from "@/components/HomeHighlights";
 import ExactPredictionCelebration from "@/components/ExactPredictionCelebration";
 import HomeBanner from "@/components/HomeBanner";
 import OnlineMembersCounter from "@/components/OnlineMembersCounter";
-import KnockoutRulesNotice from "@/components/KnockoutRulesNotice";
-import { markKnockoutRulesNoticeSeen } from "@/lib/users";
+import PredictionEditNotice from "../components/PredictionEditNotice";
 
 const forgotPasswordMessage = `السلام عليكم، نسيت الرقم السري في منصة توقعات كأس العالم 2026.
 
@@ -30,35 +28,7 @@ const forgotPasswordWhatsappUrl = `https://wa.me/966542180200?text=${encodeURICo
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, loading, isLoggedIn, logout, refreshUser } = useAuth();
-  const [showKnockoutRulesNotice, setShowKnockoutRulesNotice] = useState(false);
-  const [savingKnockoutRulesNotice, setSavingKnockoutRulesNotice] =
-    useState(false);
-
-  useEffect(() => {
-    if (loading || !isLoggedIn || !user) {
-      setShowKnockoutRulesNotice(false);
-      return;
-    }
-
-    setShowKnockoutRulesNotice(user.seenNotices?.knockoutRulesV2 !== true);
-  }, [loading, isLoggedIn, user]);
-
-  async function handleConfirmKnockoutRulesNotice() {
-    if (!user?.id || savingKnockoutRulesNotice) return;
-
-    try {
-      setSavingKnockoutRulesNotice(true);
-      await markKnockoutRulesNoticeSeen(user.id);
-      await refreshUser();
-      setShowKnockoutRulesNotice(false);
-    } catch (error) {
-      console.error("فشل حفظ إشعار قواعد خروج المغلوب:", error);
-      alert("تعذر حفظ تأكيد قراءة الإشعار، حاول مرة ثانية");
-    } finally {
-      setSavingKnockoutRulesNotice(false);
-    }
-  }
+  const { user, loading, isLoggedIn, logout } = useAuth();
 
   return (
     <main
@@ -66,13 +36,7 @@ export default function HomePage() {
       className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
     >
       <ExactPredictionCelebration />
-
-      {showKnockoutRulesNotice && (
-        <KnockoutRulesNotice
-          saving={savingKnockoutRulesNotice}
-          onConfirm={handleConfirmKnockoutRulesNotice}
-        />
-      )}
+      <PredictionEditNotice />
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">

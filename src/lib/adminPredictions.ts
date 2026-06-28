@@ -36,6 +36,8 @@ export type AdminPrediction = {
   isCalculated: boolean;
 
   createdAt: string;
+  editedAt: string | null;
+  editCount: number;
   calculatedAt: string | null;
 };
 
@@ -236,6 +238,11 @@ export async function getAdminPredictions(): Promise<AdminPrediction[]> {
         isCalculated: Boolean(data.isCalculated),
 
         createdAt: toText(data.createdAt),
+        editedAt:
+          data.editedAt === null || data.editedAt === undefined
+            ? null
+            : toText(data.editedAt),
+        editCount: toNumber(data.editCount),
         calculatedAt:
           data.calculatedAt === null || data.calculatedAt === undefined
             ? null

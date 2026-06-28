@@ -14,6 +14,8 @@ type PredictionType = "normal" | "golden";
 
 type AdminPredictionWithType = AdminPrediction & {
   predictionType?: PredictionType;
+  editedAt?: string | null;
+  editCount?: number;
 };
 
 type PredictionStatus =
@@ -22,6 +24,7 @@ type PredictionStatus =
   | "exact"
   | "winner"
   | "wrong"
+  | "edited"
   | "golden"
   | "goldenExact"
   | "goldenWinner";
@@ -79,6 +82,10 @@ function isWrongPrediction(prediction: AdminPredictionWithType) {
   return prediction.isCalculated && prediction.points === 0;
 }
 
+function isEditedPrediction(prediction: AdminPredictionWithType) {
+  return Boolean(prediction.editedAt) || Number(prediction.editCount || 0) > 0;
+}
+
 function getPredictionResultLabel(prediction: AdminPredictionWithType) {
   const golden = isGoldenPrediction(prediction);
 
@@ -128,6 +135,7 @@ function matchesStatusFilter(
   if (status === "exact") return isExactPrediction(prediction);
   if (status === "winner") return isWinnerPrediction(prediction);
   if (status === "wrong") return isWrongPrediction(prediction);
+  if (status === "edited") return isEditedPrediction(prediction);
   if (status === "golden") return golden;
   if (status === "goldenExact") return golden && isExactPrediction(prediction);
   if (status === "goldenWinner") {
@@ -240,6 +248,9 @@ export default function AdminPredictionsPanel() {
         : "";
 
       const duplicateText = isDuplicatePrediction(prediction) ? "مكرر" : "";
+      const editedText = isEditedPrediction(prediction)
+        ? "معدل معدلة تم التعديل"
+        : "";
 
       const matchesSearch =
         !searchValue ||
@@ -248,7 +259,8 @@ export default function AdminPredictionsPanel() {
         prediction.awayTeamName.toLowerCase().includes(searchValue) ||
         prediction.id.toLowerCase().includes(searchValue) ||
         predictionTypeText.includes(searchValue) ||
-        duplicateText.includes(searchValue);
+        duplicateText.includes(searchValue) ||
+        editedText.includes(searchValue);
 
       const matchesMatch = matchId === "all" || prediction.matchId === matchId;
       const matchesStatus = matchesStatusFilter(prediction, status);
@@ -291,6 +303,10 @@ export default function AdminPredictionsPanel() {
     isDuplicatePrediction(prediction)
   ).length;
 
+  const totalEdited = predictions.filter((prediction) =>
+    isEditedPrediction(prediction)
+  ).length;
+
   const totalGoldenExact = predictions.filter((prediction) => {
     return isGoldenPrediction(prediction) && isExactPrediction(prediction);
   }).length;
@@ -329,7 +345,7 @@ export default function AdminPredictionsPanel() {
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-9">
+      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-10">
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-center">
           <div className="text-[11px] text-slate-400">الإجمالي</div>
           <div className="mt-1 text-2xl font-black">{predictions.length}</div>
@@ -339,6 +355,13 @@ export default function AdminPredictionsPanel() {
           <div className="text-[11px] text-red-100">مكرر</div>
           <div className="mt-1 text-2xl font-black text-red-200">
             {totalDuplicates}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-blue-400/30 bg-blue-500/10 p-3 text-center">
+          <div className="text-[11px] text-blue-100">معدلة</div>
+          <div className="mt-1 text-2xl font-black text-blue-200">
+            {totalEdited}
           </div>
         </div>
 
@@ -430,6 +453,7 @@ export default function AdminPredictionsPanel() {
           <option value="exact">بالملي</option>
           <option value="winner">الفائز</option>
           <option value="wrong">خطأ +0</option>
+          <option value="edited">التوقعات المعدلة</option>
           <option value="golden">التوقعات الذهبية</option>
           <option value="goldenExact">ذهبي بالملي +6</option>
           <option value="goldenWinner">فائز ذهبي +2</option>
@@ -543,7 +567,7 @@ export default function AdminPredictionsPanel() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1120px] border-collapse text-sm">
+            <table className="w-full min-w-[1240px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-white/10 bg-slate-950/80 text-[12px] text-slate-300">
                   <th className="px-3 py-3 text-right font-black">#</th>
@@ -559,6 +583,7 @@ export default function AdminPredictionsPanel() {
                   <th className="px-3 py-3 text-center font-black">
                     وقت التوقع
                   </th>
+                  <th className="px-3 py-3 text-center font-black">التعديل</th>
                   <th className="px-3 py-3 text-center font-black">
                     وقت الاحتساب
                   </th>
@@ -669,6 +694,21 @@ export default function AdminPredictionsPanel() {
 
                       <td className="px-3 py-3 text-center text-[11px] text-slate-400">
                         {formatDate(prediction.createdAt)}
+                      </td>
+
+                      <td className="px-3 py-3 text-center">
+                        {isEditedPrediction(prediction) ? (
+                          <div className="inline-flex flex-col items-center gap-1 rounded-xl border border-blue-400/30 bg-blue-500/10 px-3 py-2 text-[11px] font-black text-blue-100">
+                            <span>
+                              تم التعديل {prediction.editCount || 1} مرة
+                            </span>
+                            <span className="font-bold text-blue-200/80">
+                              {formatDate(prediction.editedAt)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-500">—</span>
+                        )}
                       </td>
 
                       <td className="px-3 py-3 text-center text-[11px] text-slate-400">

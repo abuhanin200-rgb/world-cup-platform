@@ -33,14 +33,15 @@ export type AppUser = {
   currentStreak: number;
   bestStreak: number;
 
+  seenNotices?: {
+    knockoutRulesV2?: boolean;
+    predictionEditWindowV1?: boolean;
+    [key: string]: boolean | undefined;
+  };
+
   createdAt?: string;
   updatedAt?: string;
   lastUpdated?: string;
-
-  seenNotices?: {
-    knockoutRulesV1?: boolean;
-    knockoutRulesV2?: boolean;
-  };
 };
 
 export type RegisterUserInput = {
@@ -70,6 +71,8 @@ export type UpdateUserPasswordInput = {
   confirmPassword: string;
 };
 
+export type UserNoticeKey = "knockoutRulesV2" | "predictionEditWindowV1";
+
 function cleanText(value: string) {
   return value.trim();
 }
@@ -93,11 +96,13 @@ function normalizeSeenNotices(value: unknown): AppUser["seenNotices"] {
   }
 
   const notices = value as Record<string, unknown>;
+  const result: NonNullable<AppUser["seenNotices"]> = {};
 
-  return {
-    knockoutRulesV1: notices.knockoutRulesV1 === true,
-    knockoutRulesV2: notices.knockoutRulesV2 === true,
-  };
+  Object.keys(notices).forEach((key) => {
+    result[key] = Boolean(notices[key]);
+  });
+
+  return result;
 }
 
 function mapUserDoc(id: string, data: Record<string, unknown>): AppUser {
@@ -123,11 +128,11 @@ function mapUserDoc(id: string, data: Record<string, unknown>): AppUser {
     currentStreak: toNumber(data.currentStreak),
     bestStreak: toNumber(data.bestStreak),
 
+    seenNotices: normalizeSeenNotices(data.seenNotices),
+
     createdAt: data.createdAt ? String(data.createdAt) : undefined,
     updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
     lastUpdated: data.lastUpdated ? String(data.lastUpdated) : undefined,
-
-    seenNotices: normalizeSeenNotices(data.seenNotices),
   };
 }
 
@@ -228,13 +233,10 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
     currentStreak: 0,
     bestStreak: 0,
 
+    seenNotices: {},
+
     createdAt: now,
     updatedAt: now,
-
-    seenNotices: {
-      knockoutRulesV1: false,
-      knockoutRulesV2: false,
-    },
   };
 
   const userRef = await addDoc(collection(db, "users"), userData);
@@ -309,6 +311,7 @@ export async function updateUserProfile(
   }
 
   const now = new Date().toISOString();
+
   const userRef = doc(db, "users", userId);
 
   await updateDoc(userRef, {
@@ -364,17 +367,29 @@ export async function updateUserPassword(
   return updatedUser;
 }
 
-export async function markKnockoutRulesNoticeSeen(userId: string) {
+export async function markUserNoticeSeen(
+  userId: string,
+  noticeKey: UserNoticeKey
+): Promise<AppUser> {
   const cleanUserId = cleanText(userId);
 
   if (!cleanUserId) {
     throw new Error("معرّف العضو غير موجود");
   }
 
+  const now = new Date().toISOString();
   const userRef = doc(db, "users", cleanUserId);
 
   await updateDoc(userRef, {
-    "seenNotices.knockoutRulesV2": true,
-    updatedAt: new Date().toISOString(),
+    [`seenNotices.${noticeKey}`]: true,
+    updatedAt: now,
   });
+
+  const updatedUser = await getUserById(cleanUserId);
+
+  if (!updatedUser) {
+    throw new Error("تعذر تحميل بيانات العضو بعد تحديث الإشعار");
+  }
+
+  return updatedUser;
 }

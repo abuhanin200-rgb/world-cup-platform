@@ -28,8 +28,6 @@ export type Prediction = {
   homeTeamEmoji: string;
   awayTeamName: string;
   awayTeamEmoji: string;
-  homeTeamCode: string;
-  awayTeamCode: string;
 
   homeScore: number;
   awayScore: number;
@@ -53,6 +51,8 @@ export type Prediction = {
   createdAt?: string;
   createdAtServer?: unknown;
   updatedAt?: string;
+  editedAt?: string | null;
+  editCount?: number;
 };
 
 export type SubmitPredictionInput = {
@@ -65,6 +65,17 @@ export type SubmitPredictionInput = {
   homeTeamEmoji: string;
   awayTeamName: string;
   awayTeamEmoji: string;
+
+  homeScore: number;
+  awayScore: number;
+
+  qualifiedTeamCode?: string;
+  qualificationMethod?: QualificationMethod;
+};
+
+export type UpdatePredictionInput = {
+  userId: string;
+  matchId: string;
 
   homeScore: number;
   awayScore: number;
@@ -99,7 +110,12 @@ type PredictionMatchInfo = {
   matchStage: MatchStage;
   homeTeamCode: string;
   awayTeamCode: string;
+  startAt: string;
+  status: string;
+  isActive: boolean;
 };
+
+export const PREDICTION_EDIT_WINDOW_MS = 5 * 60 * 1000;
 
 function validateScore(score: number) {
   return Number.isInteger(score) && score >= 0 && score <= 30;
@@ -145,6 +161,9 @@ async function getPredictionMatchInfo(
       matchStage: "group",
       homeTeamCode: "",
       awayTeamCode: "",
+      startAt: "",
+      status: "scheduled",
+      isActive: false,
     };
   }
 
@@ -157,6 +176,9 @@ async function getPredictionMatchInfo(
       matchStage: "group",
       homeTeamCode: "",
       awayTeamCode: "",
+      startAt: "",
+      status: "scheduled",
+      isActive: false,
     };
   }
 
@@ -167,6 +189,9 @@ async function getPredictionMatchInfo(
     matchStage: normalizeMatchStage(data.matchStage),
     homeTeamCode: toText(data.homeTeamCode),
     awayTeamCode: toText(data.awayTeamCode),
+    startAt: toText(data.startAt),
+    status: toText(data.status) || "scheduled",
+    isActive: Boolean(data.isActive),
   };
 }
 
@@ -191,8 +216,6 @@ function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
     homeTeamEmoji: toText(data.homeTeamEmoji),
     awayTeamName: toText(data.awayTeamName),
     awayTeamEmoji: toText(data.awayTeamEmoji),
-    homeTeamCode: toText(data.homeTeamCode),
-    awayTeamCode: toText(data.awayTeamCode),
 
     homeScore: toNumber(data.homeScore),
     awayScore: toNumber(data.awayScore),
@@ -239,6 +262,104 @@ function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
     createdAt: toText(data.createdAt),
     createdAtServer: data.createdAtServer,
     updatedAt: toText(data.updatedAt),
+    editedAt:
+      data.editedAt === null || data.editedAt === undefined
+        ? null
+        : toText(data.editedAt),
+    editCount: toNumber(data.editCount),
+  };
+}
+
+function getPredictionCreatedTime(prediction: Prediction) {
+  const createdTime = new Date(prediction.createdAt || "").getTime();
+
+  return Number.isFinite(createdTime) ? createdTime : 0;
+}
+
+function getMatchStartTime(startAt: string) {
+  const startTime = new Date(startAt).getTime();
+
+  return Number.isFinite(startTime) ? startTime : 0;
+}
+
+function isPredictionEditWindowOpen(
+  prediction: Prediction,
+  matchInfo: Pick<PredictionMatchInfo, "startAt" | "status" | "isActive">,
+  nowTime = Date.now()
+) {
+  if (!prediction || prediction.isCalculated) return false;
+  if (!matchInfo.isActive || matchInfo.status !== "scheduled") return false;
+
+  const createdTime = getPredictionCreatedTime(prediction);
+  const startTime = getMatchStartTime(matchInfo.startAt);
+
+  if (!createdTime || !startTime) return false;
+  if (nowTime >= startTime) return false;
+
+  return nowTime - createdTime <= PREDICTION_EDIT_WINDOW_MS;
+}
+
+export function getPredictionEditWindowRemainingMs(
+  prediction: Prediction,
+  matchStartAt: string,
+  nowTime = Date.now()
+) {
+  const createdTime = getPredictionCreatedTime(prediction);
+  const startTime = getMatchStartTime(matchStartAt);
+
+  if (!createdTime || !startTime) return 0;
+
+  const editDeadline = createdTime + PREDICTION_EDIT_WINDOW_MS;
+  const effectiveDeadline = Math.min(editDeadline, startTime);
+
+  return Math.max(0, effectiveDeadline - nowTime);
+}
+
+function validateKnockoutPredictionFields({
+  matchInfo,
+  homeScore,
+  awayScore,
+  qualifiedTeamCode,
+  qualificationMethod,
+}: {
+  matchInfo: PredictionMatchInfo;
+  homeScore: number;
+  awayScore: number;
+  qualifiedTeamCode?: string;
+  qualificationMethod?: QualificationMethod | null;
+}) {
+  const isKnockoutDrawPrediction =
+    matchInfo.matchStage === "knockout" && homeScore === awayScore;
+
+  const cleanQualifiedTeamCode = isKnockoutDrawPrediction
+    ? toText(qualifiedTeamCode)
+    : "";
+
+  const cleanQualificationMethod = isKnockoutDrawPrediction
+    ? normalizeQualificationMethod(qualificationMethod)
+    : null;
+
+  if (isKnockoutDrawPrediction) {
+    const validQualifiedTeam =
+      cleanQualifiedTeamCode === matchInfo.homeTeamCode ||
+      cleanQualifiedTeamCode === matchInfo.awayTeamCode;
+
+    if (!validQualifiedTeam) {
+      throw new Error("اختر المنتخب المتأهل");
+    }
+
+    if (!cleanQualificationMethod) {
+      throw new Error("اختر طريقة التأهل");
+    }
+  }
+
+  return {
+    qualifiedTeamCode: isKnockoutDrawPrediction
+      ? cleanQualifiedTeamCode
+      : null,
+    qualificationMethod: isKnockoutDrawPrediction
+      ? cleanQualificationMethod
+      : null,
   };
 }
 
@@ -332,30 +453,14 @@ export async function submitPrediction(input: SubmitPredictionInput) {
   }
 
   const matchInfo = await getPredictionMatchInfo(input.matchId);
-  const isKnockoutDrawPrediction =
-    matchInfo.matchStage === "knockout" && input.homeScore === input.awayScore;
-
-  const qualifiedTeamCode = isKnockoutDrawPrediction
-    ? toText(input.qualifiedTeamCode)
-    : "";
-
-  const qualificationMethod = isKnockoutDrawPrediction
-    ? normalizeQualificationMethod(input.qualificationMethod)
-    : null;
-
-  if (isKnockoutDrawPrediction) {
-    const validQualifiedTeam =
-      qualifiedTeamCode === matchInfo.homeTeamCode ||
-      qualifiedTeamCode === matchInfo.awayTeamCode;
-
-    if (!validQualifiedTeam) {
-      throw new Error("اختر المنتخب المتأهل");
-    }
-
-    if (!qualificationMethod) {
-      throw new Error("اختر طريقة التأهل");
-    }
-  }
+  const { qualifiedTeamCode, qualificationMethod } =
+    validateKnockoutPredictionFields({
+      matchInfo,
+      homeScore: input.homeScore,
+      awayScore: input.awayScore,
+      qualifiedTeamCode: input.qualifiedTeamCode,
+      qualificationMethod: input.qualificationMethod,
+    });
 
   const now = new Date().toISOString();
 
@@ -369,14 +474,12 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     homeTeamEmoji: input.homeTeamEmoji,
     awayTeamName: input.awayTeamName,
     awayTeamEmoji: input.awayTeamEmoji,
-    homeTeamCode: matchInfo.homeTeamCode,
-    awayTeamCode: matchInfo.awayTeamCode,
 
     homeScore: input.homeScore,
     awayScore: input.awayScore,
 
-    qualifiedTeamCode: isKnockoutDrawPrediction ? qualifiedTeamCode : null,
-    qualificationMethod: isKnockoutDrawPrediction ? qualificationMethod : null,
+    qualifiedTeamCode,
+    qualificationMethod,
 
     points: 0,
     resultType: "",
@@ -394,6 +497,8 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     createdAt: now,
     createdAtServer: serverTimestamp(),
     updatedAt: now,
+    editedAt: null,
+    editCount: 0,
   };
 
   const userRef = doc(db, "users", input.userId);
@@ -416,6 +521,72 @@ export async function submitPrediction(input: SubmitPredictionInput) {
   return {
     id: predictionRef.id,
     ...predictionData,
+  } as Prediction;
+}
+
+export async function updatePrediction(input: UpdatePredictionInput) {
+  if (!input.userId) {
+    throw new Error("يجب تسجيل الدخول أولًا لتعديل التوقع");
+  }
+
+  if (!input.matchId) {
+    throw new Error("بيانات المباراة غير مكتملة");
+  }
+
+  if (!validateScore(input.homeScore) || !validateScore(input.awayScore)) {
+    throw new Error("أدخل نتيجة صحيحة من 0 إلى 30");
+  }
+
+  const predictionDocId = getPredictionDocId(input.userId, input.matchId);
+  const predictionRef = doc(db, "predictions", predictionDocId);
+  const predictionSnap = await getDoc(predictionRef);
+
+  if (!predictionSnap.exists()) {
+    throw new Error("لم يتم العثور على توقعك لهذه المباراة");
+  }
+
+  const currentPrediction = mapPrediction(
+    predictionSnap.id,
+    predictionSnap.data()
+  );
+
+  const matchInfo = await getPredictionMatchInfo(input.matchId);
+
+  if (!isPredictionEditWindowOpen(currentPrediction, matchInfo)) {
+    throw new Error("انتهت مدة تعديل التوقع");
+  }
+
+  const { qualifiedTeamCode, qualificationMethod } =
+    validateKnockoutPredictionFields({
+      matchInfo,
+      homeScore: input.homeScore,
+      awayScore: input.awayScore,
+      qualifiedTeamCode: input.qualifiedTeamCode,
+      qualificationMethod: input.qualificationMethod,
+    });
+
+  const now = new Date().toISOString();
+  const editCount = (currentPrediction.editCount || 0) + 1;
+
+  const predictionUpdate = {
+    homeScore: input.homeScore,
+    awayScore: input.awayScore,
+    qualifiedTeamCode,
+    qualificationMethod,
+    updatedAt: now,
+    editedAt: now,
+    editCount,
+  };
+
+  const batch = writeBatch(db);
+
+  batch.update(predictionRef, predictionUpdate);
+
+  await batch.commit();
+
+  return {
+    ...currentPrediction,
+    ...predictionUpdate,
   } as Prediction;
 }
 
