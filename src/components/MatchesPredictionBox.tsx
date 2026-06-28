@@ -388,6 +388,8 @@ export default function MatchesPredictionBox() {
         homeTeamEmoji: match.homeTeamEmoji,
         awayTeamName: match.awayTeamName,
         awayTeamEmoji: match.awayTeamEmoji,
+        homeTeamCode: match.homeTeamCode,
+awayTeamCode: match.awayTeamCode,
 
         homeScore,
         awayScore,
