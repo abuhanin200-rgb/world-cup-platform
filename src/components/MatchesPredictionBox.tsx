@@ -488,7 +488,7 @@ export default function MatchesPredictionBox() {
 
                     {savedPrediction.qualifiedTeamCode && (
                       <div className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-sm font-bold text-blue-100">
-                        المتأهل المختار:{" "}
+                        المتأهل:{" "}
                         {savedPrediction.qualifiedTeamCode ===
                         match.homeTeamCode
                           ? match.homeTeamName
