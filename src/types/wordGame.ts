@@ -21,6 +21,7 @@ export type WordGameDailyGame = {
   status: WordGameStatus;
   attemptsUsed: number;
   startedAt: number;
+  firstGuessAt: number | null;
   finishedAt: number | null;
   durationMs: number | null;
   won: boolean;

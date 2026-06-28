@@ -97,6 +97,7 @@ export async function getOrCreateTodayWordGame(params: {
     status: "playing",
     attemptsUsed: 0,
     startedAt: Date.now(),
+    firstGuessAt: null,
     finishedAt: null,
     durationMs: null,
     won: false,
@@ -145,20 +146,21 @@ export function buildWordGameGuessResult(params: {
   const won =
     normalizedGuess === normalizeWordGameText(params.currentGame.targetWord);
 
-  const attemptsUsed = guesses.length;
-  const isFinished = won || attemptsUsed >= WORD_GAME_MAX_ATTEMPTS;
-  const finishedAt = isFinished ? Date.now() : null;
-  const durationMs =
-    isFinished && finishedAt ? finishedAt - params.currentGame.startedAt : null;
+ const attemptsUsed = guesses.length;
+const isFinished = won || attemptsUsed >= WORD_GAME_MAX_ATTEMPTS;
+const firstGuessAt = params.currentGame.firstGuessAt ?? Date.now();
+const finishedAt = isFinished ? Date.now() : null;
+const durationMs = isFinished && finishedAt ? finishedAt - firstGuessAt : null;
 
   return {
     ...params.currentGame,
     guesses,
     won,
-    attemptsUsed,
-    status: won ? "won" : isFinished ? "lost" : "playing",
-    finishedAt,
-    durationMs,
+attemptsUsed,
+firstGuessAt,
+status: won ? "won" : isFinished ? "lost" : "playing",
+finishedAt,
+durationMs,
   };
 }
 
