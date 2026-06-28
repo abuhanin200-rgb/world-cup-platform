@@ -755,7 +755,7 @@ export default function MatchesPredictionBox() {
 
                     {savedPrediction.qualifiedTeamCode && (
                       <div className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-xs font-bold leading-6 text-blue-100 md:text-sm">
-                        المتأهل المختار:{" "}
+                        المتأهل:{" "}
                         <span className="font-black text-white">
                           {getQualifiedTeamEmoji(
                             match,
