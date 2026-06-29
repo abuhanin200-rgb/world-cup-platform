@@ -9,10 +9,26 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-import type { OnlinePresence, PresenceActivity, PresencePage } from "@/types/presence";
+import type {
+  OnlinePresence,
+  PresenceActivity,
+  PresencePage,
+} from "@/types/presence";
 
 const presenceCollection = "onlinePresence";
 const ONLINE_WINDOW_MS = 60 * 1000;
+
+function getTodayStartInMakkahTime() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const today = formatter.format(new Date());
+  return new Date(`${today}T00:00:00+03:00`).getTime();
+}
 
 export function getPresenceInfoFromPath(path: string): {
   currentPage: PresencePage;
@@ -22,6 +38,13 @@ export function getPresenceInfoFromPath(path: string): {
     return {
       currentPage: "home",
       activity: "يشاهد الصفحة الرئيسية",
+    };
+  }
+
+  if (path.startsWith("/challenge-studio")) {
+    return {
+      currentPage: "challengeStudio",
+      activity: "يشاهد استوديو التحدي",
     };
   }
 
@@ -109,6 +132,42 @@ export async function getOnlineMembers(): Promise<OnlinePresence[]> {
   );
 
   const snapshot = await getDocs(onlineQuery);
+
+  return snapshot.docs
+    .map((item) => item.data() as OnlinePresence)
+    .sort((a, b) => b.lastSeen - a.lastSeen);
+}
+
+export async function getChallengeStudioOnlineViewers(): Promise<
+  OnlinePresence[]
+> {
+  const since = Date.now() - ONLINE_WINDOW_MS;
+
+  const viewersQuery = query(
+    collection(db, presenceCollection),
+    where("currentPage", "==", "challengeStudio"),
+    where("lastSeen", ">=", since)
+  );
+
+  const snapshot = await getDocs(viewersQuery);
+
+  return snapshot.docs
+    .map((item) => item.data() as OnlinePresence)
+    .sort((a, b) => b.lastSeen - a.lastSeen);
+}
+
+export async function getChallengeStudioTodayVisitors(): Promise<
+  OnlinePresence[]
+> {
+  const todayStart = getTodayStartInMakkahTime();
+
+  const visitorsQuery = query(
+    collection(db, presenceCollection),
+    where("currentPage", "==", "challengeStudio"),
+    where("lastSeen", ">=", todayStart)
+  );
+
+  const snapshot = await getDocs(visitorsQuery);
 
   return snapshot.docs
     .map((item) => item.data() as OnlinePresence)

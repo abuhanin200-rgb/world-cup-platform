@@ -1,5 +1,6 @@
 export type PresencePage =
   | "home"
+  | "challengeStudio"
   | "account"
   | "wordGame"
   | "admin"
@@ -9,14 +10,15 @@ export type PresencePage =
   | "unknown";
 
 export type PresenceActivity =
-  | "يتصفح الموقع"
   | "يشاهد الصفحة الرئيسية"
-  | "يلعب خمن كلمة اليوم"
+  | "يشاهد استوديو التحدي"
   | "يشاهد حسابه"
-  | "يشاهد القوانين"
+  | "يلعب خمن كلمة اليوم"
+  | "داخل لوحة الأدمن"
   | "في صفحة الدخول"
   | "في صفحة التسجيل"
-  | "داخل لوحة الأدمن";
+  | "يشاهد القوانين"
+  | "يتصفح الموقع";
 
 export type OnlinePresence = {
   userId: string;
