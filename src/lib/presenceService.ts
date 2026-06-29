@@ -148,16 +148,15 @@ export async function getChallengeStudioOnlineViewers(): Promise<
 > {
   const since = Date.now() - ONLINE_WINDOW_MS;
 
-  const viewersQuery = query(
-    collection(db, presenceCollection),
-    where("currentPage", "==", "challengeStudio"),
-    where("lastSeen", ">=", since)
-  );
-
-  const snapshot = await getDocs(viewersQuery);
+  const snapshot = await getDocs(collection(db, presenceCollection));
 
   return snapshot.docs
     .map((item) => item.data() as OnlinePresence)
+    .filter(
+      (member) =>
+        member.currentPage === "challengeStudio" &&
+        member.lastSeen >= since
+    )
     .sort((a, b) => b.lastSeen - a.lastSeen);
 }
 

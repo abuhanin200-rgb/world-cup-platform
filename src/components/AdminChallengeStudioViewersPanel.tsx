@@ -35,7 +35,9 @@ export default function AdminChallengeStudioViewersPanel() {
       setTodayVisitors(today);
     } catch (error) {
       console.error("Challenge studio viewers load error:", error);
-      alert("تعذر تحميل مشاهدي استوديو التحدي");
+      console.error("Challenge studio viewers load error:", error);
+setOnlineViewers([]);
+setTodayVisitors([]);
     } finally {
       setLoading(false);
     }
