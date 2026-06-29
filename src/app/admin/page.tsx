@@ -20,6 +20,7 @@ import AdminLogsPanel from "@/components/AdminLogsPanel";
 import AdminPredictionsPanel from "@/components/AdminPredictionsPanel";
 import AdminHomeBannerPanel from "@/components/AdminHomeBannerPanel";
 import AdminWordGamePanel from "@/components/AdminWordGamePanel";
+import AdminChallengeStudioPanel from "@/components/AdminChallengeStudioPanel";
 
 type AdminTab =
   | "overview"
@@ -30,8 +31,9 @@ type AdminTab =
   | "members"
   | "predictions"
   | "matches"
-  | "wordGame"
-  | "logs";
+ | "wordGame"
+| "challengeStudio"
+| "logs";
 
 type CalculateFilter = "pending" | "calculated" | "all";
 
@@ -586,6 +588,7 @@ export default function AdminPage() {
             ["predictions", "🔮 توقعات الأعضاء"],
             ["matches", "📅 المباريات"],
             ["wordGame", "🎮 لعبة الكلمة"],
+            ["challengeStudio", "🎙️ استوديو التحدي"],
             ["logs", "📝 السجل"],
           ].map(([tab, label]) => (
             <button
@@ -1027,6 +1030,7 @@ export default function AdminPage() {
           />
         )}
         {activeTab === "wordGame" && <AdminWordGamePanel />}
+        {activeTab === "challengeStudio" && <AdminChallengeStudioPanel />}
         {activeTab === "logs" && <AdminLogsPanel />}
       </div>
     </main>

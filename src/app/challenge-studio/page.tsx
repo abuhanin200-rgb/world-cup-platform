@@ -1,0 +1,300 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  getPublishedChallengeStudioBulletins,
+  type ChallengeStudioBulletin,
+  type ChallengeStudioCard,
+} from "@/lib/challengeStudio";
+
+function getCardStyle(type: ChallengeStudioCard["type"]) {
+  if (type === "main") {
+    return {
+      label: "الخبر الرئيسي",
+      className: "border-red-400/30 bg-gradient-to-br from-red-500/20 to-slate-950/60",
+      iconBox: "border-red-400/30 bg-red-500/20",
+    };
+  }
+
+  if (type === "quote") {
+    return {
+      label: "مؤتمر صحفي",
+      className: "border-amber-400/30 bg-gradient-to-br from-amber-400/15 to-slate-950/60",
+      iconBox: "border-amber-400/30 bg-amber-400/20",
+    };
+  }
+
+  if (type === "number") {
+    return {
+      label: "إحصائية اليوم",
+      className: "border-sky-400/30 bg-gradient-to-br from-sky-400/15 to-slate-950/60",
+      iconBox: "border-sky-400/30 bg-sky-400/20",
+    };
+  }
+
+  if (type === "badge") {
+    return {
+      label: "وسام اليوم",
+      className: "border-emerald-400/30 bg-gradient-to-br from-emerald-400/15 to-slate-950/60",
+      iconBox: "border-emerald-400/30 bg-emerald-400/20",
+    };
+  }
+
+  if (type === "funny") {
+    return {
+      label: "لقطة اليوم",
+      className: "border-violet-400/30 bg-gradient-to-br from-violet-400/15 to-slate-950/60",
+      iconBox: "border-violet-400/30 bg-violet-400/20",
+    };
+  }
+
+  return {
+    label: "تحت المجهر",
+    className: "border-cyan-400/30 bg-gradient-to-br from-cyan-400/15 to-slate-950/60",
+    iconBox: "border-cyan-400/30 bg-cyan-400/20",
+  };
+}
+
+function StudioCard({
+  card,
+  featured = false,
+}: {
+  card: ChallengeStudioCard;
+  featured?: boolean;
+}) {
+  const style = getCardStyle(card.type);
+
+  return (
+    <article
+      className={`relative overflow-hidden rounded-3xl border p-4 shadow-2xl md:p-5 ${
+        style.className
+      } ${featured ? "md:col-span-2" : ""}`}
+    >
+      <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-3xl" />
+
+      <div className="relative">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-2xl ${style.iconBox}`}
+            >
+              {card.icon}
+            </div>
+
+            <div>
+              <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-black text-slate-200">
+                {style.label}
+              </span>
+
+              <h3 className="mt-2 text-base font-black md:text-xl">
+                {card.title}
+              </h3>
+            </div>
+          </div>
+        </div>
+
+        <p className="whitespace-pre-line text-sm font-bold leading-8 text-slate-100 md:text-base">
+          {card.content}
+        </p>
+      </div>
+    </article>
+  );
+}
+
+export default function ChallengeStudioPage() {
+  const router = useRouter();
+  const [bulletins, setBulletins] = useState<ChallengeStudioBulletin[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadBulletins() {
+    try {
+      setLoading(true);
+      const data = await getPublishedChallengeStudioBulletins(30);
+      setBulletins(data);
+    } catch (error) {
+      console.error("Challenge studio load error:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadBulletins();
+  }, []);
+
+  const latest = bulletins[0];
+  const archive = bulletins.slice(1);
+
+  const sortedCards = useMemo(() => {
+    if (!latest) return [];
+    return [...latest.cards].sort((a, b) => b.priority - a.priority);
+  }, [latest]);
+
+  const mainCard = sortedCards.find((card) => card.type === "main") || sortedCards[0];
+  const otherCards = sortedCards.filter((card) => card !== mainCard);
+
+  const breakingText =
+    mainCard?.content ||
+    "استوديو التحدي يترقب أحداث المنافسة القادمة بين الأعضاء.";
+
+  return (
+    <main
+      dir="rtl"
+      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
+    >
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="h-10 w-10 overflow-hidden rounded-2xl border border-white/20 bg-white/10 md:h-12 md:w-12">
+              <img
+                src="/wc2026-logo.png"
+                alt="شعار منصة توقعات كأس العالم 2026"
+                className="h-full w-full object-contain p-1"
+              />
+            </div>
+
+            <div>
+              <h1 className="text-xs font-black md:text-xl">
+                منصة توقعات كأس العالم 2026
+              </h1>
+              <p className="text-[10px] text-slate-300 md:text-sm">
+                World Cup 2026 Predictions Platform
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold hover:bg-white/10 md:text-sm"
+          >
+            الرئيسية
+          </button>
+        </div>
+      </header>
+
+      <section className="mx-auto max-w-6xl px-3 py-5 md:px-4 md:py-7">
+        <div className="relative mb-5 overflow-hidden rounded-3xl border border-amber-400/25 bg-white/10 p-5 text-center shadow-2xl md:p-7">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.18),transparent_40%)]" />
+
+          <div className="relative">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-400/30 bg-slate-950/50 text-4xl shadow-lg shadow-amber-950/30">
+              🎙️
+            </div>
+
+            <h2 className="text-3xl font-black md:text-5xl">
+              استوديو التحدي
+            </h2>
+
+            <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-7 text-amber-100 md:text-base">
+              القناة الرسمية لأخبار الأعضاء، التصريحات، الأوسمة، والطقطقة الرياضية الخفيفة.
+            </p>
+
+            <p className="mt-2 text-[11px] text-slate-300 md:text-xs">
+              المحتوى ترفيهي ومولد بالذكاء الاصطناعي بناءً على بيانات البطولة.
+            </p>
+          </div>
+        </div>
+
+        {latest && (
+          <div className="mb-5 overflow-hidden rounded-2xl border border-red-400/30 bg-red-500/10 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="shrink-0 bg-red-500 px-4 py-3 text-xs font-black text-white md:text-sm">
+                🚨 عاجل
+              </div>
+
+              <div className="min-w-0 flex-1 overflow-hidden py-3">
+                <div className="animate-pulse truncate text-xs font-black text-red-100 md:text-sm">
+                  {breakingText}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center text-slate-300">
+            جاري تحميل النشرة...
+          </div>
+        ) : !latest ? (
+          <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
+            <div className="text-4xl">🎙️</div>
+
+            <h3 className="mt-3 text-xl font-black">النشرة لم تُنشر بعد</h3>
+
+            <p className="mt-2 text-sm text-slate-300">
+              قريبًا تظهر هنا أخبار الأعضاء وتحدياتهم.
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-black md:text-2xl">
+                  نشرة اليوم
+                </h3>
+                <p className="mt-1 text-xs text-slate-300">{latest.date}</p>
+              </div>
+
+              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-100">
+                مباشر
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {mainCard && <StudioCard card={mainCard} featured />}
+
+              {otherCards.map((card, index) => (
+                <StudioCard key={`${card.type}-${index}`} card={card} />
+              ))}
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-3 text-center text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
+              🎙️ تصريحات ومحتوى استوديو التحدي ترفيهية ومولدة بالذكاء الاصطناعي، وليست تصريحات حقيقية من الأعضاء.
+            </div>
+
+            {archive.length > 0 && (
+              <div className="mt-8">
+                <h3 className="mb-3 text-xl font-black">📚 آخر النشرات</h3>
+
+                <div className="space-y-3">
+                  {archive.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-black">
+                            {item.summary || "نشرة استوديو التحدي"}
+                          </div>
+
+                          <div className="mt-1 text-xs text-slate-400">
+                            {item.date}
+                          </div>
+                        </div>
+
+                        <span className="rounded-full bg-slate-800 px-3 py-1 text-[11px] text-slate-300">
+                          {item.cards.length} بطاقات
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <footer className="border-t border-white/10 py-5 text-center text-xs text-slate-400">
+        <div className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
+          <span>©</span>
+          <span>فكرة وتصميم</span>
+          <span className="font-bold text-slate-200">عبدالسلام العنزي</span>
+        </div>
+      </footer>
+    </main>
+  );
+}

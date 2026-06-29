@@ -192,22 +192,31 @@ export default function HomePage() {
 
         <ExactHitsTicker />
 
-        <div className="mt-4 flex flex-row items-center justify-center gap-3">
-          <div className="flex items-center justify-center">
-            <OnlineMembersCounter />
-          </div>
-
+        <div className="mt-4 grid grid-cols-2 gap-3">
           <button
             type="button"
             onClick={() => router.push("/word-game")}
-            className="inline-flex min-h-[54px] items-center justify-center rounded-full border border-amber-400/30 bg-slate-950/40 px-4 py-3 text-xs font-black text-amber-100 shadow-lg shadow-slate-950/30 transition hover:border-amber-300/50 hover:bg-amber-400/10 md:px-6 md:text-sm"
+            className="inline-flex min-h-[54px] items-center justify-center rounded-full border border-amber-400/30 bg-slate-950/40 px-3 py-3 text-xs font-black text-amber-100 shadow-lg shadow-slate-950/30 transition hover:border-amber-300/50 hover:bg-amber-400/10 md:px-6 md:text-sm"
           >
             <span className="ml-2 text-lg">🎮</span>
-            <span>اضغط هنا وخمن كلمة اليوم</span>
+            <span>خمن كلمة اليوم</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/challenge-studio")}
+            className="inline-flex min-h-[54px] items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950/40 px-3 py-3 text-xs font-black text-cyan-100 shadow-lg shadow-slate-950/30 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 md:px-6 md:text-sm"
+          >
+            <span className="ml-2 text-lg">🎙️</span>
+            <span>استوديو التحدي</span>
           </button>
         </div>
 
         <LeaderboardTable />
+
+        <div className="mt-4 flex items-center justify-center">
+          <OnlineMembersCounter />
+        </div>
       </section>
 
       <footer className="border-t border-white/10 py-5 text-center text-xs text-slate-400">
