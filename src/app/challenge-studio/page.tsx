@@ -2,17 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 import {
   getPublishedChallengeStudioBulletins,
   type ChallengeStudioBulletin,
   type ChallengeStudioCard,
 } from "@/lib/challengeStudio";
+import { updateOnlinePresence } from "@/lib/presenceService";
 
 function getCardStyle(type: ChallengeStudioCard["type"]) {
   if (type === "main") {
     return {
       label: "الخبر الرئيسي",
-      className: "border-red-400/30 bg-gradient-to-br from-red-500/20 to-slate-950/60",
+      className:
+        "border-red-400/30 bg-gradient-to-br from-red-500/20 to-slate-950/60",
       iconBox: "border-red-400/30 bg-red-500/20",
     };
   }
@@ -20,7 +23,8 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
   if (type === "quote") {
     return {
       label: "مؤتمر صحفي",
-      className: "border-amber-400/30 bg-gradient-to-br from-amber-400/15 to-slate-950/60",
+      className:
+        "border-amber-400/30 bg-gradient-to-br from-amber-400/15 to-slate-950/60",
       iconBox: "border-amber-400/30 bg-amber-400/20",
     };
   }
@@ -28,7 +32,8 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
   if (type === "number") {
     return {
       label: "إحصائية اليوم",
-      className: "border-sky-400/30 bg-gradient-to-br from-sky-400/15 to-slate-950/60",
+      className:
+        "border-sky-400/30 bg-gradient-to-br from-sky-400/15 to-slate-950/60",
       iconBox: "border-sky-400/30 bg-sky-400/20",
     };
   }
@@ -36,7 +41,8 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
   if (type === "badge") {
     return {
       label: "وسام اليوم",
-      className: "border-emerald-400/30 bg-gradient-to-br from-emerald-400/15 to-slate-950/60",
+      className:
+        "border-emerald-400/30 bg-gradient-to-br from-emerald-400/15 to-slate-950/60",
       iconBox: "border-emerald-400/30 bg-emerald-400/20",
     };
   }
@@ -44,14 +50,16 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
   if (type === "funny") {
     return {
       label: "لقطة اليوم",
-      className: "border-violet-400/30 bg-gradient-to-br from-violet-400/15 to-slate-950/60",
+      className:
+        "border-violet-400/30 bg-gradient-to-br from-violet-400/15 to-slate-950/60",
       iconBox: "border-violet-400/30 bg-violet-400/20",
     };
   }
 
   return {
     label: "تحت المجهر",
-    className: "border-cyan-400/30 bg-gradient-to-br from-cyan-400/15 to-slate-950/60",
+    className:
+      "border-cyan-400/30 bg-gradient-to-br from-cyan-400/15 to-slate-950/60",
     iconBox: "border-cyan-400/30 bg-cyan-400/20",
   };
 }
@@ -104,6 +112,8 @@ function StudioCard({
 
 export default function ChallengeStudioPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
   const [bulletins, setBulletins] = useState<ChallengeStudioBulletin[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -123,6 +133,18 @@ export default function ChallengeStudioPage() {
     loadBulletins();
   }, []);
 
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    updateOnlinePresence({
+      userId: user.id,
+      fullName: user.fullName,
+      path: "/challenge-studio",
+    }).catch((error) => {
+      console.error("Challenge studio presence update error:", error);
+    });
+  }, [authLoading, user]);
+
   const latest = bulletins[0];
   const archive = bulletins.slice(1);
 
@@ -131,7 +153,9 @@ export default function ChallengeStudioPage() {
     return [...latest.cards].sort((a, b) => b.priority - a.priority);
   }, [latest]);
 
-  const mainCard = sortedCards.find((card) => card.type === "main") || sortedCards[0];
+  const mainCard =
+    sortedCards.find((card) => card.type === "main") || sortedCards[0];
+
   const otherCards = sortedCards.filter((card) => card !== mainCard);
 
   const breakingText =
@@ -188,7 +212,8 @@ export default function ChallengeStudioPage() {
             </h2>
 
             <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-7 text-amber-100 md:text-base">
-              القناة الرسمية لأخبار الأعضاء، التصريحات، الأوسمة، والطقطقة الرياضية الخفيفة.
+              القناة الرسمية لأخبار الأعضاء، التصريحات، الأوسمة، والطقطقة
+              الرياضية الخفيفة.
             </p>
 
             <p className="mt-2 text-[11px] text-slate-300 md:text-xs">
@@ -251,7 +276,8 @@ export default function ChallengeStudioPage() {
             </div>
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-3 text-center text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
-              🎙️ تصريحات ومحتوى استوديو التحدي ترفيهية ومولدة بالذكاء الاصطناعي، وليست تصريحات حقيقية من الأعضاء.
+              🎙️ تصريحات ومحتوى استوديو التحدي ترفيهية ومولدة بالذكاء
+              الاصطناعي، وليست تصريحات حقيقية من الأعضاء.
             </div>
 
             {archive.length > 0 && (

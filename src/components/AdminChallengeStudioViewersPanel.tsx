@@ -41,12 +41,9 @@ export default function AdminChallengeStudioViewersPanel() {
     }
   }
 
-  useEffect(() => {
-    loadData();
-
-    const interval = window.setInterval(loadData, 10000);
-    return () => window.clearInterval(interval);
-  }, []);
+ useEffect(() => {
+  loadData();
+}, []);
 
   const onlineIds = new Set(onlineViewers.map((item) => item.userId));
 

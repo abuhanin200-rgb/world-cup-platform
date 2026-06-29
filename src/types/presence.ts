@@ -27,4 +27,5 @@ export type OnlinePresence = {
   activity: PresenceActivity;
   path: string;
   lastSeen: number;
+  lastChallengeStudioVisit?: number;
 };

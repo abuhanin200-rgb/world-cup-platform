@@ -16,7 +16,7 @@ import type {
 } from "@/types/presence";
 
 const presenceCollection = "onlinePresence";
-const ONLINE_WINDOW_MS = 60 * 1000;
+const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
 function getTodayStartInMakkahTime() {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -104,14 +104,19 @@ export async function updateOnlinePresence(params: {
   const { currentPage, activity } = getPresenceInfoFromPath(params.path);
   const presenceRef = doc(db, presenceCollection, params.userId);
 
-  const data: OnlinePresence = {
-    userId: params.userId,
-    fullName: params.fullName,
-    currentPage,
-    activity,
-    path: params.path,
-    lastSeen: Date.now(),
-  };
+ const now = Date.now();
+
+const data: OnlinePresence = {
+  userId: params.userId,
+  fullName: params.fullName,
+  currentPage,
+  activity,
+  path: params.path,
+  lastSeen: now,
+  ...(currentPage === "challengeStudio"
+    ? { lastChallengeStudioVisit: now }
+    : {}),
+};
 
   await setDoc(
     presenceRef,
@@ -161,15 +166,14 @@ export async function getChallengeStudioTodayVisitors(): Promise<
 > {
   const todayStart = getTodayStartInMakkahTime();
 
-  const visitorsQuery = query(
-    collection(db, presenceCollection),
-    where("currentPage", "==", "challengeStudio"),
-    where("lastSeen", ">=", todayStart)
-  );
-
-  const snapshot = await getDocs(visitorsQuery);
+  const snapshot = await getDocs(collection(db, presenceCollection));
 
   return snapshot.docs
     .map((item) => item.data() as OnlinePresence)
-    .sort((a, b) => b.lastSeen - a.lastSeen);
+    .filter((member) => (member.lastChallengeStudioVisit ?? 0) >= todayStart)
+    .sort(
+      (a, b) =>
+        (b.lastChallengeStudioVisit ?? 0) -
+        (a.lastChallengeStudioVisit ?? 0)
+    );
 }
