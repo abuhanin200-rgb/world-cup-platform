@@ -9,6 +9,11 @@ import {
   getAdminPredictions,
   getPredictionMatchOptions,
 } from "@/lib/adminPredictions";
+import {
+  getAdminAddPredictionMatches,
+  getAdminAddPredictionUsers,
+} from "@/lib/adminAddPrediction";
+import { submitPrediction } from "@/lib/predictions";
 
 type PredictionType = "normal" | "golden";
 
@@ -156,6 +161,23 @@ export default function AdminPredictionsPanel() {
   const [matchId, setMatchId] = useState("all");
   const [status, setStatus] = useState<PredictionStatus>("all");
   const [page, setPage] = useState(1);
+  const [showAddPrediction, setShowAddPrediction] = useState(false);
+
+const [users, setUsers] = useState<any[]>([]);
+const [matches, setMatches] = useState<any[]>([]);
+
+const [selectedUserId, setSelectedUserId] = useState("");
+const [selectedMatchId, setSelectedMatchId] = useState("");
+
+const [homeScore, setHomeScore] = useState(0);
+const [awayScore, setAwayScore] = useState(0);
+
+const [savingPrediction, setSavingPrediction] = useState(false);
+
+const [qualifiedTeamCode, setQualifiedTeamCode] = useState("");
+const [qualificationMethod, setQualificationMethod] = useState<
+  "extraTime" | "penalties" | ""
+>("");
 
   const pageSize = 20;
 
@@ -213,9 +235,25 @@ export default function AdminPredictionsPanel() {
     }
   }
 
-  useEffect(() => {
-    loadPredictions();
-  }, []);
+ useEffect(() => {
+  loadPredictions();
+
+  async function loadAddPredictionData() {
+    try {
+      const [usersData, matchesData] = await Promise.all([
+        getAdminAddPredictionUsers(),
+        getAdminAddPredictionMatches(),
+      ]);
+
+      setUsers(usersData);
+      setMatches(matchesData);
+    } catch (error) {
+      console.error("Load add prediction data:", error);
+    }
+  }
+
+  loadAddPredictionData();
+}, []);
 
   const matchOptions = useMemo(() => {
     return getPredictionMatchOptions(predictions);
@@ -315,8 +353,182 @@ export default function AdminPredictionsPanel() {
     return isGoldenPrediction(prediction) && isWinnerPrediction(prediction);
   }).length;
 
+  const selectedMatchForAdminAdd =
+  matches.find((match) => match.id === selectedMatchId) || null;
+
+const isAdminAddKnockoutDraw =
+  selectedMatchForAdminAdd?.matchStage === "knockout" &&
+  Number(homeScore) === Number(awayScore);
+
+  async function handleSaveAdminPrediction() {
+  try {
+    setSavingPrediction(true);
+
+   if (!selectedMatchForAdminAdd) {
+  alert("اختر المباراة");
+  return;
+}
+
+await submitPrediction({
+  userId: selectedUserId,
+  userName: users.find((user) => user.id === selectedUserId)?.fullName || "عضو",
+
+  matchId: selectedMatchId,
+
+  homeTeamName: selectedMatchForAdminAdd.homeTeamName,
+  homeTeamEmoji: selectedMatchForAdminAdd.homeTeamEmoji,
+  awayTeamName: selectedMatchForAdminAdd.awayTeamName,
+  awayTeamEmoji: selectedMatchForAdminAdd.awayTeamEmoji,
+  homeTeamCode: selectedMatchForAdminAdd.homeTeamCode,
+  awayTeamCode: selectedMatchForAdminAdd.awayTeamCode,
+
+  homeScore: Number(homeScore),
+  awayScore: Number(awayScore),
+
+  qualifiedTeamCode: qualifiedTeamCode || undefined,
+  qualificationMethod: qualificationMethod || undefined,
+
+  adminOverride: true,
+});
+
+    alert("تمت إضافة التوقع بنجاح");
+
+    setShowAddPrediction(false);
+    setSelectedUserId("");
+    setSelectedMatchId("");
+    setHomeScore(0);
+    setAwayScore(0);
+    setQualifiedTeamCode("");
+    setQualificationMethod("");
+
+    await loadPredictions();
+  } catch (error) {
+    alert(error instanceof Error ? error.message : "تعذر إضافة التوقع");
+  } finally {
+    setSavingPrediction(false);
+  }
+}
+
   return (
     <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
+      {showAddPrediction && (
+  <div className="mb-5 rounded-3xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h3 className="text-lg font-black text-emerald-100">
+        ➕ إضافة توقع لعضو
+      </h3>
+
+      <button
+        type="button"
+        onClick={() => setShowAddPrediction(false)}
+        className="rounded-lg border border-white/10 px-3 py-1 text-xs font-bold text-slate-200 hover:bg-white/10"
+      >
+        إغلاق
+      </button>
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <select
+        value={selectedUserId}
+        onChange={(event) => setSelectedUserId(event.target.value)}
+        className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
+      >
+        <option value="">اختر العضو</option>
+        {users.map((user) => (
+          <option key={user.id} value={user.id}>
+            {user.fullName}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={selectedMatchId}
+        onChange={(event) => {
+          setSelectedMatchId(event.target.value);
+          setQualifiedTeamCode("");
+          setQualificationMethod("");
+        }}
+        className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
+      >
+        <option value="">اختر المباراة</option>
+        {matches.map((match) => (
+          <option key={match.id} value={match.id}>
+            {match.homeTeamEmoji} {match.homeTeamName} × {match.awayTeamName}{" "}
+            {match.awayTeamEmoji}
+          </option>
+        ))}
+      </select>
+
+      <input
+        type="number"
+        min={0}
+        max={30}
+        value={homeScore}
+        onChange={(event) => setHomeScore(Number(event.target.value))}
+        placeholder="نتيجة المنتخب الأول"
+        className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black"
+      />
+
+      <input
+        type="number"
+        min={0}
+        max={30}
+        value={awayScore}
+        onChange={(event) => setAwayScore(Number(event.target.value))}
+        placeholder="نتيجة المنتخب الثاني"
+        className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black"
+      />
+    </div>
+
+    {isAdminAddKnockoutDraw && selectedMatchForAdminAdd && (
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <select
+          value={qualifiedTeamCode}
+          onChange={(event) => setQualifiedTeamCode(event.target.value)}
+          className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
+        >
+          <option value="">اختر المتأهل</option>
+          <option value={selectedMatchForAdminAdd.homeTeamCode}>
+            {selectedMatchForAdminAdd.homeTeamEmoji}{" "}
+            {selectedMatchForAdminAdd.homeTeamName}
+          </option>
+          <option value={selectedMatchForAdminAdd.awayTeamCode}>
+            {selectedMatchForAdminAdd.awayTeamEmoji}{" "}
+            {selectedMatchForAdminAdd.awayTeamName}
+          </option>
+        </select>
+
+        <select
+          value={qualificationMethod}
+          onChange={(event) =>
+            setQualificationMethod(
+              event.target.value as "extraTime" | "penalties" | ""
+            )
+          }
+          className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
+        >
+          <option value="">اختر طريقة التأهل</option>
+          <option value="extraTime">أشواط إضافية</option>
+          <option value="penalties">ركلات ترجيح</option>
+        </select>
+      </div>
+    )}
+
+    <button
+      type="button"
+      disabled={savingPrediction}
+      onClick={handleSaveAdminPrediction}
+      className="mt-4 w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white hover:bg-emerald-400 disabled:opacity-50"
+    >
+      {savingPrediction ? "جاري الحفظ..." : "حفظ التوقع"}
+    </button>
+
+    <p className="mt-3 text-xs leading-6 text-emerald-100">
+      التوقع سيُحفظ بنفس طريقة توقع العضو، ولن يؤثر على النقاط إلا عند احتساب
+      المباراة.
+    </p>
+  </div>
+)}
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-black md:text-2xl">🔮 توقعات الأعضاء</h2>
@@ -342,6 +554,14 @@ export default function AdminPredictionsPanel() {
           >
             تحديث البيانات
           </button>
+
+          <button
+  type="button"
+  onClick={() => setShowAddPrediction(true)}
+  className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white hover:bg-emerald-400"
+>
+  ➕ إضافة توقع لعضو
+</button>
         </div>
       </div>
 

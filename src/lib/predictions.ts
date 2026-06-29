@@ -75,6 +75,8 @@ awayTeamCode?: string;
 
   qualifiedTeamCode?: string;
   qualificationMethod?: QualificationMethod;
+
+  adminOverride?: boolean;
 };
 
 export type UpdatePredictionInput = {
@@ -449,18 +451,18 @@ export async function submitPrediction(input: SubmitPredictionInput) {
   const predictionDocId = getPredictionDocId(input.userId, input.matchId);
   const predictionRef = doc(db, "predictions", predictionDocId);
 
-  const existingFixedPrediction = await getDoc(predictionRef);
+ const existingFixedPrediction = await getDoc(predictionRef);
 
-  if (existingFixedPrediction.exists()) {
-    throw new Error("تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله");
-  }
+if (existingFixedPrediction.exists() && !input.adminOverride) {
+  throw new Error("تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله");
+}
 
   const existingPrediction = await getUserPredictionForMatch(
     input.userId,
     input.matchId
   );
 
-  if (existingPrediction) {
+  if (existingPrediction && !input.adminOverride) {
     throw new Error("تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله");
   }
 
