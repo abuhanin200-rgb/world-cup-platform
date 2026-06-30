@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   setDoc,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -25,6 +26,8 @@ export type ChallengeStudioChatMessage = {
   userName: string;
   text: string;
   createdAt: Date | null;
+  updatedAt: Date | null;
+  isEdited: boolean;
 };
 
 export type ChallengeStudioChatLike = {
@@ -50,6 +53,12 @@ type SendChallengeStudioMessageInput = {
   text: string;
 };
 
+type EditChallengeStudioMessageInput = {
+  messageId: string;
+  userId: string;
+  text: string;
+};
+
 type SendChallengeStudioReplyInput = {
   messageId: string;
   userId: string;
@@ -71,6 +80,7 @@ type ValidationResult = {
 const MAX_MESSAGE_LENGTH = 250;
 const MAX_REPLY_LENGTH = 150;
 const MESSAGE_COOLDOWN_MS = 5000;
+const MESSAGE_EDIT_WINDOW_MS = 5 * 60 * 1000;
 
 function normalizeMessage(text: string) {
   return text.replace(/\s+/g, " ").trim();
@@ -153,6 +163,14 @@ function buildLikeId(messageId: string, userId: string) {
   return `${messageId}_${userId}`;
 }
 
+export function canEditChallengeStudioMessage(message: ChallengeStudioChatMessage) {
+  if (!message.createdAt) return false;
+
+  const diff = Date.now() - message.createdAt.getTime();
+
+  return diff <= MESSAGE_EDIT_WINDOW_MS;
+}
+
 export function subscribeChallengeStudioMessages(
   callback: (messages: ChallengeStudioChatMessage[]) => void,
   onError?: (error: Error) => void
@@ -176,6 +194,8 @@ export function subscribeChallengeStudioMessages(
             userName: String(data.userName || "عضو"),
             text: String(data.text || ""),
             createdAt: toDate(data.createdAt),
+            updatedAt: toDate(data.updatedAt),
+            isEdited: Boolean(data.isEdited),
           };
         })
         .reverse();
@@ -296,6 +316,8 @@ export async function sendChallengeStudioMessage({
         userName: String(data.userName || "عضو"),
         text: String(data.text || ""),
         createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
+        isEdited: Boolean(data.isEdited),
       };
     });
 
@@ -327,6 +349,66 @@ export async function sendChallengeStudioMessage({
     userName: normalizeMessage(userName).slice(0, 40) || "عضو",
     text: cleanText,
     createdAt: serverTimestamp(),
+    updatedAt: null,
+    isEdited: false,
+  });
+}
+
+export async function editChallengeStudioMessage({
+  messageId,
+  userId,
+  text,
+}: EditChallengeStudioMessageInput) {
+  const cleanText = normalizeMessage(text);
+
+  const textValidation = validateMessageText(cleanText);
+
+  if (!textValidation.ok) {
+    throw new Error(textValidation.error);
+  }
+
+  if (!messageId) {
+    throw new Error("تعذر تحديد الرسالة.");
+  }
+
+  if (!userId) {
+    throw new Error("سجّل دخولك أولًا لتعديل الرسالة.");
+  }
+
+  const messageRef = doc(db, CHALLENGE_STUDIO_CHAT_COLLECTION, messageId);
+  const messageSnapshot = await getDoc(messageRef);
+
+  if (!messageSnapshot.exists()) {
+    throw new Error("الرسالة غير موجودة.");
+  }
+
+  const data = messageSnapshot.data();
+  const messageOwnerId = String(data.userId || "");
+  const createdAt = toDate(data.createdAt);
+  const oldText = normalizeMessage(String(data.text || ""));
+
+  if (messageOwnerId !== userId) {
+    throw new Error("تقدر تعدل رسائلك فقط.");
+  }
+
+  if (!createdAt) {
+    throw new Error("تعذر التحقق من وقت الرسالة.");
+  }
+
+  const diff = Date.now() - createdAt.getTime();
+
+  if (diff > MESSAGE_EDIT_WINDOW_MS) {
+    throw new Error("انتهت مدة تعديل الرسالة. التعديل متاح لمدة 5 دقائق فقط.");
+  }
+
+  if (oldText === cleanText) {
+    throw new Error("لم يتم تغيير نص الرسالة.");
+  }
+
+  await updateDoc(messageRef, {
+    text: cleanText,
+    updatedAt: serverTimestamp(),
+    isEdited: true,
   });
 }
 

@@ -5,6 +5,8 @@ import {
   ChallengeStudioChatLike,
   ChallengeStudioChatMessage,
   ChallengeStudioChatReply,
+  canEditChallengeStudioMessage,
+  editChallengeStudioMessage,
   sendChallengeStudioMessage,
   sendChallengeStudioReply,
   subscribeChallengeStudioMessageLikes,
@@ -40,8 +42,10 @@ export default function ChallengeStudioAnalysis({
   const [replies, setReplies] = useState<ChallengeStudioChatReply[]>([]);
   const [messageText, setMessageText] = useState("");
   const [replyText, setReplyText] = useState("");
+  const [editText, setEditText] = useState("");
   const [sending, setSending] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [error, setError] = useState("");
   const [lastSentAt, setLastSentAt] = useState<number | null>(null);
   const [openLikesMessageId, setOpenLikesMessageId] = useState<string | null>(
@@ -50,8 +54,15 @@ export default function ChallengeStudioAnalysis({
   const [openReplyMessageId, setOpenReplyMessageId] = useState<string | null>(
     null
   );
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
   const messagesBoxRef = useRef<HTMLDivElement | null>(null);
+  const didInitializeReplyNotificationsRef = useRef(false);
+const seenReplyIdsRef = useRef<Set<string>>(new Set());
+
+const [newReplyNotificationIds, setNewReplyNotificationIds] = useState<
+  string[]
+>([]);
 
   useEffect(() => {
     const unsubscribe = subscribeChallengeStudioMessages(
@@ -100,6 +111,45 @@ export default function ChallengeStudioAnalysis({
     messagesBox.scrollTop = messagesBox.scrollHeight;
   }, [messages.length, replies.length]);
 
+  useEffect(() => {
+  if (!currentUserId || messages.length === 0) return;
+
+  const myMessageIds = new Set(
+    messages
+      .filter((message) => message.userId === currentUserId)
+      .map((message) => message.id)
+  );
+
+  const repliesOnMyMessages = replies.filter(
+    (reply) =>
+      myMessageIds.has(reply.messageId) && reply.userId !== currentUserId
+  );
+
+  if (!didInitializeReplyNotificationsRef.current) {
+    repliesOnMyMessages.forEach((reply) => {
+      seenReplyIdsRef.current.add(reply.id);
+    });
+
+    didInitializeReplyNotificationsRef.current = true;
+    return;
+  }
+
+  const newReplyIds = repliesOnMyMessages
+    .filter((reply) => !seenReplyIdsRef.current.has(reply.id))
+    .map((reply) => reply.id);
+
+  if (newReplyIds.length === 0) return;
+
+  newReplyIds.forEach((replyId) => {
+    seenReplyIdsRef.current.add(replyId);
+  });
+
+  setNewReplyNotificationIds((currentIds) => [
+    ...currentIds,
+    ...newReplyIds,
+  ]);
+}, [currentUserId, messages, replies]);
+
   const cleanMessageText = useMemo(() => {
     return messageText.replace(/\s+/g, " ").trim();
   }, [messageText]);
@@ -108,8 +158,13 @@ export default function ChallengeStudioAnalysis({
     return replyText.replace(/\s+/g, " ").trim();
   }, [replyText]);
 
+  const cleanEditText = useMemo(() => {
+    return editText.replace(/\s+/g, " ").trim();
+  }, [editText]);
+
   const remainingCharacters = MAX_MESSAGE_LENGTH - messageText.length;
   const remainingReplyCharacters = MAX_REPLY_LENGTH - replyText.length;
+  const remainingEditCharacters = MAX_MESSAGE_LENGTH - editText.length;
 
   const canSend =
     cleanMessageText.length > 0 &&
@@ -120,6 +175,11 @@ export default function ChallengeStudioAnalysis({
     cleanReplyText.length > 0 &&
     cleanReplyText.length <= MAX_REPLY_LENGTH &&
     !sendingReply;
+
+  const canSaveEdit =
+    cleanEditText.length > 0 &&
+    cleanEditText.length <= MAX_MESSAGE_LENGTH &&
+    !savingEdit;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -168,6 +228,8 @@ export default function ChallengeStudioAnalysis({
       setLastSentAt(Date.now());
       setOpenLikesMessageId(null);
       setOpenReplyMessageId(null);
+      setEditingMessageId(null);
+      setEditText("");
     } catch (sendError) {
       const message =
         sendError instanceof Error
@@ -243,6 +305,60 @@ export default function ChallengeStudioAnalysis({
     }
   }
 
+  function startEditingMessage(message: ChallengeStudioChatMessage) {
+    setError("");
+    setOpenLikesMessageId(null);
+    setOpenReplyMessageId(null);
+    setEditingMessageId(message.id);
+    setEditText(message.text);
+  }
+
+  function cancelEditingMessage() {
+    setEditingMessageId(null);
+    setEditText("");
+    setSavingEdit(false);
+  }
+
+  async function handleSaveEdit(messageId: string) {
+    setError("");
+
+    if (!currentUserId) {
+      setError("سجّل دخولك أولًا لتعديل الرسالة.");
+      return;
+    }
+
+    if (!cleanEditText) {
+      setError("اكتب نص الرسالة أولًا.");
+      return;
+    }
+
+    if (cleanEditText.length > MAX_MESSAGE_LENGTH) {
+      setError(`الحد الأقصى للرسالة ${MAX_MESSAGE_LENGTH} حرفًا.`);
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+
+      await editChallengeStudioMessage({
+        messageId,
+        userId: currentUserId,
+        text: cleanEditText,
+      });
+
+      setEditingMessageId(null);
+      setEditText("");
+      setError("");
+    } catch (editError) {
+      const message =
+        editError instanceof Error ? editError.message : "تعذر تعديل الرسالة.";
+
+      setError(message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   function getMessageLikes(messageId: string) {
     return likes.filter((like) => like.messageId === messageId);
   }
@@ -256,6 +372,16 @@ export default function ChallengeStudioAnalysis({
       (like) => like.messageId === messageId && like.userId === currentUserId
     );
   }
+
+  function handleShowNewReplies() {
+  setNewReplyNotificationIds([]);
+
+  const messagesBox = messagesBoxRef.current;
+
+  if (!messagesBox) return;
+
+  messagesBox.scrollTop = messagesBox.scrollHeight;
+}
 
   return (
     <section
@@ -301,6 +427,25 @@ export default function ChallengeStudioAnalysis({
         )}
       </div>
 
+      {newReplyNotificationIds.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-sky-400/30 bg-sky-400/10 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm font-black text-sky-100">
+              🔔 عندك {newReplyNotificationIds.length} رد جديد على رسائلك في
+              استديو التحليل
+            </div>
+
+           <button
+  type="button"
+  onClick={handleShowNewReplies}
+  className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/15"
+>
+  عرض الردود
+</button>
+          </div>
+        </div>
+      )}
+
       <div
         ref={messagesBoxRef}
         className="mb-4 max-h-80 space-y-3 overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-3"
@@ -312,6 +457,9 @@ export default function ChallengeStudioAnalysis({
             const messageReplies = getMessageReplies(message.id);
             const likedByMe = isMessageLikedByMe(message.id);
             const replyBoxOpen = openReplyMessageId === message.id;
+            const editBoxOpen = editingMessageId === message.id;
+            const canEditThisMessage =
+              isMine && canEditChallengeStudioMessage(message);
 
             return (
               <div
@@ -322,17 +470,75 @@ export default function ChallengeStudioAnalysis({
                     : "border-white/10 bg-white/5"
                 }`}
               >
-                <button
-                  type="button"
-                  onClick={() => onMemberClick(message.userId)}
-                  className="mb-1 text-sm font-black text-emerald-300 hover:underline"
-                >
-                  {message.userName}
-                </button>
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onMemberClick(message.userId)}
+                    className="text-sm font-black text-emerald-300 hover:underline"
+                  >
+                    {message.userName}
+                  </button>
 
-                <p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
-                  {message.text}
-                </p>
+                  {message.isEdited && (
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-400">
+                      تم التعديل
+                    </span>
+                  )}
+                </div>
+
+                {editBoxOpen ? (
+                  <div className="mt-2 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3">
+                    <textarea
+                      value={editText}
+                      onChange={(event) => {
+                        setEditText(event.target.value);
+                        setError("");
+                      }}
+                      maxLength={MAX_MESSAGE_LENGTH}
+                      placeholder="عدّل رسالتك... بدون روابط وبحد أقصى 250 حرف"
+                      className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-xs text-white outline-none placeholder:text-slate-500 focus:border-amber-400/50"
+                    />
+
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <div
+                        className={`text-[11px] ${
+                          remainingEditCharacters < 20
+                            ? "text-amber-300"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        المتبقي {remainingEditCharacters} حرف
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEditingMessage}
+                          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-slate-200 hover:bg-white/10"
+                        >
+                          إلغاء
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={!canSaveEdit}
+                          onClick={() => handleSaveEdit(message.id)}
+                          className="rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {savingEdit ? "جاري الحفظ..." : "حفظ التعديل"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 text-[11px] font-bold text-amber-100">
+                      التعديل متاح لمدة 5 دقائق من وقت إرسال الرسالة.
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
+                    {message.text}
+                  </p>
+                )}
 
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="relative flex flex-wrap items-center gap-2">
@@ -366,6 +572,8 @@ export default function ChallengeStudioAnalysis({
                       type="button"
                       onClick={() => {
                         setOpenLikesMessageId(null);
+                        setEditingMessageId(null);
+                        setEditText("");
                         setOpenReplyMessageId((currentId) =>
                           currentId === message.id ? null : message.id
                         );
@@ -378,6 +586,16 @@ export default function ChallengeStudioAnalysis({
                         ? `(${messageReplies.length})`
                         : ""}
                     </button>
+
+                    {canEditThisMessage && !editBoxOpen && (
+                      <button
+                        type="button"
+                        onClick={() => startEditingMessage(message)}
+                        className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-bold text-amber-200 hover:bg-amber-400/20"
+                      >
+                        تعديل
+                      </button>
+                    )}
 
                     {openLikesMessageId === message.id &&
                       messageLikes.length > 0 && (
@@ -528,7 +746,7 @@ export default function ChallengeStudioAnalysis({
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-[11px] font-bold leading-6 text-slate-400 md:text-xs">
           شروط 🎙️ استديو التحليل: الرسالة 250 حرف، الرد 150 حرف، بدون روابط،
-          وبين كل رسالة ورسالة 5 ثواني.
+          تعديل الرسالة متاح لمدة 5 دقائق، وبين كل رسالة ورسالة 5 ثواني.
         </div>
 
         {error && (
