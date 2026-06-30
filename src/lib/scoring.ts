@@ -24,6 +24,11 @@ type PredictionDoc = {
   homeScore: number;
   awayScore: number;
 
+  homeTeamCode?: string;
+awayTeamCode?: string;
+homeTeamName?: string;
+awayTeamName?: string;
+
   qualifiedTeamCode?: string | null;
   qualificationMethod?: QualificationMethod | null;
 
@@ -75,6 +80,59 @@ export type CalculateMatchInput = {
   actualQualificationMethod?: QualificationMethod;
 };
 
+const TEAM_IDENTITY_ALIASES: Record<string, string[]> = {
+  ARG: ["ARG", "الأرجنتين", "الارجنتين", "ARGENTINA"],
+  AUS: ["AUS", "أستراليا", "استراليا", "AUSTRALIA"],
+  AUT: ["AUT", "النمسا", "AUSTRIA"],
+  BEL: ["BEL", "بلجيكا", "BELGIUM"],
+  BIH: ["BIH", "البوسنة والهرسك", "البوسنة", "BOSNIA"],
+  BRA: ["BRA", "البرازيل", "BRAZIL"],
+  CAN: ["CAN", "كندا", "CANADA"],
+  CIV: ["CIV", "ساحل العاج", "IVORY COAST"],
+  COD: ["COD", "الكونغو الديمقراطية", "الكونغو", "DR CONGO"],
+  COL: ["COL", "كولومبيا", "COLOMBIA"],
+  CPV: ["CPV", "الرأس الأخضر", "الراس الاخضر", "CAPE VERDE"],
+  CRO: ["CRO", "كرواتيا", "CROATIA"],
+  CZE: ["CZE", "التشيك", "CZECHIA"],
+  DEN: ["DEN", "الدنمارك", "DENMARK"],
+  ECU: ["ECU", "الإكوادور", "الاكوادور", "ECUADOR"],
+  EGY: ["EGY", "مصر", "EGYPT"],
+  ENG: ["ENG", "إنجلترا", "انجلترا", "ENGLAND"],
+  ESP: ["ESP", "إسبانيا", "اسبانيا", "SPAIN"],
+  FRA: ["FRA", "فرنسا", "FRANCE"],
+  GER: ["GER", "ألمانيا", "المانيا", "GERMANY"],
+  GHA: ["GHA", "غانا", "GHANA"],
+  HAI: ["HAI", "هايتي", "HAITI"],
+  IRN: ["IRN", "إيران", "ايران", "IRAN"],
+  IRQ: ["IRQ", "العراق", "IRAQ"],
+  JOR: ["JOR", "الأردن", "الاردن", "JORDAN"],
+  JPN: ["JPN", "اليابان", "JAPAN"],
+  KOR: ["KOR", "كوريا الجنوبية", "SOUTH KOREA"],
+  MAR: ["MAR", "MOR", "المغرب", "MOROCCO"],
+  MOR: ["MOR", "MAR", "المغرب", "MOROCCO"],
+  MEX: ["MEX", "المكسيك", "MEXICO"],
+  NED: ["NED", "HOL", "هولندا", "NETHERLANDS"],
+  HOL: ["HOL", "NED", "هولندا", "NETHERLANDS"],
+  NOR: ["NOR", "النرويج", "NORWAY"],
+  NZL: ["NZL", "نيوزيلندا", "NEW ZEALAND"],
+  PAN: ["PAN", "بنما", "PANAMA"],
+  PAR: ["PAR", "باراغواي", "PARAGUAY"],
+  POR: ["POR", "البرتغال", "PORTUGAL"],
+  QAT: ["QAT", "قطر", "QATAR"],
+  RSA: ["RSA", "جنوب أفريقيا", "جنوب افريقيا", "SOUTH AFRICA"],
+  KSA: ["KSA", "السعودية", "SAUDI ARABIA"],
+  SEN: ["SEN", "السنغال", "SENEGAL"],
+  SUI: ["SUI", "سويسرا", "SWITZERLAND"],
+  SWE: ["SWE", "السويد", "SWEDEN"],
+  TUN: ["TUN", "تونس", "TUNISIA"],
+  TUR: ["TUR", "تركيا", "TURKEY"],
+  URU: ["URU", "الأوروغواي", "الاورغواي", "URUGUAY"],
+  USA: ["USA", "الولايات المتحدة", "أمريكا", "امريكا", "UNITED STATES"],
+  UZB: ["UZB", "أوزبكستان", "اوزبكستان", "UZBEKISTAN"],
+  DZA: ["DZA", "ALG", "الجزائر", "ALGERIA"],
+  ALG: ["ALG", "DZA", "الجزائر", "ALGERIA"],
+};
+
 function validateScore(score: number) {
   return Number.isInteger(score) && score >= 0 && score <= 30;
 }
@@ -99,6 +157,40 @@ function normalizeQualificationMethod(
 
 function toText(value: unknown) {
   return String(value || "").trim();
+}
+
+function normalizeTeamIdentity(value?: string | null) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function getTeamIdentitySet(value?: string | null) {
+  const normalizedValue = normalizeTeamIdentity(value);
+
+  if (!normalizedValue) return [];
+
+  const aliases = TEAM_IDENTITY_ALIASES[normalizedValue] || [normalizedValue];
+
+  return Array.from(
+    new Set(
+      aliases
+        .map((alias) => normalizeTeamIdentity(alias))
+        .filter((alias) => alias.length > 0)
+    )
+  );
+}
+
+function teamIdentityValuesMatch(
+  firstValue?: string | null,
+  secondValue?: string | null
+) {
+  const firstAliases = getTeamIdentitySet(firstValue);
+  const secondAliases = getTeamIdentitySet(secondValue);
+
+  if (firstAliases.length === 0 || secondAliases.length === 0) {
+    return false;
+  }
+
+  return firstAliases.some((alias) => secondAliases.includes(alias));
 }
 
 async function getMatchById(matchId: string): Promise<MatchDoc> {
@@ -132,6 +224,118 @@ function getOutcomeTeamCode(match: MatchDoc, outcome: Outcome) {
   if (outcome === "home") return match.homeTeamCode;
   if (outcome === "away") return match.awayTeamCode;
   return "";
+}
+
+function getTeamIdentities(
+  prediction: PredictionDoc,
+  match: MatchDoc,
+  side: "home" | "away"
+) {
+  const values =
+    side === "home"
+      ? [match.homeTeamCode, prediction.homeTeamCode, prediction.homeTeamName]
+      : [match.awayTeamCode, prediction.awayTeamCode, prediction.awayTeamName];
+
+  const identities = values.flatMap((value) => getTeamIdentitySet(value));
+
+  return Array.from(new Set(identities));
+}
+
+function teamValueMatchesSide(
+  prediction: PredictionDoc,
+  match: MatchDoc,
+  side: "home" | "away",
+  value?: string | null
+) {
+  const valueIdentities = getTeamIdentitySet(value);
+
+  if (valueIdentities.length === 0) return false;
+
+  const sideIdentities = getTeamIdentities(prediction, match, side);
+
+  return valueIdentities.some((identity) => sideIdentities.includes(identity));
+}
+
+function getTeamSideFromValue(
+  prediction: PredictionDoc,
+  match: MatchDoc,
+  value?: string | null
+): "home" | "away" | null {
+  if (teamValueMatchesSide(prediction, match, "home", value)) {
+    return "home";
+  }
+
+  if (teamValueMatchesSide(prediction, match, "away", value)) {
+    return "away";
+  }
+
+  return null;
+}
+
+function teamValuesMatch(
+  prediction: PredictionDoc,
+  match: MatchDoc,
+  firstValue?: string | null,
+  secondValue?: string | null
+) {
+  if (teamIdentityValuesMatch(firstValue, secondValue)) {
+    return true;
+  }
+
+  const firstSide = getTeamSideFromValue(prediction, match, firstValue);
+  const secondSide = getTeamSideFromValue(prediction, match, secondValue);
+
+  return Boolean(firstSide && secondSide && firstSide === secondSide);
+}
+
+function predictedOutcomeMatchesQualifiedTeam(params: {
+  prediction: PredictionDoc;
+  match: MatchDoc;
+  predictedOutcome: Outcome;
+  actualQualifiedTeamCode?: string | null;
+}) {
+  const { prediction, match, predictedOutcome, actualQualifiedTeamCode } =
+    params;
+
+  if (predictedOutcome === "home") {
+    return teamValueMatchesSide(
+      prediction,
+      match,
+      "home",
+      actualQualifiedTeamCode
+    );
+  }
+
+  if (predictedOutcome === "away") {
+    return teamValueMatchesSide(
+      prediction,
+      match,
+      "away",
+      actualQualifiedTeamCode
+    );
+  }
+
+  return false;
+}
+
+function normalizeActualQualifiedTeamCode(params: {
+  match: MatchDoc;
+  value?: string | null;
+}) {
+  const { match, value } = params;
+  const selectedValue = toText(value);
+
+  if (!selectedValue) return "";
+
+  if (teamIdentityValuesMatch(match.homeTeamCode, selectedValue)) {
+    return match.homeTeamCode;
+  }
+
+  if (teamIdentityValuesMatch(match.awayTeamCode, selectedValue)) {
+    return match.awayTeamCode;
+  }
+
+  return selectedValue;
 }
 
 function getPointValues(predictionType: PredictionType) {
@@ -226,18 +430,20 @@ function calculateKnockoutPredictionPoints(params: {
       };
     }
 
-    if (actualOutcome === "draw" && actualQualifiedTeamCode) {
-      const predictedWinnerTeamCode = getOutcomeTeamCode(
+    if (
+      actualOutcome === "draw" &&
+      actualQualifiedTeamCode &&
+      predictedOutcomeMatchesQualifiedTeam({
+        prediction,
         match,
-        predictedOutcome
-      );
-
-      if (predictedWinnerTeamCode === actualQualifiedTeamCode) {
-        return {
-          points: pointsValue.winner,
-          resultType: "winner" as const,
-        };
-      }
+        predictedOutcome,
+        actualQualifiedTeamCode,
+      })
+    ) {
+      return {
+        points: pointsValue.winner,
+        resultType: "winner" as const,
+      };
     }
 
     return {
@@ -261,7 +467,12 @@ function calculateKnockoutPredictionPoints(params: {
     if (
       prediction.qualifiedTeamCode &&
       actualQualifiedTeamCode &&
-      prediction.qualifiedTeamCode === actualQualifiedTeamCode
+      teamValuesMatch(
+        prediction,
+        match,
+        prediction.qualifiedTeamCode,
+        actualQualifiedTeamCode
+      )
     ) {
       points += pointsValue.qualified;
       if (resultType !== "exact") resultType = "winner";
@@ -287,7 +498,12 @@ function calculateKnockoutPredictionPoints(params: {
   if (
     prediction.qualifiedTeamCode &&
     actualWinnerTeamCode &&
-    prediction.qualifiedTeamCode === actualWinnerTeamCode
+    teamValuesMatch(
+      prediction,
+      match,
+      prediction.qualifiedTeamCode,
+      actualWinnerTeamCode
+    )
   ) {
     return {
       points: pointsValue.winner,
@@ -480,7 +696,10 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
 
   const actualQualifiedTeamCode =
     match.matchStage === "knockout" && actualOutcome === "draw"
-      ? toText(input.actualQualifiedTeamCode)
+      ? normalizeActualQualifiedTeamCode({
+          match,
+          value: input.actualQualifiedTeamCode,
+        })
       : actualOutcome === "home"
       ? match.homeTeamCode
       : actualOutcome === "away"
@@ -494,8 +713,8 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
 
   if (match.matchStage === "knockout" && actualOutcome === "draw") {
     const validQualifiedTeam =
-      actualQualifiedTeamCode === match.homeTeamCode ||
-      actualQualifiedTeamCode === match.awayTeamCode;
+      teamIdentityValuesMatch(actualQualifiedTeamCode, match.homeTeamCode) ||
+      teamIdentityValuesMatch(actualQualifiedTeamCode, match.awayTeamCode);
 
     if (!validQualifiedTeam) {
       throw new Error("اختر المنتخب المتأهل");
@@ -683,8 +902,8 @@ export async function undoMatchCalculation(matchId: string) {
   const allCalculatedPredictions = await getAllCalculatedPredictions();
 
   const remainingCalculatedPredictions = allCalculatedPredictions.filter(
-  (prediction) => prediction.matchId !== matchId
-);
+    (prediction) => prediction.matchId !== matchId
+  );
 
   const statsByUser = buildUserStats(remainingCalculatedPredictions);
   const rankedUsers = buildRankedUsers(allUsers, statsByUser);
