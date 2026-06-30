@@ -28,6 +28,11 @@ export type ChallengeStudioChatMessage = {
   createdAt: Date | null;
   updatedAt: Date | null;
   isEdited: boolean;
+
+  replyToMessageId: string | null;
+  replyToUserId: string | null;
+  replyToUserName: string | null;
+  replyToText: string | null;
 };
 
 export type ChallengeStudioChatLike = {
@@ -51,6 +56,7 @@ type SendChallengeStudioMessageInput = {
   userId: string;
   userName: string;
   text: string;
+  replyToMessage?: ChallengeStudioChatMessage | null;
 };
 
 type EditChallengeStudioMessageInput = {
@@ -60,7 +66,7 @@ type EditChallengeStudioMessageInput = {
 };
 
 type SendChallengeStudioReplyInput = {
-  messageId: string;
+  message: ChallengeStudioChatMessage;
   userId: string;
   userName: string;
   text: string;
@@ -163,7 +169,33 @@ function buildLikeId(messageId: string, userId: string) {
   return `${messageId}_${userId}`;
 }
 
-export function canEditChallengeStudioMessage(message: ChallengeStudioChatMessage) {
+function buildMessageFromDoc(
+  docId: string,
+  data: Record<string, unknown>
+): ChallengeStudioChatMessage {
+  return {
+    id: docId,
+    userId: String(data.userId || ""),
+    userName: String(data.userName || "عضو"),
+    text: String(data.text || ""),
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+    isEdited: Boolean(data.isEdited),
+
+    replyToMessageId: data.replyToMessageId
+      ? String(data.replyToMessageId)
+      : null,
+    replyToUserId: data.replyToUserId ? String(data.replyToUserId) : null,
+    replyToUserName: data.replyToUserName
+      ? String(data.replyToUserName)
+      : null,
+    replyToText: data.replyToText ? String(data.replyToText) : null,
+  };
+}
+
+export function canEditChallengeStudioMessage(
+  message: ChallengeStudioChatMessage
+) {
   if (!message.createdAt) return false;
 
   const diff = Date.now() - message.createdAt.getTime();
@@ -178,26 +210,14 @@ export function subscribeChallengeStudioMessages(
   const messagesQuery = query(
     collection(db, CHALLENGE_STUDIO_CHAT_COLLECTION),
     orderBy("createdAt", "desc"),
-    limit(50)
+    limit(80)
   );
 
   return onSnapshot(
     messagesQuery,
     (snapshot) => {
       const messages = snapshot.docs
-        .map((docItem) => {
-          const data = docItem.data();
-
-          return {
-            id: docItem.id,
-            userId: String(data.userId || ""),
-            userName: String(data.userName || "عضو"),
-            text: String(data.text || ""),
-            createdAt: toDate(data.createdAt),
-            updatedAt: toDate(data.updatedAt),
-            isEdited: Boolean(data.isEdited),
-          };
-        })
+        .map((docItem) => buildMessageFromDoc(docItem.id, docItem.data()))
         .reverse();
 
       callback(messages);
@@ -285,6 +305,7 @@ export async function sendChallengeStudioMessage({
   userId,
   userName,
   text,
+  replyToMessage = null,
 }: SendChallengeStudioMessageInput) {
   const cleanText = normalizeMessage(text);
 
@@ -307,19 +328,9 @@ export async function sendChallengeStudioMessage({
   const latestMessagesSnapshot = await getDocs(latestMessagesQuery);
 
   const latestMessages: ChallengeStudioChatMessage[] =
-    latestMessagesSnapshot.docs.map((docItem) => {
-      const data = docItem.data();
-
-      return {
-        id: docItem.id,
-        userId: String(data.userId || ""),
-        userName: String(data.userName || "عضو"),
-        text: String(data.text || ""),
-        createdAt: toDate(data.createdAt),
-        updatedAt: toDate(data.updatedAt),
-        isEdited: Boolean(data.isEdited),
-      };
-    });
+    latestMessagesSnapshot.docs.map((docItem) =>
+      buildMessageFromDoc(docItem.id, docItem.data())
+    );
 
   const lastUserMessage =
     latestMessages.find((message) => message.userId === userId) || null;
@@ -327,7 +338,7 @@ export async function sendChallengeStudioMessage({
   if (lastUserMessage) {
     const lastText = normalizeMessage(lastUserMessage.text);
 
-    if (lastText === cleanText) {
+    if (lastText === cleanText && !replyToMessage) {
       throw new Error("لا يمكن تكرار نفس الرسالة مباشرة.");
     }
 
@@ -344,6 +355,10 @@ export async function sendChallengeStudioMessage({
     }
   }
 
+  const replyToText = replyToMessage
+    ? normalizeMessage(replyToMessage.text).slice(0, 120)
+    : null;
+
   await addDoc(collection(db, CHALLENGE_STUDIO_CHAT_COLLECTION), {
     userId,
     userName: normalizeMessage(userName).slice(0, 40) || "عضو",
@@ -351,6 +366,11 @@ export async function sendChallengeStudioMessage({
     createdAt: serverTimestamp(),
     updatedAt: null,
     isEdited: false,
+
+    replyToMessageId: replyToMessage ? replyToMessage.id : null,
+    replyToUserId: replyToMessage ? replyToMessage.userId : null,
+    replyToUserName: replyToMessage ? replyToMessage.userName : null,
+    replyToText,
   });
 }
 
@@ -413,7 +433,7 @@ export async function editChallengeStudioMessage({
 }
 
 export async function sendChallengeStudioReply({
-  messageId,
+  message,
   userId,
   userName,
   text,
@@ -426,7 +446,7 @@ export async function sendChallengeStudioReply({
     throw new Error(textValidation.error);
   }
 
-  if (!messageId) {
+  if (!message.id) {
     throw new Error("تعذر تحديد الرسالة.");
   }
 
@@ -434,12 +454,11 @@ export async function sendChallengeStudioReply({
     throw new Error("سجّل دخولك أولًا للرد.");
   }
 
-  await addDoc(collection(db, CHALLENGE_STUDIO_CHAT_REPLIES_COLLECTION), {
-    messageId,
+  await sendChallengeStudioMessage({
     userId,
-    userName: normalizeMessage(userName).slice(0, 40) || "عضو",
+    userName,
     text: cleanText,
-    createdAt: serverTimestamp(),
+    replyToMessage: message,
   });
 }
 
