@@ -5,6 +5,7 @@ import {
   ChallengeStudioChatLike,
   ChallengeStudioChatMessage,
   canEditChallengeStudioMessage,
+  deleteChallengeStudioMessage,
   editChallengeStudioMessage,
   sendChallengeStudioMessage,
   subscribeChallengeStudioMessageLikes,
@@ -32,6 +33,11 @@ type ChallengeStudioAnalysisProps = {
 
 const MAX_MESSAGE_LENGTH = 250;
 const MESSAGE_COOLDOWN_MS = 5000;
+const CHAT_ADMIN_NAMES = [
+  "عبدالسلام العنزي",
+  "عبدالسلام بن حمدي العنزي",
+  "أبو راكان",
+];
 
 function normalizeText(text: string) {
   return text.replace(/\s+/g, " ").trim();
@@ -61,6 +67,7 @@ export default function ChallengeStudioAnalysis({
   const [editText, setEditText] = useState("");
   const [sending, setSending] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [lastSentAt, setLastSentAt] = useState<number | null>(null);
   const [openLikesMessageId, setOpenLikesMessageId] = useState<string | null>(
@@ -266,6 +273,8 @@ export default function ChallengeStudioAnalysis({
   const shouldShowMentionList =
     mentionSearch !== null && mentionCandidates.length > 0;
 
+    const canManageChat = CHAT_ADMIN_NAMES.includes(normalizeText(currentUserName));
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -403,6 +412,47 @@ export default function ChallengeStudioAnalysis({
       setSavingEdit(false);
     }
   }
+
+  async function handleDeleteMessage(message: ChallengeStudioChatMessage) {
+  setError("");
+
+  if (!canManageChat) {
+    setError("حذف الرسائل متاح للمشرف فقط.");
+    return;
+  }
+
+  const confirmDelete = window.confirm(
+    `حذف رسالة ${message.userName}؟\n\n${message.text}`
+  );
+
+  if (!confirmDelete) return;
+
+  try {
+    setDeletingMessageId(message.id);
+
+    await deleteChallengeStudioMessage({
+      messageId: message.id,
+    });
+
+    setOpenLikesMessageId(null);
+    setEditingMessageId(null);
+
+    if (replyingToMessage?.id === message.id) {
+      setReplyingToMessage(null);
+    }
+
+    setError("");
+  } catch (deleteError) {
+    const messageText =
+      deleteError instanceof Error
+        ? deleteError.message
+        : "تعذر حذف الرسالة.";
+
+    setError(messageText);
+  } finally {
+    setDeletingMessageId(null);
+  }
+}
 
   function startReplyingToMessage(message: ChallengeStudioChatMessage) {
     setError("");
@@ -728,6 +778,17 @@ export default function ChallengeStudioAnalysis({
                           تعديل
                         </button>
                       )}
+
+{canManageChat && (
+  <button
+    type="button"
+    disabled={deletingMessageId === message.id}
+    onClick={() => handleDeleteMessage(message)}
+    className="rounded-full border border-red-400/20 bg-red-500/10 px-3 py-1 text-[11px] font-bold text-red-200 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    {deletingMessageId === message.id ? "حذف..." : "حذف"}
+  </button>
+)}
 
                       {openLikesMessageId === message.id &&
                         messageLikes.length > 0 && (

@@ -13,6 +13,8 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -76,6 +78,10 @@ type ToggleChallengeStudioMessageLikeInput = {
   messageId: string;
   userId: string;
   userName: string;
+};
+
+type DeleteChallengeStudioMessageInput = {
+  messageId: string;
 };
 
 type ValidationResult = {
@@ -490,4 +496,47 @@ export async function toggleChallengeStudioMessageLike({
     userName: normalizeMessage(userName).slice(0, 40) || "عضو",
     createdAt: serverTimestamp(),
   });
+}
+
+export async function deleteChallengeStudioMessage({
+  messageId,
+}: DeleteChallengeStudioMessageInput) {
+  if (!messageId) {
+    throw new Error("تعذر تحديد الرسالة.");
+  }
+
+  const messageRef = doc(db, CHALLENGE_STUDIO_CHAT_COLLECTION, messageId);
+  const messageSnapshot = await getDoc(messageRef);
+
+  if (!messageSnapshot.exists()) {
+    throw new Error("الرسالة غير موجودة.");
+  }
+
+  const batch = writeBatch(db);
+
+  batch.delete(messageRef);
+
+  const likesQuery = query(
+    collection(db, CHALLENGE_STUDIO_CHAT_LIKES_COLLECTION),
+    where("messageId", "==", messageId)
+  );
+
+  const likesSnapshot = await getDocs(likesQuery);
+
+  likesSnapshot.docs.forEach((likeDoc) => {
+    batch.delete(likeDoc.ref);
+  });
+
+  const oldRepliesQuery = query(
+    collection(db, CHALLENGE_STUDIO_CHAT_REPLIES_COLLECTION),
+    where("messageId", "==", messageId)
+  );
+
+  const oldRepliesSnapshot = await getDocs(oldRepliesQuery);
+
+  oldRepliesSnapshot.docs.forEach((replyDoc) => {
+    batch.delete(replyDoc.ref);
+  });
+
+  await batch.commit();
 }
