@@ -128,26 +128,84 @@ function getQualificationMethodLabel(value?: string | null) {
   return "";
 }
 
+const TEAM_CODE_ARABIC_NAMES: Record<string, string> = {
+  ARG: "الأرجنتين",
+  AUS: "أستراليا",
+  AUT: "النمسا",
+  BEL: "بلجيكا",
+  BIH: "البوسنة والهرسك",
+  BRA: "البرازيل",
+  CAN: "كندا",
+  CIV: "ساحل العاج",
+  COD: "الكونغو الديمقراطية",
+  COL: "كولومبيا",
+  CPV: "الرأس الأخضر",
+  CRO: "كرواتيا",
+  CZE: "التشيك",
+  DEN: "الدنمارك",
+  ECU: "الإكوادور",
+  EGY: "مصر",
+  ENG: "إنجلترا",
+  ESP: "إسبانيا",
+  FRA: "فرنسا",
+  GER: "ألمانيا",
+  GHA: "غانا",
+  HAI: "هايتي",
+  IRN: "إيران",
+  IRQ: "العراق",
+  JOR: "الأردن",
+  JPN: "اليابان",
+  KOR: "كوريا الجنوبية",
+  MAR: "المغرب",
+  MEX: "المكسيك",
+  NED: "هولندا",
+  NOR: "النرويج",
+  NZL: "نيوزيلندا",
+  PAN: "بنما",
+  PAR: "باراغواي",
+  POR: "البرتغال",
+  QAT: "قطر",
+  RSA: "جنوب أفريقيا",
+  KSA: "السعودية",
+  SEN: "السنغال",
+  SUI: "سويسرا",
+  SWE: "السويد",
+  TUN: "تونس",
+  TUR: "تركيا",
+  URU: "الأوروغواي",
+  USA: "الولايات المتحدة",
+  UZB: "أوزبكستان",
+  DZA: "الجزائر",
+};
+
 function getQualifiedTeamName(
   prediction: Prediction,
   qualifiedTeamCode?: string | null
 ) {
   if (!qualifiedTeamCode) return "";
 
+  const code = qualifiedTeamCode.trim().toUpperCase();
+
   const predictionWithCodes = prediction as Prediction & {
     homeTeamCode?: string | null;
     awayTeamCode?: string | null;
   };
 
-  if (qualifiedTeamCode === predictionWithCodes.homeTeamCode) {
+  if (
+    predictionWithCodes.homeTeamCode &&
+    code === predictionWithCodes.homeTeamCode.trim().toUpperCase()
+  ) {
     return prediction.homeTeamName;
   }
 
-  if (qualifiedTeamCode === predictionWithCodes.awayTeamCode) {
+  if (
+    predictionWithCodes.awayTeamCode &&
+    code === predictionWithCodes.awayTeamCode.trim().toUpperCase()
+  ) {
     return prediction.awayTeamName;
   }
 
-  return qualifiedTeamCode;
+  return TEAM_CODE_ARABIC_NAMES[code] || qualifiedTeamCode;
 }
 
 function getPredictionStatus(prediction: Prediction) {
@@ -1049,14 +1107,35 @@ function PredictionDetailsModal({
                         )}
 
                         {prediction.isCalculated && (
-                          <div className="mt-3 rounded-xl border border-white/10 bg-slate-950/50 p-2 text-center text-xs font-bold text-slate-300">
-                            النتيجة الفعلية:{" "}
-                            <span className="text-white">
-                              {prediction.actualHomeScore} -{" "}
-                              {prediction.actualAwayScore}
-                            </span>
-                          </div>
-                        )}
+  <div className="mt-3 space-y-2">
+    <div className="rounded-xl border border-white/10 bg-slate-950/50 p-2 text-center text-xs font-bold text-slate-300">
+      النتيجة الفعلية:{" "}
+      <span className="text-white">
+        {prediction.actualHomeScore} - {prediction.actualAwayScore}
+      </span>
+    </div>
+
+    {prediction.actualQualifiedTeamCode &&
+      prediction.actualQualificationMethod && (
+        <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-2 text-center text-xs font-bold leading-6 text-emerald-100">
+          المتأهل الفعلي:{" "}
+          <span className="font-black text-white">
+            {getQualifiedTeamName(
+              prediction,
+              prediction.actualQualifiedTeamCode
+            )}
+          </span>
+          {" "}
+          • الطريقة:{" "}
+          <span className="font-black text-white">
+            {getQualificationMethodLabel(
+              prediction.actualQualificationMethod
+            )}
+          </span>
+        </div>
+      )}
+  </div>
+)}
 
                         {!prediction.isCalculated && (
                           <div className="mt-3 rounded-xl border border-slate-400/20 bg-slate-400/10 p-2 text-center text-xs font-bold text-slate-300">

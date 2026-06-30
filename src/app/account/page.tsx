@@ -59,26 +59,84 @@ function getQualificationMethodLabel(value?: string | null) {
   return "";
 }
 
+const TEAM_CODE_ARABIC_NAMES: Record<string, string> = {
+  ARG: "الأرجنتين",
+  AUS: "أستراليا",
+  AUT: "النمسا",
+  BEL: "بلجيكا",
+  BIH: "البوسنة والهرسك",
+  BRA: "البرازيل",
+  CAN: "كندا",
+  CIV: "ساحل العاج",
+  COD: "الكونغو الديمقراطية",
+  COL: "كولومبيا",
+  CPV: "الرأس الأخضر",
+  CRO: "كرواتيا",
+  CZE: "التشيك",
+  DEN: "الدنمارك",
+  ECU: "الإكوادور",
+  EGY: "مصر",
+  ENG: "إنجلترا",
+  ESP: "إسبانيا",
+  FRA: "فرنسا",
+  GER: "ألمانيا",
+  GHA: "غانا",
+  HAI: "هايتي",
+  IRN: "إيران",
+  IRQ: "العراق",
+  JOR: "الأردن",
+  JPN: "اليابان",
+  KOR: "كوريا الجنوبية",
+  MAR: "المغرب",
+  MEX: "المكسيك",
+  NED: "هولندا",
+  NOR: "النرويج",
+  NZL: "نيوزيلندا",
+  PAN: "بنما",
+  PAR: "باراغواي",
+  POR: "البرتغال",
+  QAT: "قطر",
+  RSA: "جنوب أفريقيا",
+  KSA: "السعودية",
+  SEN: "السنغال",
+  SUI: "سويسرا",
+  SWE: "السويد",
+  TUN: "تونس",
+  TUR: "تركيا",
+  URU: "الأوروغواي",
+  USA: "الولايات المتحدة",
+  UZB: "أوزبكستان",
+  DZA: "الجزائر",
+};
+
 function getQualifiedTeamName(
   prediction: AccountPrediction,
   qualifiedTeamCode?: string | null
 ) {
   if (!qualifiedTeamCode) return "";
 
+  const code = qualifiedTeamCode.trim().toUpperCase();
+
   const predictionWithCodes = prediction as AccountPrediction & {
     homeTeamCode?: string | null;
     awayTeamCode?: string | null;
   };
 
-  if (qualifiedTeamCode === predictionWithCodes.homeTeamCode) {
+  if (
+    predictionWithCodes.homeTeamCode &&
+    code === predictionWithCodes.homeTeamCode.trim().toUpperCase()
+  ) {
     return prediction.homeTeamName;
   }
 
-  if (qualifiedTeamCode === predictionWithCodes.awayTeamCode) {
+  if (
+    predictionWithCodes.awayTeamCode &&
+    code === predictionWithCodes.awayTeamCode.trim().toUpperCase()
+  ) {
     return prediction.awayTeamName;
   }
 
-  return qualifiedTeamCode;
+  return TEAM_CODE_ARABIC_NAMES[code] || qualifiedTeamCode;
 }
 
 function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
@@ -119,9 +177,12 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
 
 function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
   const isGolden = prediction.predictionType === "golden";
+
   const knockoutPrediction = prediction as AccountPrediction & {
     qualifiedTeamCode?: string | null;
     qualificationMethod?: string | null;
+    actualQualifiedTeamCode?: string | null;
+    actualQualificationMethod?: string | null;
   };
 
   return (
@@ -160,6 +221,7 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
           <div className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-sm font-black text-amber-300">
             توقعك
           </div>
+
           <div className="mt-2 text-lg font-black text-white">
             {prediction.homeScore} - {prediction.awayScore}
           </div>
@@ -182,6 +244,7 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
               knockoutPrediction.qualifiedTeamCode
             )}
           </span>
+
           {knockoutPrediction.qualificationMethod && (
             <>
               {" "}
@@ -197,11 +260,33 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
       )}
 
       {prediction.isCalculated && (
-        <div className="mt-4 rounded-2xl border border-white/10 bg-white/10 p-3 text-center text-sm text-slate-200">
-          النتيجة الفعلية:{" "}
-          <span className="font-black text-emerald-300">
-            {prediction.actualHomeScore} - {prediction.actualAwayScore}
-          </span>
+        <div className="mt-4 space-y-2">
+          <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-center text-sm text-slate-200">
+            النتيجة الفعلية:{" "}
+            <span className="font-black text-emerald-300">
+              {prediction.actualHomeScore} - {prediction.actualAwayScore}
+            </span>
+          </div>
+
+          {knockoutPrediction.actualQualifiedTeamCode &&
+            knockoutPrediction.actualQualificationMethod && (
+              <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-xs font-bold leading-6 text-emerald-100 md:text-sm">
+                المتأهل الفعلي:{" "}
+                <span className="font-black text-white">
+                  {getQualifiedTeamName(
+                    prediction,
+                    knockoutPrediction.actualQualifiedTeamCode
+                  )}
+                </span>
+                {" "}
+                • الطريقة:{" "}
+                <span className="font-black text-white">
+                  {getQualificationMethodLabel(
+                    knockoutPrediction.actualQualificationMethod
+                  )}
+                </span>
+              </div>
+            )}
         </div>
       )}
     </div>

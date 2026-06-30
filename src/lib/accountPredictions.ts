@@ -25,6 +25,9 @@ export type AccountPrediction = {
   actualHomeScore: number | null;
   actualAwayScore: number | null;
 
+  actualQualifiedTeamCode?: string | null;
+actualQualificationMethod?: QualificationMethod | null;
+
   points: number;
   resultType: AccountPredictionResultType;
   isCalculated: boolean;
@@ -119,6 +122,11 @@ export async function getAccountPredictions(
 
         actualHomeScore: toNullableNumber(data.actualHomeScore),
         actualAwayScore: toNullableNumber(data.actualAwayScore),
+
+        actualQualifiedTeamCode: toNullableText(data.actualQualifiedTeamCode),
+actualQualificationMethod: normalizeQualificationMethod(
+  data.actualQualificationMethod
+),
 
         points: toNumber(data.points),
         resultType: normalizeResultType(data.resultType),
