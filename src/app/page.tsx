@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import HomeStats from "@/components/HomeStats";
@@ -11,6 +12,9 @@ import ExactPredictionCelebration from "@/components/ExactPredictionCelebration"
 import HomeBanner from "@/components/HomeBanner";
 import OnlineMembersCounter from "@/components/OnlineMembersCounter";
 import PredictionEditNotice from "../components/PredictionEditNotice";
+import { getPublishedChallengeStudioBulletins } from "@/lib/challengeStudio";
+
+const CHALLENGE_STUDIO_LAST_SEEN_KEY = "challengeStudioLastSeenBulletin";
 
 const forgotPasswordMessage = `السلام عليكم، نسيت الرقم السري في منصة توقعات كأس العالم 2026.
 
@@ -26,9 +30,58 @@ const forgotPasswordWhatsappUrl = `https://wa.me/966542180200?text=${encodeURICo
   forgotPasswordMessage
 )}`;
 
+function getChallengeStudioBulletinSeenKey(bulletin: {
+  id?: string;
+  date?: string;
+  summary?: string;
+}) {
+  return `${bulletin.id || ""}-${bulletin.date || ""}-${
+    bulletin.summary || ""
+  }`;
+}
+
 export default function HomePage() {
   const router = useRouter();
   const { user, loading, isLoggedIn, logout } = useAuth();
+
+  const [hasUnreadChallengeStudio, setHasUnreadChallengeStudio] =
+    useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkChallengeStudioUnread() {
+      try {
+        const bulletins = await getPublishedChallengeStudioBulletins(1);
+        const latestBulletin = bulletins[0];
+
+        if (!latestBulletin) {
+          if (isMounted) {
+            setHasUnreadChallengeStudio(false);
+          }
+
+          return;
+        }
+
+        const latestKey = getChallengeStudioBulletinSeenKey(latestBulletin);
+        const savedKey = window.localStorage.getItem(
+          CHALLENGE_STUDIO_LAST_SEEN_KEY
+        );
+
+        if (isMounted) {
+          setHasUnreadChallengeStudio(Boolean(latestKey && latestKey !== savedKey));
+        }
+      } catch (error) {
+        console.error("Challenge studio unread check error:", error);
+      }
+    }
+
+    checkChallengeStudioUnread();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <main
@@ -205,8 +258,15 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => router.push("/challenge-studio")}
-            className="inline-flex min-h-[54px] items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950/40 px-3 py-3 text-xs font-black text-cyan-100 shadow-lg shadow-slate-950/30 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 md:px-6 md:text-sm"
+            className="relative inline-flex min-h-[54px] items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950/40 px-3 py-3 text-xs font-black text-cyan-100 shadow-lg shadow-slate-950/30 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 md:px-6 md:text-sm"
           >
+            {hasUnreadChallengeStudio && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex h-4 w-4 rounded-full bg-red-500 ring-2 ring-slate-950" />
+              </span>
+            )}
+
             <span className="ml-2 text-lg">🎙️</span>
             <span>استوديو التحدي</span>
           </button>

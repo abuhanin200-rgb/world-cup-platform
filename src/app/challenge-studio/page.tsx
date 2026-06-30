@@ -16,6 +16,34 @@ import { PredictionDetailsModal } from "@/components/LeaderboardTable";
 import { getLeaderboardUsers, type LeaderboardUser } from "@/lib/leaderboard";
 import { getPredictionsByUserId, type Prediction } from "@/lib/predictions";
 
+const CHALLENGE_STUDIO_LAST_SEEN_KEY = "challengeStudioLastSeenBulletin";
+
+function getChallengeStudioBulletinSeenKey(bulletin: {
+  id?: string;
+  date?: string;
+  summary?: string;
+}) {
+  return `${bulletin.id || ""}-${bulletin.date || ""}-${
+    bulletin.summary || ""
+  }`;
+}
+
+function markLatestChallengeStudioBulletinAsSeen(
+  bulletins: ChallengeStudioBulletin[]
+) {
+  if (typeof window === "undefined") return;
+
+  const latestBulletin = bulletins[0];
+
+  if (!latestBulletin) return;
+
+  const latestKey = getChallengeStudioBulletinSeenKey(latestBulletin);
+
+  if (!latestKey) return;
+
+  window.localStorage.setItem(CHALLENGE_STUDIO_LAST_SEEN_KEY, latestKey);
+}
+
 function getCardStyle(type: ChallengeStudioCard["type"]) {
   if (type === "main") {
     return {
@@ -170,8 +198,11 @@ export default function ChallengeStudioPage() {
   async function loadBulletins() {
     try {
       setLoading(true);
+
       const data = await getPublishedChallengeStudioBulletins(30);
+
       setBulletins(data);
+      markLatestChallengeStudioBulletinAsSeen(data);
     } catch (error) {
       console.error("Challenge studio load error:", error);
     } finally {
@@ -183,7 +214,7 @@ export default function ChallengeStudioPage() {
     loadBulletins();
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     if (authLoading || !user) return;
 
     const currentUser = user;
