@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChallengeStudioChatLike,
   ChallengeStudioChatMessage,
@@ -51,6 +51,8 @@ export default function ChallengeStudioAnalysis({
     null
   );
 
+  const messagesBoxRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     const unsubscribe = subscribeChallengeStudioMessages(
       (newMessages) => {
@@ -89,6 +91,14 @@ export default function ChallengeStudioAnalysis({
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const messagesBox = messagesBoxRef.current;
+
+    if (!messagesBox) return;
+
+    messagesBox.scrollTop = messagesBox.scrollHeight;
+  }, [messages.length, replies.length]);
 
   const cleanMessageText = useMemo(() => {
     return messageText.replace(/\s+/g, " ").trim();
@@ -291,7 +301,10 @@ export default function ChallengeStudioAnalysis({
         )}
       </div>
 
-      <div className="mb-4 max-h-80 space-y-3 overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-3">
+      <div
+        ref={messagesBoxRef}
+        className="mb-4 max-h-80 space-y-3 overflow-y-auto rounded-2xl border border-white/10 bg-black/20 p-3"
+      >
         {messages.length > 0 ? (
           messages.map((message) => {
             const isMine = message.userId === currentUserId;
