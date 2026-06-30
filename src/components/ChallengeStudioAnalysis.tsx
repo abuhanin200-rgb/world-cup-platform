@@ -642,27 +642,27 @@ export default function ChallengeStudioAnalysis({
               isMine && canEditChallengeStudioMessage(message);
 
             return (
-              <div
-                key={message.id}
-                className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`relative max-w-[82%] rounded-3xl border px-4 py-3 shadow-lg md:max-w-[70%] ${
-                    isMine
-                      ? "rounded-br-md border-emerald-400/20 bg-emerald-500/15"
-                      : "rounded-bl-md border-white/10 bg-white/8"
-                  }`}
-                >
+             <div
+  key={message.id}
+  className={`flex w-full ${isMine ? "justify-end" : "justify-start"}`}
+>
+  <div
+    className={`relative max-w-[82%] rounded-3xl border px-4 py-3 shadow-lg md:max-w-[68%] ${
+      isMine
+        ? "rounded-br-md border-emerald-300/30 bg-gradient-to-br from-emerald-500/25 to-emerald-700/20 text-right shadow-emerald-950/30"
+        : "rounded-bl-md border-sky-300/15 bg-gradient-to-br from-slate-800/90 to-slate-950/80 text-right shadow-slate-950/40"
+    }`}
+  >
                   <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                     <button
-                      type="button"
-                      onClick={() => onMemberClick(message.userId)}
-                      className={`text-sm font-black hover:underline ${
-                        isMine ? "text-emerald-200" : "text-sky-300"
-                      }`}
-                    >
-                      {message.userName}
-                    </button>
+  type="button"
+  onClick={() => onMemberClick(message.userId)}
+  className={`text-sm font-black hover:underline ${
+    isMine ? "text-emerald-100" : "text-sky-300"
+  }`}
+>
+  {isMine ? "أنت" : message.userName}
+</button>
 
                     {message.isEdited && (
                       <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-400">
@@ -728,7 +728,11 @@ export default function ChallengeStudioAnalysis({
                       </div>
                     </div>
                   ) : (
-                    <p className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-100">
+                    <p
+  className={`whitespace-pre-wrap break-words text-sm leading-7 ${
+    isMine ? "text-emerald-50" : "text-slate-100"
+  }`}
+>
                       {renderMessageText(message.text)}
                     </p>
                   )}
@@ -817,7 +821,11 @@ export default function ChallengeStudioAnalysis({
                     </div>
 
                     {message.createdAt && (
-                      <div className="text-[10px] text-slate-500">
+                      <div
+  className={`text-[10px] ${
+    isMine ? "text-emerald-100/70" : "text-slate-500"
+  }`}
+>
                         {message.createdAt.toLocaleTimeString("ar-SA", {
                           hour: "2-digit",
                           minute: "2-digit",
