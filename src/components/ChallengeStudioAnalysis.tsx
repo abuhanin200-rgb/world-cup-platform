@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ChallengeStudioChatLike,
   ChallengeStudioChatMessage,
@@ -51,8 +51,6 @@ export default function ChallengeStudioAnalysis({
     null
   );
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
     const unsubscribe = subscribeChallengeStudioMessages(
       (newMessages) => {
@@ -91,13 +89,6 @@ export default function ChallengeStudioAnalysis({
 
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
-    });
-  }, [messages.length]);
 
   const cleanMessageText = useMemo(() => {
     return messageText.replace(/\s+/g, " ").trim();
@@ -369,7 +360,10 @@ export default function ChallengeStudioAnalysis({
                       }}
                       className="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-[11px] font-bold text-sky-200 hover:bg-sky-400/20"
                     >
-                      رد {messageReplies.length > 0 ? `(${messageReplies.length})` : ""}
+                      رد{" "}
+                      {messageReplies.length > 0
+                        ? `(${messageReplies.length})`
+                        : ""}
                     </button>
 
                     {openLikesMessageId === message.id &&
@@ -487,8 +481,6 @@ export default function ChallengeStudioAnalysis({
             لا توجد رسائل حتى الآن. افتح التحليل يا بطل.
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
