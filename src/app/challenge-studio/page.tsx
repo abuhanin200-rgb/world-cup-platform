@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
   getPublishedChallengeStudioBulletins,
   type ChallengeStudioBulletin,
   type ChallengeStudioCard,
 } from "@/lib/challengeStudio";
-import { updateOnlinePresence } from "@/lib/presenceService";
+import {
+  getChallengeStudioOnlineViewers,
+  updateOnlinePresence,
+} from "@/lib/presenceService";
+import ChallengeStudioAnalysis from "@/components/ChallengeStudioAnalysis";
+import { PredictionDetailsModal } from "@/components/LeaderboardTable";
+import { getLeaderboardUsers, type LeaderboardUser } from "@/lib/leaderboard";
+import { getPredictionsByUserId, type Prediction } from "@/lib/predictions";
 
 function getCardStyle(type: ChallengeStudioCard["type"]) {
   if (type === "main") {
@@ -111,11 +117,55 @@ function StudioCard({
 }
 
 export default function ChallengeStudioPage() {
-  const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
   const [bulletins, setBulletins] = useState<ChallengeStudioBulletin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [onlineMembers, setOnlineMembers] = useState<
+    { userId: string; userName: string }[]
+  >([]);
+
+  const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(
+    null
+  );
+  const [selectedPredictions, setSelectedPredictions] = useState<Prediction[]>(
+    []
+  );
+  const [loadingPredictions, setLoadingPredictions] = useState(false);
+
+  async function openMemberProfile(userId: string) {
+    if (!userId) return;
+
+    try {
+      setSelectedUser(null);
+      setSelectedPredictions([]);
+      setLoadingPredictions(true);
+
+      const users = await getLeaderboardUsers();
+      const member = users.find((item) => item.id === userId);
+
+      if (!member) {
+        alert("تعذر العثور على ملف العضو.");
+        return;
+      }
+
+      setSelectedUser(member);
+
+      const predictions = await getPredictionsByUserId(userId);
+      setSelectedPredictions(predictions);
+    } catch (error) {
+      console.error("Challenge studio member profile error:", error);
+      alert("تعذر تحميل ملف العضو.");
+    } finally {
+      setLoadingPredictions(false);
+    }
+  }
+
+  function closeMemberProfile() {
+    setSelectedUser(null);
+    setSelectedPredictions([]);
+    setLoadingPredictions(false);
+  }
 
   async function loadBulletins() {
     try {
@@ -133,16 +183,64 @@ export default function ChallengeStudioPage() {
     loadBulletins();
   }, []);
 
+    useEffect(() => {
+    if (authLoading || !user) return;
+
+    const currentUser = user;
+
+    function updatePresence() {
+      updateOnlinePresence({
+        userId: currentUser.id,
+        fullName: currentUser.fullName,
+        path: "/challenge-studio",
+      }).catch((error) => {
+        console.error("Challenge studio presence update error:", error);
+      });
+    }
+
+    updatePresence();
+
+    const intervalId = window.setInterval(() => {
+      updatePresence();
+    }, 60000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [authLoading, user]);
+
   useEffect(() => {
     if (authLoading || !user) return;
 
-    updateOnlinePresence({
-      userId: user.id,
-      fullName: user.fullName,
-      path: "/challenge-studio",
-    }).catch((error) => {
-      console.error("Challenge studio presence update error:", error);
-    });
+    let isMounted = true;
+
+    async function loadOnlineMembers() {
+      try {
+        const viewers = await getChallengeStudioOnlineViewers();
+
+        if (!isMounted) return;
+
+        setOnlineMembers(
+          viewers.map((viewer) => ({
+            userId: viewer.userId,
+            userName: viewer.fullName || "عضو",
+          }))
+        );
+      } catch (error) {
+        console.error("Challenge studio online viewers error:", error);
+      }
+    }
+
+    loadOnlineMembers();
+
+    const intervalId = window.setInterval(() => {
+      loadOnlineMembers();
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
   }, [authLoading, user]);
 
   const latest = bulletins[0];
@@ -188,13 +286,12 @@ export default function ChallengeStudioPage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push("/")}
+          <a
+            href="/"
             className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold hover:bg-white/10 md:text-sm"
           >
             الرئيسية
-          </button>
+          </a>
         </div>
       </header>
 
@@ -243,15 +340,26 @@ export default function ChallengeStudioPage() {
             جاري تحميل النشرة...
           </div>
         ) : !latest ? (
-          <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
-            <div className="text-4xl">🎙️</div>
+          <>
+            <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
+              <div className="text-4xl">🎙️</div>
 
-            <h3 className="mt-3 text-xl font-black">النشرة لم تُنشر بعد</h3>
+              <h3 className="mt-3 text-xl font-black">النشرة لم تُنشر بعد</h3>
 
-            <p className="mt-2 text-sm text-slate-300">
-              قريبًا تظهر هنا أخبار الأعضاء وتحدياتهم.
-            </p>
-          </div>
+              <p className="mt-2 text-sm text-slate-300">
+                قريبًا تظهر هنا أخبار الأعضاء وتحدياتهم.
+              </p>
+            </div>
+
+            <div className="mt-8">
+              <ChallengeStudioAnalysis
+                currentUserId={user?.id || ""}
+                currentUserName={user?.fullName || "عضو"}
+                onlineMembers={onlineMembers}
+                onMemberClick={openMemberProfile}
+              />
+            </div>
+          </>
         ) : (
           <>
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -310,9 +418,27 @@ export default function ChallengeStudioPage() {
                 </div>
               </div>
             )}
+
+            <div className="mt-8">
+              <ChallengeStudioAnalysis
+                currentUserId={user?.id || ""}
+                currentUserName={user?.fullName || "عضو"}
+                onlineMembers={onlineMembers}
+                onMemberClick={openMemberProfile}
+              />
+            </div>
           </>
         )}
       </section>
+
+      {selectedUser && (
+        <PredictionDetailsModal
+          user={selectedUser}
+          predictions={selectedPredictions}
+          loading={loadingPredictions}
+          onClose={closeMemberProfile}
+        />
+      )}
 
       <footer className="border-t border-white/10 py-5 text-center text-xs text-slate-400">
         <div className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">

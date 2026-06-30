@@ -778,7 +778,7 @@ function AchievementCard({ achievement }: { achievement: MemberAchievement }) {
   );
 }
 
-function PredictionDetailsModal({
+export function PredictionDetailsModal({
   user,
   predictions,
   loading,

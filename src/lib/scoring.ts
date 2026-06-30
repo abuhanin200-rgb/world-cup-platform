@@ -226,6 +226,20 @@ function calculateKnockoutPredictionPoints(params: {
       };
     }
 
+    if (actualOutcome === "draw" && actualQualifiedTeamCode) {
+      const predictedWinnerTeamCode = getOutcomeTeamCode(
+        match,
+        predictedOutcome
+      );
+
+      if (predictedWinnerTeamCode === actualQualifiedTeamCode) {
+        return {
+          points: pointsValue.winner,
+          resultType: "winner" as const,
+        };
+      }
+    }
+
     return {
       points: 0,
       resultType: "wrong" as const,
@@ -669,8 +683,8 @@ export async function undoMatchCalculation(matchId: string) {
   const allCalculatedPredictions = await getAllCalculatedPredictions();
 
   const remainingCalculatedPredictions = allCalculatedPredictions.filter(
-    (prediction) => prediction.matchId !== matchId
-  );
+  (prediction) => prediction.matchId !== matchId
+);
 
   const statsByUser = buildUserStats(remainingCalculatedPredictions);
   const rankedUsers = buildRankedUsers(allUsers, statsByUser);
