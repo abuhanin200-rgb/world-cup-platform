@@ -130,6 +130,8 @@ export function buildWordGameGuessResult(params: {
     throw new Error("انتهت محاولاتك لهذا اليوم.");
   }
 
+  const now = Date.now();
+
   const letters = evaluateWordGameGuess(
     normalizedGuess,
     params.currentGame.targetWord
@@ -146,21 +148,27 @@ export function buildWordGameGuessResult(params: {
   const won =
     normalizedGuess === normalizeWordGameText(params.currentGame.targetWord);
 
- const attemptsUsed = guesses.length;
-const isFinished = won || attemptsUsed >= WORD_GAME_MAX_ATTEMPTS;
-const firstGuessAt = params.currentGame.firstGuessAt ?? Date.now();
-const finishedAt = isFinished ? Date.now() : null;
-const durationMs = isFinished && finishedAt ? finishedAt - firstGuessAt : null;
+  const attemptsUsed = guesses.length;
+  const isFinished = won || attemptsUsed >= WORD_GAME_MAX_ATTEMPTS;
+
+  const isFirstGuess = params.currentGame.guesses.length === 0;
+
+  const firstGuessAt = isFirstGuess
+    ? now
+    : params.currentGame.firstGuessAt ?? now;
+
+  const finishedAt = isFinished ? now : null;
+  const durationMs = isFinished && finishedAt ? finishedAt - firstGuessAt : null;
 
   return {
     ...params.currentGame,
     guesses,
     won,
-attemptsUsed,
-firstGuessAt,
-status: won ? "won" : isFinished ? "lost" : "playing",
-finishedAt,
-durationMs,
+    attemptsUsed,
+    firstGuessAt,
+    status: won ? "won" : isFinished ? "lost" : "playing",
+    finishedAt,
+    durationMs,
   };
 }
 
