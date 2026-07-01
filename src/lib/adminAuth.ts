@@ -1,5 +1,5 @@
-const ADMIN_USERNAME = "admin";
-const ADMIN_PASSCODE = "2026";
+const ADMIN_USERNAME = "aburakan";
+const ADMIN_PASSCODE = "0542180200Ss@";
 
 const ADMIN_STORAGE_KEY = "worldcup_2026_admin_access";
 
