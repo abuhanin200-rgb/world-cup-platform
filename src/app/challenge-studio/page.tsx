@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   getPublishedChallengeStudioBulletins,
@@ -17,15 +17,14 @@ import { getLeaderboardUsers, type LeaderboardUser } from "@/lib/leaderboard";
 import { getPredictionsByUserId, type Prediction } from "@/lib/predictions";
 
 const CHALLENGE_STUDIO_LAST_SEEN_KEY = "challengeStudioLastSeenBulletin";
+const ARCHIVE_PAGE_SIZE = 4;
 
 function getChallengeStudioBulletinSeenKey(bulletin: {
   id?: string;
   date?: string;
   summary?: string;
 }) {
-  return `${bulletin.id || ""}-${bulletin.date || ""}-${
-    bulletin.summary || ""
-  }`;
+  return `${bulletin.id || ""}-${bulletin.date || ""}-${bulletin.summary || ""}`;
 }
 
 function markLatestChallengeStudioBulletinAsSeen(
@@ -34,11 +33,9 @@ function markLatestChallengeStudioBulletinAsSeen(
   if (typeof window === "undefined") return;
 
   const latestBulletin = bulletins[0];
-
   if (!latestBulletin) return;
 
   const latestKey = getChallengeStudioBulletinSeenKey(latestBulletin);
-
   if (!latestKey) return;
 
   window.localStorage.setItem(CHALLENGE_STUDIO_LAST_SEEN_KEY, latestKey);
@@ -146,16 +143,18 @@ function StudioCard({
 
 export default function ChallengeStudioPage() {
   const { user, loading: authLoading } = useAuth();
+  const bulletinTopRef = useRef<HTMLDivElement | null>(null);
 
   const [bulletins, setBulletins] = useState<ChallengeStudioBulletin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBulletinId, setSelectedBulletinId] = useState("");
+  const [archivePage, setArchivePage] = useState(0);
+
   const [onlineMembers, setOnlineMembers] = useState<
     { userId: string; userName: string }[]
   >([]);
 
-  const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(
-    null
-  );
+  const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
   const [selectedPredictions, setSelectedPredictions] = useState<Prediction[]>(
     []
   );
@@ -208,6 +207,28 @@ export default function ChallengeStudioPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function selectBulletin(id: string) {
+    setSelectedBulletinId(id);
+
+    window.setTimeout(() => {
+      bulletinTopRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
+  }
+
+  function backToLatestBulletin() {
+    setSelectedBulletinId("");
+
+    window.setTimeout(() => {
+      bulletinTopRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
   }
 
   useEffect(() => {
@@ -275,12 +296,29 @@ export default function ChallengeStudioPage() {
   }, [authLoading, user]);
 
   const latest = bulletins[0];
-  const archive = bulletins.slice(1);
+
+  const currentBulletin =
+    bulletins.find((item) => item.id === selectedBulletinId) || latest;
+
+  const isViewingArchive =
+    Boolean(selectedBulletinId) && currentBulletin?.id !== latest?.id;
+
+  const archive = bulletins.filter((item) => item.id !== currentBulletin?.id);
+
+  const archiveTotalPages = Math.max(
+    1,
+    Math.ceil(archive.length / ARCHIVE_PAGE_SIZE)
+  );
+
+  const visibleArchive = archive.slice(
+    archivePage * ARCHIVE_PAGE_SIZE,
+    archivePage * ARCHIVE_PAGE_SIZE + ARCHIVE_PAGE_SIZE
+  );
 
   const sortedCards = useMemo(() => {
-    if (!latest) return [];
-    return [...latest.cards].sort((a, b) => b.priority - a.priority);
-  }, [latest]);
+    if (!currentBulletin) return [];
+    return [...currentBulletin.cards].sort((a, b) => b.priority - a.priority);
+  }, [currentBulletin]);
 
   const mainCard =
     sortedCards.find((card) => card.type === "main") || sortedCards[0];
@@ -350,7 +388,7 @@ export default function ChallengeStudioPage() {
           </div>
         </div>
 
-        {latest && (
+        {currentBulletin && (
           <div className="mb-5 overflow-hidden rounded-2xl border border-red-400/30 bg-red-500/10 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="shrink-0 bg-red-500 px-4 py-3 text-xs font-black text-white md:text-sm">
@@ -370,7 +408,7 @@ export default function ChallengeStudioPage() {
           <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center text-slate-300">
             جاري تحميل النشرة...
           </div>
-        ) : !latest ? (
+        ) : !currentBulletin ? (
           <>
             <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
               <div className="text-4xl">🎙️</div>
@@ -393,17 +431,34 @@ export default function ChallengeStudioPage() {
           </>
         ) : (
           <>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-black md:text-2xl">
-                  نشرة اليوم
-                </h3>
-                <p className="mt-1 text-xs text-slate-300">{latest.date}</p>
-              </div>
+            <div ref={bulletinTopRef} className="mb-4 scroll-mt-24">
+              {isViewingArchive && (
+                <div className="mb-4 rounded-2xl border border-amber-400/25 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100 md:text-sm">
+                  📚 أنت تشاهد نشرة قديمة: {currentBulletin.date}
+                  <button
+                    type="button"
+                    onClick={backToLatestBulletin}
+                    className="mr-3 rounded-xl bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950 hover:bg-amber-300"
+                  >
+                    العودة لأحدث نشرة
+                  </button>
+                </div>
+              )}
 
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-100">
-                مباشر
-              </span>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-black md:text-2xl">
+                    {isViewingArchive ? "نشرة من الأرشيف" : "نشرة اليوم"}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-300">
+                    {currentBulletin.date}
+                  </p>
+                </div>
+
+                <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-100">
+                  {isViewingArchive ? "أرشيف" : "مباشر"}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -421,13 +476,25 @@ export default function ChallengeStudioPage() {
 
             {archive.length > 0 && (
               <div className="mt-8">
-                <h3 className="mb-3 text-xl font-black">📚 آخر النشرات</h3>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-xl font-black">📚 آخر النشرات</h3>
+
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-300">
+                    {archivePage + 1} / {archiveTotalPages}
+                  </span>
+                </div>
 
                 <div className="space-y-3">
-                  {archive.map((item) => (
-                    <div
+                  {visibleArchive.map((item) => (
+                    <button
+                      type="button"
                       key={item.id}
-                      className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                      onClick={() => selectBulletin(item.id)}
+                      className={`w-full rounded-2xl border p-4 text-right transition hover:bg-white/10 ${
+                        item.id === currentBulletin.id
+                          ? "border-amber-400/40 bg-amber-400/10"
+                          : "border-white/10 bg-white/5"
+                      }`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -440,13 +507,41 @@ export default function ChallengeStudioPage() {
                           </div>
                         </div>
 
-                        <span className="rounded-full bg-slate-800 px-3 py-1 text-[11px] text-slate-300">
+                        <span className="shrink-0 rounded-full bg-slate-800 px-3 py-1 text-[11px] text-slate-300">
                           {item.cards.length} بطاقات
                         </span>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
+
+                {archiveTotalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setArchivePage((page) => Math.max(0, page - 1))
+                      }
+                      disabled={archivePage === 0}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      السابق
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setArchivePage((page) =>
+                          Math.min(archiveTotalPages - 1, page + 1)
+                        )
+                      }
+                      disabled={archivePage >= archiveTotalPages - 1}
+                      className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      التالي
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
