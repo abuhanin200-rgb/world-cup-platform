@@ -33,56 +33,16 @@ const EXCEPTIONAL_EVENT_TYPES = new Set<ChallengeStudioEvent["type"]>([
 ]);
 
 const EDITORIAL_SECTIONS = [
-  {
-    icon: "👑",
-    title: "ملك التوقعات",
-    goal: "إبراز المتصدر أو صاحب التأثير الأقوى في لوحة الصدارة إذا كان الحدث متاحًا.",
-  },
-  {
-    icon: "🐎",
-    title: "الحصان الأسود",
-    goal: "إبراز عضو خارج دائرة الأسماء المعتادة إذا ظهرت له قفزة أو نتيجة لافتة من البيانات.",
-  },
-  {
-    icon: "🚀",
-    title: "أسرع صعود",
-    goal: "اختيار أكبر صعود حقيقي في الترتيب عند توفر حدث الصعود.",
-  },
-  {
-    icon: "📉",
-    title: "أكبر تراجع",
-    goal: "تناول أكبر تراجع حقيقي بلغة محترمة وغير جارحة إذا كان الحدث موجودًا.",
-  },
-  {
-    icon: "🎯",
-    title: "قناص النتائج",
-    goal: "إبراز من أصاب نتيجة دقيقة أو توقعًا ذهبيًا اعتمادًا على البيانات فقط.",
-  },
-  {
-    icon: "🔥",
-    title: "نجم الجولة",
-    goal: "اختيار صاحب أفضل أثر في الجولة من نقاط أو نتائج صحيحة أو حدث بارز.",
-  },
-  {
-    icon: "⚡",
-    title: "أفضل عودة",
-    goal: "إبراز عضو عاد للمنافسة بعد تحسن واضح في النتائج أو الترتيب إذا كان ذلك موجودًا.",
-  },
-  {
-    icon: "📈",
-    title: "الأكثر ثباتًا",
-    goal: "إبراز عضو يحافظ على مركزه أو مستواه إذا كانت البيانات تدعم ذلك.",
-  },
-  {
-    icon: "👀",
-    title: "تحت المجهر",
-    goal: "وضع عضو أو مواجهة أو توقع قادم تحت المتابعة إذا كان الحدث مرسلًا ضمن البيانات.",
-  },
-  {
-    icon: "🎙️",
-    title: "كلمة الاستوديو",
-    goal: "خاتمة تحريرية قصيرة مبنية على الصورة العامة للأحداث دون اختراع أرقام أو وقائع.",
-  },
+  { icon: "👑", title: "ملك التوقعات", goal: "إبراز المتصدر إذا كان الحدث متاحًا." },
+  { icon: "🐎", title: "الحصان الأسود", goal: "إبراز عضو صاعد أو مفاجئ من البيانات." },
+  { icon: "🚀", title: "أسرع صعود", goal: "إبراز أكبر صعود حقيقي في الترتيب." },
+  { icon: "📉", title: "أكبر تراجع", goal: "تناول أكبر تراجع بلغة محترمة." },
+  { icon: "🎯", title: "قناص النتائج", goal: "إبراز من أصاب نتائج دقيقة." },
+  { icon: "🔥", title: "نجم الجولة", goal: "اختيار صاحب أفضل أثر في الجولة." },
+  { icon: "⚡", title: "أفضل عودة", goal: "إبراز من عاد للمنافسة بعد تحسن واضح." },
+  { icon: "📈", title: "الأكثر ثباتًا", goal: "إبراز عضو يحافظ على مستواه." },
+  { icon: "👀", title: "تحت المجهر", goal: "متابعة عضو أو توقع أو مواجهة." },
+  { icon: "🎙️", title: "كلمة الاستوديو", goal: "خاتمة تحريرية قصيرة." },
 ];
 
 function getTodaySaudiDate() {
@@ -101,9 +61,7 @@ function getTimeValue(value?: string) {
 }
 
 function normalizeMemberName(value: unknown) {
-  return String(value || "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return String(value || "").replace(/\s+/g, " ").trim();
 }
 
 function getEventMembers(event: ChallengeStudioEvent) {
@@ -115,7 +73,6 @@ function getEventMembers(event: ChallengeStudioEvent) {
 async function getRecentlyMentionedMembers() {
   const bulletins = await getChallengeStudioBulletins(20);
   const cutoff = Date.now() - 48 * 60 * 60 * 1000;
-
   const names = new Set<string>();
 
   bulletins.forEach((bulletin) => {
@@ -143,15 +100,12 @@ function filterEventsForCooldown(
 
   const preferred = events.filter((event) => {
     const members = getEventMembers(event);
-
     if (members.length === 0) return true;
     if (isExceptionalEvent(event)) return true;
-
     return !members.some((member) => recentSet.has(member));
   });
 
   if (preferred.length >= REQUIRED_CARDS_COUNT) return preferred;
-
   return events;
 }
 
@@ -192,19 +146,45 @@ function findRepeatedMemberMentions(
   return allNames.filter((name) => countOccurrences(fullText, name) > 1);
 }
 
+function findGenericMemberWords(cards: AiCard[], summary = "") {
+  const forbidden = [
+    "أحد الأعضاء",
+    "أحد المشاركين",
+    "عضو بارز",
+    "عضو لافت",
+    "أحد المنافسين",
+    "أحد المتسابقين",
+    "متسابق",
+    "مشارك",
+  ];
+
+  const fullText = `${summary}\n${cards
+    .map((card) => `${card.title}\n${card.content}`)
+    .join("\n")}`;
+
+  return forbidden.filter((word) => fullText.includes(word));
+}
+
 function buildPrompt(events: ChallengeStudioEvent[], recentMembers: string[]) {
   return `
 أنت رئيس تحرير رياضي محترف داخل منصة توقعات كأس العالم 2026.
-مهمتك كتابة نشرة يومية باسم "استوديو التحدي" بأسلوب يشبه نشرات القنوات الرياضية الاحترافية.
+مهمتك كتابة نشرة يومية باسم "استوديو التحدي" بأسلوب صحفي رياضي احترافي.
 
 نبرة الكتابة:
 - العربية فصيحة، واضحة، سهلة القراءة، وخالية من الأخطاء الإملائية والنحوية.
 - الأسلوب صحفي رياضي حي، لا يكون رسميًا جامدًا ولا عاميًا زائدًا.
 - الجمل قصيرة إلى متوسطة، مترابطة، ومفهومة من القراءة الأولى.
 - استخدم التشويق والتحليل دون مبالغة، ودون اختراع وقائع.
-- لا تستخدم تراكيب مترجمة حرفيًا أو جملًا ركيكة.
 - لا تستخدم Markdown.
 - لا تكتب أي شرح خارج JSON.
+
+قاعدة ذكر الأسماء وهي إلزامية جدًا:
+- إذا كان الحدث يحتوي على members أو memberName أو userName أو leaderName أو secondName، يجب ذكر الاسم الحقيقي للعضو في البطاقة.
+- ممنوع استخدام عبارات عامة بدل الاسم إذا كان الاسم موجودًا في البيانات.
+- العبارات الممنوعة إذا كان الاسم موجودًا: "أحد الأعضاء"، "أحد المشاركين"، "عضو بارز"، "عضو لافت"، "أحد المنافسين"، "متسابق"، "مشارك".
+- إذا كان الحدث يحتوي على اسمين مثل منافسة المتصدر والوصيف، يمكن ذكر الاسمين في نفس البطاقة فقط.
+- إذا كان الحدث لا يحتوي على أي اسم، عندها فقط يمكن استخدام صياغة عامة.
+- اذكر اسم العضو مرة واحدة فقط في البطاقة، ثم أكمل بالضمائر أو الوصف دون تكرار الاسم.
 
 قواعد صارمة جدًا:
 - اكتب 8 بطاقات بالضبط، لا أقل ولا أكثر.
@@ -215,16 +195,12 @@ function buildPrompt(events: ChallengeStudioEvent[], recentMembers: string[]) {
 - لا تخترع نقاطًا أو ترتيبًا أو توقعات أو نتائج أو سلاسل أو إنجازات.
 - اعتمد فقط على الأحداث المرسلة لك في آخر البرومبت.
 - إذا لم تجد معلومة رقمية واضحة في الحدث، لا تذكر رقمًا من عندك.
-- إذا كان الحدث لا يدعم فقرة معينة، تجاهل هذه الفقرة واختر فقرة أخرى من الأحداث المتاحة.
 - لا تذكر أن النص مولد بالذكاء الاصطناعي.
 - لا تكتب: "تصريح غير حقيقي" أو "للترفيه فقط" أو أي عبارة مشابهة.
 - الطرافة مسموحة فقط إذا كانت محترمة وخفيفة وبدون إحراج أو تجريح.
-- لا تستخدم أي معلومة من خارج الأحداث المرسلة.
 
 قواعد التنوع:
 - لا تبدأ البطاقات بنفس الكلمة أو نفس التركيب.
-- تجنب الاعتماد المتكرر على بدايات مثل: واصل، نجح، خطف الأنظار، فرض، أكد، استعاد، عزز، اقترب، سجل.
-- نوّع بدايات الفقرات بين: قراءة تحليلية، زاوية رقمية، متابعة للمنافسة، تعليق استوديو، نظرة على الترتيب، تنبيه للجولة القادمة.
 - لا تجعل كل البطاقات عن أصحاب المراكز الأولى.
 - امنح مساحة لأصحاب الصعود، السلاسل، التوقعات الدقيقة، المطاردين، ومن ظهر له حدث حقيقي لافت.
 
@@ -259,14 +235,6 @@ main, quote, number, badge, funny, watch
 7- بطاقة حركة ترتيب: صعود أو تراجع أو ثبات إذا توفرت البيانات.
 8- بطاقة ختامية بعنوان "كلمة الاستوديو" أو تنبيه مهم للجولة.
 
-تعليمات تحريرية لكل بطاقة:
-- العنوان قصير وواضح وجذاب.
-- النص لا يكرر العنوان حرفيًا.
-- لا تستخدم الاسم نفسه في العنوان والنص معًا؛ اذكر اسم العضو مرة واحدة فقط داخل النشرة كلها.
-- اجعل كل بطاقة مستقلة بفكرة مختلفة.
-- الخبر الرئيسي أطول نسبيًا، وبقية البطاقات قصيرة إلى متوسطة.
-- دقق النص لغويًا قبل الإخراج.
-
 صيغة الإخراج المطلوبة:
 {
   "summary": "عنوان مختصر للنشرة بدون تكرار أسماء الأعضاء",
@@ -292,14 +260,17 @@ function buildRepairPrompt(input: {
   previousCards: AiCard[];
   previousSummary: string;
   repeatedMembers: string[];
+  genericWords: string[];
 }) {
   return `
 أعد كتابة نشرة "استوديو التحدي" من جديد لأن المسودة السابقة خالفت قواعد التحرير.
 
-سبب الإعادة:
+أسباب الإعادة:
 - عدد البطاقات يجب أن يكون ${REQUIRED_CARDS_COUNT} بالضبط.
-- الأسماء التالية تكررت ويجب منع تكرارها تمامًا:
+- الأسماء التالية تكررت ويجب منع تكرارها:
 ${JSON.stringify(input.repeatedMembers, null, 2)}
+- ظهرت عبارات عامة بدل أسماء حقيقية، وهي ممنوعة إذا كانت البيانات تحتوي على أسماء:
+${JSON.stringify(input.genericWords, null, 2)}
 
 المسودة السابقة:
 ${JSON.stringify(
@@ -376,12 +347,7 @@ async function requestAiBulletin(prompt: string, temperature = 0.72) {
   const response = await openai.chat.completions.create({
     model: AI_MODEL,
     temperature,
-    messages: [
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
+    messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
   });
 
@@ -419,19 +385,27 @@ export async function POST() {
       parsed.summary,
       filteredEvents[0]?.title || "نشرة استوديو التحدي"
     );
+
     let repeatedMembers = findRepeatedMemberMentions(
       cards,
       filteredEvents,
       summary
     );
 
-    if (cards.length < REQUIRED_CARDS_COUNT || repeatedMembers.length > 0) {
+    let genericWords = findGenericMemberWords(cards, summary);
+
+    if (
+      cards.length < REQUIRED_CARDS_COUNT ||
+      repeatedMembers.length > 0 ||
+      genericWords.length > 0
+    ) {
       const repairPrompt = buildRepairPrompt({
         events: filteredEvents,
         recentMembers,
         previousCards: cards,
         previousSummary: summary,
         repeatedMembers,
+        genericWords,
       });
 
       parsed = parseAiJson(await requestAiBulletin(repairPrompt, 0.45));
@@ -440,11 +414,14 @@ export async function POST() {
         parsed.summary,
         filteredEvents[0]?.title || "نشرة استوديو التحدي"
       );
+
       repeatedMembers = findRepeatedMemberMentions(
         cards,
         filteredEvents,
         summary
       );
+
+      genericWords = findGenericMemberWords(cards, summary);
     }
 
     if (cards.length < REQUIRED_CARDS_COUNT) {
@@ -460,6 +437,17 @@ export async function POST() {
           error:
             "تم إيقاف النشرة لأن اسم عضو تكرر داخلها. أعد التوليد للحصول على نسخة مختلفة.",
           repeatedMembers,
+        },
+        { status: 500 }
+      );
+    }
+
+    if (genericWords.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "تم إيقاف النشرة لأنها استخدمت عبارات عامة بدل أسماء الأعضاء. أعد التوليد.",
+          genericWords,
         },
         { status: 500 }
       );
