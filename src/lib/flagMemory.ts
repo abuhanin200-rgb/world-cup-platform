@@ -1,11 +1,11 @@
 import {
-  addDoc,
   collection,
+  doc,
+  getDoc,
   getDocs,
-  limit,
-  orderBy,
   query,
   serverTimestamp,
+  setDoc,
   where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -32,6 +32,8 @@ export type SaveFlagMemoryResultInput = {
   mistakes: number;
   matchesCount: number;
 };
+
+const flagMemoryResultsCollection = "flagMemoryResults";
 
 export function getSaudiDateKey(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -87,7 +89,7 @@ function mapFlagMemoryResult(
   data: Record<string, unknown>
 ): FlagMemoryResult {
   return {
-    id,
+    id: String(data.id || id),
     userId: String(data.userId || ""),
     userName: String(data.userName || ""),
     dateKey: String(data.dateKey || ""),
@@ -101,24 +103,28 @@ function mapFlagMemoryResult(
   };
 }
 
+function sortFlagMemoryResults(results: FlagMemoryResult[]) {
+  return [...results].sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score;
+    if (a.timeSeconds !== b.timeSeconds) return a.timeSeconds - b.timeSeconds;
+    if (a.moves !== b.moves) return a.moves - b.moves;
+    if (a.mistakes !== b.mistakes) return a.mistakes - b.mistakes;
+
+    return a.userName.localeCompare(b.userName, "ar");
+  });
+}
+
 export async function getTodayFlagMemoryResult(userId: string) {
   if (!userId) return null;
 
   const dateKey = getSaudiDateKey();
+  const resultId = `${userId}_${dateKey}`;
+  const resultRef = doc(db, flagMemoryResultsCollection, resultId);
+  const snapshot = await getDoc(resultRef);
 
-  const q = query(
-    collection(db, "flagMemoryResults"),
-    where("userId", "==", userId),
-    where("dateKey", "==", dateKey),
-    limit(1)
-  );
+  if (!snapshot.exists()) return null;
 
-  const snapshot = await getDocs(q);
-
-  if (snapshot.empty) return null;
-
-  const docSnap = snapshot.docs[0];
-  return mapFlagMemoryResult(docSnap.id, docSnap.data());
+  return mapFlagMemoryResult(snapshot.id, snapshot.data());
 }
 
 export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
@@ -130,36 +136,43 @@ export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
     throw new Error("اسم العضو غير موجود");
   }
 
-  const existing = await getTodayFlagMemoryResult(input.userId);
+  const dateKey = getSaudiDateKey();
+  const resultId = `${input.userId}_${dateKey}`;
+  const resultRef = doc(db, flagMemoryResultsCollection, resultId);
+  const existingSnapshot = await getDoc(resultRef);
 
-  if (existing) {
+  if (existingSnapshot.exists()) {
     throw new Error("لديك نتيجة مسجلة اليوم. المحاولة الرسمية مرة واحدة يوميًا.");
   }
 
-  const dateKey = getSaudiDateKey();
+  const timeSeconds = Math.max(1, Math.floor(input.timeSeconds));
+  const moves = Math.max(0, Math.floor(input.moves));
+  const mistakes = Math.max(0, Math.floor(input.mistakes));
+  const matchesCount = Math.max(1, Math.floor(input.matchesCount));
 
   const score = calculateFlagMemoryScore({
-    timeSeconds: input.timeSeconds,
-    moves: input.moves,
-    mistakes: input.mistakes,
-    matchesCount: input.matchesCount,
+    timeSeconds,
+    moves,
+    mistakes,
+    matchesCount,
   });
 
-  const docRef = await addDoc(collection(db, "flagMemoryResults"), {
+  await setDoc(resultRef, {
+    id: resultId,
     userId: input.userId,
     userName: input.userName.trim(),
     dateKey,
-    timeSeconds: Math.max(1, Math.floor(input.timeSeconds)),
-    moves: Math.max(0, Math.floor(input.moves)),
-    mistakes: Math.max(0, Math.floor(input.mistakes)),
-    matchesCount: Math.max(1, Math.floor(input.matchesCount)),
+    timeSeconds,
+    moves,
+    mistakes,
+    matchesCount,
     score,
     completed: true,
     createdAt: serverTimestamp(),
   });
 
   return {
-    id: docRef.id,
+    id: resultId,
     dateKey,
     score,
   };
@@ -168,34 +181,26 @@ export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
 export async function getFlagMemoryDailyLeaderboard(maxItems = 20) {
   const dateKey = getSaudiDateKey();
 
-  const q = query(
-    collection(db, "flagMemoryResults"),
-    where("dateKey", "==", dateKey),
-    orderBy("score", "desc"),
-    orderBy("timeSeconds", "asc"),
-    orderBy("moves", "asc"),
-    limit(maxItems)
+  const resultsQuery = query(
+    collection(db, flagMemoryResultsCollection),
+    where("dateKey", "==", dateKey)
   );
 
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocs(resultsQuery);
 
-  return snapshot.docs.map((docSnap) =>
+  const results = snapshot.docs.map((docSnap) =>
     mapFlagMemoryResult(docSnap.id, docSnap.data())
   );
+
+  return sortFlagMemoryResults(results).slice(0, maxItems);
 }
 
 export async function getFlagMemoryAllTimeLeaderboard(maxItems = 20) {
-  const q = query(
-    collection(db, "flagMemoryResults"),
-    orderBy("score", "desc"),
-    orderBy("timeSeconds", "asc"),
-    orderBy("moves", "asc"),
-    limit(maxItems)
-  );
+  const snapshot = await getDocs(collection(db, flagMemoryResultsCollection));
 
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs.map((docSnap) =>
+  const results = snapshot.docs.map((docSnap) =>
     mapFlagMemoryResult(docSnap.id, docSnap.data())
   );
+
+  return sortFlagMemoryResults(results).slice(0, maxItems);
 }

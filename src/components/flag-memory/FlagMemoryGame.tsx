@@ -286,24 +286,12 @@ export default function FlagMemoryGame() {
   return (
     <section dir="rtl" className="space-y-5">
       <div className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-black md:text-3xl">
-              🎌 تحدي تطابق الأعلام
-            </h1>
-            <p className="mt-2 text-sm font-bold leading-6 text-slate-300">
-              24 بطاقة، 12 علمًا متطابقًا، ومحاولة رسمية واحدة يوميًا. ركّز
-              جيدًا؛ لا توجد إعادة ترتيب أثناء التحدي.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm font-black text-amber-100">
-            {todayResult
-              ? "✅ نتيجتك اليومية محفوظة"
-              : status === "playing"
-              ? "التحدي جارٍ الآن"
-              : "جاهز للتحدي؟"}
-          </div>
+        <div className="mb-5 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center text-sm font-black text-amber-100 md:text-base">
+          {todayResult
+            ? "✅ نتيجتك اليومية محفوظة"
+            : status === "playing"
+            ? "التحدي جارٍ الآن"
+            : "جاهز للتحدي؟"}
         </div>
 
         <div className="mb-5 grid grid-cols-4 gap-2 md:gap-3">
@@ -431,13 +419,13 @@ export default function FlagMemoryGame() {
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-black">🏆 ترتيب تحدي الأعلام اليومي</h2>
-            <p className="mt-1 text-xs font-bold text-slate-400">
-              الأعلى نقاطًا، ثم الأسرع، ثم الأقل محاولات.
-            </p>
-          </div>
+        <div className="mb-4 text-center">
+          <h2 className="text-xl font-black md:text-2xl">
+            🏆 ترتيب تحدي الأعلام اليومي
+          </h2>
+          <p className="mt-1 text-xs font-bold text-slate-400">
+            الأعلى نقاطًا، ثم الأسرع، ثم الأقل محاولات.
+          </p>
         </div>
 
         {leaderboard.length === 0 ? (
