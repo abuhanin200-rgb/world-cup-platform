@@ -140,6 +140,23 @@ function sortFlagMemoryResults(results: FlagMemoryResult[]) {
   });
 }
 
+function dedupeFlagMemoryResultsByUser(results: FlagMemoryResult[]) {
+  const sorted = sortFlagMemoryResults(results);
+  const seen = new Set<string>();
+  const unique: FlagMemoryResult[] = [];
+
+  sorted.forEach((result) => {
+    const key = result.userId || result.userName;
+
+    if (!key || seen.has(key)) return;
+
+    seen.add(key);
+    unique.push(result);
+  });
+
+  return unique;
+}
+
 function normalizePairsCount(value: unknown) {
   const count = Number(value);
 
@@ -163,10 +180,7 @@ function mapFlagMemorySettings(
 
     pairsCount: normalizePairsCount(data.pairsCount),
 
-    oneAttemptPerDay:
-      typeof data.oneAttemptPerDay === "boolean"
-        ? data.oneAttemptPerDay
-        : DEFAULT_FLAG_MEMORY_SETTINGS.oneAttemptPerDay,
+    oneAttemptPerDay: true,
 
     memberNotice:
       typeof data.memberNotice === "string" && data.memberNotice.trim()
@@ -207,7 +221,7 @@ export async function saveFlagMemorySettings(
   const settings: FlagMemorySettings = {
     enabled: input.enabled,
     pairsCount,
-    oneAttemptPerDay: input.oneAttemptPerDay,
+    oneAttemptPerDay: true,
     memberNotice: memberNotice || DEFAULT_FLAG_MEMORY_SETTINGS.memberNotice,
   };
 
@@ -223,17 +237,39 @@ export async function saveFlagMemorySettings(
   return settings;
 }
 
+async function getTodayFlagMemoryResultsRaw() {
+  const dateKey = getSaudiDateKey();
+
+  const resultsQuery = query(
+    collection(db, flagMemoryResultsCollection),
+    where("dateKey", "==", dateKey)
+  );
+
+  const snapshot = await getDocs(resultsQuery);
+
+  return snapshot.docs.map((docSnap) =>
+    mapFlagMemoryResult(docSnap.id, docSnap.data())
+  );
+}
+
 export async function getTodayFlagMemoryResult(userId: string) {
   if (!userId) return null;
 
   const dateKey = getSaudiDateKey();
-  const resultId = `${userId}_${dateKey}`;
-  const resultRef = doc(db, flagMemoryResultsCollection, resultId);
-  const snapshot = await getDoc(resultRef);
+  const stableResultId = `${userId}_${dateKey}`;
+  const stableResultRef = doc(db, flagMemoryResultsCollection, stableResultId);
+  const stableSnapshot = await getDoc(stableResultRef);
 
-  if (!snapshot.exists()) return null;
+  if (stableSnapshot.exists()) {
+    return mapFlagMemoryResult(stableSnapshot.id, stableSnapshot.data());
+  }
 
-  return mapFlagMemoryResult(snapshot.id, snapshot.data());
+  const todayResults = await getTodayFlagMemoryResultsRaw();
+  const userResults = todayResults.filter((result) => result.userId === userId);
+
+  if (userResults.length === 0) return null;
+
+  return sortFlagMemoryResults(userResults)[0];
 }
 
 export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
@@ -251,14 +287,17 @@ export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
     throw new Error("تحدي الأعلام متوقف مؤقتًا من إدارة المنصة.");
   }
 
+  const existing = await getTodayFlagMemoryResult(input.userId);
+
+  if (existing) {
+    throw new Error(
+      "لديك نتيجة مسجلة اليوم. تبدأ محاولة جديدة بعد الساعة 12:00 منتصف الليل بتوقيت مكة."
+    );
+  }
+
   const dateKey = getSaudiDateKey();
   const resultId = `${input.userId}_${dateKey}`;
   const resultRef = doc(db, flagMemoryResultsCollection, resultId);
-  const existingSnapshot = await getDoc(resultRef);
-
-  if (settings.oneAttemptPerDay && existingSnapshot.exists()) {
-    throw new Error("لديك نتيجة مسجلة اليوم. المحاولة الرسمية مرة واحدة يوميًا.");
-  }
 
   const timeSeconds = Math.max(1, Math.floor(input.timeSeconds));
   const moves = Math.max(0, Math.floor(input.moves));
@@ -294,20 +333,9 @@ export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
 }
 
 export async function getFlagMemoryDailyLeaderboard(maxItems = 20) {
-  const dateKey = getSaudiDateKey();
+  const results = await getTodayFlagMemoryResultsRaw();
 
-  const resultsQuery = query(
-    collection(db, flagMemoryResultsCollection),
-    where("dateKey", "==", dateKey)
-  );
-
-  const snapshot = await getDocs(resultsQuery);
-
-  const results = snapshot.docs.map((docSnap) =>
-    mapFlagMemoryResult(docSnap.id, docSnap.data())
-  );
-
-  return sortFlagMemoryResults(results).slice(0, maxItems);
+  return dedupeFlagMemoryResultsByUser(results).slice(0, maxItems);
 }
 
 export async function getFlagMemoryAllTimeLeaderboard(maxItems = 20) {
@@ -317,24 +345,13 @@ export async function getFlagMemoryAllTimeLeaderboard(maxItems = 20) {
     mapFlagMemoryResult(docSnap.id, docSnap.data())
   );
 
-  return sortFlagMemoryResults(results).slice(0, maxItems);
+  return dedupeFlagMemoryResultsByUser(results).slice(0, maxItems);
 }
 
 export async function getTodayFlagMemoryAdminResults() {
-  const dateKey = getSaudiDateKey();
+  const results = await getTodayFlagMemoryResultsRaw();
 
-  const resultsQuery = query(
-    collection(db, flagMemoryResultsCollection),
-    where("dateKey", "==", dateKey)
-  );
-
-  const snapshot = await getDocs(resultsQuery);
-
-  const results = snapshot.docs.map((docSnap) =>
-    mapFlagMemoryResult(docSnap.id, docSnap.data())
-  );
-
-  return sortFlagMemoryResults(results);
+  return dedupeFlagMemoryResultsByUser(results);
 }
 
 export async function adminDeleteFlagMemoryResult(resultId: string) {
@@ -350,10 +367,14 @@ export async function adminDeleteUserTodayFlagMemoryResult(userId: string) {
     throw new Error("معرّف العضو غير موجود");
   }
 
-  const dateKey = getSaudiDateKey();
-  const resultId = `${userId}_${dateKey}`;
+  const todayResults = await getTodayFlagMemoryResultsRaw();
+  const userResults = todayResults.filter((result) => result.userId === userId);
 
-  await deleteDoc(doc(db, flagMemoryResultsCollection, resultId));
+  await Promise.all(
+    userResults.map((result) =>
+      deleteDoc(doc(db, flagMemoryResultsCollection, result.id))
+    )
+  );
 }
 
 export async function adminDeleteTodayFlagMemoryResults() {

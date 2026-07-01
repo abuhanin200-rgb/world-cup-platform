@@ -82,6 +82,13 @@ function formatTime(totalSeconds: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function getRankLabel(rank: number) {
+  if (rank === 1) return "🥇";
+  if (rank === 2) return "🥈";
+  if (rank === 3) return "🥉";
+  return rank;
+}
+
 function getUserId(user: unknown) {
   const data = user as Record<string, unknown> | null | undefined;
   return String(data?.id || data?.uid || "");
@@ -195,7 +202,9 @@ export default function FlagMemoryGame() {
     }
 
     if (settings.oneAttemptPerDay && todayResult) {
-      setMessage("عندك نتيجة مسجلة اليوم. المحاولة الرسمية مرة واحدة يوميًا.");
+      setMessage(
+        "عندك نتيجة مسجلة اليوم. تبدأ محاولة جديدة بعد الساعة 12:00 منتصف الليل بتوقيت مكة."
+      );
       return;
     }
 
@@ -463,8 +472,8 @@ export default function FlagMemoryGame() {
           <h2 className="text-xl font-black md:text-2xl">
             🏆 ترتيب تحدي الأعلام اليومي
           </h2>
-          <p className="mt-1 text-xs font-bold text-slate-400">
-            الأعلى نقاطًا، ثم الأسرع، ثم الأقل محاولات.
+          <p className="mt-1 text-xs font-bold leading-5 text-slate-400">
+            الأعلى نقاطًا، ثم الأسرع وقتًا، ثم الأقل محاولات.
           </p>
         </div>
 
@@ -473,42 +482,71 @@ export default function FlagMemoryGame() {
             لا توجد نتائج اليوم حتى الآن.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-white/10">
-            <table className="w-full text-right text-xs md:text-sm">
-              <thead className="bg-slate-950/80 text-slate-300">
-                <tr>
-                  <th className="px-3 py-3">#</th>
-                  <th className="px-3 py-3">العضو</th>
-                  <th className="px-3 py-3">النقاط</th>
-                  <th className="px-3 py-3">الوقت</th>
-                  <th className="hidden px-3 py-3 md:table-cell">المحاولات</th>
-                  <th className="hidden px-3 py-3 md:table-cell">الأخطاء</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.map((result, index) => (
-                  <tr
-                    key={result.id}
-                    className="border-t border-white/10 bg-slate-950/40"
-                  >
-                    <td className="px-3 py-3 font-black">{index + 1}</td>
-                    <td className="px-3 py-3 font-black">{result.userName}</td>
-                    <td className="px-3 py-3 font-black text-amber-300">
-                      {result.score}
-                    </td>
-                    <td className="px-3 py-3">
-                      {formatTime(result.timeSeconds)}
-                    </td>
-                    <td className="hidden px-3 py-3 md:table-cell">
-                      {result.moves}
-                    </td>
-                    <td className="hidden px-3 py-3 md:table-cell">
-                      {result.mistakes}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {leaderboard.map((result, index) => {
+              const rank = index + 1;
+
+              return (
+                <article
+                  key={result.id}
+                  className="rounded-2xl border border-white/10 bg-slate-950/55 p-3 shadow-lg shadow-slate-950/20"
+                >
+                  <div className="mb-3 flex items-start gap-3">
+                    <div className="flex h-10 min-w-10 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 text-base font-black text-amber-200">
+                      {getRankLabel(rank)}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[11px] font-bold text-slate-400">
+                        العضو
+                      </div>
+
+                      <div className="mt-1 whitespace-normal break-words text-right text-sm font-black leading-6 text-white md:text-base">
+                        {result.userName}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="rounded-xl border border-amber-400/15 bg-amber-400/10 p-2 text-center">
+                      <div className="text-[10px] font-bold text-amber-100/80">
+                        النقاط
+                      </div>
+                      <div className="mt-1 text-base font-black text-amber-300">
+                        {result.score}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
+                      <div className="text-[10px] font-bold text-slate-400">
+                        الوقت
+                      </div>
+                      <div className="mt-1 text-sm font-black text-white" dir="ltr">
+                        {formatTime(result.timeSeconds)}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
+                      <div className="text-[10px] font-bold text-slate-400">
+                        المحاولات
+                      </div>
+                      <div className="mt-1 text-sm font-black text-white">
+                        {result.moves}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
+                      <div className="text-[10px] font-bold text-slate-400">
+                        الأخطاء
+                      </div>
+                      <div className="mt-1 text-sm font-black text-white">
+                        {result.mistakes}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
