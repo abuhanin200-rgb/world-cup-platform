@@ -250,7 +250,7 @@ export default function HomePage() {
 
         <ExactHitsTicker />
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <button
             type="button"
             onClick={() => router.push("/word-game")}
@@ -258,6 +258,15 @@ export default function HomePage() {
           >
             <span className="ml-2 text-lg">🎮</span>
             <span>خمن كلمة اليوم</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/flag-memory")}
+            className="inline-flex min-h-[54px] items-center justify-center rounded-full border border-emerald-400/30 bg-slate-950/40 px-3 py-3 text-xs font-black text-emerald-100 shadow-lg shadow-slate-950/30 transition hover:border-emerald-300/50 hover:bg-emerald-400/10 md:px-6 md:text-sm"
+          >
+            <span className="ml-2 text-lg">🎌</span>
+            <span>تحدي الأعلام</span>
           </button>
 
           <button
