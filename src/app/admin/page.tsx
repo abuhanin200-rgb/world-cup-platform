@@ -27,7 +27,7 @@ type AdminTab =
   | "add"
   | "calculate"
   | "settings"
-  | "banner"
+  | "notices"
   | "members"
   | "predictions"
   | "matches"
@@ -595,7 +595,7 @@ export default function AdminPage() {
             ["add", "➕ إضافة مباراة"],
             ["calculate", "🧮 احتساب النتائج"],
             ["settings", "⚙️ إعدادات الشرائط"],
-            ["banner", "🖼️ البانر"],
+            ["notices", "🔔 إشعارات الأعضاء"],
             ["members", "👥 إدارة الأعضاء"],
             ["predictions", "🔮 توقعات الأعضاء"],
             ["matches", "📅 المباريات"],
@@ -1031,7 +1031,7 @@ export default function AdminPage() {
         )}
 
         {activeTab === "settings" && <AdminSettingsPanel />}
-        {activeTab === "banner" && <AdminHomeBannerPanel />}
+        {activeTab === "notices" && <AdminHomeBannerPanel />}
         {activeTab === "members" && <AdminMembersPanel />}
         {activeTab === "predictions" && <AdminPredictionsPanel />}
         {activeTab === "matches" && (

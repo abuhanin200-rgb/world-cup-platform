@@ -12,6 +12,7 @@ import ExactPredictionCelebration from "@/components/ExactPredictionCelebration"
 import HomeBanner from "@/components/HomeBanner";
 import OnlineMembersCounter from "@/components/OnlineMembersCounter";
 import PredictionEditNotice from "../components/PredictionEditNotice";
+import MemberNoticeRenderer from "@/components/MemberNoticeRenderer";
 import { getPublishedChallengeStudioBulletins } from "@/lib/challengeStudio";
 
 const CHALLENGE_STUDIO_LAST_SEEN_KEY = "challengeStudioLastSeenBulletin";
@@ -69,7 +70,9 @@ export default function HomePage() {
         );
 
         if (isMounted) {
-          setHasUnreadChallengeStudio(Boolean(latestKey && latestKey !== savedKey));
+          setHasUnreadChallengeStudio(
+            Boolean(latestKey && latestKey !== savedKey)
+          );
         }
       } catch (error) {
         console.error("Challenge studio unread check error:", error);
@@ -90,6 +93,8 @@ export default function HomePage() {
     >
       <ExactPredictionCelebration />
       <PredictionEditNotice />
+
+      {isLoggedIn && user && <MemberNoticeRenderer userId={user.id} />}
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">
