@@ -4,10 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   calculateFlagMemoryScore,
+  DEFAULT_FLAG_MEMORY_SETTINGS,
   getFlagMemoryDailyLeaderboard,
+  getFlagMemorySettings,
   getTodayFlagMemoryResult,
   saveFlagMemoryResult,
   type FlagMemoryResult,
+  type FlagMemorySettings,
 } from "@/lib/flagMemory";
 import { getFlagMemoryTeams, type FlagMemoryTeam } from "@/lib/flagMemoryTeams";
 
@@ -19,8 +22,6 @@ type MemoryCard = {
 };
 
 type GameStatus = "ready" | "playing" | "finished" | "saved";
-
-const PAIRS_COUNT = 12;
 
 function getRandomValue() {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -51,8 +52,9 @@ function createCardId(teamId: string) {
   return `${teamId}-${Date.now()}-${Math.random()}`;
 }
 
-function buildCards() {
-  const teams = shuffleRandom(getFlagMemoryTeams()).slice(0, PAIRS_COUNT);
+function buildCards(pairsCount: number) {
+  const safePairsCount = Math.max(4, Math.min(18, Math.floor(pairsCount)));
+  const teams = shuffleRandom(getFlagMemoryTeams()).slice(0, safePairsCount);
 
   const cards = teams.flatMap((team) => [
     {
@@ -96,8 +98,14 @@ export default function FlagMemoryGame() {
   const userId = getUserId(user);
   const userName = getUserName(user);
 
-  const initialCards = useMemo(() => buildCards(), []);
+  const initialCards = useMemo(
+    () => buildCards(DEFAULT_FLAG_MEMORY_SETTINGS.pairsCount),
+    []
+  );
 
+  const [settings, setSettings] = useState<FlagMemorySettings>(
+    DEFAULT_FLAG_MEMORY_SETTINGS
+  );
   const [cards, setCards] = useState<MemoryCard[]>(initialCards);
   const [selectedCards, setSelectedCards] = useState<MemoryCard[]>([]);
   const [status, setStatus] = useState<GameStatus>("ready");
@@ -113,25 +121,34 @@ export default function FlagMemoryGame() {
 
   const lockRef = useRef(false);
 
+  const pairsCount = settings.pairsCount;
+  const totalCards = pairsCount * 2;
   const matchedCount = cards.filter((card) => card.matched).length / 2;
+
   const currentScore = calculateFlagMemoryScore({
     timeSeconds: Math.max(1, seconds),
     moves,
     mistakes,
-    matchesCount: PAIRS_COUNT,
+    matchesCount: pairsCount,
   });
 
   async function loadGameData() {
     try {
       setCheckingResult(true);
 
-      const [result, leaders] = await Promise.all([
+      const [settingsData, result, leaders] = await Promise.all([
+        getFlagMemorySettings(),
         userId ? getTodayFlagMemoryResult(userId) : Promise.resolve(null),
         getFlagMemoryDailyLeaderboard(20),
       ]);
 
+      setSettings(settingsData);
       setTodayResult(result);
       setLeaderboard(leaders);
+
+      if (status === "ready") {
+        setCards(buildCards(settingsData.pairsCount));
+      }
     } catch (error) {
       console.error("Load flag memory data error:", error);
       setMessage("تعذر تحميل بيانات تحدي الأعلام.");
@@ -167,24 +184,29 @@ export default function FlagMemoryGame() {
   }, [cards, status]);
 
   function startGame() {
+    if (!settings.enabled) {
+      setMessage("تحدي الأعلام متوقف مؤقتًا من إدارة المنصة.");
+      return;
+    }
+
     if (!isLoggedIn || !userId) {
       setMessage("سجّل دخولك أولًا عشان تدخل التحدي وتحفظ نتيجتك.");
       return;
     }
 
-    if (todayResult) {
+    if (settings.oneAttemptPerDay && todayResult) {
       setMessage("عندك نتيجة مسجلة اليوم. المحاولة الرسمية مرة واحدة يوميًا.");
       return;
     }
 
-    if (hasStartedInThisSession) {
+    if (settings.oneAttemptPerDay && hasStartedInThisSession) {
       setMessage(
         "بدأت التحدي في هذه الجلسة. أكمل المحاولة الحالية لتجنب إعادة الترتيب."
       );
       return;
     }
 
-    setCards(buildCards());
+    setCards(buildCards(settings.pairsCount));
     setSelectedCards([]);
     setStatus("playing");
     setMoves(0);
@@ -249,7 +271,7 @@ export default function FlagMemoryGame() {
         timeSeconds: seconds,
         moves,
         mistakes,
-        matchesCount: PAIRS_COUNT,
+        matchesCount: pairsCount,
       });
 
       setStatus("saved");
@@ -272,6 +294,12 @@ export default function FlagMemoryGame() {
     );
   }
 
+  const startButtonDisabled =
+    status === "playing" ||
+    !settings.enabled ||
+    (settings.oneAttemptPerDay && Boolean(todayResult)) ||
+    (settings.oneAttemptPerDay && hasStartedInThisSession);
+
   if (loading || checkingResult) {
     return (
       <section
@@ -286,12 +314,24 @@ export default function FlagMemoryGame() {
   return (
     <section dir="rtl" className="space-y-5">
       <div className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
-        <div className="mb-5 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-center text-sm font-black text-amber-100 md:text-base">
-          {todayResult
+        <div
+          className={`mb-5 rounded-2xl border px-4 py-3 text-center text-sm font-black md:text-base ${
+            settings.enabled
+              ? "border-amber-400/30 bg-amber-400/10 text-amber-100"
+              : "border-red-400/30 bg-red-500/10 text-red-100"
+          }`}
+        >
+          {!settings.enabled
+            ? "⛔ تحدي الأعلام متوقف مؤقتًا"
+            : todayResult && settings.oneAttemptPerDay
             ? "✅ نتيجتك اليومية محفوظة"
             : status === "playing"
             ? "التحدي جارٍ الآن"
             : "جاهز للتحدي؟"}
+        </div>
+
+        <div className="mb-5 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-xs font-bold leading-6 text-slate-300 md:text-sm">
+          {settings.memberNotice}
         </div>
 
         <div className="mb-5 grid grid-cols-4 gap-2 md:gap-3">
@@ -348,14 +388,14 @@ export default function FlagMemoryGame() {
           <button
             type="button"
             onClick={startGame}
-            disabled={
-              status === "playing" ||
-              Boolean(todayResult) ||
-              hasStartedInThisSession
-            }
+            disabled={startButtonDisabled}
             className="rounded-2xl bg-amber-400 px-5 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {status === "playing" ? "التحدي بدأ" : "ابدأ التحدي الرسمي"}
+            {!settings.enabled
+              ? "التحدي متوقف"
+              : status === "playing"
+              ? "التحدي بدأ"
+              : "ابدأ التحدي الرسمي"}
           </button>
 
           {status === "finished" && (
@@ -371,7 +411,7 @@ export default function FlagMemoryGame() {
         </div>
 
         <div className="mb-4 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-sm font-black text-slate-200">
-          المتطابق: {matchedCount} / {PAIRS_COUNT}
+          المتطابق: {matchedCount} / {pairsCount} — عدد البطاقات: {totalCards}
         </div>
 
         <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:gap-2">

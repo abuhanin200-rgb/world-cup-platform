@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -33,7 +34,32 @@ export type SaveFlagMemoryResultInput = {
   matchesCount: number;
 };
 
+export type FlagMemorySettings = {
+  enabled: boolean;
+  pairsCount: number;
+  oneAttemptPerDay: boolean;
+  memberNotice: string;
+  updatedAt?: unknown;
+};
+
+export type SaveFlagMemorySettingsInput = {
+  enabled: boolean;
+  pairsCount: number;
+  oneAttemptPerDay: boolean;
+  memberNotice: string;
+};
+
 const flagMemoryResultsCollection = "flagMemoryResults";
+const settingsCollection = "settings";
+const flagMemorySettingsDocId = "flagMemory";
+
+export const DEFAULT_FLAG_MEMORY_SETTINGS: FlagMemorySettings = {
+  enabled: true,
+  pairsCount: 12,
+  oneAttemptPerDay: true,
+  memberNotice:
+    "24 بطاقة، 12 علمًا متطابقًا، ومحاولة رسمية واحدة يوميًا. ركّز جيدًا؛ لا توجد إعادة ترتيب أثناء التحدي.",
+};
 
 export function getSaudiDateKey(date = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -114,6 +140,89 @@ function sortFlagMemoryResults(results: FlagMemoryResult[]) {
   });
 }
 
+function normalizePairsCount(value: unknown) {
+  const count = Number(value);
+
+  if (!Number.isInteger(count)) return DEFAULT_FLAG_MEMORY_SETTINGS.pairsCount;
+  if (count < 4) return 4;
+  if (count > 18) return 18;
+
+  return count;
+}
+
+function mapFlagMemorySettings(
+  data: Record<string, unknown> | null | undefined
+): FlagMemorySettings {
+  if (!data) return DEFAULT_FLAG_MEMORY_SETTINGS;
+
+  return {
+    enabled:
+      typeof data.enabled === "boolean"
+        ? data.enabled
+        : DEFAULT_FLAG_MEMORY_SETTINGS.enabled,
+
+    pairsCount: normalizePairsCount(data.pairsCount),
+
+    oneAttemptPerDay:
+      typeof data.oneAttemptPerDay === "boolean"
+        ? data.oneAttemptPerDay
+        : DEFAULT_FLAG_MEMORY_SETTINGS.oneAttemptPerDay,
+
+    memberNotice:
+      typeof data.memberNotice === "string" && data.memberNotice.trim()
+        ? data.memberNotice.trim().slice(0, 240)
+        : DEFAULT_FLAG_MEMORY_SETTINGS.memberNotice,
+
+    updatedAt: data.updatedAt,
+  };
+}
+
+export function formatFlagMemoryTime(totalSeconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+export async function getFlagMemorySettings() {
+  const settingsRef = doc(db, settingsCollection, flagMemorySettingsDocId);
+  const snapshot = await getDoc(settingsRef);
+
+  if (!snapshot.exists()) {
+    return DEFAULT_FLAG_MEMORY_SETTINGS;
+  }
+
+  return mapFlagMemorySettings(snapshot.data());
+}
+
+export async function saveFlagMemorySettings(
+  input: SaveFlagMemorySettingsInput
+) {
+  const settingsRef = doc(db, settingsCollection, flagMemorySettingsDocId);
+
+  const pairsCount = normalizePairsCount(input.pairsCount);
+  const memberNotice = input.memberNotice.trim().slice(0, 240);
+
+  const settings: FlagMemorySettings = {
+    enabled: input.enabled,
+    pairsCount,
+    oneAttemptPerDay: input.oneAttemptPerDay,
+    memberNotice: memberNotice || DEFAULT_FLAG_MEMORY_SETTINGS.memberNotice,
+  };
+
+  await setDoc(
+    settingsRef,
+    {
+      ...settings,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return settings;
+}
+
 export async function getTodayFlagMemoryResult(userId: string) {
   if (!userId) return null;
 
@@ -136,12 +245,18 @@ export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
     throw new Error("اسم العضو غير موجود");
   }
 
+  const settings = await getFlagMemorySettings();
+
+  if (!settings.enabled) {
+    throw new Error("تحدي الأعلام متوقف مؤقتًا من إدارة المنصة.");
+  }
+
   const dateKey = getSaudiDateKey();
   const resultId = `${input.userId}_${dateKey}`;
   const resultRef = doc(db, flagMemoryResultsCollection, resultId);
   const existingSnapshot = await getDoc(resultRef);
 
-  if (existingSnapshot.exists()) {
+  if (settings.oneAttemptPerDay && existingSnapshot.exists()) {
     throw new Error("لديك نتيجة مسجلة اليوم. المحاولة الرسمية مرة واحدة يوميًا.");
   }
 
@@ -203,4 +318,57 @@ export async function getFlagMemoryAllTimeLeaderboard(maxItems = 20) {
   );
 
   return sortFlagMemoryResults(results).slice(0, maxItems);
+}
+
+export async function getTodayFlagMemoryAdminResults() {
+  const dateKey = getSaudiDateKey();
+
+  const resultsQuery = query(
+    collection(db, flagMemoryResultsCollection),
+    where("dateKey", "==", dateKey)
+  );
+
+  const snapshot = await getDocs(resultsQuery);
+
+  const results = snapshot.docs.map((docSnap) =>
+    mapFlagMemoryResult(docSnap.id, docSnap.data())
+  );
+
+  return sortFlagMemoryResults(results);
+}
+
+export async function adminDeleteFlagMemoryResult(resultId: string) {
+  if (!resultId) {
+    throw new Error("معرّف النتيجة غير موجود");
+  }
+
+  await deleteDoc(doc(db, flagMemoryResultsCollection, resultId));
+}
+
+export async function adminDeleteUserTodayFlagMemoryResult(userId: string) {
+  if (!userId) {
+    throw new Error("معرّف العضو غير موجود");
+  }
+
+  const dateKey = getSaudiDateKey();
+  const resultId = `${userId}_${dateKey}`;
+
+  await deleteDoc(doc(db, flagMemoryResultsCollection, resultId));
+}
+
+export async function adminDeleteTodayFlagMemoryResults() {
+  const dateKey = getSaudiDateKey();
+
+  const resultsQuery = query(
+    collection(db, flagMemoryResultsCollection),
+    where("dateKey", "==", dateKey)
+  );
+
+  const snapshot = await getDocs(resultsQuery);
+
+  await Promise.all(snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+
+  return {
+    deletedResults: snapshot.size,
+  };
 }
