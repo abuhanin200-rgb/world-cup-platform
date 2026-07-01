@@ -108,10 +108,18 @@ function getSecondsUntilNextMakkahMidnight() {
   const month = Number(makkahParts.find((part) => part.type === "month")?.value);
   const day = Number(makkahParts.find((part) => part.type === "day")?.value);
 
-  const nextMakkahMidnightUtcMs = Date.UTC(year, month - 1, day + 1, 21, 0, 0);
+  // منتصف الليل القادم بتوقيت مكة = الساعة 21:00 UTC من تاريخ اليوم الحالي في مكة
+  const nextMakkahMidnightUtcMs = Date.UTC(year, month - 1, day, 21, 0, 0);
+
   const diffMs = nextMakkahMidnightUtcMs - now.getTime();
 
-  return Math.max(0, Math.floor(diffMs / 1000));
+  if (diffMs > 0) {
+    return Math.floor(diffMs / 1000);
+  }
+
+  // احتياط لو دخلنا بعد منتصف الليل مباشرة
+  const fallbackNextMidnightUtcMs = Date.UTC(year, month - 1, day + 1, 21, 0, 0);
+  return Math.max(0, Math.floor((fallbackNextMidnightUtcMs - now.getTime()) / 1000));
 }
 
 function getRankLabel(rank: number) {
@@ -400,9 +408,6 @@ export default function FlagMemoryGame() {
           </div>
           <div className="mt-1 text-2xl font-black text-cyan-100 tabular-nums" dir="ltr">
             {formatCountdown(nextChallengeSeconds)}
-          </div>
-          <div className="mt-1 text-[11px] font-bold text-slate-300">
-            يبدأ التحدي والترتيب الجديد يوميًا الساعة 12:00 ص بتوقيت مكة
           </div>
         </div>
 
