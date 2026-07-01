@@ -10,7 +10,7 @@ import {
 } from "@/lib/matches";
 import { getTeams, Team } from "@/lib/teams";
 import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
-import { isAdminUnlocked, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
+import { listenAdminAccess, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
 import { addAdminLog } from "@/lib/adminLogs";
 import AdminOverviewPanel from "@/components/AdminOverviewPanel";
 import AdminMembersPanel from "@/components/AdminMembersPanel";
@@ -227,10 +227,14 @@ export default function AdminPage() {
     }
   }
 
-  useEffect(() => {
-    setUnlocked(isAdminUnlocked());
-    setCheckingAccess(false);
-  }, []);
+ useEffect(() => {
+  const unsubscribe = listenAdminAccess((result) => {
+    setUnlocked(result.unlocked);
+    setCheckingAccess(result.loading);
+  });
+
+  return () => unsubscribe();
+}, []);
 
   useEffect(() => {
     if (unlocked) {
@@ -256,23 +260,31 @@ export default function AdminPage() {
     }
   }, [activeTab, calculateMatches, selectedMatchId]);
 
-  function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+ async function handleLogin(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
 
-    try {
-      unlockAdmin(username, passcode);
-      setUnlocked(true);
-      setUsername("");
-      setPasscode("");
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "تعذر دخول الأدمن");
-    }
+  try {
+    setCheckingAccess(true);
+
+    await unlockAdmin(username, passcode);
+
+    setUsername("");
+    setPasscode("");
+  } catch (error) {
+    setCheckingAccess(false);
+    alert(error instanceof Error ? error.message : "تعذر دخول الأدمن");
   }
+}
 
-  function handleLogout() {
-    lockAdmin();
+ async function handleLogout() {
+  try {
+    await lockAdmin();
     setUnlocked(false);
+  } catch (error) {
+    console.error("Admin logout error:", error);
+    alert("تعذر تسجيل خروج الأدمن");
   }
+}
 
   async function handleAddMatch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -516,7 +528,7 @@ export default function AdminPage() {
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              placeholder="اسم المستخدم"
+              placeholder="إيميل الأدمن"
               className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
             />
 

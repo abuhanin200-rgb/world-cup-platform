@@ -1,22 +1,91 @@
-const ADMIN_USERNAME = "aburakan";
-const ADMIN_PASSCODE = "0542180200Ss@";
+import { doc, getDoc } from "firebase/firestore";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  type User,
+} from "firebase/auth";
+import { auth, db } from "./firebase";
 
-const ADMIN_STORAGE_KEY = "worldcup_2026_admin_access";
+type AdminAccessResult = {
+  unlocked: boolean;
+  loading: boolean;
+  user: User | null;
+};
 
-export function isAdminUnlocked() {
-  if (typeof window === "undefined") return false;
+async function isFirebaseUserAdmin(user: User | null) {
+  if (!user) return false;
 
-  return localStorage.getItem(ADMIN_STORAGE_KEY) === "true";
+  const adminRef = doc(db, "admins", user.uid);
+  const adminSnap = await getDoc(adminRef);
+
+  if (!adminSnap.exists()) return false;
+
+  const data = adminSnap.data();
+
+  return data.role === "admin" && data.enabled === true;
 }
 
-export function unlockAdmin(username: string, passcode: string) {
-  if (username.trim() !== ADMIN_USERNAME || passcode.trim() !== ADMIN_PASSCODE) {
-    throw new Error("بيانات دخول الأدمن غير صحيحة");
+export function listenAdminAccess(
+  callback: (result: AdminAccessResult) => void
+) {
+  callback({
+    unlocked: false,
+    loading: true,
+    user: null,
+  });
+
+  return onAuthStateChanged(auth, async (user) => {
+    try {
+      const isAdmin = await isFirebaseUserAdmin(user);
+
+      callback({
+        unlocked: isAdmin,
+        loading: false,
+        user: isAdmin ? user : null,
+      });
+
+      if (user && !isAdmin) {
+        await signOut(auth);
+      }
+    } catch (error) {
+      console.error("Admin access check error:", error);
+
+      callback({
+        unlocked: false,
+        loading: false,
+        user: null,
+      });
+
+      await signOut(auth);
+    }
+  });
+}
+
+export async function unlockAdmin(email: string, password: string) {
+  const cleanEmail = email.trim();
+  const cleanPassword = password.trim();
+
+  if (!cleanEmail || !cleanPassword) {
+    throw new Error("أدخل إيميل الأدمن وكلمة المرور");
   }
 
-  localStorage.setItem(ADMIN_STORAGE_KEY, "true");
+  const credential = await signInWithEmailAndPassword(
+    auth,
+    cleanEmail,
+    cleanPassword
+  );
+
+  const isAdmin = await isFirebaseUserAdmin(credential.user);
+
+  if (!isAdmin) {
+    await signOut(auth);
+    throw new Error("هذا الحساب لا يملك صلاحية الأدمن");
+  }
+
+  return credential.user;
 }
 
-export function lockAdmin() {
-  localStorage.removeItem(ADMIN_STORAGE_KEY);
+export async function lockAdmin() {
+  await signOut(auth);
 }
