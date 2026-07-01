@@ -16,6 +16,10 @@ export type ChallengeStudioEventType =
   | "best_streak"
   | "highest_accuracy"
   | "most_exact_results"
+  | "round_star"
+  | "best_comeback"
+  | "most_stable"
+  | "studio_word"
   | "black_horse"
   | "worst_luck"
   | "forgot_prediction"
@@ -446,6 +450,209 @@ function buildMostExactEvent(users: LeaderboardUser[]) {
   };
 }
 
+function buildRoundStarEvent(predictions: RawPrediction[]) {
+  const now = Date.now();
+  const roundStats = new Map<
+    string,
+    {
+      userId: string;
+      userName: string;
+      roundPoints: number;
+      exactCount: number;
+      correctCount: number;
+      calculatedCount: number;
+      latestCalculatedAt: string;
+      latestCalculatedTime: number;
+    }
+  >();
+
+  predictions.forEach((prediction) => {
+    const calculatedTime = getTimeValue(prediction.calculatedAt);
+
+    if (
+      !prediction.isCalculated ||
+      calculatedTime <= 0 ||
+      now - calculatedTime > 24 * 60 * 60 * 1000 ||
+      !prediction.userId ||
+      !prediction.userName
+    ) {
+      return;
+    }
+
+    const current = roundStats.get(prediction.userId) || {
+      userId: prediction.userId,
+      userName: prediction.userName,
+      roundPoints: 0,
+      exactCount: 0,
+      correctCount: 0,
+      calculatedCount: 0,
+      latestCalculatedAt: prediction.calculatedAt,
+      latestCalculatedTime: calculatedTime,
+    };
+
+    current.roundPoints += prediction.points;
+    current.calculatedCount += 1;
+
+    if (
+      prediction.resultType === "exact" ||
+      prediction.points === 3 ||
+      prediction.points === 6
+    ) {
+      current.exactCount += 1;
+    }
+
+    if (prediction.points > 0) {
+      current.correctCount += 1;
+    }
+
+    if (calculatedTime > current.latestCalculatedTime) {
+      current.latestCalculatedAt = prediction.calculatedAt;
+      current.latestCalculatedTime = calculatedTime;
+    }
+
+    roundStats.set(prediction.userId, current);
+  });
+
+  const star = Array.from(roundStats.values())
+    .filter((item) => item.roundPoints > 0)
+    .sort((a, b) => {
+      if (b.roundPoints !== a.roundPoints) return b.roundPoints - a.roundPoints;
+      if (b.exactCount !== a.exactCount) return b.exactCount - a.exactCount;
+      if (b.correctCount !== a.correctCount)
+        return b.correctCount - a.correctCount;
+      return b.latestCalculatedTime - a.latestCalculatedTime;
+    })[0];
+
+  if (!star) return null;
+
+  return {
+    id: `round_star_${star.userId}_${star.roundPoints}_${star.exactCount}`,
+    type: "round_star" as const,
+    title: "نجم الجولة",
+    priority: star.exactCount > 0 ? 92 : 82,
+    members: [star.userName],
+    data: {
+      memberName: star.userName,
+      roundPoints: star.roundPoints,
+      exactCount: star.exactCount,
+      correctCount: star.correctCount,
+      calculatedCount: star.calculatedCount,
+      latestCalculatedAt: star.latestCalculatedAt,
+    },
+  };
+}
+
+function buildBestComebackEvent(users: LeaderboardUser[]) {
+  const user = [...users]
+    .filter((item) => {
+      return (
+        item.total >= 5 &&
+        item.rankDirection === "up" &&
+        item.rankChange >= 2 &&
+        item.currentRank > 3 &&
+        item.points > 0
+      );
+    })
+    .sort((a, b) => {
+      const aScore = a.rankChange * 3 + a.currentStreak + a.exact;
+      const bScore = b.rankChange * 3 + b.currentStreak + b.exact;
+
+      if (bScore !== aScore) return bScore - aScore;
+      if (b.currentStreak !== a.currentStreak)
+        return b.currentStreak - a.currentStreak;
+      return b.points - a.points;
+    })[0];
+
+  if (!user) return null;
+
+  return {
+    id: `best_comeback_${user.id}_${user.rankChange}_${user.currentRank}`,
+    type: "best_comeback" as const,
+    title: "أفضل عودة",
+    priority: user.rankChange >= 6 ? 86 : 77,
+    members: [user.fullName],
+    data: {
+      memberName: user.fullName,
+      rankChange: user.rankChange,
+      currentRank: user.currentRank,
+      points: user.points,
+      currentStreak: user.currentStreak,
+      exact: user.exact,
+    },
+  };
+}
+
+function buildMostStableEvent(users: LeaderboardUser[]) {
+  const user = [...users]
+    .filter((item) => {
+      return (
+        item.total >= 6 &&
+        item.points > 0 &&
+        (String(item.rankDirection) === "same" ||
+          String(item.rankDirection) === "stable" ||
+          item.rankChange === 0)
+      );
+    })
+    .map((item) => ({ ...item, accuracy: getAccuracy(item) }))
+    .sort((a, b) => {
+      if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy;
+      if (b.exact !== a.exact) return b.exact - a.exact;
+      if (a.currentRank !== b.currentRank) return a.currentRank - b.currentRank;
+      return b.points - a.points;
+    })[0];
+
+  if (!user) return null;
+
+  return {
+    id: `most_stable_${user.id}_${user.currentRank}_${user.accuracy}`,
+    type: "most_stable" as const,
+    title: "الأكثر ثباتًا",
+    priority: user.currentRank <= 10 ? 80 : 70,
+    members: [user.fullName],
+    data: {
+      memberName: user.fullName,
+      currentRank: user.currentRank,
+      points: user.points,
+      accuracy: user.accuracy,
+      total: user.total,
+      correct: user.correct,
+      exact: user.exact,
+    },
+  };
+}
+
+function buildStudioWordEvent(users: LeaderboardUser[], matches: Match[]) {
+  const activeUsers = users.filter((user) => user.total > 0);
+  const leader = activeUsers[0];
+  const second = activeUsers[1];
+
+  const scheduledMatchesCount = matches.filter((match) => {
+    const startTime = getTimeValue(match.startAt);
+    return (
+      match.isActive &&
+      match.status === "scheduled" &&
+      startTime > Date.now()
+    );
+  }).length;
+
+  if (activeUsers.length === 0 && scheduledMatchesCount === 0) return null;
+
+  return {
+    id: `studio_word_${activeUsers.length}_${scheduledMatchesCount}`,
+    type: "studio_word" as const,
+    title: "كلمة الاستوديو",
+    priority: 58,
+    members: [],
+    data: {
+      activeMembersCount: activeUsers.length,
+      scheduledMatchesCount,
+      leaderPoints: leader ? leader.points : null,
+      secondPoints: second ? second.points : null,
+      pointsDiff: leader && second ? leader.points - second.points : null,
+    },
+  };
+}
+
 function buildBlackHorseEvent(users: LeaderboardUser[]) {
   const user = [...users]
     .filter((item) => item.total >= 5 && item.total <= 20 && item.points > 0)
@@ -557,7 +764,9 @@ function buildExactAfterCalculationEvent(predictions: RawPrediction[]) {
 
       return (
         item.isCalculated &&
-        (item.resultType === "exact" || item.points === 3 || item.points === 6) &&
+        (item.resultType === "exact" ||
+          item.points === 3 ||
+          item.points === 6) &&
         calculatedTime > 0 &&
         now - calculatedTime <= 24 * 60 * 60 * 1000
       );
@@ -592,7 +801,9 @@ function buildWinnerAfterCalculationEvent(predictions: RawPrediction[]) {
 
       return (
         item.isCalculated &&
-        (item.resultType === "winner" || item.points === 1 || item.points === 2) &&
+        (item.resultType === "winner" ||
+          item.points === 1 ||
+          item.points === 2) &&
         calculatedTime > 0 &&
         now - calculatedTime <= 24 * 60 * 60 * 1000
       );
@@ -668,6 +879,7 @@ export async function buildChallengeStudioEvents(): Promise<
   const events = [
     buildGoldenPredictionAlertEvent(matches),
     buildExactAfterCalculationEvent(predictions),
+    buildRoundStarEvent(predictions),
     buildLeaderPressureEvent(activeUsers),
     buildStrongMatchAlertEvent(matches),
     buildDangerousPredictionEvent(predictions),
@@ -679,12 +891,15 @@ export async function buildChallengeStudioEvents(): Promise<
     buildBestStreakEvent(activeUsers),
     buildHighestAccuracyEvent(activeUsers),
     buildMostExactEvent(activeUsers),
+    buildBestComebackEvent(activeUsers),
+    buildMostStableEvent(activeUsers),
     buildBlackHorseEvent(activeUsers),
     buildWorstLuckEvent(activeUsers),
     buildWinnerAfterCalculationEvent(predictions),
     buildForgotPredictionEvent(activeUsers, matches, predictions),
     buildMissedAfterCalculationEvent(predictions),
+    buildStudioWordEvent(activeUsers, matches),
   ].filter(Boolean) as ChallengeStudioEvent[];
 
-  return events.sort((a, b) => b.priority - a.priority).slice(0, 24);
+  return events.sort((a, b) => b.priority - a.priority).slice(0, 30);
 }
