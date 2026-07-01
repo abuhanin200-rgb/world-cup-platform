@@ -82,6 +82,38 @@ function formatTime(totalSeconds: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatCountdown(totalSeconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safeSeconds / 3600);
+  const minutes = Math.floor((safeSeconds % 3600) / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+    2,
+    "0"
+  )}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getSecondsUntilNextMakkahMidnight() {
+  const now = new Date();
+
+  const makkahParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+
+  const year = Number(makkahParts.find((part) => part.type === "year")?.value);
+  const month = Number(makkahParts.find((part) => part.type === "month")?.value);
+  const day = Number(makkahParts.find((part) => part.type === "day")?.value);
+
+  const nextMakkahMidnightUtcMs = Date.UTC(year, month - 1, day + 1, 21, 0, 0);
+  const diffMs = nextMakkahMidnightUtcMs - now.getTime();
+
+  return Math.max(0, Math.floor(diffMs / 1000));
+}
+
 function getRankLabel(rank: number) {
   if (rank === 1) return "🥇";
   if (rank === 2) return "🥈";
@@ -119,6 +151,9 @@ export default function FlagMemoryGame() {
   const [moves, setMoves] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [seconds, setSeconds] = useState(0);
+  const [nextChallengeSeconds, setNextChallengeSeconds] = useState(
+    getSecondsUntilNextMakkahMidnight()
+  );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [todayResult, setTodayResult] = useState<FlagMemoryResult | null>(null);
@@ -167,6 +202,26 @@ export default function FlagMemoryGame() {
   useEffect(() => {
     if (loading) return;
     loadGameData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, userId]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const remainingSeconds = getSecondsUntilNextMakkahMidnight();
+      setNextChallengeSeconds(remainingSeconds);
+
+      if (remainingSeconds <= 1) {
+        setStatus("ready");
+        setMoves(0);
+        setMistakes(0);
+        setSeconds(0);
+        setSelectedCards([]);
+        setHasStartedInThisSession(false);
+        loadGameData();
+      }
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, userId]);
 
@@ -324,7 +379,7 @@ export default function FlagMemoryGame() {
     <section dir="rtl" className="space-y-5">
       <div className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
         <div
-          className={`mb-5 rounded-2xl border px-4 py-3 text-center text-sm font-black md:text-base ${
+          className={`mb-4 rounded-2xl border px-4 py-3 text-center text-sm font-black md:text-base ${
             settings.enabled
               ? "border-amber-400/30 bg-amber-400/10 text-amber-100"
               : "border-red-400/30 bg-red-500/10 text-red-100"
@@ -337,6 +392,18 @@ export default function FlagMemoryGame() {
             : status === "playing"
             ? "التحدي جارٍ الآن"
             : "جاهز للتحدي؟"}
+        </div>
+
+        <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-center">
+          <div className="text-xs font-bold text-cyan-100/80">
+            تحدي جديد بعد
+          </div>
+          <div className="mt-1 text-2xl font-black text-cyan-100 tabular-nums" dir="ltr">
+            {formatCountdown(nextChallengeSeconds)}
+          </div>
+          <div className="mt-1 text-[11px] font-bold text-slate-300">
+            يبدأ التحدي والترتيب الجديد يوميًا الساعة 12:00 ص بتوقيت مكة
+          </div>
         </div>
 
         <div className="mb-5 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-xs font-bold leading-6 text-slate-300 md:text-sm">
