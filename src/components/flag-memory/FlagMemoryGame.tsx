@@ -411,9 +411,24 @@ export default function FlagMemoryGame() {
           </div>
         </div>
 
-        <div className="mb-5 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-xs font-bold leading-6 text-slate-300 md:text-sm">
-          {settings.memberNotice}
-        </div>
+        <div className="mb-5 rounded-2xl border border-white/10 bg-slate-950/55 p-3 text-center">
+  <div className="mb-2 text-sm font-black text-white">
+    شرح النقاط
+  </div>
+
+  <div className="space-y-1 text-[11px] font-bold leading-5 text-slate-300 md:text-xs">
+    <p>
+      كل زوج أعلام = <span className="text-amber-300">20 نقطة</span>، ومكافأة السرعة تصل إلى{" "}
+      <span className="text-emerald-300">+50</span>.
+    </p>
+
+    <p>
+      الخصم: الخطأ <span className="text-red-300">-3</span>، كل 30 ثانية{" "}
+      <span className="text-red-300">-1</span>، والمحاولة الزائدة{" "}
+      <span className="text-red-300">-2</span>.
+    </p>
+  </div>
+</div>
 
         <div className="mb-5 grid grid-cols-4 gap-2 md:gap-3">
           <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center md:p-3">

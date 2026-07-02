@@ -367,12 +367,7 @@ function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
     .filter((prediction) => {
       if (!prediction.isCalculated) return false;
 
-      const isExact =
-        prediction.resultType === "exact" ||
-        prediction.points === 3 ||
-        prediction.points === 6;
-
-      if (!isExact) return false;
+     if (prediction.resultType !== "exact") return false;
 
       const referenceTime =
         prediction.calculatedTimeValue || prediction.createdTimeValue;
