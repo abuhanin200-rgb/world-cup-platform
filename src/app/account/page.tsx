@@ -111,7 +111,7 @@ const TEAM_CODE_ARABIC_NAMES: Record<string, string> = {
 
 function getQualifiedTeamName(
   prediction: AccountPrediction,
-  qualifiedTeamCode?: string | null
+  qualifiedTeamCode?: string | null,
 ) {
   if (!qualifiedTeamCode) return "";
 
@@ -139,6 +139,146 @@ function getQualifiedTeamName(
   return TEAM_CODE_ARABIC_NAMES[code] || qualifiedTeamCode;
 }
 
+type AccountKnockoutPrediction = AccountPrediction & {
+  qualifiedTeamCode?: string | null;
+  qualificationMethod?: string | null;
+  actualQualifiedTeamCode?: string | null;
+  actualQualificationMethod?: string | null;
+};
+
+function normalizeNumberValue(value?: number | string | null) {
+  if (value === undefined || value === null || value === "") return null;
+
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function normalizeTeamCode(value?: string | null) {
+  return value ? value.trim().toUpperCase() : "";
+}
+
+function getQualifiedTeamPoints(prediction: AccountPrediction) {
+  return isGoldenPrediction(prediction) ? 4 : 2;
+}
+
+function getQualificationMethodPoints(prediction: AccountPrediction) {
+  return isGoldenPrediction(prediction) ? 2 : 1;
+}
+
+function getKnockoutPointsBreakdown(prediction: AccountPrediction) {
+  if (!prediction.isCalculated) return null;
+
+  const knockoutPrediction = prediction as AccountKnockoutPrediction;
+
+  const homeScore = normalizeNumberValue(prediction.homeScore);
+  const awayScore = normalizeNumberValue(prediction.awayScore);
+  const actualHomeScore = normalizeNumberValue(prediction.actualHomeScore);
+  const actualAwayScore = normalizeNumberValue(prediction.actualAwayScore);
+
+  const predictionWasDraw =
+    homeScore !== null && awayScore !== null && homeScore === awayScore;
+
+  const actualWasDraw =
+    actualHomeScore !== null &&
+    actualAwayScore !== null &&
+    actualHomeScore === actualAwayScore;
+
+  if (
+    !predictionWasDraw ||
+    !actualWasDraw ||
+    !knockoutPrediction.actualQualifiedTeamCode ||
+    !knockoutPrediction.actualQualificationMethod
+  ) {
+    return null;
+  }
+
+  const scoreCorrect =
+    homeScore === actualHomeScore && awayScore === actualAwayScore;
+
+  const qualifiedTeamCorrect =
+    normalizeTeamCode(knockoutPrediction.qualifiedTeamCode) !== "" &&
+    normalizeTeamCode(knockoutPrediction.qualifiedTeamCode) ===
+      normalizeTeamCode(knockoutPrediction.actualQualifiedTeamCode);
+
+  const qualificationMethodCorrect =
+    Boolean(knockoutPrediction.qualificationMethod) &&
+    knockoutPrediction.qualificationMethod ===
+      knockoutPrediction.actualQualificationMethod;
+
+ return {
+  scorePoints: scoreCorrect
+    ? getExactPoints(prediction)
+    : getWinnerPoints(prediction),
+  qualifiedTeamPoints: qualifiedTeamCorrect
+    ? getQualifiedTeamPoints(prediction)
+    : 0,
+  qualificationMethodPoints: qualificationMethodCorrect
+    ? getQualificationMethodPoints(prediction)
+    : 0,
+};
+}
+
+function PointsBreakdownItem({
+  label,
+  points,
+}: {
+  label: string;
+  points: number;
+}) {
+  const hasPoints = points > 0;
+
+  return (
+    <div
+      className={`rounded-xl border px-2 py-2 text-center ${
+        hasPoints
+          ? "border-emerald-400/25 bg-emerald-400/10"
+          : "border-slate-400/15 bg-slate-400/10"
+      }`}
+    >
+      <div className="text-[10px] font-bold text-slate-300 md:text-[11px]">
+        {label}
+      </div>
+
+      <div
+        className={`mt-1 text-xs font-black md:text-sm ${
+          hasPoints ? "text-emerald-300" : "text-slate-400"
+        }`}
+      >
+        +{points}
+      </div>
+    </div>
+  );
+}
+
+function PointsBreakdown({ prediction }: { prediction: AccountPrediction }) {
+  const breakdown = getKnockoutPointsBreakdown(prediction);
+
+  if (!breakdown) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-400/20 bg-slate-950/50 p-3">
+      <div className="mb-2 text-center text-[11px] font-black text-amber-200 md:text-xs">
+        تفصيل النقاط
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5 md:gap-2">
+        <PointsBreakdownItem label="النتيجة" points={breakdown.scorePoints} />
+
+        <PointsBreakdownItem
+          label="المتأهل"
+          points={breakdown.qualifiedTeamPoints}
+        />
+
+        <PointsBreakdownItem
+          label="الطريقة"
+          points={breakdown.qualificationMethodPoints}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
   if (!prediction.isCalculated) {
     return (
@@ -151,9 +291,7 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
   if (prediction.resultType === "exact") {
     return (
       <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-black text-emerald-300">
-        {isGoldenPrediction(prediction)
-          ? `ذهبي بالملي +${getExactPoints(prediction)}`
-          : `جابها بالملي +${getExactPoints(prediction)}`}
+        النتيجة بالملي
       </span>
     );
   }
@@ -241,17 +379,16 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
           <span className="font-black text-white">
             {getQualifiedTeamName(
               prediction,
-              knockoutPrediction.qualifiedTeamCode
+              knockoutPrediction.qualifiedTeamCode,
             )}
           </span>
-
           {knockoutPrediction.qualificationMethod && (
             <>
               {" "}
               • الطريقة:{" "}
               <span className="font-black text-white">
                 {getQualificationMethodLabel(
-                  knockoutPrediction.qualificationMethod
+                  knockoutPrediction.qualificationMethod,
                 )}
               </span>
             </>
@@ -275,18 +412,19 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
                 <span className="font-black text-white">
                   {getQualifiedTeamName(
                     prediction,
-                    knockoutPrediction.actualQualifiedTeamCode
+                    knockoutPrediction.actualQualifiedTeamCode,
                   )}
-                </span>
-                {" "}
+                </span>{" "}
                 • الطريقة:{" "}
                 <span className="font-black text-white">
                   {getQualificationMethodLabel(
-                    knockoutPrediction.actualQualificationMethod
+                    knockoutPrediction.actualQualificationMethod,
                   )}
                 </span>
               </div>
             )}
+
+          <PointsBreakdown prediction={prediction} />
         </div>
       )}
     </div>
@@ -539,11 +677,11 @@ function getAccountAchievements({
   }).length;
 
   const pendingPredictions = predictions.filter(
-    (prediction) => !prediction.isCalculated
+    (prediction) => !prediction.isCalculated,
   ).length;
 
   const calculatedPredictions = predictions.filter(
-    (prediction) => prediction.isCalculated
+    (prediction) => prediction.isCalculated,
   ).length;
 
   return [
@@ -718,7 +856,7 @@ function MyAchievementsSection({
   });
 
   const unlockedAchievements = achievements.filter(
-    (achievement) => achievement.unlocked
+    (achievement) => achievement.unlocked,
   );
 
   return (
@@ -815,11 +953,11 @@ export default function AccountPage() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [unlockedAchievementModal, setUnlockedAchievementModal] =
-  useState<Achievement | null>(null);
+    useState<Achievement | null>(null);
 
   const totalPredictionPages = Math.max(
     1,
-    Math.ceil(predictions.length / PREDICTIONS_PER_PAGE)
+    Math.ceil(predictions.length / PREDICTIONS_PER_PAGE),
   );
 
   const visiblePredictions = useMemo(() => {
@@ -835,54 +973,56 @@ export default function AccountPage() {
     }
   }, [loading, isLoggedIn, router]);
   useEffect(() => {
-  if (!user || predictionsLoading) return;
+    if (!user || predictionsLoading) return;
 
-  const achievements = getAccountAchievements({
-    total: user.total || 0,
-    correct: user.correct || 0,
-    currentRank: user.currentRank || 0,
-    bestStreak: user.bestStreak || 0,
-    predictions,
-  });
+    const achievements = getAccountAchievements({
+      total: user.total || 0,
+      correct: user.correct || 0,
+      currentRank: user.currentRank || 0,
+      bestStreak: user.bestStreak || 0,
+      predictions,
+    });
 
-  const unlockedAchievements = achievements.filter(
-    (achievement) => achievement.unlocked
-  );
+    const unlockedAchievements = achievements.filter(
+      (achievement) => achievement.unlocked,
+    );
 
-  const storageKey = `worldcup_2026_seen_achievements_${user.id}`;
-  const storedValue = localStorage.getItem(storageKey);
+    const storageKey = `worldcup_2026_seen_achievements_${user.id}`;
+    const storedValue = localStorage.getItem(storageKey);
 
-  if (!storedValue) {
-  localStorage.setItem(
-    storageKey,
-    JSON.stringify(unlockedAchievements.map((achievement) => achievement.title))
-  );
-  return;
-}
+    if (!storedValue) {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify(
+          unlockedAchievements.map((achievement) => achievement.title),
+        ),
+      );
+      return;
+    }
 
-const seenTitles: string[] = JSON.parse(storedValue);
+    const seenTitles: string[] = JSON.parse(storedValue);
 
-  const newAchievement = unlockedAchievements.find(
-    (achievement) => !seenTitles.includes(achievement.title)
-  );
+    const newAchievement = unlockedAchievements.find(
+      (achievement) => !seenTitles.includes(achievement.title),
+    );
 
-  if (!newAchievement) return;
+    if (!newAchievement) return;
 
-  setUnlockedAchievementModal(newAchievement);
-  createUserNotification({
-  userId: user.id,
-  type: "achievement",
-  title: `🏅 وسام جديد: ${newAchievement.title}`,
-  message: newAchievement.description,
-}).catch((error) => {
-  console.error("فشل إنشاء إشعار الوسام:", error);
-});
+    setUnlockedAchievementModal(newAchievement);
+    createUserNotification({
+      userId: user.id,
+      type: "achievement",
+      title: `🏅 وسام جديد: ${newAchievement.title}`,
+      message: newAchievement.description,
+    }).catch((error) => {
+      console.error("فشل إنشاء إشعار الوسام:", error);
+    });
 
-  localStorage.setItem(
-    storageKey,
-    JSON.stringify([...seenTitles, newAchievement.title])
-  );
-}, [user, predictions, predictionsLoading]);
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify([...seenTitles, newAchievement.title]),
+    );
+  }, [user, predictions, predictionsLoading]);
 
   useEffect(() => {
     async function loadTeams() {
@@ -904,7 +1044,7 @@ const seenTitles: string[] = JSON.parse(storedValue);
     setEditPhone(user.phone || "");
 
     const selectedTeam = teams.find(
-      (team) => team.nameAr === user.favoriteTeam
+      (team) => team.nameAr === user.favoriteTeam,
     );
 
     setEditTeamCode(selectedTeam?.code || "");
@@ -923,7 +1063,7 @@ const seenTitles: string[] = JSON.parse(storedValue);
 
         const newTotalPages = Math.max(
           1,
-          Math.ceil(data.length / PREDICTIONS_PER_PAGE)
+          Math.ceil(data.length / PREDICTIONS_PER_PAGE),
         );
 
         setCurrentPredictionsPage((page) => Math.min(page, newTotalPages));
@@ -943,7 +1083,7 @@ const seenTitles: string[] = JSON.parse(storedValue);
 
   function goToNextPredictionsPage() {
     setCurrentPredictionsPage((page) =>
-      Math.min(totalPredictionPages, page + 1)
+      Math.min(totalPredictionPages, page + 1),
     );
   }
 
@@ -1040,13 +1180,13 @@ const seenTitles: string[] = JSON.parse(storedValue);
       className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
     >
       {unlockedAchievementModal && (
-  <AchievementUnlockModal
-    icon={unlockedAchievementModal.icon}
-    title={unlockedAchievementModal.title}
-    description={unlockedAchievementModal.description}
-    onClose={() => setUnlockedAchievementModal(null)}
-  />
-)}
+        <AchievementUnlockModal
+          icon={unlockedAchievementModal.icon}
+          title={unlockedAchievementModal.title}
+          description={unlockedAchievementModal.description}
+          onClose={() => setUnlockedAchievementModal(null)}
+        />
+      )}
       <div className="mx-auto max-w-5xl">
         <header className="mb-6 flex items-center justify-between gap-3">
           <button
@@ -1154,16 +1294,16 @@ const seenTitles: string[] = JSON.parse(storedValue);
             </button>
 
             <button
-  type="button"
-  onClick={() => setActiveTab("notifications")}
-  className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
-    activeTab === "notifications"
-      ? "bg-amber-400 text-slate-950"
-      : "text-slate-300 hover:bg-white/10"
-  }`}
->
-  🔔 الإشعارات
-</button>
+              type="button"
+              onClick={() => setActiveTab("notifications")}
+              className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
+                activeTab === "notifications"
+                  ? "bg-amber-400 text-slate-950"
+                  : "text-slate-300 hover:bg-white/10"
+              }`}
+            >
+              🔔 الإشعارات
+            </button>
 
             <button
               type="button"
@@ -1179,10 +1319,10 @@ const seenTitles: string[] = JSON.parse(storedValue);
           </div>
 
           {activeTab === "notifications" && (
-  <div className="mt-5">
-    <NotificationsPreview />
-  </div>
-)}
+            <div className="mt-5">
+              <NotificationsPreview />
+            </div>
+          )}
 
           {activeTab === "predictions" && (
             <div className="mt-5">
@@ -1342,8 +1482,8 @@ const seenTitles: string[] = JSON.parse(storedValue);
                 <h3 className="mb-2 text-lg font-black">تغيير الرقم السري</h3>
 
                 <p className="mb-4 text-xs leading-6 text-slate-300 md:text-sm">
-                  يمكنك تغيير الرقم السري الخاص بحسابك من هنا. لن تتأثر نقاطك
-                  أو توقعاتك السابقة.
+                  يمكنك تغيير الرقم السري الخاص بحسابك من هنا. لن تتأثر نقاطك أو
+                  توقعاتك السابقة.
                 </p>
 
                 {(passwordMessage || passwordError) && (

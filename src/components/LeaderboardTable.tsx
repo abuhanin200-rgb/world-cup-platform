@@ -180,7 +180,7 @@ const TEAM_CODE_ARABIC_NAMES: Record<string, string> = {
 
 function getQualifiedTeamName(
   prediction: Prediction,
-  qualifiedTeamCode?: string | null
+  qualifiedTeamCode?: string | null,
 ) {
   if (!qualifiedTeamCode) return "";
 
@@ -208,6 +208,154 @@ function getQualifiedTeamName(
   return TEAM_CODE_ARABIC_NAMES[code] || qualifiedTeamCode;
 }
 
+type MemberKnockoutPrediction = Prediction & {
+  qualifiedTeamCode?: string | null;
+  qualificationMethod?: string | null;
+  actualQualifiedTeamCode?: string | null;
+  actualQualificationMethod?: string | null;
+};
+
+function normalizeNumberValue(value?: number | string | null) {
+  if (value === undefined || value === null || value === "") return null;
+
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function normalizeTeamCode(value?: string | null) {
+  return value ? value.trim().toUpperCase() : "";
+}
+
+function getExactPoints(prediction: Prediction) {
+  return isGoldenPrediction(prediction) ? 6 : 3;
+}
+
+function getWinnerPoints(prediction: Prediction) {
+  return isGoldenPrediction(prediction) ? 2 : 1;
+}
+
+function getQualifiedTeamPoints(prediction: Prediction) {
+  return isGoldenPrediction(prediction) ? 4 : 2;
+}
+
+function getQualificationMethodPoints(prediction: Prediction) {
+  return isGoldenPrediction(prediction) ? 2 : 1;
+}
+
+function getKnockoutPointsBreakdown(prediction: Prediction) {
+  if (!prediction.isCalculated) return null;
+
+  const knockoutPrediction = prediction as MemberKnockoutPrediction;
+
+  const homeScore = normalizeNumberValue(prediction.homeScore);
+  const awayScore = normalizeNumberValue(prediction.awayScore);
+  const actualHomeScore = normalizeNumberValue(prediction.actualHomeScore);
+  const actualAwayScore = normalizeNumberValue(prediction.actualAwayScore);
+
+  const predictionWasDraw =
+    homeScore !== null && awayScore !== null && homeScore === awayScore;
+
+  const actualWasDraw =
+    actualHomeScore !== null &&
+    actualAwayScore !== null &&
+    actualHomeScore === actualAwayScore;
+
+  if (
+    !predictionWasDraw ||
+    !actualWasDraw ||
+    !knockoutPrediction.actualQualifiedTeamCode ||
+    !knockoutPrediction.actualQualificationMethod
+  ) {
+    return null;
+  }
+
+  const scoreCorrect =
+    homeScore === actualHomeScore && awayScore === actualAwayScore;
+
+  const qualifiedTeamCorrect =
+    normalizeTeamCode(knockoutPrediction.qualifiedTeamCode) !== "" &&
+    normalizeTeamCode(knockoutPrediction.qualifiedTeamCode) ===
+      normalizeTeamCode(knockoutPrediction.actualQualifiedTeamCode);
+
+  const qualificationMethodCorrect =
+    Boolean(knockoutPrediction.qualificationMethod) &&
+    knockoutPrediction.qualificationMethod ===
+      knockoutPrediction.actualQualificationMethod;
+
+  return {
+  scorePoints: scoreCorrect
+    ? getExactPoints(prediction)
+    : getWinnerPoints(prediction),
+  qualifiedTeamPoints: qualifiedTeamCorrect
+    ? getQualifiedTeamPoints(prediction)
+    : 0,
+  qualificationMethodPoints: qualificationMethodCorrect
+    ? getQualificationMethodPoints(prediction)
+    : 0,
+};
+}
+
+function PointsBreakdownItem({
+  label,
+  points,
+}: {
+  label: string;
+  points: number;
+}) {
+  const hasPoints = points > 0;
+
+  return (
+    <div
+      className={`rounded-xl border px-2 py-2 text-center ${
+        hasPoints
+          ? "border-emerald-400/25 bg-emerald-400/10"
+          : "border-slate-400/15 bg-slate-400/10"
+      }`}
+    >
+      <div className="text-[10px] font-bold text-slate-300 md:text-[11px]">
+        {label}
+      </div>
+
+      <div
+        className={`mt-1 text-xs font-black md:text-sm ${
+          hasPoints ? "text-emerald-300" : "text-slate-400"
+        }`}
+      >
+        +{points}
+      </div>
+    </div>
+  );
+}
+
+function PointsBreakdown({ prediction }: { prediction: Prediction }) {
+  const breakdown = getKnockoutPointsBreakdown(prediction);
+
+  if (!breakdown) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-400/20 bg-slate-950/50 p-3">
+      <div className="mb-2 text-center text-[11px] font-black text-amber-200 md:text-xs">
+        تفصيل النقاط
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5 md:gap-2">
+        <PointsBreakdownItem label="النتيجة" points={breakdown.scorePoints} />
+
+        <PointsBreakdownItem
+          label="المتأهل"
+          points={breakdown.qualifiedTeamPoints}
+        />
+
+        <PointsBreakdownItem
+          label="الطريقة"
+          points={breakdown.qualificationMethodPoints}
+        />
+      </div>
+    </div>
+  );
+}
+
 function getPredictionStatus(prediction: Prediction) {
   const golden = isGoldenPrediction(prediction);
 
@@ -220,18 +368,14 @@ function getPredictionStatus(prediction: Prediction) {
     };
   }
 
-  if (
-    prediction.resultType === "exact" ||
-    prediction.points === 3 ||
-    prediction.points === 6
-  ) {
-    return {
-      text: golden ? "ذهبي بالملي +6" : "صح بالملي +3",
-      className: golden
-        ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
-        : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-    };
-  }
+  if (prediction.resultType === "exact") {
+  return {
+    text: "النتيجة بالملي",
+    className: golden
+      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+  };
+}
 
   if (
     prediction.resultType === "winner" ||
@@ -458,10 +602,22 @@ function getTitleProgress(user: LeaderboardUser) {
 
 function TitlesGuideModal({ onClose }: { onClose: () => void }) {
   const titles = [
-    { icon: "👋", title: "مشجع جديد", condition: "التسجيل في المنصة قبل أول توقع" },
-    { icon: "🔮", title: "مبتدئ التوقعات", condition: "شارك في توقع واحد أو أكثر" },
+    {
+      icon: "👋",
+      title: "مشجع جديد",
+      condition: "التسجيل في المنصة قبل أول توقع",
+    },
+    {
+      icon: "🔮",
+      title: "مبتدئ التوقعات",
+      condition: "شارك في توقع واحد أو أكثر",
+    },
     { icon: "📊", title: "محلل واعد", condition: "شارك في 8 توقعات أو أكثر" },
-    { icon: "🔥", title: "نشيط التوقعات", condition: "شارك في 20 توقع أو أكثر" },
+    {
+      icon: "🔥",
+      title: "نشيط التوقعات",
+      condition: "شارك في 20 توقع أو أكثر",
+    },
     { icon: "⚽", title: "حاضر دائمًا", condition: "شارك في 40 توقع أو أكثر" },
     { icon: "🎯", title: "صياد النقاط", condition: "حقق 3 توقعات صحيحة" },
     { icon: "🧠", title: "خبير النتائج", condition: "حقق 7 توقعات صحيحة" },
@@ -597,24 +753,19 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
 
 function getMemberAchievements(
   user: LeaderboardUser,
-  predictions: Prediction[]
+  predictions: Prediction[],
 ): MemberAchievement[] {
-  const exactHits = predictions.filter((prediction) => {
-    return (
-      prediction.isCalculated &&
-      (prediction.resultType === "exact" ||
-        prediction.points === 3 ||
-        prediction.points === 6)
-    );
-  }).length;
+ const exactHits = predictions.filter((prediction) => {
+  return prediction.isCalculated && prediction.resultType === "exact";
+}).length;
 
-  const goldenExactHits = predictions.filter((prediction) => {
-    return (
-      prediction.isCalculated &&
-      prediction.predictionType === "golden" &&
-      (prediction.resultType === "exact" || prediction.points === 6)
-    );
-  }).length;
+const goldenExactHits = predictions.filter((prediction) => {
+  return (
+    prediction.isCalculated &&
+    prediction.predictionType === "golden" &&
+    prediction.resultType === "exact"
+  );
+}).length;
 
   const goldenWinnerHits = predictions.filter((prediction) => {
     return (
@@ -629,11 +780,11 @@ function getMemberAchievements(
   }).length;
 
   const calculatedPredictions = predictions.filter(
-    (prediction) => prediction.isCalculated
+    (prediction) => prediction.isCalculated,
   ).length;
 
   const pendingPredictions = predictions.filter(
-    (prediction) => !prediction.isCalculated
+    (prediction) => !prediction.isCalculated,
   ).length;
 
   return [
@@ -695,7 +846,8 @@ function getMemberAchievements(
       icon: "💪",
       title: "من النخبة",
       description: "دخل قائمة أول 10 مراكز",
-      unlocked: user.currentRank > 0 && user.currentRank <= 10 && user.total > 0,
+      unlocked:
+        user.currentRank > 0 && user.currentRank <= 10 && user.total > 0,
     },
     {
       icon: "🏅",
@@ -795,12 +947,12 @@ export function PredictionDetailsModal({
   const titleProgress = getTitleProgress(user);
   const achievements = getMemberAchievements(user, predictions);
   const unlockedAchievements = achievements.filter(
-    (achievement) => achievement.unlocked
+    (achievement) => achievement.unlocked,
   );
 
   const totalPredictionPages = Math.max(
     1,
-    Math.ceil(predictions.length / MEMBER_PREDICTIONS_PER_PAGE)
+    Math.ceil(predictions.length / MEMBER_PREDICTIONS_PER_PAGE),
   );
 
   const visiblePredictions = useMemo(() => {
@@ -821,7 +973,7 @@ export function PredictionDetailsModal({
 
   function goToNextPredictionPage() {
     setCurrentPredictionPage((page) =>
-      Math.min(totalPredictionPages, page + 1)
+      Math.min(totalPredictionPages, page + 1),
     );
   }
 
@@ -1089,7 +1241,7 @@ export function PredictionDetailsModal({
                             <span className="font-black text-white">
                               {getQualifiedTeamName(
                                 prediction,
-                                knockoutPrediction.qualifiedTeamCode
+                                knockoutPrediction.qualifiedTeamCode,
                               )}
                             </span>
                             {knockoutPrediction.qualificationMethod && (
@@ -1098,7 +1250,7 @@ export function PredictionDetailsModal({
                                 • الطريقة:{" "}
                                 <span className="font-black text-white">
                                   {getQualificationMethodLabel(
-                                    knockoutPrediction.qualificationMethod
+                                    knockoutPrediction.qualificationMethod,
                                   )}
                                 </span>
                               </>
@@ -1107,35 +1259,37 @@ export function PredictionDetailsModal({
                         )}
 
                         {prediction.isCalculated && (
-  <div className="mt-3 space-y-2">
-    <div className="rounded-xl border border-white/10 bg-slate-950/50 p-2 text-center text-xs font-bold text-slate-300">
-      النتيجة الفعلية:{" "}
-      <span className="text-white">
-        {prediction.actualHomeScore} - {prediction.actualAwayScore}
-      </span>
-    </div>
+                          <div className="mt-3 space-y-2">
+                            <div className="rounded-xl border border-white/10 bg-slate-950/50 p-2 text-center text-xs font-bold text-slate-300">
+                              النتيجة الفعلية:{" "}
+                              <span className="text-white">
+                                {prediction.actualHomeScore} -{" "}
+                                {prediction.actualAwayScore}
+                              </span>
+                            </div>
 
-    {prediction.actualQualifiedTeamCode &&
-      prediction.actualQualificationMethod && (
-        <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-2 text-center text-xs font-bold leading-6 text-emerald-100">
-          المتأهل الفعلي:{" "}
-          <span className="font-black text-white">
-            {getQualifiedTeamName(
-              prediction,
-              prediction.actualQualifiedTeamCode
-            )}
-          </span>
-          {" "}
-          • الطريقة:{" "}
-          <span className="font-black text-white">
-            {getQualificationMethodLabel(
-              prediction.actualQualificationMethod
-            )}
-          </span>
-        </div>
-      )}
-  </div>
-)}
+                            {prediction.actualQualifiedTeamCode &&
+                              prediction.actualQualificationMethod && (
+                                <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-2 text-center text-xs font-bold leading-6 text-emerald-100">
+                                  المتأهل الفعلي:{" "}
+                                  <span className="font-black text-white">
+                                    {getQualifiedTeamName(
+                                      prediction,
+                                      prediction.actualQualifiedTeamCode,
+                                    )}
+                                  </span>{" "}
+                                  • الطريقة:{" "}
+                                  <span className="font-black text-white">
+                                    {getQualificationMethodLabel(
+                                      prediction.actualQualificationMethod,
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+
+                            <PointsBreakdown prediction={prediction} />
+                          </div>
+                        )}
 
                         {!prediction.isCalculated && (
                           <div className="mt-3 rounded-xl border border-slate-400/20 bg-slate-400/10 p-2 text-center text-xs font-bold text-slate-300">
@@ -1190,10 +1344,10 @@ export default function LeaderboardTable() {
   const [showTitlesGuide, setShowTitlesGuide] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(
-    null
+    null,
   );
   const [selectedPredictions, setSelectedPredictions] = useState<Prediction[]>(
-    []
+    [],
   );
   const [loadingPredictions, setLoadingPredictions] = useState(false);
 
@@ -1215,7 +1369,7 @@ export default function LeaderboardTable() {
 
         const newTotalPages = Math.max(
           1,
-          Math.ceil(data.length / USERS_PER_PAGE)
+          Math.ceil(data.length / USERS_PER_PAGE),
         );
 
         setCurrentPage((page) => Math.min(page, newTotalPages));
