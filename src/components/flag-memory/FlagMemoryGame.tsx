@@ -554,64 +554,64 @@ export default function FlagMemoryGame() {
             لا توجد نتائج اليوم حتى الآن.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {leaderboard.map((result, index) => {
               const rank = index + 1;
 
               return (
                 <article
                   key={result.id}
-                  className="rounded-2xl border border-white/10 bg-slate-950/55 p-3 shadow-lg shadow-slate-950/20"
+                  className="rounded-2xl border border-white/10 bg-slate-950/55 p-2.5 shadow-md shadow-slate-950/20"
                 >
-                  <div className="mb-3 flex items-start gap-3">
-                    <div className="flex h-10 min-w-10 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 text-base font-black text-amber-200">
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className="flex h-8 min-w-8 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-sm font-black text-amber-200">
                       {getRankLabel(rank)}
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="text-[11px] font-bold text-slate-400">
+                      <div className="text-[10px] font-bold text-slate-400">
                         العضو
                       </div>
 
-                      <div className="mt-1 whitespace-normal break-words text-right text-sm font-black leading-6 text-white md:text-base">
+                      <div className="mt-0.5 whitespace-normal break-words text-right text-sm font-black leading-5 text-white">
                         {result.userName}
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="rounded-xl border border-amber-400/15 bg-amber-400/10 p-2 text-center">
-                      <div className="text-[10px] font-bold text-amber-100/80">
+                  <div className="grid grid-cols-4 gap-1.5">
+                    <div className="rounded-xl border border-amber-400/15 bg-amber-400/10 p-1.5 text-center">
+                      <div className="text-[9px] font-bold text-amber-100/80">
                         النقاط
                       </div>
-                      <div className="mt-1 text-base font-black text-amber-300">
+                      <div className="mt-0.5 text-sm font-black text-amber-300">
                         {result.score}
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
-                      <div className="text-[10px] font-bold text-slate-400">
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-center">
+                      <div className="text-[9px] font-bold text-slate-400">
                         الوقت
                       </div>
-                      <div className="mt-1 text-sm font-black text-white" dir="ltr">
+                      <div className="mt-0.5 text-xs font-black text-white" dir="ltr">
                         {formatTime(result.timeSeconds)}
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
-                      <div className="text-[10px] font-bold text-slate-400">
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-center">
+                      <div className="text-[9px] font-bold text-slate-400">
                         المحاولات
                       </div>
-                      <div className="mt-1 text-sm font-black text-white">
+                      <div className="mt-0.5 text-xs font-black text-white">
                         {result.moves}
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
-                      <div className="text-[10px] font-bold text-slate-400">
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-center">
+                      <div className="text-[9px] font-bold text-slate-400">
                         الأخطاء
                       </div>
-                      <div className="mt-1 text-sm font-black text-white">
+                      <div className="mt-0.5 text-xs font-black text-white">
                         {result.mistakes}
                       </div>
                     </div>
