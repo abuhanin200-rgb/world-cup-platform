@@ -12,18 +12,20 @@ function getRankLabel(rank: number) {
   return rank;
 }
 
-export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
-  const topThree = items.slice(0, 3);
+function getStatusLabel(won: boolean) {
+  return won ? "فاز" : "خسر";
+}
 
+export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
   return (
-    <div className="rounded-[28px] border border-white/10 bg-white/10 p-3 shadow-2xl md:p-5">
-      <div className="mb-5 text-right">
-        <h2 className="text-[24px] font-black leading-tight text-white md:text-[30px]">
-          🏆 ترتيب اليوم
+    <section className="rounded-[28px] border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
+      <div className="mb-5 text-center">
+        <h2 className="text-[25px] font-black leading-tight text-white md:text-[30px]">
+          🏆 ترتيب تحدي خمن كلمة اليوم
         </h2>
 
-        <p className="mt-1 text-[13px] font-semibold leading-6 text-slate-300 md:text-[14px]">
-          حسب الفوز ثم الأقل محاولات، ثم الأسرع
+        <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-300 md:text-[14px]">
+          حسب الفوز ثم الأسرع وقتًا، ثم الأقل محاولات.
         </p>
       </div>
 
@@ -33,93 +35,70 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            {topThree.map((item) => (
-              <div
-                key={item.userId}
-                className="rounded-[18px] border border-amber-400/25 bg-slate-950/25 px-2 py-3 text-center"
-              >
-                <div className="text-[22px] leading-none">
+          {items.map((item) => (
+            <div
+              key={item.userId}
+              className="rounded-[22px] border border-white/10 bg-slate-950/45 p-4 shadow-xl"
+            >
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/10 text-lg font-black text-white">
                   {getRankLabel(item.rank)}
                 </div>
 
-                <div className="mt-2 whitespace-normal break-words text-[13px] font-bold leading-5 text-white md:text-[15px]">
-                  {item.userName}
-                </div>
-
-                <div
-                  dir="ltr"
-                  className="mt-1 text-[12px] font-medium tracking-tight text-slate-300 tabular-nums md:text-[13px]"
-                >
-                  {formatDurationMs(item.durationMs)} • {item.attemptsUsed}/6
+                <div className="min-w-0 flex-1 text-right">
+                  <div className="text-[12px] font-bold text-slate-400">
+                    العضو
+                  </div>
+                  <div className="mt-1 whitespace-normal break-words text-[18px] font-black leading-6 text-white">
+                    {item.userName}
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
 
-          <div className="overflow-hidden rounded-[20px] border border-white/10">
-            <div className="grid grid-cols-[34px_minmax(88px,1fr)_54px_58px_54px] bg-white/10 md:grid-cols-[42px_1fr_68px_68px_68px]">
-              <div className="py-3 text-center text-[12px] font-black text-white md:text-[13px]">
-                #
-              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-center">
+                  <div className="text-[11px] font-bold text-amber-100">
+                    النتيجة
+                  </div>
+                  <div className="mt-1 text-[18px] font-black text-amber-300">
+                    {getStatusLabel(item.won)}
+                  </div>
+                </div>
 
-              <div className="py-3 pr-2 text-right text-[12px] font-black text-white md:text-[13px]">
-                الاسم
-              </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
+                  <div className="text-[11px] font-bold text-slate-400">
+                    الوقت
+                  </div>
+                  <div
+                    dir="ltr"
+                    className="mt-1 text-[18px] font-black text-white tabular-nums"
+                  >
+                    {formatDurationMs(item.durationMs)}
+                  </div>
+                </div>
 
-              <div className="py-3 text-center text-[12px] font-black text-white md:text-[13px]">
-                الحالة
-              </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
+                  <div className="text-[11px] font-bold text-slate-400">
+                    المحاولات
+                  </div>
+                  <div className="mt-1 text-[18px] font-black text-white tabular-nums">
+                    {item.attemptsUsed}/6
+                  </div>
+                </div>
 
-              <div className="py-3 text-center text-[12px] font-black text-white md:text-[13px]">
-                محاولات
-              </div>
-
-              <div className="py-3 text-center text-[12px] font-black text-white md:text-[13px]">
-                الوقت
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
+                  <div className="text-[11px] font-bold text-slate-400">
+                    التصنيف
+                  </div>
+                  <div className="mt-1 text-[13px] font-black leading-5 text-emerald-200">
+                    {(item as any).categoryLabel ?? "عامّة"}
+                  </div>
+                </div>
               </div>
             </div>
-
-            {items.map((item) => (
-              <div
-                key={item.userId}
-                className="grid grid-cols-[34px_minmax(88px,1fr)_54px_58px_54px] items-center border-t border-white/10 md:grid-cols-[42px_1fr_68px_68px_68px]"
-              >
-                <div className="py-3 text-center text-[12px] font-bold text-white md:text-[14px]">
-                  {getRankLabel(item.rank)}
-                </div>
-
-                <div className="whitespace-normal break-words px-1 py-3 text-right text-[12px] font-semibold leading-5 text-white md:px-2 md:text-[14px]">
-                  {item.userName}
-                </div>
-
-                <div className="flex justify-center py-3">
-                  <span
-                    className={
-                      item.won
-                        ? "rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-200 md:px-2.5 md:text-[11px]"
-                        : "rounded-full border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] font-bold text-red-200 md:px-2.5 md:text-[11px]"
-                    }
-                  >
-                    {item.won ? "فاز" : "خسر"}
-                  </span>
-                </div>
-
-                <div className="py-3 text-center text-[11px] font-medium tracking-tight text-slate-200 tabular-nums md:text-[13px]">
-                  {item.attemptsUsed}/6
-                </div>
-
-                <div
-                  dir="ltr"
-                  className="py-3 text-center text-[11px] font-medium tracking-tight text-slate-200 tabular-nums md:text-[13px]"
-                >
-                  {formatDurationMs(item.durationMs)}
-                </div>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

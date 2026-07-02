@@ -28,6 +28,10 @@ import {
   normalizeWordGameText,
   WORD_GAME_MAX_ATTEMPTS,
 } from "@/lib/wordGameLogic";
+import {
+  getWordGameCategoryLabel,
+  getWordGameWordCategory,
+} from "@/lib/wordGameWords";
 
 const gamesCollection = "wordGameDailyGames";
 const resultsCollection = "wordGameDailyResults";
@@ -150,7 +154,6 @@ export function buildWordGameGuessResult(params: {
 
   const attemptsUsed = guesses.length;
   const isFinished = won || attemptsUsed >= WORD_GAME_MAX_ATTEMPTS;
-
   const isFirstGuess = params.currentGame.guesses.length === 0;
 
   const firstGuessAt = isFirstGuess
@@ -280,37 +283,55 @@ export async function getTodayWordGameLeaderboard(): Promise<
 > {
   const dateKey = getMakkahDateKey();
 
-  const leaderboardQuery = query(
-    collection(db, resultsCollection),
-    where("dateKey", "==", dateKey)
-  );
+  const [resultsSnapshot, gamesSnapshot] = await Promise.all([
+    getDocs(
+      query(collection(db, resultsCollection), where("dateKey", "==", dateKey))
+    ),
+    getDocs(
+      query(collection(db, gamesCollection), where("dateKey", "==", dateKey))
+    ),
+  ]);
 
-  const snapshot = await getDocs(leaderboardQuery);
+  const gamesByUserId = new Map<string, WordGameDailyGame>();
 
-  return snapshot.docs
+  gamesSnapshot.docs.forEach((docItem) => {
+    const game = docItem.data() as WordGameDailyGame;
+    gamesByUserId.set(game.userId, game);
+  });
+
+  return resultsSnapshot.docs
     .map((item) => item.data() as WordGameDailyResult)
     .sort((a, b) => {
       if (a.won !== b.won) return a.won ? -1 : 1;
-      if (a.attemptsUsed !== b.attemptsUsed) {
-        return a.attemptsUsed - b.attemptsUsed;
-      }
 
       const aDuration = a.durationMs ?? Number.MAX_SAFE_INTEGER;
       const bDuration = b.durationMs ?? Number.MAX_SAFE_INTEGER;
 
       if (aDuration !== bDuration) return aDuration - bDuration;
 
+      if (a.attemptsUsed !== b.attemptsUsed) {
+        return a.attemptsUsed - b.attemptsUsed;
+      }
+
       return a.finishedAt - b.finishedAt;
     })
-    .map((item, index) => ({
-      userId: item.userId,
-      userName: item.userName,
-      won: item.won,
-      attemptsUsed: item.attemptsUsed,
-      durationMs: item.durationMs,
-      finishedAt: item.finishedAt,
-      rank: index + 1,
-    }));
+    .map((item, index) => {
+      const game = gamesByUserId.get(item.userId);
+      const categoryLabel = game?.targetWord
+        ? getWordGameCategoryLabel(getWordGameWordCategory(game.targetWord))
+        : "عامّة";
+
+      return {
+        userId: item.userId,
+        userName: item.userName,
+        won: item.won,
+        attemptsUsed: item.attemptsUsed,
+        durationMs: item.durationMs,
+        finishedAt: item.finishedAt,
+        rank: index + 1,
+        categoryLabel,
+      };
+    });
 }
 
 export async function getTodayWordGameAdminGames(): Promise<

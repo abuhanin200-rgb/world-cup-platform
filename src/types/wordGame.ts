@@ -56,6 +56,7 @@ export type WordGameLeaderboardItem = {
   durationMs: number | null;
   finishedAt: number;
   rank: number;
+  categoryLabel?: string;
 };
 
 export type WordGameAdminDailyStats = {
