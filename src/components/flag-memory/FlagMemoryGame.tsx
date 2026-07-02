@@ -476,7 +476,7 @@ export default function FlagMemoryGame() {
               ? "التحدي متوقف"
               : status === "playing"
               ? "التحدي بدأ"
-              : "ابدأ التحدي الرسمي"}
+              : "ابدأ التحدي"}
           </button>
 
           {status === "finished" && (
