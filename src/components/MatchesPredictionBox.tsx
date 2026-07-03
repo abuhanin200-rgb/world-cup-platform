@@ -94,24 +94,6 @@ function getCountdownText(startAt: string) {
   return `${hh}:${mm}:${ss}`;
 }
 
-function formatShortCountdown(ms: number) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor((totalSeconds % 86400) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  const hh = String(hours).padStart(2, "0");
-  const mm = String(minutes).padStart(2, "0");
-  const ss = String(seconds).padStart(2, "0");
-
-  if (days > 0) {
-    return `${days} يوم ${hh}:${mm}:${ss}`;
-  }
-
-  return `${hh}:${mm}:${ss}`;
-}
 
 function isPredictionClosed(startAt: string) {
   const startTime = new Date(startAt).getTime();
@@ -598,9 +580,7 @@ awayTeamCode: match.awayTeamCode,
             const knockoutDrawInput = isKnockoutDrawInput(
               match as MatchWithKnockout
             );
-            const editRemainingMs = savedPrediction
-              ? getEditRemainingMs(savedPrediction, match)
-              : 0;
+            
             const editable =
               savedPrediction && canEditPrediction(savedPrediction, match);
             const editing = editingMatchId === match.id && Boolean(editable);
@@ -713,9 +693,8 @@ awayTeamCode: match.awayTeamCode,
                 {editing ? (
                   <div className="mt-5">
                     <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100">
-                     تعديل التوقع متاح حتى بداية المباراة:{" "}
-                      {formatShortCountdown(editRemainingMs)}
-                    </div>
+  تعديل التوقع متاح حتى بداية المباراة
+</div>
 
                     {renderScoreInputs(match, golden)}
                     {renderQualificationFields(match, knockoutDrawInput)}
@@ -793,9 +772,8 @@ awayTeamCode: match.awayTeamCode,
                     {editable && (
                       <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center">
                         <div className="text-xs font-black text-amber-100 md:text-sm">
-                         تعديل التوقع متاح حتى بداية المباراة:{" "}
-                          {formatShortCountdown(editRemainingMs)}
-                        </div>
+  تعديل التوقع متاح حتى بداية المباراة
+</div>
 
                         <button
                           type="button"
