@@ -170,6 +170,7 @@ export default function FlagMemoryGame() {
   const [hasStartedInThisSession, setHasStartedInThisSession] = useState(false);
 
   const lockRef = useRef(false);
+const autoSaveRef = useRef(false);
 
   const pairsCount = settings.pairsCount;
   const totalCards = pairsCount * 2;
@@ -244,14 +245,52 @@ export default function FlagMemoryGame() {
   }, [status]);
 
   useEffect(() => {
-    const completed =
-      cards.length > 0 && cards.every((card) => card.matched === true);
+  const completed =
+    cards.length > 0 && cards.every((card) => card.matched === true);
 
-    if (completed && status === "playing") {
-      setStatus("finished");
-      setMessage("أحسنت! أنهيت تحدي الأعلام بنجاح. احفظ نتيجتك الآن.");
+  if (!completed || status !== "playing") return;
+  if (autoSaveRef.current) return;
+
+  autoSaveRef.current = true;
+  setStatus("finished");
+  setMessage("أحسنت! أنهيت تحدي الأعلام بنجاح. جاري اعتماد نتيجتك تلقائيًا...");
+
+  async function autoSaveResult() {
+    if (!userId) {
+      setMessage("تعذر اعتماد النتيجة لأن بيانات العضو غير مكتملة.");
+      return;
     }
-  }, [cards, status]);
+
+    try {
+      setSaving(true);
+
+      await saveFlagMemoryResult({
+        userId,
+        userName,
+        timeSeconds: seconds,
+        moves,
+        mistakes,
+        matchesCount: pairsCount,
+      });
+
+      setStatus("saved");
+      setMessage("تم اعتماد نتيجتك الرسمية تلقائيًا في تحدي الأعلام.");
+      await loadGameData();
+    } catch (error) {
+      console.error("Auto save flag memory result error:", error);
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "تعذر اعتماد نتيجة تحدي الأعلام تلقائيًا."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  autoSaveResult();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [cards, status, userId, userName, seconds, moves, mistakes, pairsCount]);
 
   function startGame() {
     if (!settings.enabled) {
@@ -286,7 +325,8 @@ export default function FlagMemoryGame() {
     setSeconds(0);
     setMessage("");
     setHasStartedInThisSession(true);
-    lockRef.current = false;
+lockRef.current = false;
+autoSaveRef.current = false;
   }
 
   function handleCardClick(card: MemoryCard) {
@@ -366,8 +406,9 @@ export default function FlagMemoryGame() {
     );
   }
 
-  const startButtonDisabled =
-    status === "playing" ||
+ const startButtonDisabled =
+  saving ||
+  status === "playing" ||
     !settings.enabled ||
     (settings.oneAttemptPerDay && Boolean(todayResult)) ||
     (settings.oneAttemptPerDay && hasStartedInThisSession);
@@ -397,9 +438,11 @@ export default function FlagMemoryGame() {
             ? "⛔ تحدي الأعلام متوقف مؤقتًا"
             : todayResult && settings.oneAttemptPerDay
             ? "✅ نتيجتك اليومية محفوظة"
-            : status === "playing"
-            ? "التحدي جارٍ الآن"
-            : "جاهز للتحدي؟"}
+           : saving
+? "جاري اعتماد النتيجة..."
+: status === "playing"
+? "التحدي بدأ"
+: "ابدأ التحدي"}
         </div>
 
         <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-center">
@@ -494,17 +537,7 @@ export default function FlagMemoryGame() {
               : "ابدأ التحدي"}
           </button>
 
-          {status === "finished" && (
-            <button
-              type="button"
-              onClick={handleSaveResult}
-              disabled={saving}
-              className="rounded-2xl bg-emerald-400 px-5 py-3 text-sm font-black text-slate-950 hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? "جاري حفظ النتيجة..." : "حفظ النتيجة الرسمية"}
-            </button>
-          )}
-        </div>
+            </div>
 
         <div className="mb-4 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-sm font-black text-slate-200">
           المتطابق: {matchedCount} / {pairsCount} — عدد البطاقات: {totalCards}
