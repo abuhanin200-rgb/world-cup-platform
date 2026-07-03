@@ -11,6 +11,7 @@ import { getTeams, Team } from "@/lib/teams";
 import { updateUserPassword, updateUserProfile } from "@/lib/users";
 import AchievementUnlockModal from "@/components/AchievementUnlockModal";
 import NotificationsPreview from "@/components/NotificationsPreview";
+import TeamFlag from "@/components/TeamFlag";
 import { createUserNotification } from "@/lib/notifications";
 
 const PREDICTIONS_PER_PAGE = 10;
@@ -137,6 +138,42 @@ function getQualifiedTeamName(
   }
 
   return TEAM_CODE_ARABIC_NAMES[code] || qualifiedTeamCode;
+}
+
+function getPredictionTeamCode(
+  prediction: AccountPrediction,
+  side: "home" | "away",
+) {
+  const predictionWithCodes = prediction as AccountPrediction & {
+    homeTeamCode?: string | null;
+    awayTeamCode?: string | null;
+  };
+
+  const code =
+    side === "home"
+      ? predictionWithCodes.homeTeamCode
+      : predictionWithCodes.awayTeamCode;
+
+  return code || "";
+}
+
+function getQualifiedTeamEmoji(
+  prediction: AccountPrediction,
+  qualifiedTeamCode?: string | null,
+) {
+  if (!qualifiedTeamCode) return "";
+
+  const code = qualifiedTeamCode.trim().toUpperCase();
+
+  if (code === getPredictionTeamCode(prediction, "home").trim().toUpperCase()) {
+    return prediction.homeTeamEmoji;
+  }
+
+  if (code === getPredictionTeamCode(prediction, "away").trim().toUpperCase()) {
+    return prediction.awayTeamEmoji;
+  }
+
+  return "";
 }
 
 type AccountKnockoutPrediction = AccountPrediction & {
@@ -349,7 +386,14 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
         <div className="min-w-0">
-          <div className="text-3xl">{prediction.homeTeamEmoji || "🏳️"}</div>
+          <div className="flex justify-center">
+            <TeamFlag
+              code={getPredictionTeamCode(prediction, "home")}
+              emoji={prediction.homeTeamEmoji}
+              name={prediction.homeTeamName}
+              size="md"
+            />
+          </div>
           <div className="mt-1 truncate text-xs font-black md:text-sm">
             {prediction.homeTeamName}
           </div>
@@ -366,7 +410,14 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
         </div>
 
         <div className="min-w-0">
-          <div className="text-3xl">{prediction.awayTeamEmoji || "🏳️"}</div>
+          <div className="flex justify-center">
+            <TeamFlag
+              code={getPredictionTeamCode(prediction, "away")}
+              emoji={prediction.awayTeamEmoji}
+              name={prediction.awayTeamName}
+              size="md"
+            />
+          </div>
           <div className="mt-1 truncate text-xs font-black md:text-sm">
             {prediction.awayTeamName}
           </div>
@@ -376,11 +427,25 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
       {knockoutPrediction.qualifiedTeamCode && (
         <div className="mt-4 rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-xs font-bold leading-6 text-blue-100 md:text-sm">
           المتأهل:{" "}
-          <span className="font-black text-white">
-            {getQualifiedTeamName(
-              prediction,
-              knockoutPrediction.qualifiedTeamCode,
-            )}
+          <span className="inline-flex items-center justify-center gap-1.5 font-black text-white">
+            <TeamFlag
+              code={knockoutPrediction.qualifiedTeamCode}
+              emoji={getQualifiedTeamEmoji(
+                prediction,
+                knockoutPrediction.qualifiedTeamCode,
+              )}
+              name={getQualifiedTeamName(
+                prediction,
+                knockoutPrediction.qualifiedTeamCode,
+              )}
+              size="sm"
+            />
+            <span>
+              {getQualifiedTeamName(
+                prediction,
+                knockoutPrediction.qualifiedTeamCode,
+              )}
+            </span>
           </span>
           {knockoutPrediction.qualificationMethod && (
             <>
@@ -409,11 +474,25 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
             knockoutPrediction.actualQualificationMethod && (
               <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-xs font-bold leading-6 text-emerald-100 md:text-sm">
                 المتأهل الفعلي:{" "}
-                <span className="font-black text-white">
-                  {getQualifiedTeamName(
-                    prediction,
-                    knockoutPrediction.actualQualifiedTeamCode,
-                  )}
+                <span className="inline-flex items-center justify-center gap-1.5 font-black text-white">
+                  <TeamFlag
+                    code={knockoutPrediction.actualQualifiedTeamCode}
+                    emoji={getQualifiedTeamEmoji(
+                      prediction,
+                      knockoutPrediction.actualQualifiedTeamCode,
+                    )}
+                    name={getQualifiedTeamName(
+                      prediction,
+                      knockoutPrediction.actualQualifiedTeamCode,
+                    )}
+                    size="sm"
+                  />
+                  <span>
+                    {getQualifiedTeamName(
+                      prediction,
+                      knockoutPrediction.actualQualifiedTeamCode,
+                    )}
+                  </span>
                 </span>{" "}
                 • الطريقة:{" "}
                 <span className="font-black text-white">
@@ -1173,6 +1252,9 @@ export default function AccountPage() {
   const accountCorrect = user.correct || 0;
   const accountRank = user.currentRank || 0;
   const accountBestStreak = user.bestStreak || 0;
+  const accountFavoriteTeam = teams.find(
+    (team) => team.nameAr === user.favoriteTeam,
+  );
 
   return (
     <main
@@ -1210,8 +1292,13 @@ export default function AccountPage() {
         </header>
 
         <section className="rounded-3xl border border-white/10 bg-white/10 p-5 text-center shadow-2xl md:p-8">
-          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10 text-4xl">
-            {user.teamEmoji || "🏆"}
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10">
+            <TeamFlag
+              code={accountFavoriteTeam?.code || editTeamCode}
+              emoji={user.teamEmoji || "🏆"}
+              name={user.favoriteTeam || "المنتخب المرشح"}
+              size="lg"
+            />
           </div>
 
           <h1 className="text-3xl font-black md:text-4xl">{user.fullName}</h1>
@@ -1459,7 +1546,7 @@ export default function AccountPage() {
                     <option value="">اختر المنتخب</option>
                     {teams.map((team) => (
                       <option key={team.code} value={team.code}>
-                        {team.emoji} {team.nameAr}
+                        {team.nameAr}
                       </option>
                     ))}
                   </select>

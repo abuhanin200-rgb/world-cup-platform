@@ -7,6 +7,7 @@ import {
   SiteSettings,
   TickerSpeed,
 } from "@/lib/siteSettings";
+import TeamFlag from "@/components/TeamFlag";
 
 function getSpeedLabel(speed: string) {
   if (speed === "very_slow") return "بطيء جدًا";
@@ -30,6 +31,20 @@ function getPixelsPerSecond(speed: TickerSpeed) {
 
 function isGoldenPrediction(prediction: LatestPrediction) {
   return prediction.predictionType === "golden";
+}
+
+function getPredictionTeamCode(
+  prediction: LatestPrediction,
+  side: "home" | "away"
+) {
+  const predictionWithCodes = prediction as LatestPrediction & {
+    homeTeamCode?: string;
+    awayTeamCode?: string;
+  };
+
+  return side === "home"
+    ? predictionWithCodes.homeTeamCode
+    : predictionWithCodes.awayTeamCode;
 }
 
 function getPredictionsSignature(predictions: LatestPrediction[]) {
@@ -201,8 +216,14 @@ export default function LatestPredictionsTicker() {
           توقع
         </span>
 
-        <span className="font-bold">
-          {prediction.homeTeamEmoji} {prediction.homeTeamName}
+        <span className="inline-flex items-center gap-1.5 font-bold">
+          <TeamFlag
+            code={getPredictionTeamCode(prediction, "home")}
+            emoji={prediction.homeTeamEmoji}
+            name={prediction.homeTeamName}
+            size="xs"
+          />
+          <span>{prediction.homeTeamName}</span>
         </span>
 
         <span
@@ -215,8 +236,14 @@ export default function LatestPredictionsTicker() {
           {prediction.homeScore} - {prediction.awayScore}
         </span>
 
-        <span className="font-bold">
-          {prediction.awayTeamName} {prediction.awayTeamEmoji}
+        <span className="inline-flex items-center gap-1.5 font-bold">
+          <span>{prediction.awayTeamName}</span>
+          <TeamFlag
+            code={getPredictionTeamCode(prediction, "away")}
+            emoji={prediction.awayTeamEmoji}
+            name={prediction.awayTeamName}
+            size="xs"
+          />
         </span>
       </div>
     );

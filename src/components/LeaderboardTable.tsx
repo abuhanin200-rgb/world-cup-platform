@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getLeaderboardUsers, LeaderboardUser } from "@/lib/leaderboard";
 import { getPredictionsByUserId, Prediction } from "@/lib/predictions";
+import TeamFlag from "@/components/TeamFlag";
 
 const USERS_PER_PAGE = 20;
 const MEMBER_PREDICTIONS_PER_PAGE = 6;
@@ -227,6 +228,93 @@ function normalizeTeamCode(value?: string | null) {
   return value ? value.trim().toUpperCase() : "";
 }
 
+function normalizeTeamName(value?: string | null) {
+  return value ? value.trim() : "";
+}
+
+function getTeamCodeFromName(name?: string | null) {
+  const normalizedName = normalizeTeamName(name);
+
+  if (!normalizedName) return "";
+
+  const match = Object.entries(TEAM_CODE_ARABIC_NAMES).find(
+    ([, arabicName]) => arabicName === normalizedName,
+  );
+
+  return match?.[0] || "";
+}
+
+function getPredictionHomeTeamCode(prediction: Prediction) {
+  const predictionWithCodes = prediction as Prediction & {
+    homeTeamCode?: string | null;
+  };
+
+  return (
+    normalizeTeamCode(predictionWithCodes.homeTeamCode) ||
+    getTeamCodeFromName(prediction.homeTeamName)
+  );
+}
+
+function getPredictionAwayTeamCode(prediction: Prediction) {
+  const predictionWithCodes = prediction as Prediction & {
+    awayTeamCode?: string | null;
+  };
+
+  return (
+    normalizeTeamCode(predictionWithCodes.awayTeamCode) ||
+    getTeamCodeFromName(prediction.awayTeamName)
+  );
+}
+
+function getLeaderboardUserTeamCode(user: LeaderboardUser) {
+  const userWithTeamCode = user as LeaderboardUser & {
+    teamCode?: string | null;
+    favoriteTeamCode?: string | null;
+  };
+
+  return (
+    normalizeTeamCode(userWithTeamCode.teamCode) ||
+    normalizeTeamCode(userWithTeamCode.favoriteTeamCode) ||
+    getTeamCodeFromName(user.favoriteTeam)
+  );
+}
+
+function getQualifiedTeamCode(
+  prediction: Prediction,
+  qualifiedTeamCode?: string | null,
+) {
+  const code = normalizeTeamCode(qualifiedTeamCode);
+
+  if (!code) return "";
+
+  const homeTeamCode = getPredictionHomeTeamCode(prediction);
+  const awayTeamCode = getPredictionAwayTeamCode(prediction);
+
+  if (homeTeamCode && code === homeTeamCode) return homeTeamCode;
+  if (awayTeamCode && code === awayTeamCode) return awayTeamCode;
+
+  return code;
+}
+
+function getQualifiedTeamEmoji(
+  prediction: Prediction,
+  qualifiedTeamCode?: string | null,
+) {
+  const code = normalizeTeamCode(qualifiedTeamCode);
+  const homeTeamCode = getPredictionHomeTeamCode(prediction);
+  const awayTeamCode = getPredictionAwayTeamCode(prediction);
+
+  if (code && homeTeamCode && code === homeTeamCode) {
+    return prediction.homeTeamEmoji || "";
+  }
+
+  if (code && awayTeamCode && code === awayTeamCode) {
+    return prediction.awayTeamEmoji || "";
+  }
+
+  return "";
+}
+
 function getExactPoints(prediction: Prediction) {
   return isGoldenPrediction(prediction) ? 6 : 3;
 }
@@ -383,7 +471,7 @@ function getPredictionStatus(prediction: Prediction) {
     prediction.points === 2
   ) {
     return {
-      text: golden ? "فائز ذهبي +2" : "الفائز صحيح +1",
+      text: golden ? "فائز ذهبي " : "الفائز صحيح",
       className: golden
         ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
         : "border-amber-400/30 bg-amber-400/10 text-amber-100",
@@ -1000,8 +1088,14 @@ export function PredictionDetailsModal({
 
         <div className="max-h-[70vh] overflow-y-auto p-4">
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-4 text-center">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-slate-950/60 text-3xl">
-              {user.teamEmoji || "🏆"}
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-slate-950/60">
+              <TeamFlag
+                code={getLeaderboardUserTeamCode(user)}
+                emoji={user.teamEmoji}
+                name={user.favoriteTeam}
+                size="lg"
+                className="h-12 w-12 rounded-2xl"
+              />
             </div>
 
             <h2 className="text-xl font-black leading-8 md:text-2xl">
@@ -1205,8 +1299,13 @@ export function PredictionDetailsModal({
 
                         <div className="grid grid-cols-[1fr_52px_1fr] items-center gap-2 text-center">
                           <div className="min-w-0">
-                            <div className="text-2xl">
-                              {prediction.homeTeamEmoji}
+                            <div className="flex justify-center">
+                              <TeamFlag
+                                code={getPredictionHomeTeamCode(prediction)}
+                                emoji={prediction.homeTeamEmoji}
+                                name={prediction.homeTeamName}
+                                size="md"
+                              />
                             </div>
 
                             <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
@@ -1225,8 +1324,13 @@ export function PredictionDetailsModal({
                           </div>
 
                           <div className="min-w-0">
-                            <div className="text-2xl">
-                              {prediction.awayTeamEmoji}
+                            <div className="flex justify-center">
+                              <TeamFlag
+                                code={getPredictionAwayTeamCode(prediction)}
+                                emoji={prediction.awayTeamEmoji}
+                                name={prediction.awayTeamName}
+                                size="md"
+                              />
                             </div>
 
                             <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
@@ -1238,7 +1342,22 @@ export function PredictionDetailsModal({
                         {knockoutPrediction.qualifiedTeamCode && (
                           <div className="mt-3 rounded-xl border border-blue-400/30 bg-blue-400/10 p-2 text-center text-xs font-bold leading-6 text-blue-100">
                             المتأهل:{" "}
-                            <span className="font-black text-white">
+                            <span className="inline-flex items-center justify-center gap-1.5 font-black text-white">
+                              <TeamFlag
+                                code={getQualifiedTeamCode(
+                                  prediction,
+                                  knockoutPrediction.qualifiedTeamCode,
+                                )}
+                                emoji={getQualifiedTeamEmoji(
+                                  prediction,
+                                  knockoutPrediction.qualifiedTeamCode,
+                                )}
+                                name={getQualifiedTeamName(
+                                  prediction,
+                                  knockoutPrediction.qualifiedTeamCode,
+                                )}
+                                size="xs"
+                              />
                               {getQualifiedTeamName(
                                 prediction,
                                 knockoutPrediction.qualifiedTeamCode,
@@ -1272,7 +1391,22 @@ export function PredictionDetailsModal({
                               prediction.actualQualificationMethod && (
                                 <div className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-2 text-center text-xs font-bold leading-6 text-emerald-100">
                                   المتأهل الفعلي:{" "}
-                                  <span className="font-black text-white">
+                                  <span className="inline-flex items-center justify-center gap-1.5 font-black text-white">
+                                    <TeamFlag
+                                      code={getQualifiedTeamCode(
+                                        prediction,
+                                        prediction.actualQualifiedTeamCode,
+                                      )}
+                                      emoji={getQualifiedTeamEmoji(
+                                        prediction,
+                                        prediction.actualQualifiedTeamCode,
+                                      )}
+                                      name={getQualifiedTeamName(
+                                        prediction,
+                                        prediction.actualQualifiedTeamCode,
+                                      )}
+                                      size="xs"
+                                    />
                                     {getQualifiedTeamName(
                                       prediction,
                                       prediction.actualQualifiedTeamCode,

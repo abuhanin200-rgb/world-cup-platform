@@ -7,12 +7,24 @@ import {
   HomeHighlightUser,
 } from "@/lib/highlights";
 import { getSiteSettings, TickerSpeed } from "@/lib/siteSettings";
+import TeamFlag from "@/components/TeamFlag";
 
 type ExactHitWithPredictionType = ExactHit & {
   predictionType?: "normal" | "golden";
   points?: number;
   createdAt?: string;
   calculatedAt?: string;
+};
+
+type HomeHighlightUserWithTeamCode = HomeHighlightUser & {
+  favoriteTeamCode?: string;
+  teamCode?: string;
+};
+
+type QualifiedTeamInfo = {
+  code: string;
+  emoji?: string;
+  name: string;
 };
 
 function EmptyCard({ title, text }: { title: string; text: string }) {
@@ -46,6 +58,10 @@ function HighlightCard({
     return <EmptyCard title={title} text={emptyText} />;
   }
 
+  const userWithTeamCode = user as HomeHighlightUserWithTeamCode;
+  const teamCode =
+    userWithTeamCode.favoriteTeamCode || userWithTeamCode.teamCode;
+
   return (
     <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center shadow-xl md:p-3">
       <h2 className="text-[11px] font-black leading-5 text-white md:text-sm">
@@ -53,8 +69,13 @@ function HighlightCard({
       </h2>
 
       <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 p-2 md:p-3">
-        <div className="text-lg leading-none md:text-2xl">
-          {user.teamEmoji || "🏳️"}
+        <div className="flex justify-center">
+          <TeamFlag
+            code={teamCode}
+            emoji={user.teamEmoji}
+            name={user.favoriteTeam}
+            size="md"
+          />
         </div>
 
         <div className="mt-1 min-h-[30px] break-words text-[11px] font-black leading-4 text-white md:text-sm">
@@ -147,18 +168,32 @@ function getQualificationMethodLabel(value?: string | null) {
   return "";
 }
 
-function getQualifiedTeamLabel(hit: ExactHitWithPredictionType) {
-  if (!hit.qualifiedTeamCode) return "";
+function getQualifiedTeamInfo(
+  hit: ExactHitWithPredictionType,
+): QualifiedTeamInfo | null {
+  if (!hit.qualifiedTeamCode) return null;
 
   if (hit.qualifiedTeamCode === hit.homeTeamCode) {
-    return `${hit.homeTeamEmoji} ${hit.homeTeamName}`;
+    return {
+      code: hit.homeTeamCode,
+      emoji: hit.homeTeamEmoji,
+      name: hit.homeTeamName,
+    };
   }
 
   if (hit.qualifiedTeamCode === hit.awayTeamCode) {
-    return `${hit.awayTeamEmoji} ${hit.awayTeamName}`;
+    return {
+      code: hit.awayTeamCode,
+      emoji: hit.awayTeamEmoji,
+      name: hit.awayTeamName,
+    };
   }
 
-  return hit.qualifiedTeamCode;
+  return {
+    code: hit.qualifiedTeamCode,
+    emoji: undefined,
+    name: hit.qualifiedTeamCode,
+  };
 }
 
 export default function HomeHighlights() {
@@ -199,9 +234,7 @@ export default function HomeHighlights() {
     return (
       <section className="mt-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-5 md:p-4">
         <div className="mb-3 text-center">
-          <h2 className="text-base font-black md:text-xl">
-            أبطال التحدي الآن
-          </h2>
+          <h2 className="text-base font-black md:text-xl">أبطال التحدي الآن</h2>
 
           <p className="mt-1 text-[10px] text-slate-300 md:text-xs">
             أسماء تتغير تلقائيًا حسب التوقعات والنتائج
@@ -353,7 +386,7 @@ export function ExactHitsTicker() {
 
   const duration = Math.max(
     25,
-    Math.round((groupWidth || 1200) / pixelsPerSecond)
+    Math.round((groupWidth || 1200) / pixelsPerSecond),
   );
 
   function pauseTicker() {
@@ -367,6 +400,7 @@ export function ExactHitsTicker() {
   function renderExactHitCard(hit: ExactHit, index: number) {
     const exactHit = hit as ExactHitWithPredictionType;
     const golden = isGoldenExactHit(exactHit);
+    const qualifiedTeam = getQualifiedTeamInfo(exactHit);
 
     return (
       <div
@@ -383,7 +417,6 @@ export function ExactHitsTicker() {
             ⭐ ذهبي بالملي +6
           </span>
         )}
-
         <span
           className={
             golden ? "font-black text-amber-300" : "font-black text-emerald-300"
@@ -394,30 +427,48 @@ export function ExactHitsTicker() {
         {golden
           ? "جاب التوقع الذهبي بالملي في مباراة"
           : "جابها صح بالملي في مباراة"}{" "}
-        <span className="font-bold">
-          {hit.homeTeamEmoji} {hit.homeTeamName}
+        <span className="inline-flex items-center gap-1 align-middle font-bold">
+          <TeamFlag
+            code={hit.homeTeamCode}
+            emoji={hit.homeTeamEmoji}
+            name={hit.homeTeamName}
+            size="xs"
+          />
+          {hit.homeTeamName}
         </span>{" "}
         <span className="font-black text-amber-300">
           {hit.homeScore} - {hit.awayScore}
         </span>{" "}
-        <span className="font-bold">
-          {hit.awayTeamName} {hit.awayTeamEmoji}
+        <span className="inline-flex items-center gap-1 align-middle font-bold">
+          {hit.awayTeamName}
+          <TeamFlag
+            code={hit.awayTeamCode}
+            emoji={hit.awayTeamEmoji}
+            name={hit.awayTeamName}
+            size="xs"
+          />
         </span>
-
-        {exactHit.qualifiedTeamCode && (
-  <>
-    {" "}
-    <span className="font-black text-blue-200">
-      • المتأهل {getQualifiedTeamLabel(exactHit)}
-    </span>
-    {exactHit.qualificationMethod && (
-      <span className="font-black text-blue-200">
-        {" "}
-        • {getQualificationMethodLabel(exactHit.qualificationMethod)}
-      </span>
-    )}
-  </>
-)}
+        {qualifiedTeam && (
+          <>
+            {" "}
+            <span className="inline-flex items-center gap-1 align-middle font-black text-blue-200">
+              • المتأهل
+              <TeamFlag
+                code={qualifiedTeam.code}
+                emoji={qualifiedTeam.emoji}
+                name={qualifiedTeam.name}
+                size="xs"
+              />
+              {qualifiedTeam.name}
+            </span>
+            {exactHit.qualificationMethod && (
+              <span className="font-black text-blue-200">
+                {" "}
+                • {getQualificationMethodLabel(exactHit.qualificationMethod)}
+              </span>
+            )}
+          </>
+        )}
       </div>
     );
   }
@@ -425,6 +476,7 @@ export function ExactHitsTicker() {
   function renderExactHitListItem(hit: ExactHit) {
     const exactHit = hit as ExactHitWithPredictionType;
     const golden = isGoldenExactHit(exactHit);
+    const qualifiedTeam = getQualifiedTeamInfo(exactHit);
 
     return (
       <div
@@ -456,27 +508,48 @@ export function ExactHitsTicker() {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-slate-950/70 px-3 py-2 text-xs font-black text-white">
-          <span>
-            {hit.homeTeamEmoji} {hit.homeTeamName}
+          <span className="inline-flex items-center gap-1">
+            <TeamFlag
+              code={hit.homeTeamCode}
+              emoji={hit.homeTeamEmoji}
+              name={hit.homeTeamName}
+              size="sm"
+            />
+            {hit.homeTeamName}
           </span>
 
           <span className="rounded-lg bg-amber-400 px-2 py-1 text-slate-950">
             {hit.homeScore} - {hit.awayScore}
           </span>
 
-          <span>
-            {hit.awayTeamName} {hit.awayTeamEmoji}
+          <span className="inline-flex items-center gap-1">
+            {hit.awayTeamName}
+            <TeamFlag
+              code={hit.awayTeamCode}
+              emoji={hit.awayTeamEmoji}
+              name={hit.awayTeamName}
+              size="sm"
+            />
           </span>
         </div>
 
-        {exactHit.qualifiedTeamCode && (
-  <div className="mt-2 rounded-xl border border-blue-400/30 bg-blue-400/10 px-3 py-2 text-center text-xs font-black text-blue-100">
-    المتأهل {getQualifiedTeamLabel(exactHit)}
-    {exactHit.qualificationMethod && (
-      <> • {getQualificationMethodLabel(exactHit.qualificationMethod)}</>
-    )}
-  </div>
-)}
+        {qualifiedTeam && (
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-1 rounded-xl border border-blue-400/30 bg-blue-400/10 px-3 py-2 text-center text-xs font-black text-blue-100">
+            <span>المتأهل</span>
+            <TeamFlag
+              code={qualifiedTeam.code}
+              emoji={qualifiedTeam.emoji}
+              name={qualifiedTeam.name}
+              size="sm"
+            />
+            <span>{qualifiedTeam.name}</span>
+            {exactHit.qualificationMethod && (
+              <span>
+                • {getQualificationMethodLabel(exactHit.qualificationMethod)}
+              </span>
+            )}
+          </div>
+        )}
 
         {golden && (
           <div className="mt-2 inline-flex rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950">
@@ -553,7 +626,7 @@ export function ExactHitsTicker() {
 
           <div className="flex flex-none gap-3">
             {repeatedHits.map((hit, index) =>
-              renderExactHitCard(hit, index + repeatedHits.length)
+              renderExactHitCard(hit, index + repeatedHits.length),
             )}
           </div>
         </div>

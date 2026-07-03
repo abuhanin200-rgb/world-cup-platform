@@ -7,6 +7,7 @@ export type HomeHighlightUser = {
   fullName: string;
   favoriteTeam: string;
   teamEmoji: string;
+  teamCode: string;
 
   points: number;
   total: number;
@@ -77,6 +78,111 @@ function toNullableText(value: unknown) {
   }
 
   return toText(value);
+}
+
+const TEAM_NAME_TO_CODE: Record<string, string> = {
+  "الأرجنتين": "ARG",
+  "الارجنتين": "ARG",
+  "أستراليا": "AUS",
+  "استراليا": "AUS",
+  "النمسا": "AUT",
+  "بلجيكا": "BEL",
+  "البوسنة والهرسك": "BIH",
+  "البرازيل": "BRA",
+  "كندا": "CAN",
+  "ساحل العاج": "CIV",
+  "الكونغو الديمقراطية": "COD",
+  "كولومبيا": "COL",
+  "الرأس الأخضر": "CPV",
+  "الراس الاخضر": "CPV",
+  "كرواتيا": "CRO",
+  "التشيك": "CZE",
+  "الدنمارك": "DEN",
+  "الإكوادور": "ECU",
+  "الاكوادور": "ECU",
+  "مصر": "EGY",
+  "إنجلترا": "ENG",
+  "انجلترا": "ENG",
+  "إسبانيا": "ESP",
+  "اسبانيا": "ESP",
+  "فرنسا": "FRA",
+  "ألمانيا": "GER",
+  "المانيا": "GER",
+  "غانا": "GHA",
+  "هايتي": "HAI",
+  "إيران": "IRN",
+  "ايران": "IRN",
+  "العراق": "IRQ",
+  "الأردن": "JOR",
+  "الاردن": "JOR",
+  "اليابان": "JPN",
+  "كوريا الجنوبية": "KOR",
+  "المغرب": "MAR",
+  "المكسيك": "MEX",
+  "هولندا": "NED",
+  "النرويج": "NOR",
+  "نيوزيلندا": "NZL",
+  "بنما": "PAN",
+  "باراغواي": "PAR",
+  "الباراغواي": "PAR",
+  "البرتغال": "POR",
+  "قطر": "QAT",
+  "جنوب أفريقيا": "RSA",
+  "جنوب افريقيا": "RSA",
+  "السعودية": "KSA",
+  "المملكة العربية السعودية": "KSA",
+  "السنغال": "SEN",
+  "سويسرا": "SUI",
+  "السويد": "SWE",
+  "تونس": "TUN",
+  "تركيا": "TUR",
+  "الأوروغواي": "URU",
+  "الاوروغواي": "URU",
+  "أوروغواي": "URU",
+  "اوروغواي": "URU",
+  "الولايات المتحدة": "USA",
+  "أمريكا": "USA",
+  "امريكا": "USA",
+  "أوزبكستان": "UZB",
+  "اوزبكستان": "UZB",
+  "الجزائر": "DZA",
+};
+
+function normalizeTeamName(value: string) {
+  return value
+    .replace(/[ًٌٍَُِّْـ]/g, "")
+    .replace(/[إأآا]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getTeamCodeFromUserData(data: Record<string, unknown>) {
+  const directCode =
+    toText(data.teamCode) ||
+    toText(data.favoriteTeamCode) ||
+    toText(data.selectedTeamCode) ||
+    toText(data.championTeamCode);
+
+  if (directCode) {
+    return directCode.toUpperCase();
+  }
+
+  const favoriteTeam = toText(data.favoriteTeam);
+
+  if (!favoriteTeam) return "";
+
+  const exactCode = TEAM_NAME_TO_CODE[favoriteTeam];
+
+  if (exactCode) return exactCode;
+
+  const normalizedFavoriteTeam = normalizeTeamName(favoriteTeam);
+
+  const matchedEntry = Object.entries(TEAM_NAME_TO_CODE).find(([teamName]) => {
+    return normalizeTeamName(teamName) === normalizedFavoriteTeam;
+  });
+
+  return matchedEntry?.[1] || "";
 }
 
 function normalizePredictionType(value: unknown): PredictionType {
@@ -152,6 +258,7 @@ async function getUsersForHighlights(): Promise<HomeHighlightUser[]> {
         fullName: toText(data.fullName) || "عضو بدون اسم",
         favoriteTeam: toText(data.favoriteTeam),
         teamEmoji: toText(data.teamEmoji),
+        teamCode: getTeamCodeFromUserData(data),
 
         points: toNumber(data.points),
         total: toNumber(data.total),
@@ -367,7 +474,7 @@ function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
     .filter((prediction) => {
       if (!prediction.isCalculated) return false;
 
-     if (prediction.resultType !== "exact") return false;
+      if (prediction.resultType !== "exact") return false;
 
       const referenceTime =
         prediction.calculatedTimeValue || prediction.createdTimeValue;

@@ -11,6 +11,7 @@ import {
   updatePrediction,
 } from "@/lib/predictions";
 import { useAuth } from "@/context/AuthContext";
+import TeamFlag from "@/components/TeamFlag";
 
 type QualificationMethod = "extraTime" | "penalties";
 
@@ -94,7 +95,6 @@ function getCountdownText(startAt: string) {
   return `${hh}:${mm}:${ss}`;
 }
 
-
 function isPredictionClosed(startAt: string) {
   const startTime = new Date(startAt).getTime();
 
@@ -126,10 +126,7 @@ function getQualificationMethodLabel(value?: string | null) {
   return "";
 }
 
-function getQualifiedTeamName(
-  match: Match,
-  qualifiedTeamCode?: string | null
-) {
+function getQualifiedTeamName(match: Match, qualifiedTeamCode?: string | null) {
   if (!qualifiedTeamCode) return "";
 
   if (qualifiedTeamCode === match.homeTeamCode) {
@@ -143,21 +140,33 @@ function getQualifiedTeamName(
   return qualifiedTeamCode;
 }
 
-function getQualifiedTeamEmoji(
+function getQualifiedTeamFlagData(
   match: Match,
-  qualifiedTeamCode?: string | null
+  qualifiedTeamCode?: string | null,
 ) {
-  if (!qualifiedTeamCode) return "";
+  if (!qualifiedTeamCode) return null;
 
   if (qualifiedTeamCode === match.homeTeamCode) {
-    return match.homeTeamEmoji;
+    return {
+      code: match.homeTeamCode,
+      emoji: match.homeTeamEmoji,
+      name: match.homeTeamName,
+    };
   }
 
   if (qualifiedTeamCode === match.awayTeamCode) {
-    return match.awayTeamEmoji;
+    return {
+      code: match.awayTeamCode,
+      emoji: match.awayTeamEmoji,
+      name: match.awayTeamName,
+    };
   }
 
-  return "";
+  return {
+    code: qualifiedTeamCode,
+    emoji: "",
+    name: qualifiedTeamCode,
+  };
 }
 
 export default function MatchesPredictionBox() {
@@ -167,7 +176,7 @@ export default function MatchesPredictionBox() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [inputs, setInputs] = useState<PredictionInputs>({});
   const [savedPredictions, setSavedPredictions] = useState<SavedPredictions>(
-    {}
+    {},
   );
   const [loading, setLoading] = useState(true);
   const [savingMatchId, setSavingMatchId] = useState("");
@@ -200,7 +209,7 @@ export default function MatchesPredictionBox() {
         currentMatches.map(async (match) => {
           const prediction = await getUserPredictionForMatch(user.id, match.id);
           return [match.id, prediction] as const;
-        })
+        }),
       );
 
       const nextSaved: SavedPredictions = {};
@@ -245,11 +254,8 @@ export default function MatchesPredictionBox() {
   function updateInput(
     matchId: string,
     key:
-      | "homeScore"
-      | "awayScore"
-      | "qualifiedTeamCode"
-      | "qualificationMethod",
-    value: string
+      "homeScore" | "awayScore" | "qualifiedTeamCode" | "qualificationMethod",
+    value: string,
   ) {
     if (
       (key === "homeScore" || key === "awayScore") &&
@@ -278,7 +284,9 @@ export default function MatchesPredictionBox() {
   }
 
   function canEditPrediction(prediction: Prediction, match: Match) {
-    return !prediction.isCalculated && getEditRemainingMs(prediction, match) > 0;
+    return (
+      !prediction.isCalculated && getEditRemainingMs(prediction, match) > 0
+    );
   }
 
   function isKnockoutDrawInput(match: MatchWithKnockout) {
@@ -379,7 +387,7 @@ export default function MatchesPredictionBox() {
         awayTeamName: match.awayTeamName,
         awayTeamEmoji: match.awayTeamEmoji,
         homeTeamCode: match.homeTeamCode,
-awayTeamCode: match.awayTeamCode,
+        awayTeamCode: match.awayTeamCode,
 
         homeScore,
         awayScore,
@@ -409,7 +417,7 @@ awayTeamCode: match.awayTeamCode,
       alert(
         error instanceof Error
           ? error.message
-          : "تعذر تسجيل التوقع، حاول مرة أخرى"
+          : "تعذر تسجيل التوقع، حاول مرة أخرى",
       );
     } finally {
       setSavingMatchId("");
@@ -471,7 +479,7 @@ awayTeamCode: match.awayTeamCode,
       alert(
         error instanceof Error
           ? error.message
-          : "تعذر تعديل التوقع، حاول مرة أخرى"
+          : "تعذر تعديل التوقع، حاول مرة أخرى",
       );
     } finally {
       setSavingMatchId("");
@@ -527,12 +535,8 @@ awayTeamCode: match.awayTeamCode,
           className="h-12 rounded-2xl border border-blue-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none focus:border-blue-300"
         >
           <option value="">اختر المنتخب المتأهل</option>
-          <option value={match.homeTeamCode}>
-            {match.homeTeamEmoji} {match.homeTeamName}
-          </option>
-          <option value={match.awayTeamCode}>
-            {match.awayTeamEmoji} {match.awayTeamName}
-          </option>
+          <option value={match.homeTeamCode}>{match.homeTeamName}</option>
+          <option value={match.awayTeamCode}>{match.awayTeamName}</option>
         </select>
 
         <select
@@ -578,9 +582,9 @@ awayTeamCode: match.awayTeamCode,
             const golden = isGoldenMatch(match);
             const knockout = isKnockoutMatch(match as MatchWithKnockout);
             const knockoutDrawInput = isKnockoutDrawInput(
-              match as MatchWithKnockout
+              match as MatchWithKnockout,
             );
-            
+
             const editable =
               savedPrediction && canEditPrediction(savedPrediction, match);
             const editing = editingMatchId === match.id && Boolean(editable);
@@ -640,8 +644,8 @@ awayTeamCode: match.awayTeamCode,
                       closed
                         ? "border-red-400/20 bg-red-500/10 text-red-100"
                         : golden
-                        ? "border-amber-300/40 bg-amber-400/20 text-amber-100"
-                        : "border-amber-400/20 bg-amber-400/10 text-amber-100"
+                          ? "border-amber-300/40 bg-amber-400/20 text-amber-100"
+                          : "border-amber-400/20 bg-amber-400/10 text-amber-100"
                     }`}
                   >
                     {closed
@@ -652,8 +656,13 @@ awayTeamCode: match.awayTeamCode,
 
                 <div className="grid grid-cols-[1fr_48px_1fr] items-center gap-2">
                   <div className="min-w-0 text-center">
-                    <div className="text-3xl leading-none">
-                      {match.homeTeamEmoji}
+                    <div className="flex justify-center">
+                      <TeamFlag
+                        code={match.homeTeamCode}
+                        emoji={match.homeTeamEmoji}
+                        name={match.homeTeamName}
+                        size="lg"
+                      />
                     </div>
 
                     <div className="mt-2 text-lg font-black leading-none text-white md:text-xl">
@@ -676,8 +685,13 @@ awayTeamCode: match.awayTeamCode,
                   </div>
 
                   <div className="min-w-0 text-center">
-                    <div className="text-3xl leading-none">
-                      {match.awayTeamEmoji}
+                    <div className="flex justify-center">
+                      <TeamFlag
+                        code={match.awayTeamCode}
+                        emoji={match.awayTeamEmoji}
+                        name={match.awayTeamName}
+                        size="lg"
+                      />
                     </div>
 
                     <div className="mt-2 text-lg font-black leading-none text-white md:text-xl">
@@ -693,8 +707,8 @@ awayTeamCode: match.awayTeamCode,
                 {editing ? (
                   <div className="mt-5">
                     <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100">
-  تعديل التوقع متاح حتى بداية المباراة
-</div>
+                      تعديل التوقع متاح حتى بداية المباراة
+                    </div>
 
                     {renderScoreInputs(match, golden)}
                     {renderQualificationFields(match, knockoutDrawInput)}
@@ -742,38 +756,50 @@ awayTeamCode: match.awayTeamCode,
                       {savedPrediction.awayScore}
                     </div>
 
-                    {savedPrediction.qualifiedTeamCode && (
-                      <div className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-xs font-bold leading-6 text-blue-100 md:text-sm">
-                        المتأهل:{" "}
-                        <span className="font-black text-white">
-                          {getQualifiedTeamEmoji(
-                            match,
-                            savedPrediction.qualifiedTeamCode
-                          )}{" "}
-                          {getQualifiedTeamName(
-                            match,
-                            savedPrediction.qualifiedTeamCode
-                          )}
-                        </span>
-                        {savedPrediction.qualificationMethod && (
-                          <>
-                            {" "}
-                            • طريقة التأهل:{" "}
-                            <span className="font-black text-white">
-                              {getQualificationMethodLabel(
-                                savedPrediction.qualificationMethod
+                    {savedPrediction.qualifiedTeamCode &&
+                      (() => {
+                        const qualifiedTeam = getQualifiedTeamFlagData(
+                          match,
+                          savedPrediction.qualifiedTeamCode,
+                        );
+
+                        return (
+                          <div className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-xs font-bold leading-6 text-blue-100 md:text-sm">
+                            المتأهل:{" "}
+                            <span className="inline-flex items-center justify-center gap-1.5 font-black text-white">
+                              {qualifiedTeam && (
+                                <TeamFlag
+                                  code={qualifiedTeam.code}
+                                  emoji={qualifiedTeam.emoji}
+                                  name={qualifiedTeam.name}
+                                  size="sm"
+                                />
+                              )}
+                              {getQualifiedTeamName(
+                                match,
+                                savedPrediction.qualifiedTeamCode,
                               )}
                             </span>
-                          </>
-                        )}
-                      </div>
-                    )}
+                            {savedPrediction.qualificationMethod && (
+                              <>
+                                {" "}
+                                • طريقة التأهل:{" "}
+                                <span className="font-black text-white">
+                                  {getQualificationMethodLabel(
+                                    savedPrediction.qualificationMethod,
+                                  )}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                     {editable && (
                       <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center">
                         <div className="text-xs font-black text-amber-100 md:text-sm">
-  تعديل التوقع متاح حتى بداية المباراة
-</div>
+                          تعديل التوقع متاح حتى بداية المباراة
+                        </div>
 
                         <button
                           type="button"
@@ -809,10 +835,10 @@ awayTeamCode: match.awayTeamCode,
                       {savingMatchId === match.id
                         ? "جاري الاعتماد..."
                         : isLoggedIn
-                        ? golden
-                          ? "اعتماد التوقع الذهبي"
-                          : "اعتماد التوقع"
-                        : "سجّل الدخول لاعتماد التوقع"}
+                          ? golden
+                            ? "اعتماد التوقع الذهبي"
+                            : "اعتماد التوقع"
+                          : "سجّل الدخول لاعتماد التوقع"}
                     </button>
                   </div>
                 )}
