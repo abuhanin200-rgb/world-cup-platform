@@ -96,13 +96,21 @@ function getCountdownText(startAt: string) {
 
 function formatShortCountdown(ms: number) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
+
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
-    2,
-    "0"
-  )}`;
+  const hh = String(hours).padStart(2, "0");
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+
+  if (days > 0) {
+    return `${days} يوم ${hh}:${mm}:${ss}`;
+  }
+
+  return `${hh}:${mm}:${ss}`;
 }
 
 function isPredictionClosed(startAt: string) {
@@ -435,7 +443,7 @@ awayTeamCode: match.awayTeamCode,
     const savedPrediction = savedPredictions[match.id];
 
     if (!savedPrediction || !canEditPrediction(savedPrediction, match)) {
-      alert("انتهت مدة تعديل التوقع");
+      alert("انتهى وقت تعديل التوقع");
       return;
     }
 
@@ -705,7 +713,7 @@ awayTeamCode: match.awayTeamCode,
                 {editing ? (
                   <div className="mt-5">
                     <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100">
-                      يمكنك تعديل التوقع خلال:{" "}
+                     تعديل التوقع متاح حتى بداية المباراة:{" "}
                       {formatShortCountdown(editRemainingMs)}
                     </div>
 
@@ -785,7 +793,7 @@ awayTeamCode: match.awayTeamCode,
                     {editable && (
                       <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center">
                         <div className="text-xs font-black text-amber-100 md:text-sm">
-                          يمكنك تعديل التوقع خلال:{" "}
+                         تعديل التوقع متاح حتى بداية المباراة:{" "}
                           {formatShortCountdown(editRemainingMs)}
                         </div>
 

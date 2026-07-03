@@ -121,7 +121,7 @@ type PredictionMatchInfo = {
   isActive: boolean;
 };
 
-export const PREDICTION_EDIT_WINDOW_MS = 5 * 60 * 1000;
+export const PREDICTION_EDIT_WINDOW_MS = 0;
 
 function validateScore(score: number) {
   return Number.isInteger(score) && score >= 0 && score <= 30;
@@ -304,13 +304,11 @@ function isPredictionEditWindowOpen(
   if (!prediction || prediction.isCalculated) return false;
   if (!matchInfo.isActive || matchInfo.status !== "scheduled") return false;
 
-  const createdTime = getPredictionCreatedTime(prediction);
   const startTime = getMatchStartTime(matchInfo.startAt);
 
-  if (!createdTime || !startTime) return false;
-  if (nowTime >= startTime) return false;
+  if (!startTime) return false;
 
-  return nowTime - createdTime <= PREDICTION_EDIT_WINDOW_MS;
+  return nowTime < startTime;
 }
 
 export function getPredictionEditWindowRemainingMs(
@@ -318,15 +316,13 @@ export function getPredictionEditWindowRemainingMs(
   matchStartAt: string,
   nowTime = Date.now()
 ) {
-  const createdTime = getPredictionCreatedTime(prediction);
+  if (!prediction || prediction.isCalculated) return 0;
+
   const startTime = getMatchStartTime(matchStartAt);
 
-  if (!createdTime || !startTime) return 0;
+  if (!startTime) return 0;
 
-  const editDeadline = createdTime + PREDICTION_EDIT_WINDOW_MS;
-  const effectiveDeadline = Math.min(editDeadline, startTime);
-
-  return Math.max(0, effectiveDeadline - nowTime);
+  return Math.max(0, startTime - nowTime);
 }
 
 function validateKnockoutPredictionFields({
