@@ -32,17 +32,87 @@ const EXCEPTIONAL_EVENT_TYPES = new Set<ChallengeStudioEvent["type"]>([
   "most_exact_results",
 ]);
 
+const GENERIC_MEMBER_WORDS = [
+  "أحد الأعضاء",
+  "أحد المشاركين",
+  "عضو بارز",
+  "عضو لافت",
+  "أحد المنافسين",
+  "أحد المتسابقين",
+  "العضو الذي",
+  "العضو المتصدر",
+  "عضو يحافظ",
+  "عضو يملك",
+  "عضو يقف",
+  "عضو دخل",
+  "عضو صعد",
+  "عضو تراجع",
+  "صاحب المركز",
+  "صاحب الصدارة",
+  "صاحب الرقم",
+  "صاحب الحركة",
+  "صاحب التوقع",
+  "المتصدر",
+  "الوصيف",
+  "المنافس",
+  "المطارد",
+  "منافسه",
+  "مطارده",
+  "متسابق",
+  "مشارك",
+];
+
 const EDITORIAL_SECTIONS = [
-  { icon: "👑", title: "ملك التوقعات", goal: "إبراز المتصدر إذا كان الحدث متاحًا." },
-  { icon: "🐎", title: "الحصان الأسود", goal: "إبراز عضو صاعد أو مفاجئ من البيانات." },
-  { icon: "🚀", title: "أسرع صعود", goal: "إبراز أكبر صعود حقيقي في الترتيب." },
-  { icon: "📉", title: "أكبر تراجع", goal: "تناول أكبر تراجع بلغة محترمة." },
-  { icon: "🎯", title: "قناص النتائج", goal: "إبراز من أصاب نتائج دقيقة." },
-  { icon: "🔥", title: "نجم الجولة", goal: "اختيار صاحب أفضل أثر في الجولة." },
-  { icon: "⚡", title: "أفضل عودة", goal: "إبراز من عاد للمنافسة بعد تحسن واضح." },
-  { icon: "📈", title: "الأكثر ثباتًا", goal: "إبراز عضو يحافظ على مستواه." },
-  { icon: "👀", title: "تحت المجهر", goal: "متابعة عضو أو توقع أو مواجهة." },
-  { icon: "🎙️", title: "كلمة الاستوديو", goal: "خاتمة تحريرية قصيرة." },
+  {
+    icon: "👑",
+    title: "ملك التوقعات",
+    goal: "إبراز المتصدر إذا كان الحدث متاحًا.",
+  },
+  {
+    icon: "🐎",
+    title: "الحصان الأسود",
+    goal: "إبراز عضو صاعد أو مفاجئ من البيانات.",
+  },
+  {
+    icon: "🚀",
+    title: "أسرع صعود",
+    goal: "إبراز أكبر صعود حقيقي في الترتيب.",
+  },
+  {
+    icon: "📉",
+    title: "أكبر تراجع",
+    goal: "تناول أكبر تراجع بلغة محترمة.",
+  },
+  {
+    icon: "🎯",
+    title: "قناص النتائج",
+    goal: "إبراز من أصاب نتائج دقيقة.",
+  },
+  {
+    icon: "🔥",
+    title: "نجم الجولة",
+    goal: "اختيار صاحب أفضل أثر في الجولة.",
+  },
+  {
+    icon: "⚡",
+    title: "أفضل عودة",
+    goal: "إبراز من عاد للمنافسة بعد تحسن واضح.",
+  },
+  {
+    icon: "📈",
+    title: "الأكثر ثباتًا",
+    goal: "إبراز عضو يحافظ على مستواه.",
+  },
+  {
+    icon: "👀",
+    title: "تحت المجهر",
+    goal: "متابعة عضو أو توقع أو مواجهة.",
+  },
+  {
+    icon: "🎙️",
+    title: "كلمة الاستوديو",
+    goal: "خاتمة تحريرية قصيرة.",
+  },
 ];
 
 function getTodaySaudiDate() {
@@ -61,13 +131,36 @@ function getTimeValue(value?: string) {
 }
 
 function normalizeMemberName(value: unknown) {
-  return String(value || "").replace(/\s+/g, " ").trim();
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getText(value: unknown) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getNumber(value: unknown) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
 }
 
 function getEventMembers(event: ChallengeStudioEvent) {
-  return Array.isArray(event.members)
-    ? event.members.map(normalizeMemberName).filter(Boolean)
-    : [];
+  const names = [
+    ...(Array.isArray(event.members) ? event.members : []),
+    event.data.memberName,
+    event.data.userName,
+    event.data.leaderName,
+    event.data.secondName,
+  ];
+
+  return Array.from(new Set(names.map(normalizeMemberName).filter(Boolean)));
+}
+
+function eventHasMembers(event: ChallengeStudioEvent) {
+  return getEventMembers(event).length > 0;
 }
 
 async function getRecentlyMentionedMembers() {
@@ -94,7 +187,7 @@ function isExceptionalEvent(event: ChallengeStudioEvent) {
 
 function filterEventsForCooldown(
   events: ChallengeStudioEvent[],
-  recentMembers: string[]
+  recentMembers: string[],
 ) {
   const recentSet = new Set(recentMembers.map(normalizeMemberName));
 
@@ -109,14 +202,18 @@ function filterEventsForCooldown(
   return events;
 }
 
+function getAllEventMemberNames(events: ChallengeStudioEvent[]) {
+  return Array.from(
+    new Set(events.flatMap((event) => getEventMembers(event)).filter(Boolean)),
+  ).sort((a, b) => b.length - a.length);
+}
+
 function extractMentionedMembersFromCards(
   cards: AiCard[],
   events: ChallengeStudioEvent[],
-  summary = ""
+  summary = "",
 ) {
-  const allNames = Array.from(
-    new Set(events.flatMap((event) => getEventMembers(event)).filter(Boolean))
-  ).sort((a, b) => b.length - a.length);
+  const allNames = getAllEventMemberNames(events);
 
   const text = `${summary}\n${cards
     .map((card) => `${card.title}\n${card.content}`)
@@ -125,44 +222,12 @@ function extractMentionedMembersFromCards(
   return allNames.filter((name) => text.includes(name));
 }
 
-function countOccurrences(text: string, value: string) {
-  if (!value) return 0;
-  return text.split(value).length - 1;
-}
-
-function findRepeatedMemberMentions(
-  cards: AiCard[],
-  events: ChallengeStudioEvent[],
-  summary = ""
-) {
-  const allNames = Array.from(
-    new Set(events.flatMap((event) => getEventMembers(event)).filter(Boolean))
-  ).sort((a, b) => b.length - a.length);
-
-  const fullText = `${summary}\n${cards
-    .map((card) => `${card.title}\n${card.content}`)
-    .join("\n")}`;
-
-  return allNames.filter((name) => countOccurrences(fullText, name) > 1);
-}
-
 function findGenericMemberWords(cards: AiCard[], summary = "") {
-  const forbidden = [
-    "أحد الأعضاء",
-    "أحد المشاركين",
-    "عضو بارز",
-    "عضو لافت",
-    "أحد المنافسين",
-    "أحد المتسابقين",
-    "متسابق",
-    "مشارك",
-  ];
-
   const fullText = `${summary}\n${cards
     .map((card) => `${card.title}\n${card.content}`)
     .join("\n")}`;
 
-  return forbidden.filter((word) => fullText.includes(word));
+  return GENERIC_MEMBER_WORDS.filter((word) => fullText.includes(word));
 }
 
 function buildPrompt(events: ChallengeStudioEvent[], recentMembers: string[]) {
@@ -179,15 +244,20 @@ function buildPrompt(events: ChallengeStudioEvent[], recentMembers: string[]) {
 - لا تكتب أي شرح خارج JSON.
 
 قاعدة ذكر الأسماء وهي إلزامية جدًا:
-- إذا كان الحدث يحتوي على members أو memberName أو userName أو leaderName أو secondName، يجب ذكر الاسم الحقيقي للعضو في البطاقة.
+- إذا كان الحدث يحتوي على members أو memberName أو userName أو leaderName أو secondName، يجب ذكر الاسم الحقيقي للعضو في البطاقة نفسها.
+- لا تكتب بطاقة عن عضو موجود في البيانات بدون ذكر اسمه الحقيقي.
 - ممنوع استخدام عبارات عامة بدل الاسم إذا كان الاسم موجودًا في البيانات.
-- العبارات الممنوعة إذا كان الاسم موجودًا: "أحد الأعضاء"، "أحد المشاركين"، "عضو بارز"، "عضو لافت"، "أحد المنافسين"، "متسابق"، "مشارك".
+- العبارات الممنوعة إذا كان الاسم موجودًا: ${JSON.stringify(GENERIC_MEMBER_WORDS)}.
 - إذا كان الحدث يحتوي على اسمين مثل منافسة المتصدر والوصيف، يمكن ذكر الاسمين في نفس البطاقة فقط.
 - إذا كان الحدث لا يحتوي على أي اسم، عندها فقط يمكن استخدام صياغة عامة.
 - اذكر اسم العضو مرة واحدة فقط في البطاقة، ثم أكمل بالضمائر أو الوصف دون تكرار الاسم.
 
 قواعد صارمة جدًا:
 - اكتب 8 بطاقات بالضبط، لا أقل ولا أكثر.
+- محتوى كل بطاقة يجب أن يكون بين 45 و75 كلمة تقريبًا.
+- لا تجعل البطاقة قصيرة أو جملة واحدة فقط.
+- كل بطاقة يجب أن تحتوي على سياق ثم تحليل مختصر ثم أثر الحدث على المنافسة.
+- لا تكرر نفس المعنى داخل البطاقة.
 - لا تكرر اسم أي عضو داخل النشرة نهائيًا، لا في العنوان ولا في النص ولا في الملخص.
 - إذا ظهر اسم عضو في بطاقة، لا يظهر مرة أخرى في أي بطاقة أخرى.
 - لا يظهر العضو الموجود ضمن قائمة آخر 48 ساعة إلا إذا كان الحدث استثنائيًا وموجودًا ضمن البيانات.
@@ -251,39 +321,6 @@ main, quote, number, badge, funny, watch
 
 الأحداث المتاحة:
 ${JSON.stringify(events, null, 2)}
-`;
-}
-
-function buildRepairPrompt(input: {
-  events: ChallengeStudioEvent[];
-  recentMembers: string[];
-  previousCards: AiCard[];
-  previousSummary: string;
-  repeatedMembers: string[];
-  genericWords: string[];
-}) {
-  return `
-أعد كتابة نشرة "استوديو التحدي" من جديد لأن المسودة السابقة خالفت قواعد التحرير.
-
-أسباب الإعادة:
-- عدد البطاقات يجب أن يكون ${REQUIRED_CARDS_COUNT} بالضبط.
-- الأسماء التالية تكررت ويجب منع تكرارها:
-${JSON.stringify(input.repeatedMembers, null, 2)}
-- ظهرت عبارات عامة بدل أسماء حقيقية، وهي ممنوعة إذا كانت البيانات تحتوي على أسماء:
-${JSON.stringify(input.genericWords, null, 2)}
-
-المسودة السابقة:
-${JSON.stringify(
-  {
-    summary: input.previousSummary,
-    cards: input.previousCards,
-  },
-  null,
-  2
-)}
-
-استخدم القواعد الأصلية التالية كما هي، وأخرج JSON فقط:
-${buildPrompt(input.events, input.recentMembers)}
 `;
 }
 
@@ -362,6 +399,511 @@ function parseAiJson(raw: string) {
   }
 }
 
+function removeMemberNamesFromTitle(title: string, allNames: string[]) {
+  let nextTitle = title;
+
+  allNames.forEach((name) => {
+    if (!name) return;
+    nextTitle = nextTitle.split(name).join("");
+  });
+
+  nextTitle = cleanContent(nextTitle)
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[-–—:،\s]+/, "")
+    .replace(/[-–—:،\s]+$/, "")
+    .trim();
+
+  return nextTitle || "لقطة الاستوديو";
+}
+
+function replaceGenericWordsWithName(text: string, memberName: string) {
+  if (!memberName) return text;
+
+  let nextText = text;
+
+  GENERIC_MEMBER_WORDS.forEach((word) => {
+    nextText = nextText.split(word).join(memberName);
+  });
+
+  return nextText;
+}
+
+function countOccurrences(text: string, value: string) {
+  if (!value) return 0;
+  return text.split(value).length - 1;
+}
+
+function ensureNamesInCard(params: {
+  card: AiCard;
+  event: ChallengeStudioEvent;
+  usedMembers: Set<string>;
+  allNames: string[];
+}) {
+  const eventMembers = getEventMembers(params.event);
+  const availableMembers = eventMembers.filter(
+    (member) => !params.usedMembers.has(member),
+  );
+
+  const selectedMembers =
+    params.event.type === "leader_under_pressure"
+      ? availableMembers.slice(0, 2)
+      : availableMembers.slice(0, 1);
+
+  if (eventMembers.length > 0 && selectedMembers.length === 0) {
+    return null;
+  }
+
+  let title = removeMemberNamesFromTitle(params.card.title, params.allNames);
+  let content = cleanContent(params.card.content);
+
+  selectedMembers.forEach((memberName) => {
+    content = replaceGenericWordsWithName(content, memberName);
+  });
+
+  if (selectedMembers.length > 0) {
+    const missingMembers = selectedMembers.filter(
+      (memberName) => !content.includes(memberName),
+    );
+
+    if (missingMembers.length > 0) {
+      content = `${missingMembers.join(" و")} يدخل نشرة اليوم من زاوية مستحقة. ${content}`;
+    }
+  }
+
+  params.allNames.forEach((name) => {
+    if (!name || selectedMembers.includes(name)) return;
+    content = content.split(name).join("هذا العضو");
+  });
+
+  selectedMembers.forEach((memberName) => {
+    const occurrences = countOccurrences(content, memberName);
+    if (occurrences <= 1) return;
+
+    let firstSeen = false;
+    content = content
+      .split(memberName)
+      .map((part, index) => {
+        if (index === 0) return part;
+        if (!firstSeen) {
+          firstSeen = true;
+          return `${memberName}${part}`;
+        }
+        return `هذا العضو${part}`;
+      })
+      .join("");
+  });
+
+  if (eventMembers.length > 0) {
+    selectedMembers.forEach((memberName) => params.usedMembers.add(memberName));
+  }
+
+  return {
+    ...params.card,
+    title: title.slice(0, 80),
+    content: cleanContent(content).slice(0, 1200),
+  };
+}
+
+function buildLocalCardFromEvent(
+  event: ChallengeStudioEvent,
+  usedMembers: Set<string>,
+  index: number,
+): AiCard | null {
+  const members = getEventMembers(event).filter(
+    (member) => !usedMembers.has(member),
+  );
+  const primaryName = members[0] || "";
+  const secondaryName = members[1] || "";
+
+  if (eventHasMembers(event) && !primaryName) return null;
+
+  const basePriority = Math.max(30, event.priority || 60) - index;
+
+  if (primaryName) usedMembers.add(primaryName);
+  if (event.type === "leader_under_pressure" && secondaryName) {
+    usedMembers.add(secondaryName);
+  }
+
+  if (event.type === "leader_under_pressure" && primaryName && secondaryName) {
+    return {
+      type: "main",
+      icon: "🔥",
+      title: "الصدارة تحت الضغط",
+      content: `${primaryName} يبقى في الواجهة، لكن ${secondaryName} يقترب من المشهد بفارق ${getNumber(event.data.pointsDiff)} نقطة فقط. هذا التقارب يجعل الجولة القادمة اختبارًا مباشرًا للأعصاب، لأن أي توقع صحيح قد يعيد توزيع الضغط في القمة. المنافسة هنا لم تعد مجرد ترتيب، بل صراع على التفاصيل الصغيرة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "exact_after_calculation") {
+    return {
+      type: "main",
+      icon: "🎯",
+      title: "نتيجة دقيقة تغيّر المشهد",
+      content: `${primaryName} حضر في العنوان الأبرز بعد احتساب مباراة ${getText(event.data.matchName)}، بعدما أصاب النتيجة ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)} وحصد ${getNumber(event.data.points)} نقاط. مثل هذه الضربة الدقيقة تمنح صاحبها دفعة قوية، وتضع بقية المنافسين تحت ضغط القراءة الصحيحة في المباريات القادمة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "round_star") {
+    return {
+      type: "badge",
+      icon: "🔥",
+      title: "نجم الجولة",
+      content: `${primaryName} كان الاسم الأبرز في نتائج الجولة الأخيرة، بعدما جمع ${getNumber(event.data.roundPoints)} نقاط من ${getNumber(event.data.calculatedCount)} توقعات محتسبة. هذه الحصيلة لا تعكس الحظ فقط، بل قراءة جيدة لمسار المباريات، وقد تمنحه حضورًا أقوى في حسابات المنافسة خلال المرحلة القادمة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "biggest_climb") {
+    return {
+      type: "number",
+      icon: "🚀",
+      title: "أسرع صعود",
+      content: `${primaryName} قدّم واحدة من أبرز حركات الترتيب، بعدما صعد ${getNumber(event.data.rankChange)} مراكز ووصل إلى المركز ${getNumber(event.data.currentRank)}. هذا الصعود السريع يمنحه دفعة معنوية مهمة، ويؤكد أن لوحة الصدارة ما زالت قابلة للاشتعال مع كل جولة جديدة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "biggest_drop") {
+    return {
+      type: "funny",
+      icon: "📉",
+      title: "تراجع يحتاج ردًا",
+      content: `${primaryName} تراجع ${getNumber(event.data.rankChange)} مراكز في حركة لافتة داخل الجدول. القراءة الهادئة تقول إن الهبوط مؤلم، لكنه لا يعني نهاية المنافسة. الطريق ما زال مفتوحًا للتعويض، بشرط أن تأتي الجولة القادمة بتركيز أعلى وقراءة أدق للمباريات.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "best_streak") {
+    return {
+      type: "badge",
+      icon: "🔥",
+      title: "سلسلة نارية",
+      content: `${primaryName} يستحق وسام اليوم بعد سلسلة وصلت إلى ${getNumber(event.data.bestStreak)} توقعات صحيحة. الاستمرارية بهذا الشكل تمنح المنافسة بُعدًا مختلفًا، لأنها تكشف عضوًا لا يعتمد على لقطة واحدة فقط، بل يحافظ على إيقاع ثابت في قراءة النتائج.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "highest_accuracy") {
+    return {
+      type: "number",
+      icon: "📊",
+      title: "ملك الدقة",
+      content: `${primaryName} يملك دقة تبلغ ${getNumber(event.data.accuracy)}% من أصل ${getNumber(event.data.total)} توقعات. هذا الرقم لا يظهر من فراغ، بل يعكس قراءة جيدة للمباريات وقدرة على اختيار النتائج بعناية. في سباق طويل، الدقة قد تكون أهم من كثرة المحاولات.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "most_exact_results") {
+    return {
+      type: "badge",
+      icon: "🎯",
+      title: "قناص النتائج",
+      content: `${primaryName} وصل إلى ${getNumber(event.data.exact)} توقعات دقيقة بالملي. هذا النوع من الأرقام يصنع الفارق في المراحل الحاسمة، لأن النتيجة الدقيقة تمنح أثرًا أكبر من مجرد معرفة الفائز. حضوره هنا يضعه ضمن الأسماء التي تستحق المتابعة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "best_comeback") {
+    return {
+      type: "badge",
+      icon: "⚡",
+      title: "أفضل عودة",
+      content: `${primaryName} عاد إلى الصورة بحركة لافتة، بعدما صعد ${getNumber(event.data.rankChange)} مراكز ووصل إلى المركز ${getNumber(event.data.currentRank)}. هذه العودة لا تعني تحسنًا رقميًا فقط، بل رسالة واضحة بأن التعويض ممكن متى حضرت القراءة الصحيحة والثبات في التوقعات.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "most_stable") {
+    return {
+      type: "number",
+      icon: "📈",
+      title: "الأكثر ثباتًا",
+      content: `${primaryName} يحافظ على حضوره بثبات، مع دقة ${getNumber(event.data.accuracy)}% من ${getNumber(event.data.total)} توقعات. الثبات هنا قيمة لا تقل أهمية عن الصعود السريع، لأنه يمنح صاحبه موقعًا آمنًا نسبيًا ويجعله حاضرًا في حسابات الجولات القادمة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "black_horse") {
+    return {
+      type: "badge",
+      icon: "🐎",
+      title: "الحصان الأسود",
+      content: `${primaryName} يتحرك بعيدًا عن الضجيج، لكن أرقامه تشير إلى حضور لا يمكن تجاهله. دقة تصل إلى ${getNumber(event.data.accuracy)}% تضعه ضمن الأسماء التي قد تفاجئ المنافسين. مثل هذا الهدوء قد يتحول سريعًا إلى قصة كبيرة في لوحة الصدارة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "worst_luck") {
+    return {
+      type: "funny",
+      icon: "😅",
+      title: "الأكثر حظًا سيئًا",
+      content: `${primaryName} واجه يومًا صعبًا مع ${getNumber(event.data.wrong)} توقعات غير موفقة من أصل ${getNumber(event.data.total)}. الاستوديو يقرأها بروح رياضية: الحظ يتغير، والمنافسة لا تنتهي من جولة واحدة. المهم أن يعود التركيز قبل المباراة القادمة، فالتعويض وارد دائمًا.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "forgot_prediction") {
+    return {
+      type: "funny",
+      icon: "😴",
+      title: "صح النوم",
+      content: `${primaryName} غاب عن توقع مباراة ${getText(event.data.matchName)}. في بطولة بهذا الإيقاع، تفويت مباراة واحدة قد يترك أثرًا واضحًا على الجدول. الاستوديو يذكّر بأن الحضور قبل صافرة البداية لا يقل أهمية عن دقة التوقع نفسها.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "dangerous_prediction") {
+    return {
+      type: "watch",
+      icon: "🎲",
+      title: "توقع تحت المجهر",
+      content: `${primaryName} اختار نتيجة جريئة في مباراة ${getText(event.data.matchName)}: ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)}. إذا تحققت، فقد تتحول إلى واحدة من لقطات الجولة. مثل هذه التوقعات تحمل مخاطرة عالية، لكنها قد تمنح صاحبها قفزة مهمة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "top3_spotlight" || event.type === "top10_spotlight") {
+    return {
+      type: "watch",
+      icon: event.type === "top3_spotlight" ? "🥉" : "🔟",
+      title: "تحت المجهر",
+      content: `${primaryName} يقف في المركز ${getNumber(event.data.currentRank)} ومعه ${getNumber(event.data.points)} نقطة. هذه المنطقة لا تمنح الهدوء؛ كل توقع صحيح قد يرفع السقف، وكل تعثر قد يفتح الباب للمطاردين. لذلك تبدو الجولات القادمة حاسمة في تثبيت موقعه.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "chasing_pack") {
+    const leaderName = getText(event.data.leaderName);
+
+    return {
+      type: "watch",
+      icon: "🐎",
+      title: "قادم من الخلف",
+      content: `${primaryName} يطارد من المركز ${getNumber(event.data.currentRank)}، ولا يفصله عن ${leaderName || "صاحب الصدارة"} سوى ${getNumber(event.data.pointsBehindLeader)} نقطة. هذا النوع من المطاردة يستحق المتابعة، لأن الاقتراب بهذا الشكل يجعل كل توقع قادم فرصة لتغيير موازين المنافسة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "winner_after_calculation") {
+    return {
+      type: "watch",
+      icon: "✅",
+      title: "الفائز كان في الجيب",
+      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} بنقاط مستحقة بعد قراءة الفائز بشكل صحيح. هذا النوع من التوقعات يحافظ على الحضور في الجدول، حتى لو لم تكن النتيجة بالملي. الاستمرارية في جمع النقاط الصغيرة قد تصنع فارقًا كبيرًا لاحقًا.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "missed_after_calculation") {
+    return {
+      type: "funny",
+      icon: "😬",
+      title: "فرصة لم تكتمل",
+      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} دون نقاط. النتيجة لم تخدمه هذه المرة، لكن الطريق ما زال مفتوحًا للتعويض. مثل هذه اللقطات تذكّر الجميع بأن قراءة المباراة قبل البداية قد تكون أصعب مما تبدو بعد صافرة النهاية.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "studio_word") {
+    return {
+      type: "watch",
+      icon: "🎙️",
+      title: "كلمة الاستوديو",
+      content: `الصورة العامة تقول إن المنافسة لا تزال مفتوحة. عدد الأعضاء أصحاب التوقعات المحتسبة بلغ ${getNumber(event.data.activeMembersCount)}، وهناك ${getNumber(event.data.scheduledMatchesCount)} مباريات قادمة على الرادار. هذه الأرقام تجعل كل جولة فرصة جديدة لتغيير المشهد وإعادة ترتيب المراكز.`,
+      priority: basePriority,
+    };
+  }
+
+  if (
+    event.type === "strong_match_alert" ||
+    event.type === "golden_prediction_alert"
+  ) {
+    return {
+      type: event.type === "golden_prediction_alert" ? "main" : "watch",
+      icon: event.type === "golden_prediction_alert" ? "⭐" : "⚽",
+      title:
+        event.type === "golden_prediction_alert"
+          ? "التوقع الذهبي يفتح باب التحولات"
+          : "مباراة قد تعيد ترتيب الأوراق",
+      content: `استوديو التحدي يضع مباراة ${getText(event.data.matchName)} في واجهة المتابعة. هذا النوع من المواجهات يكشف من يقرأ التفاصيل الصغيرة قبل صافرة البداية، ومن يغامر في التوقيت الصحيح. النتيجة هنا قد لا تكون مجرد توقع عابر، بل نقطة تحول في سباق الترتيب.`,
+      priority: basePriority,
+    };
+  }
+
+  if (primaryName) {
+    return {
+      type: "watch",
+      icon: "👀",
+      title: event.title || "تحت المجهر",
+      content: `${primaryName} يدخل نشرة اليوم من زاوية مستحقة. الأرقام المرتبطة بهذا الحدث تمنحه حضورًا واضحًا في المشهد. الاستوديو يضعه تحت المتابعة لأن مثل هذه التفاصيل قد تتحول إلى أثر مباشر في الجولات القادمة.`,
+      priority: basePriority,
+    };
+  }
+
+  return {
+    type: "watch",
+    icon: "🎙️",
+    title: event.title || "كلمة الاستوديو",
+    content:
+      "استوديو التحدي يرصد حركة جديدة في المنافسة. الجولات القادمة ستكشف من يملك قراءة ثابتة، ومن ينتظر لحظة الانفجار. لا توجد نقطة صغيرة في سباق طويل، فكل توقع قد يفتح بابًا جديدًا في الترتيب.",
+    priority: basePriority,
+  };
+}
+
+function buildFallbackGenericCard(index: number): AiCard {
+  const fallbackCards: AiCard[] = [
+    {
+      type: "watch",
+      icon: "👀",
+      title: "زاوية المتابعة",
+      content:
+        "استوديو التحدي يواصل قراءة التفاصيل. لا توجد نتيجة صغيرة في سباق النقاط، فكل توقع قد يكون بداية لتحول جديد. الجولات القادمة ستكشف من يحافظ على تركيزه، ومن ينتظر فرصة العودة إلى دائرة المنافسة.",
+      priority: 40,
+    },
+    {
+      type: "number",
+      icon: "📊",
+      title: "إشارة رقمية",
+      content:
+        "لوحة الصدارة لا تتحرك بالأسماء فقط، بل بالأرقام الدقيقة: نقاط، توقعات صحيحة، ونتائج بالملي تصنع الفارق. قراءة هذه الأرقام تمنح الاستوديو صورة أوضح عن شكل المنافسة قبل الجولات القادمة.",
+      priority: 39,
+    },
+    {
+      type: "badge",
+      icon: "🏅",
+      title: "رسالة المنافسة",
+      content:
+        "الحضور المستمر في التوقعات يمنح صاحبه فرصة دائمة للعودة. الغياب عن مباراة واحدة قد يكون مكلفًا، لكن الثبات في الجولات التالية قادر على تعويض الكثير وإعادة العضو إلى المشهد من جديد.",
+      priority: 38,
+    },
+  ];
+
+  return fallbackCards[index % fallbackCards.length];
+}
+
+function expandCardContent(card: AiCard) {
+  const content = cleanContent(card.content);
+
+  if (content.length >= 230) {
+    return {
+      ...card,
+      content,
+    };
+  }
+
+  const additions: Record<AiCard["type"], string> = {
+    main:
+      "هذه اللقطة تمنح النشرة وزنًا خاصًا، لأنها لا تقف عند الرقم وحده، بل تكشف كيف يمكن لتفصيل واحد أن يغيّر قراءة المنافسة ويزيد الضغط على بقية الأسماء في الجولات القادمة.",
+    quote:
+      "قراءة الاستوديو لهذا الحدث تؤكد أن المنافسة لم تعد تعتمد على الحضور فقط، بل على دقة الاختيار وتوقيت التوقع، خصوصًا مع تقارب النقاط واقتراب المراحل الأكثر حساسية.",
+    number:
+      "الأرقام هنا ليست مجرد إحصائية عابرة، بل مؤشر واضح على اتجاه المنافسة. كل رقم يحمل خلفه قراءة مختلفة، وقد يكون سببًا في صعود مفاجئ أو ضغط مباشر على المراكز المتقدمة.",
+    badge:
+      "هذا الوسام لا يأتي من فراغ، بل من أثر واضح داخل الجدول. الاستمرارية والدقة في مثل هذه الجولات تمنح العضو حضورًا إعلاميًا مستحقًا وتجعله ضمن الأسماء التي تستحق المتابعة.",
+    funny:
+      "الاستوديو يتعامل مع اللقطة بروح خفيفة، لكن الرسالة واضحة: البطولة طويلة، والتعويض ممكن في أي جولة. المهم أن يبقى التركيز حاضرًا قبل كل مباراة قادمة.",
+    watch:
+      "هذه الزاوية تستحق المتابعة لأنها قد تتحول من مجرد ملاحظة إلى حدث مؤثر. الجولات القادمة ستكشف إن كان هذا التحرك بداية لقصة أكبر داخل لوحة الصدارة.",
+  };
+
+  return {
+    ...card,
+    content: cleanContent(`${content} ${additions[card.type]}`).slice(0, 1200),
+  };
+}
+
+function hasForbiddenGenericWord(card: AiCard) {
+  const text = `${card.title}\n${card.content}`;
+  return GENERIC_MEMBER_WORDS.some((word) => text.includes(word));
+}
+
+function finalizeCardsWithLocalRepair(
+  aiCards: AiCard[],
+  events: ChallengeStudioEvent[],
+) {
+  const allNames = getAllEventMemberNames(events);
+  const usedMembers = new Set<string>();
+  const usedEventIds = new Set<string>();
+  const finalCards: AiCard[] = [];
+
+  const memberEvents = events.filter((event) => eventHasMembers(event));
+  const generalEvents = events.filter((event) => !eventHasMembers(event));
+
+  memberEvents.forEach((event, index) => {
+    if (finalCards.length >= REQUIRED_CARDS_COUNT) return;
+    if (usedEventIds.has(event.id)) return;
+
+    const localCard = buildLocalCardFromEvent(event, usedMembers, index);
+    if (!localCard) return;
+
+    const text = `${localCard.title}\n${localCard.content}`;
+    const eventMembers = getEventMembers(event);
+    const hasAtLeastOneEventMember = eventMembers.some((name) =>
+      text.includes(name),
+    );
+
+    if (!hasAtLeastOneEventMember) return;
+    if (hasForbiddenGenericWord(localCard)) return;
+
+    usedEventIds.add(event.id);
+    finalCards.push(expandCardContent(localCard));
+  });
+
+  aiCards.forEach((card) => {
+    if (finalCards.length >= REQUIRED_CARDS_COUNT) return;
+
+    const cardText = `${card.title}\n${card.content}`;
+    const cardMembers = allNames.filter((name) => cardText.includes(name));
+
+    if (cardMembers.length === 0) return;
+    if (cardMembers.some((name) => usedMembers.has(name))) return;
+    if (hasForbiddenGenericWord(card)) return;
+
+    const matchedEvent = memberEvents.find((event) => {
+      if (usedEventIds.has(event.id)) return false;
+      const eventMembers = getEventMembers(event);
+      return eventMembers.some((name) => cardMembers.includes(name));
+    });
+
+    if (!matchedEvent) return;
+
+    const cleanedCard = ensureNamesInCard({
+      card,
+      event: matchedEvent,
+      usedMembers,
+      allNames,
+    });
+
+    if (!cleanedCard) return;
+    if (hasForbiddenGenericWord(cleanedCard)) return;
+
+    usedEventIds.add(matchedEvent.id);
+    finalCards.push(expandCardContent(cleanedCard));
+  });
+
+  generalEvents.forEach((event, index) => {
+    if (finalCards.length >= REQUIRED_CARDS_COUNT) return;
+    if (usedEventIds.has(event.id)) return;
+
+    const localCard = buildLocalCardFromEvent(event, usedMembers, index);
+    if (!localCard) return;
+
+    usedEventIds.add(event.id);
+    finalCards.push(expandCardContent(localCard));
+  });
+
+  let fallbackIndex = 0;
+
+  while (finalCards.length < REQUIRED_CARDS_COUNT) {
+    finalCards.push(expandCardContent(buildFallbackGenericCard(fallbackIndex)));
+    fallbackIndex += 1;
+  }
+
+  return normalizeCards(finalCards).slice(0, REQUIRED_CARDS_COUNT);
+}
+
 export async function POST() {
   try {
     const [events, recentMembers] = await Promise.all([
@@ -372,92 +914,31 @@ export async function POST() {
     if (events.length === 0) {
       return NextResponse.json(
         { error: "لا توجد أحداث كافية لتوليد النشرة" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const filteredEvents = filterEventsForCooldown(events, recentMembers);
     const mainPrompt = buildPrompt(filteredEvents, recentMembers);
 
-    let parsed = parseAiJson(await requestAiBulletin(mainPrompt));
-    let cards = normalizeCards(Array.isArray(parsed.cards) ? parsed.cards : []);
-    let summary = normalizeSummary(
+    const parsed = parseAiJson(await requestAiBulletin(mainPrompt));
+    const aiCards = normalizeCards(
+      Array.isArray(parsed.cards) ? parsed.cards : [],
+    );
+
+    const cards = finalizeCardsWithLocalRepair(aiCards, filteredEvents);
+    const summary = normalizeSummary(
       parsed.summary,
-      filteredEvents[0]?.title || "نشرة استوديو التحدي"
+      filteredEvents[0]?.title || "نشرة استوديو التحدي",
     );
-
-    let repeatedMembers = findRepeatedMemberMentions(
-      cards,
-      filteredEvents,
-      summary
-    );
-
-    let genericWords = findGenericMemberWords(cards, summary);
-
-    if (
-      cards.length < REQUIRED_CARDS_COUNT ||
-      repeatedMembers.length > 0 ||
-      genericWords.length > 0
-    ) {
-      const repairPrompt = buildRepairPrompt({
-        events: filteredEvents,
-        recentMembers,
-        previousCards: cards,
-        previousSummary: summary,
-        repeatedMembers,
-        genericWords,
-      });
-
-      parsed = parseAiJson(await requestAiBulletin(repairPrompt, 0.45));
-      cards = normalizeCards(Array.isArray(parsed.cards) ? parsed.cards : []);
-      summary = normalizeSummary(
-        parsed.summary,
-        filteredEvents[0]?.title || "نشرة استوديو التحدي"
-      );
-
-      repeatedMembers = findRepeatedMemberMentions(
-        cards,
-        filteredEvents,
-        summary
-      );
-
-      genericWords = findGenericMemberWords(cards, summary);
-    }
-
-    if (cards.length < REQUIRED_CARDS_COUNT) {
-      return NextResponse.json(
-        { error: "الذكاء الاصطناعي لم يرجع 8 بطاقات، أعد المحاولة" },
-        { status: 500 }
-      );
-    }
-
-    if (repeatedMembers.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "تم إيقاف النشرة لأن اسم عضو تكرر داخلها. أعد التوليد للحصول على نسخة مختلفة.",
-          repeatedMembers,
-        },
-        { status: 500 }
-      );
-    }
-
-    if (genericWords.length > 0) {
-      return NextResponse.json(
-        {
-          error:
-            "تم إيقاف النشرة لأنها استخدمت عبارات عامة بدل أسماء الأعضاء. أعد التوليد.",
-          genericWords,
-        },
-        { status: 500 }
-      );
-    }
 
     const mentionedMembers = extractMentionedMembersFromCards(
       cards,
       filteredEvents,
-      summary
+      summary,
     );
+
+    const genericWords = findGenericMemberWords(cards, summary);
 
     return NextResponse.json({
       date: getTodaySaudiDate(),
@@ -466,13 +947,19 @@ export async function POST() {
       events: filteredEvents,
       mentionedMembers,
       recentMembers,
+      cleanup: {
+        aiCards: aiCards.length,
+        finalCards: cards.length,
+        genericWords,
+        localRepairUsed: true,
+      },
     });
   } catch (error) {
     console.error("AI challenge studio generation error:", error);
 
     return NextResponse.json(
       { error: "تعذر توليد النشرة بالذكاء الاصطناعي" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

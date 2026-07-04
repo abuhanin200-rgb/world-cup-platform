@@ -92,24 +92,31 @@ export type UpdatePredictionInput = {
 
 export type LatestPrediction = {
   id: string;
+
   userName: string;
+
+  matchId: string;
+
   homeTeamName: string;
   homeTeamEmoji: string;
+  homeTeamCode?: string | null;
+
   awayTeamName: string;
   awayTeamEmoji: string;
+  awayTeamCode?: string | null;
+
   homeScore: number;
   awayScore: number;
+
+  qualifiedTeamCode?: string | null;
+  qualificationMethod?: QualificationMethod | null;
+
   predictionType: PredictionType;
   matchStage: MatchStage;
+
   createdAt?: string;
 };
 
-type MatchForTicker = {
-  id: string;
-  startAt: string;
-  status: string;
-  isActive: boolean;
-};
 
 type PredictionMatchInfo = {
   predictionType: PredictionType;
@@ -284,12 +291,6 @@ awayTeamCode:
   };
 }
 
-function getPredictionCreatedTime(prediction: Prediction) {
-  const createdTime = new Date(prediction.createdAt || "").getTime();
-
-  return Number.isFinite(createdTime) ? createdTime : 0;
-}
-
 function getMatchStartTime(startAt: string) {
   const startTime = new Date(startAt).getTime();
 
@@ -373,27 +374,6 @@ function validateKnockoutPredictionFields({
   };
 }
 
-function mapMatch(id: string, data: Record<string, unknown>): MatchForTicker {
-  return {
-    id,
-    startAt: toText(data.startAt),
-    status: toText(data.status) || "scheduled",
-    isActive: Boolean(data.isActive),
-  };
-}
-
-function isMatchStillBeforeStart(match?: MatchForTicker) {
-  if (!match) return false;
-
-  if (!match.isActive) return false;
-  if (match.status !== "scheduled") return false;
-
-  const startTime = new Date(match.startAt).getTime();
-
-  if (!Number.isFinite(startTime)) return false;
-
-  return startTime > Date.now();
-}
 
 export async function getUserPredictionForMatch(
   userId: string,
@@ -605,50 +585,46 @@ export async function updatePrediction(input: UpdatePredictionInput) {
 export async function getLatestPredictions(
   maxItems = 100
 ): Promise<LatestPrediction[]> {
-  const [predictionsSnapshot, matchesSnapshot] = await Promise.all([
-    getDocs(collection(db, "predictions")),
-    getDocs(collection(db, "matches")),
-  ]);
-
-  const matchesMap = new Map<string, MatchForTicker>();
-
-  matchesSnapshot.docs
-    .filter((docSnap) => docSnap.id !== "_init")
-    .forEach((docSnap) => {
-      matchesMap.set(docSnap.id, mapMatch(docSnap.id, docSnap.data()));
-    });
+  const predictionsSnapshot = await getDocs(collection(db, "predictions"));
 
   return predictionsSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => mapPrediction(docSnap.id, docSnap.data()))
     .filter((prediction) => {
-      const match = matchesMap.get(prediction.matchId);
-
       const hasPredictionData =
         prediction.userName &&
         prediction.matchId &&
         prediction.homeTeamName &&
         prediction.awayTeamName;
 
-      return (
-        hasPredictionData &&
-        !prediction.isCalculated &&
-        isMatchStillBeforeStart(match)
-      );
+      return hasPredictionData && prediction.isCalculated === false;
     })
     .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
     .slice(0, maxItems)
     .map((prediction) => ({
       id: prediction.id,
+
       userName: prediction.userName,
+
+      matchId: prediction.matchId,
+
       homeTeamName: prediction.homeTeamName,
       homeTeamEmoji: prediction.homeTeamEmoji,
+      homeTeamCode: prediction.homeTeamCode,
+
       awayTeamName: prediction.awayTeamName,
       awayTeamEmoji: prediction.awayTeamEmoji,
+      awayTeamCode: prediction.awayTeamCode,
+
       homeScore: prediction.homeScore,
       awayScore: prediction.awayScore,
+
+      qualifiedTeamCode: prediction.qualifiedTeamCode,
+      qualificationMethod: prediction.qualificationMethod,
+
       predictionType: prediction.predictionType,
       matchStage: prediction.matchStage,
+
       createdAt: prediction.createdAt,
     }));
 }
