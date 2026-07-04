@@ -569,7 +569,7 @@ export default function ChallengeStudioPage() {
       <footer className="border-t border-white/10 py-5 text-center text-xs text-slate-400">
         <div className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
           <span>©</span>
-          <span>فكرة وتصميم</span>
+          <span>برمجة وتصميم</span>
           <span className="font-bold text-slate-200">عبدالسلام العنزي</span>
         </div>
       </footer>

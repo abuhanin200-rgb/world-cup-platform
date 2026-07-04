@@ -270,20 +270,23 @@ export default function HomePage() {
           </button>
 
           <button
-            type="button"
-            onClick={() => router.push("/challenge-studio")}
-            className="relative inline-flex min-h-[54px] items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950/40 px-3 py-3 text-xs font-black text-cyan-100 shadow-lg shadow-slate-950/30 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 md:px-6 md:text-sm"
-          >
-            {hasUnreadChallengeStudio && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex h-4 w-4 rounded-full bg-red-500 ring-2 ring-slate-950" />
-              </span>
-            )}
+  type="button"
+  onClick={() => router.push("/challenge-studio")}
+  className="relative inline-flex min-h-[62px] items-center justify-center overflow-hidden rounded-full border border-cyan-400/30 bg-slate-950/40 px-3 pb-3 pt-5 text-xs font-black text-cyan-100 shadow-lg shadow-slate-950/30 transition hover:border-cyan-300/50 hover:bg-cyan-400/10 md:px-6 md:text-sm"
+>
+  {hasUnreadChallengeStudio && (
+    <span className="absolute left-1/2 top-1.5 z-10 -translate-x-1/2">
+      <span className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-50" />
 
-            <span className="ml-2 text-lg">🎙️</span>
-            <span>استوديو التحدي</span>
-          </button>
+      <span className="relative inline-flex items-center justify-center rounded-full border border-white/20 bg-red-500 px-3 py-0.5 text-[10px] font-black text-white shadow-lg shadow-red-500/40">
+        جديد
+      </span>
+    </span>
+  )}
+
+  <span className="ml-2 text-lg">🎙️</span>
+  <span>استوديو التحدي</span>
+</button>
         </div>
 
         <LeaderboardTable />
@@ -296,7 +299,7 @@ export default function HomePage() {
       <footer className="border-t border-white/10 py-5 text-center text-xs text-slate-400">
         <div className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
           <span>©</span>
-          <span>فكرة وتصميم</span>
+          <span>برمجة وتصميم</span>
           <span className="font-bold text-slate-200">عبدالسلام العنزي</span>
         </div>
       </footer>
