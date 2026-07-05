@@ -124,23 +124,18 @@ function getQualifiedTeamInfo(
   };
 }
 
-const scrollOnceViewport = {
-  once: true,
-  amount: 0.16,
-} as const;
-
 const sectionMotion: Variants = {
   hidden: {
-    opacity: 0,
-    y: 14,
-    scale: 0.99,
+    opacity: 1,
+    y: 0,
+    scale: 1,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.32,
+      duration: 0.18,
       ease: "easeOut",
     },
   },
@@ -637,14 +632,13 @@ export default function LatestPredictionsTicker() {
       <>
         <motion.section
           variants={sectionMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
+          initial={false}
+          animate="show"
           className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2.25rem]"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
           <div className="relative flex items-center justify-center gap-2 text-center text-[14px] font-bold text-slate-300">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-300" />
+            <span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />
             <span>جاري تحميل آخر التوقعات...</span>
           </div>
         </motion.section>
@@ -658,9 +652,8 @@ export default function LatestPredictionsTicker() {
       <>
         <motion.section
           variants={sectionMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
+          initial={false}
+          animate="show"
           className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem]"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
@@ -693,9 +686,8 @@ export default function LatestPredictionsTicker() {
     <>
       <motion.section
         variants={sectionMotion}
-        initial="hidden"
-        whileInView="show"
-        viewport={scrollOnceViewport}
+        initial={false}
+        animate="show"
         className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem]"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />

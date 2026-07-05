@@ -72,7 +72,7 @@ function CountUpNumber({
   decimals?: number;
   loading: boolean;
 }) {
-  const [displayValue, setDisplayValue] = useState(0);
+  const [displayValue, setDisplayValue] = useState(value);
   const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
@@ -86,15 +86,23 @@ function CountUpNumber({
       return;
     }
 
-    const duration = 850;
+    const startValue = displayValue;
+    const difference = value - startValue;
+
+    if (Math.abs(difference) < 0.01) {
+      setDisplayValue(value);
+      return;
+    }
+
+    const duration = 1800;
     const startTime = window.performance.now();
     let animationFrameId = 0;
 
     function animate(currentTime: number) {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      const easedProgress = 1 - Math.pow(1 - progress, 3);
-      const nextValue = value * easedProgress;
+      const easedProgress = 1 - Math.pow(1 - progress, 2);
+      const nextValue = startValue + difference * easedProgress;
 
       setDisplayValue(nextValue);
 
@@ -110,11 +118,12 @@ function CountUpNumber({
     return () => {
       window.cancelAnimationFrame(animationFrameId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, loading, shouldReduceMotion]);
 
   if (loading) {
     return (
-      <span className="mx-auto block h-5 w-10 animate-pulse rounded-full bg-white/15 md:h-8 md:w-16" />
+      <span className="mx-auto block h-5 w-10 rounded-full bg-white/15 md:h-8 md:w-16" />
     );
   }
 
@@ -129,41 +138,35 @@ function CountUpNumber({
   );
 }
 
-const scrollOnceViewport = {
-  once: true,
-  amount: 0.18,
-} as const;
-
 const sectionMotion: Variants = {
   hidden: {
-    opacity: 0,
-    y: 14,
-    scale: 0.99,
+    opacity: 1,
+    y: 0,
+    scale: 1,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.32,
+      duration: 0.18,
       ease: "easeOut",
-      staggerChildren: 0.035,
     },
   },
 };
 
 const cardMotion: Variants = {
   hidden: {
-    opacity: 0,
-    y: 10,
-    scale: 0.98,
+    opacity: 1,
+    y: 0,
+    scale: 1,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.26,
+      duration: 0.16,
       ease: "easeOut",
     },
   },
@@ -289,9 +292,8 @@ export default function HomeStats() {
   return (
     <motion.section
       variants={sectionMotion}
-      initial="hidden"
-      whileInView="show"
-      viewport={scrollOnceViewport}
+      initial={false}
+      animate="show"
       className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem] md:p-5"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
@@ -327,7 +329,7 @@ export default function HomeStats() {
             <div className="pointer-events-none absolute inset-x-2 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent md:inset-x-5" />
 
             <div
-              className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 shadow-sm shadow-slate-950/15 transition duration-200 group-hover:scale-105 md:h-12 md:w-12 md:rounded-2xl ${card.valueClass}`}
+              className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 shadow-sm shadow-slate-950/15 transition duration-200 md:h-12 md:w-12 md:rounded-2xl ${card.valueClass}`}
             >
               {card.icon}
             </div>
