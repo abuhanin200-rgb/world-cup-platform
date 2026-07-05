@@ -9,6 +9,7 @@ import {
   Gauge,
   ListFilter,
   PauseCircle,
+  Sparkles,
   Star,
   X,
 } from "lucide-react";
@@ -216,10 +217,6 @@ export default function LatestPredictionsTicker() {
 
   const predictionsSignatureRef = useRef("");
   const groupRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   async function loadPredictions() {
     try {
@@ -516,9 +513,120 @@ export default function LatestPredictionsTicker() {
     );
   }
 
-  const predictionsModal =
-    isMounted &&
-    createPortal(
+  if (loading) {
+    return (
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+        <div className="relative flex items-center justify-center gap-2 text-center text-sm font-bold text-slate-300">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-300" />
+          <span>جاري تحميل آخر التوقعات...</span>
+        </div>
+      </section>
+    );
+  }
+
+  if (predictions.length === 0) {
+    return (
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+
+        <div className="relative mb-3 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setIsListOpen(true)}
+            className="group inline-flex min-h-[38px] items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-base font-black text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95 md:text-xl"
+          >
+            <Flame className="h-5 w-5 text-orange-300 transition group-hover:scale-110" />
+            <span>آخر التوقعات</span>
+          </button>
+
+          <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-slate-300">
+            غير محسوبة فقط
+          </span>
+        </div>
+
+        <div className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/40 p-4 text-center text-sm font-bold text-slate-300">
+          لا توجد توقعات غير محسوبة حاليًا.
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
+      <motion.div
+        variants={sectionMotion}
+        initial="hidden"
+        animate="show"
+        className="relative"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+        <div className="pointer-events-none absolute -right-20 top-0 h-44 w-44 rounded-full bg-orange-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
+
+        <div className="relative mb-3 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setIsListOpen(true)}
+            className="group inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-base font-black text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95 md:text-xl"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-400/15 text-orange-200">
+              <Flame className="h-5 w-5 transition group-hover:scale-110 group-hover:rotate-[-6deg]" />
+            </span>
+            <span>آخر التوقعات</span>
+            <ChevronDown className="h-4 w-4 text-slate-300 transition group-hover:translate-y-0.5" />
+          </button>
+
+          <div className="flex items-center gap-2">
+            <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-slate-300 md:inline-flex">
+              <Gauge className="h-3.5 w-3.5" />
+              <span>السرعة: {getSpeedLabel(currentSpeed)}</span>
+            </span>
+
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-black text-emerald-100 shadow-lg shadow-emerald-950/10">
+              <PauseCircle className="h-3.5 w-3.5" />
+              <span>يتوقف عند اللمس</span>
+            </span>
+          </div>
+        </div>
+
+        <div
+          dir="ltr"
+          className="latest-predictions-wrapper relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65 py-3 shadow-inner"
+          onMouseEnter={pauseTicker}
+          onMouseLeave={resumeTicker}
+          onTouchStart={pauseTicker}
+          onTouchEnd={resumeTicker}
+          onTouchCancel={resumeTicker}
+          onPointerDown={pauseTicker}
+          onPointerUp={resumeTicker}
+          onPointerCancel={resumeTicker}
+        >
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-slate-950/90 to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-slate-950/90 to-transparent" />
+
+          <div
+            className="latest-predictions-marquee flex w-max gap-3 whitespace-nowrap"
+            style={{
+              animationDuration: `${duration}s`,
+              animationPlayState: isPaused ? "paused" : "running",
+            }}
+          >
+            <div ref={groupRef} className="flex flex-none gap-3">
+              {tickerItems.map((prediction, index) =>
+                renderPredictionCard(prediction, index)
+              )}
+            </div>
+
+            <div className="flex flex-none gap-3">
+              {tickerItems.map((prediction, index) =>
+                renderPredictionCard(prediction, index + tickerItems.length)
+              )}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
       <AnimatePresence>
         {isListOpen && (
           <motion.div
@@ -526,7 +634,7 @@ export default function LatestPredictionsTicker() {
             initial="hidden"
             animate="show"
             exit="exit"
-            className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/85 p-3 backdrop-blur-md md:items-center md:p-4"
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/85 p-3 backdrop-blur-md md:items-center md:p-4"
             onClick={() => setIsListOpen(false)}
           >
             <motion.div
@@ -623,158 +731,32 @@ export default function LatestPredictionsTicker() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>,
-      document.body
-    );
+      </AnimatePresence>
 
-  if (loading) {
-    return (
-      <>
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-          <div className="relative flex items-center justify-center gap-2 text-center text-sm font-bold text-slate-300">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-300" />
-            <span>جاري تحميل آخر التوقعات...</span>
-          </div>
-        </section>
-        {predictionsModal}
-      </>
-    );
-  }
+      <style jsx>{`
+        .latest-predictions-marquee {
+          animation-name: latestPredictionsTicker;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+          will-change: transform;
+        }
 
-  if (predictions.length === 0) {
-    return (
-      <>
-        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+        .latest-predictions-wrapper:hover .latest-predictions-marquee,
+        .latest-predictions-wrapper:active .latest-predictions-marquee,
+        .latest-predictions-wrapper:focus-within .latest-predictions-marquee {
+          animation-play-state: paused;
+        }
 
-          <div className="relative mb-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setIsListOpen(true)}
-              className="group inline-flex min-h-[38px] items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-base font-black text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95 md:text-xl"
-            >
-              <Flame className="h-5 w-5 text-orange-300 transition group-hover:scale-110" />
-              <span>آخر التوقعات</span>
-            </button>
-
-            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-slate-300">
-              غير محسوبة فقط
-            </span>
-          </div>
-
-          <div className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/40 p-4 text-center text-sm font-bold text-slate-300">
-            لا توجد توقعات غير محسوبة حاليًا.
-          </div>
-        </section>
-        {predictionsModal}
-      </>
-    );
-  }
-
-  return (
-    <>
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
-        <motion.div
-          variants={sectionMotion}
-          initial="hidden"
-          animate="show"
-          className="relative"
-        >
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-          <div className="pointer-events-none absolute -right-20 top-0 h-44 w-44 rounded-full bg-orange-300/10 blur-3xl" />
-          <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
-
-          <div className="relative mb-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setIsListOpen(true)}
-              className="group inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-base font-black text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95 md:text-xl"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-400/15 text-orange-200">
-                <Flame className="h-5 w-5 transition group-hover:scale-110 group-hover:rotate-[-6deg]" />
-              </span>
-              <span>آخر التوقعات</span>
-              <ChevronDown className="h-4 w-4 text-slate-300 transition group-hover:translate-y-0.5" />
-            </button>
-
-            <div className="flex items-center gap-2">
-              <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-slate-300 md:inline-flex">
-                <Gauge className="h-3.5 w-3.5" />
-                <span>السرعة: {getSpeedLabel(currentSpeed)}</span>
-              </span>
-
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-black text-emerald-100 shadow-lg shadow-emerald-950/10">
-                <PauseCircle className="h-3.5 w-3.5" />
-                <span>يتوقف عند اللمس</span>
-              </span>
-            </div>
-          </div>
-
-          <div
-            dir="ltr"
-            className="latest-predictions-wrapper relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65 py-3 shadow-inner"
-            onMouseEnter={pauseTicker}
-            onMouseLeave={resumeTicker}
-            onTouchStart={pauseTicker}
-            onTouchEnd={resumeTicker}
-            onTouchCancel={resumeTicker}
-            onPointerDown={pauseTicker}
-            onPointerUp={resumeTicker}
-            onPointerCancel={resumeTicker}
-          >
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-slate-950/90 to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-slate-950/90 to-transparent" />
-
-            <div
-              className="latest-predictions-marquee flex w-max gap-3 whitespace-nowrap"
-              style={{
-                animationDuration: `${duration}s`,
-                animationPlayState: isPaused ? "paused" : "running",
-              }}
-            >
-              <div ref={groupRef} className="flex flex-none gap-3">
-                {tickerItems.map((prediction, index) =>
-                  renderPredictionCard(prediction, index)
-                )}
-              </div>
-
-              <div className="flex flex-none gap-3">
-                {tickerItems.map((prediction, index) =>
-                  renderPredictionCard(prediction, index + tickerItems.length)
-                )}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        <style jsx>{`
-          .latest-predictions-marquee {
-            animation-name: latestPredictionsTicker;
-            animation-timing-function: linear;
-            animation-iteration-count: infinite;
-            will-change: transform;
+        @keyframes latestPredictionsTicker {
+          0% {
+            transform: translateX(-50%);
           }
 
-          .latest-predictions-wrapper:hover .latest-predictions-marquee,
-          .latest-predictions-wrapper:active .latest-predictions-marquee,
-          .latest-predictions-wrapper:focus-within .latest-predictions-marquee {
-            animation-play-state: paused;
+          100% {
+            transform: translateX(0%);
           }
-
-          @keyframes latestPredictionsTicker {
-            0% {
-              transform: translateX(-50%);
-            }
-
-            100% {
-              transform: translateX(0%);
-            }
-          }
-        `}</style>
-      </section>
-
-      {predictionsModal}
-    </>
+        }
+      `}</style>
+    </section>
   );
 }
