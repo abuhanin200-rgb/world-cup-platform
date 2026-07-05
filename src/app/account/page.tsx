@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -15,6 +16,52 @@ import TeamFlag from "@/components/TeamFlag";
 import { createUserNotification } from "@/lib/notifications";
 
 const PREDICTIONS_PER_PAGE = 10;
+
+const pageMotion: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { duration: 0.35, ease: "easeOut", staggerChildren: 0.08 },
+  },
+};
+
+const revealMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 30,
+    scale: 0.97,
+    filter: "blur(8px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const cardMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.96,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.34, ease: "easeOut" },
+  },
+};
+
+const listMotion: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.045 },
+  },
+};
 
 type AccountTab = "predictions" | "achievements" | "notifications" | "info";
 
@@ -35,10 +82,17 @@ function StatCard({
   colorClass?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-center">
+    <motion.div
+      variants={cardMotion}
+      whileTap={{ scale: 0.96 }}
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 p-4 text-center shadow-lg shadow-slate-950/25"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
+      <div className="relative">
       <div className={`text-2xl font-black ${colorClass}`}>{value}</div>
       <div className="mt-2 text-xs text-slate-300 md:text-sm">{label}</div>
-    </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -266,7 +320,9 @@ function PointsBreakdownItem({
   const hasPoints = points > 0;
 
   return (
-    <div
+    <motion.div
+      variants={cardMotion}
+      whileTap={{ scale: 0.96 }}
       className={`rounded-xl border px-2 py-2 text-center ${
         hasPoints
           ? "border-emerald-400/25 bg-emerald-400/10"
@@ -284,7 +340,7 @@ function PointsBreakdownItem({
       >
         +{points}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -361,8 +417,10 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
   };
 
   return (
-    <div
-      className={`rounded-2xl border p-4 ${
+    <motion.div
+      variants={cardMotion}
+      whileTap={{ scale: 0.985 }}
+      className={`relative overflow-hidden rounded-2xl border p-4 shadow-lg shadow-slate-950/25 ${
         isGolden
           ? "border-amber-400/30 bg-amber-400/10"
           : "border-white/10 bg-slate-950/70"
@@ -506,7 +564,7 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
           <PointsBreakdown prediction={prediction} />
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -871,7 +929,9 @@ function getAccountAchievements({
 
 function AchievementCard({ achievement }: { achievement: Achievement }) {
   return (
-    <div
+    <motion.div
+      variants={cardMotion}
+      whileTap={{ scale: 0.98 }}
       className={`rounded-2xl border p-3 ${
         achievement.unlocked
           ? "border-amber-400/25 bg-amber-400/10"
@@ -897,7 +957,7 @@ function AchievementCard({ achievement }: { achievement: Achievement }) {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -939,7 +999,15 @@ function MyAchievementsSection({
   );
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-slate-950/40 p-4 md:p-5">
+    <motion.section
+      variants={revealMotion}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: false, amount: 0.18 }}
+      className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/40 p-4 shadow-lg shadow-slate-950/25 md:p-5"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-amber-300/8" />
+      <div className="relative">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black md:text-2xl">🏅 إنجازاتي</h2>
@@ -998,12 +1066,13 @@ function MyAchievementsSection({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+      <motion.div variants={listMotion} className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
         {achievements.map((achievement) => (
           <AchievementCard key={achievement.title} achievement={achievement} />
         ))}
+      </motion.div>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -1237,14 +1306,17 @@ export default function AccountPage() {
 
   if (loading || !user) {
     return (
-      <main
+      <motion.main
         dir="rtl"
+        variants={pageMotion}
+        initial="hidden"
+        animate="show"
         className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
       >
-        <div className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl">
+        <motion.div variants={revealMotion} className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl">
           جاري تحميل حسابك...
-        </div>
-      </main>
+        </motion.div>
+      </motion.main>
     );
   }
 
@@ -1257,10 +1329,14 @@ export default function AccountPage() {
   );
 
   return (
-    <main
+    <motion.main
       dir="rtl"
-      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+      variants={pageMotion}
+      initial="hidden"
+      animate="show"
+      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
     >
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.12),transparent_34%),radial-gradient(circle_at_10%_30%,rgba(56,189,248,0.10),transparent_32%),radial-gradient(circle_at_90%_70%,rgba(52,211,153,0.08),transparent_30%)]" />
       {unlockedAchievementModal && (
         <AchievementUnlockModal
           icon={unlockedAchievementModal.icon}
@@ -1269,12 +1345,12 @@ export default function AccountPage() {
           onClose={() => setUnlockedAchievementModal(null)}
         />
       )}
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-6 flex items-center justify-between gap-3">
+      <div className="relative mx-auto max-w-5xl">
+        <motion.header variants={revealMotion} className="mb-6 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => router.push("/")}
-            className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15"
+            className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15 active:scale-95"
           >
             العودة للرئيسية
           </button>
@@ -1285,13 +1361,22 @@ export default function AccountPage() {
               logout();
               router.push("/");
             }}
-            className="rounded-xl bg-red-500 px-4 py-2 text-sm font-black text-white hover:bg-red-400"
+            className="rounded-xl bg-red-500 px-4 py-2 text-sm font-black text-white hover:bg-red-400 active:scale-95"
           >
             خروج
           </button>
-        </header>
+        </motion.header>
 
-        <section className="rounded-3xl border border-white/10 bg-white/10 p-5 text-center shadow-2xl md:p-8">
+        <motion.section
+          variants={revealMotion}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: false, amount: 0.35 }}
+          whileTap={{ scale: 0.99 }}
+          className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-5 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-8"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
+          <div className="relative">
           <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-amber-400/30 bg-amber-400/10">
             <TeamFlag
               code={accountFavoriteTeam?.code || editTeamCode}
@@ -1316,9 +1401,16 @@ export default function AccountPage() {
               #{user.currentRank || "-"}
             </span>
           </div>
-        </section>
+          </div>
+        </motion.section>
 
-        <section className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <motion.section
+          variants={listMotion}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: false, amount: 0.25 }}
+          className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4"
+        >
           <StatCard
             label="النقاط"
             value={user.points || 0}
@@ -1338,9 +1430,15 @@ export default function AccountPage() {
             value={user.wrong || 0}
             colorClass="text-red-300"
           />
-        </section>
+        </motion.section>
 
-        <section className="mt-4 grid grid-cols-2 gap-3">
+        <motion.section
+          variants={listMotion}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: false, amount: 0.3 }}
+          className="mt-4 grid grid-cols-2 gap-3"
+        >
           <StatCard
             label="السلسلة الحالية"
             value={user.currentStreak || 0}
@@ -1352,9 +1450,17 @@ export default function AccountPage() {
             value={user.bestStreak || 0}
             colorClass="text-orange-300"
           />
-        </section>
+        </motion.section>
 
-        <section className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:p-5">
+        <motion.section
+          variants={revealMotion}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: false, amount: 0.18 }}
+          className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-5"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-cyan-300/8" />
+          <div className="relative">
           <div className="grid grid-cols-4 gap-2 rounded-2xl bg-slate-950/60 p-2">
             <button
               type="button"
@@ -1362,7 +1468,7 @@ export default function AccountPage() {
               className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
                 activeTab === "predictions"
                   ? "bg-amber-400 text-slate-950"
-                  : "text-slate-300 hover:bg-white/10"
+                  : "text-slate-300 hover:bg-white/10 active:scale-95"
               }`}
             >
               توقعاتي
@@ -1374,7 +1480,7 @@ export default function AccountPage() {
               className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
                 activeTab === "achievements"
                   ? "bg-amber-400 text-slate-950"
-                  : "text-slate-300 hover:bg-white/10"
+                  : "text-slate-300 hover:bg-white/10 active:scale-95"
               }`}
             >
               إنجازاتي
@@ -1386,7 +1492,7 @@ export default function AccountPage() {
               className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
                 activeTab === "notifications"
                   ? "bg-amber-400 text-slate-950"
-                  : "text-slate-300 hover:bg-white/10"
+                  : "text-slate-300 hover:bg-white/10 active:scale-95"
               }`}
             >
               🔔 الإشعارات
@@ -1398,7 +1504,7 @@ export default function AccountPage() {
               className={`rounded-xl px-2 py-3 text-xs font-black transition md:px-4 md:text-sm ${
                 activeTab === "info"
                   ? "bg-amber-400 text-slate-950"
-                  : "text-slate-300 hover:bg-white/10"
+                  : "text-slate-300 hover:bg-white/10 active:scale-95"
               }`}
             >
               معلومات حسابي
@@ -1431,14 +1537,14 @@ export default function AccountPage() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <motion.div variants={listMotion} initial="hidden" animate="show" className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     {visiblePredictions.map((prediction) => (
                       <PredictionCard
                         key={prediction.id}
                         prediction={prediction}
                       />
                     ))}
-                  </div>
+                  </motion.div>
 
                   {predictions.length > PREDICTIONS_PER_PAGE && (
                     <div className="mt-4 flex items-center justify-between gap-3">
@@ -1446,7 +1552,7 @@ export default function AccountPage() {
                         type="button"
                         onClick={goToPreviousPredictionsPage}
                         disabled={currentPredictionsPage === 1}
-                        className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40 md:text-sm"
+                        className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-white/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 md:text-sm"
                       >
                         السابق
                       </button>
@@ -1461,7 +1567,7 @@ export default function AccountPage() {
                         disabled={
                           currentPredictionsPage === totalPredictionPages
                         }
-                        className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40 md:text-sm"
+                        className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white transition hover:bg-white/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 md:text-sm"
                       >
                         التالي
                       </button>
@@ -1555,7 +1661,7 @@ export default function AccountPage() {
                 <button
                   type="submit"
                   disabled={savingProfile}
-                  className="w-full rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingProfile ? "جاري حفظ التعديل..." : "حفظ التعديل"}
                 </button>
@@ -1636,8 +1742,9 @@ export default function AccountPage() {
               </div>
             </div>
           )}
-        </section>
+          </div>
+        </motion.section>
       </div>
-    </main>
+    </motion.main>
   );
 }

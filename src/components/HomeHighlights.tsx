@@ -1,6 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
+import {
+  BadgeCheck,
+  Clock3,
+  Flame,
+  Gauge,
+  PauseCircle,
+  Rocket,
+  Sparkles,
+  Star,
+  Target,
+  Trophy,
+  X,
+  Zap,
+} from "lucide-react";
 import {
   ExactHit,
   getHomeHighlights,
@@ -27,28 +43,117 @@ type QualifiedTeamInfo = {
   name: string;
 };
 
+const sectionMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.38,
+      ease: "easeOut",
+      staggerChildren: 0.06,
+    },
+  },
+};
+
+const cardMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 14,
+    scale: 0.96,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: "easeOut",
+    },
+  },
+};
+
+const modalBackdropMotion: Variants = {
+  hidden: {
+    opacity: 0,
+  },
+  show: {
+    opacity: 1,
+    transition: {
+      duration: 0.18,
+      ease: "easeOut",
+    },
+  },
+  exit: {
+    opacity: 0,
+    transition: {
+      duration: 0.16,
+      ease: "easeIn",
+    },
+  },
+};
+
+const modalMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 42,
+    scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.28,
+      ease: "easeOut",
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: 28,
+    scale: 0.98,
+    transition: {
+      duration: 0.18,
+      ease: "easeIn",
+    },
+  },
+};
+
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center shadow-xl md:p-3">
-      <div className="text-[11px] font-black leading-5 text-slate-200 md:text-sm">
+    <motion.div
+      variants={cardMotion}
+      whileTap={{ scale: 0.97 }}
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-xl shadow-slate-950/25 backdrop-blur-xl md:p-3"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-300/5" />
+
+      <div className="relative text-[11px] font-black leading-5 text-slate-200 md:text-sm">
         {title}
       </div>
 
-      <p className="mt-1 text-[9px] leading-4 text-slate-300 md:text-xs">
+      <p className="relative mt-1 text-[9px] leading-4 text-slate-300 md:text-xs">
         {text}
       </p>
-    </div>
+    </motion.div>
   );
 }
 
 function HighlightCard({
   title,
+  icon,
   user,
   valueText,
   accentClass,
   emptyText,
 }: {
   title: string;
+  icon: React.ReactNode;
   user: HomeHighlightUser | null;
   valueText: string;
   accentClass: string;
@@ -63,12 +168,22 @@ function HighlightCard({
     userWithTeamCode.favoriteTeamCode || userWithTeamCode.teamCode;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/10 p-2 text-center shadow-xl md:p-3">
-      <h2 className="text-[11px] font-black leading-5 text-white md:text-sm">
-        {title}
+    <motion.div
+      variants={cardMotion}
+      whileTap={{ scale: 0.97 }}
+      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-xl shadow-slate-950/25 backdrop-blur-xl transition duration-200 hover:bg-white/[0.11] md:p-3"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-300/5" />
+      <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+      <h2 className="relative flex items-center justify-center gap-1.5 text-[11px] font-black leading-5 text-white md:text-sm">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-amber-200 transition group-hover:scale-105 md:h-7 md:w-7">
+          {icon}
+        </span>
+        <span>{title}</span>
       </h2>
 
-      <div className="mt-2 rounded-2xl border border-white/10 bg-slate-950/60 p-2 md:p-3">
+      <div className="relative mt-2 rounded-2xl border border-white/10 bg-slate-950/60 p-2 shadow-inner md:p-3">
         <div className="flex justify-center">
           <TeamFlag
             code={teamCode}
@@ -82,17 +197,17 @@ function HighlightCard({
           {user.fullName}
         </div>
 
-        <div className="mt-1 truncate text-[9px] text-slate-300 md:text-xs">
+        <div className="mt-1 truncate text-[9px] font-medium text-slate-300 md:text-xs">
           {user.favoriteTeam || "بدون منتخب"}
         </div>
 
         <div
-          className={`mt-2 rounded-xl px-1.5 py-1.5 text-[9px] font-black leading-4 md:text-xs ${accentClass}`}
+          className={`mt-2 rounded-xl px-1.5 py-1.5 text-[9px] font-black leading-4 shadow-lg md:text-xs ${accentClass}`}
         >
           {valueText}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -169,7 +284,7 @@ function getQualificationMethodLabel(value?: string | null) {
 }
 
 function getQualifiedTeamInfo(
-  hit: ExactHitWithPredictionType,
+  hit: ExactHitWithPredictionType
 ): QualifiedTeamInfo | null {
   if (!hit.qualifiedTeamCode) return null;
 
@@ -232,62 +347,88 @@ export default function HomeHighlights() {
 
   if (loading) {
     return (
-      <section className="mt-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-5 md:p-4">
-        <div className="mb-3 text-center">
-          <h2 className="text-base font-black md:text-xl">أبطال التحدي الآن</h2>
+      <motion.section
+        variants={sectionMotion}
+        initial="hidden"
+        animate="show"
+        className="relative mt-4 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-3 shadow-2xl shadow-slate-950/35 backdrop-blur-xl md:mt-5 md:p-4"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
 
-          <p className="mt-1 text-[10px] text-slate-300 md:text-xs">
+        <div className="relative mb-3 text-center">
+          <h2 className="inline-flex items-center justify-center gap-2 text-base font-black md:text-xl">
+            <Trophy className="h-5 w-5 text-amber-200" />
+            <span>أبطال التحدي الآن</span>
+          </h2>
+
+          <p className="mt-1 text-[10px] font-medium text-slate-300 md:text-xs">
             أسماء تتغير تلقائيًا حسب التوقعات والنتائج
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 md:gap-4">
-          <EmptyCard title="🏆 ملك التوقعات" text="جاري التحميل..." />
-          <EmptyCard title="🔥 أفضل سلسلة" text="جاري التحميل..." />
-          <EmptyCard title="⚡ أول الواصلين" text="جاري التحميل..." />
+        <div className="relative grid grid-cols-3 gap-2 md:gap-4">
+          <EmptyCard title="ملك التوقعات" text="جاري التحميل..." />
+          <EmptyCard title="أفضل سلسلة" text="جاري التحميل..." />
+          <EmptyCard title="أول الواصلين" text="جاري التحميل..." />
         </div>
-      </section>
+      </motion.section>
     );
   }
 
   return (
-    <section className="mt-4 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-5 md:p-4">
-      <div className="mb-3 text-center">
-        <h2 className="text-base font-black md:text-xl">
-          🔥 أبطال التحدي الآن
+    <motion.section
+      variants={sectionMotion}
+      initial="hidden"
+      animate="show"
+      className="relative mt-4 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-3 shadow-2xl shadow-slate-950/35 backdrop-blur-xl md:mt-5 md:p-4"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+      <div className="pointer-events-none absolute -right-20 top-0 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
+
+      <div className="relative mb-3 text-center">
+        <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-lg shadow-amber-950/20">
+          <Trophy className="h-5 w-5" />
+        </div>
+
+        <h2 className="text-base font-black tracking-tight md:text-xl">
+          أبطال التحدي الآن
         </h2>
 
-        <p className="mt-1 text-[10px] text-slate-300 md:text-xs">
+        <p className="mt-1 text-[10px] font-medium text-slate-300 md:text-xs">
           أسماء تتغير تلقائيًا حسب التوقعات والنتائج
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 md:gap-4">
+      <div className="relative grid grid-cols-3 gap-2 md:gap-4">
         <HighlightCard
-          title="🏆 ملك التوقعات"
+          title="ملك التوقعات"
+          icon={<Trophy className="h-3.5 w-3.5 md:h-4 md:w-4" />}
           user={predictionKing}
           valueText={`${predictionKing?.points || 0} نقاط`}
-          accentClass="bg-amber-400 text-slate-950"
+          accentClass="bg-amber-400 text-slate-950 shadow-amber-950/20"
           emptyText="يظهر بعد تسجيل أول نقاط"
         />
 
         <HighlightCard
-          title="🔥 أفضل سلسلة"
+          title="أفضل سلسلة"
+          icon={<Flame className="h-3.5 w-3.5 md:h-4 md:w-4" />}
           user={bestStreakUser}
           valueText={`السلسلة: ${bestStreakUser?.bestStreak || 0}`}
-          accentClass="bg-emerald-400 text-slate-950"
+          accentClass="bg-emerald-400 text-slate-950 shadow-emerald-950/20"
           emptyText="تظهر بعد وجود سلسلة صحيحة"
         />
 
         <HighlightCard
-          title="⚡ أول الواصلين"
+          title="أول الواصلين"
+          icon={<Zap className="h-3.5 w-3.5 md:h-4 md:w-4" />}
           user={firstArriverUser}
           valueText="توقع قبل الجميع"
-          accentClass="bg-violet-400 text-slate-950"
+          accentClass="bg-violet-400 text-slate-950 shadow-violet-950/20"
           emptyText="تظهر بعد أول توقع"
         />
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -298,8 +439,13 @@ export function ExactHitsTicker() {
   const [isPaused, setIsPaused] = useState(false);
   const [groupWidth, setGroupWidth] = useState(0);
   const [isListOpen, setIsListOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   const groupRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     async function loadExactHits() {
@@ -386,7 +532,7 @@ export function ExactHitsTicker() {
 
   const duration = Math.max(
     25,
-    Math.round((groupWidth || 1200) / pixelsPerSecond),
+    Math.round((groupWidth || 1200) / pixelsPerSecond)
   );
 
   function pauseTicker() {
@@ -406,28 +552,42 @@ export function ExactHitsTicker() {
       <div
         key={`${hit.id}-${index}`}
         dir="rtl"
-        className={`whitespace-nowrap rounded-xl border px-4 py-2 text-xs text-white md:text-sm ${
+        className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border px-3 py-2 text-xs text-white shadow-lg shadow-slate-950/25 backdrop-blur-xl md:px-4 md:text-sm ${
           golden
             ? "border-amber-300/40 bg-amber-400/15"
-            : "border-white/10 bg-slate-950/70"
+            : "border-emerald-300/20 bg-slate-950/70"
         }`}
       >
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-l ${
+            golden
+              ? "from-amber-300/15 via-transparent to-transparent"
+              : "from-emerald-300/10 via-transparent to-transparent"
+          }`}
+        />
+
         {golden && (
-          <span className="ml-2 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 md:text-xs">
-            ⭐ ذهبي بالملي +6
+          <span className="relative inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-950/20 md:text-xs">
+            <Star className="h-3 w-3 fill-slate-950" />
+            <span>ذهبي بالملي +6</span>
           </span>
         )}
+
         <span
           className={
-            golden ? "font-black text-amber-300" : "font-black text-emerald-300"
+            golden
+              ? "relative font-black text-amber-300"
+              : "relative font-black text-emerald-300"
           }
         >
           {hit.userName}
-        </span>{" "}
-        {golden
-          ? "جاب التوقع الذهبي بالملي في مباراة"
-          : "جابها صح بالملي في مباراة"}{" "}
-        <span className="inline-flex items-center gap-1 align-middle font-bold">
+        </span>
+
+        <span className="relative text-slate-300">
+          {golden ? "جاب التوقع الذهبي بالملي" : "جابها صح بالملي"}
+        </span>
+
+        <span className="relative inline-flex items-center gap-1 align-middle font-bold">
           <TeamFlag
             code={hit.homeTeamCode}
             emoji={hit.homeTeamEmoji}
@@ -435,11 +595,13 @@ export function ExactHitsTicker() {
             size="xs"
           />
           {hit.homeTeamName}
-        </span>{" "}
-        <span className="font-black text-amber-300">
+        </span>
+
+        <span className="relative rounded-xl bg-amber-400 px-2 py-1 font-black text-slate-950 shadow-inner">
           {hit.homeScore} - {hit.awayScore}
-        </span>{" "}
-        <span className="inline-flex items-center gap-1 align-middle font-bold">
+        </span>
+
+        <span className="relative inline-flex items-center gap-1 align-middle font-bold">
           {hit.awayTeamName}
           <TeamFlag
             code={hit.awayTeamCode}
@@ -448,26 +610,22 @@ export function ExactHitsTicker() {
             size="xs"
           />
         </span>
+
         {qualifiedTeam && (
-          <>
-            {" "}
-            <span className="inline-flex items-center gap-1 align-middle font-black text-blue-200">
-              • المتأهل
-              <TeamFlag
-                code={qualifiedTeam.code}
-                emoji={qualifiedTeam.emoji}
-                name={qualifiedTeam.name}
-                size="xs"
-              />
-              {qualifiedTeam.name}
-            </span>
+          <span className="relative inline-flex items-center gap-1 align-middle font-black text-blue-200">
+            <span>• المتأهل</span>
+            <TeamFlag
+              code={qualifiedTeam.code}
+              emoji={qualifiedTeam.emoji}
+              name={qualifiedTeam.name}
+              size="xs"
+            />
+            <span>{qualifiedTeam.name}</span>
+
             {exactHit.qualificationMethod && (
-              <span className="font-black text-blue-200">
-                {" "}
-                • {getQualificationMethodLabel(exactHit.qualificationMethod)}
-              </span>
+              <span>• {getQualificationMethodLabel(exactHit.qualificationMethod)}</span>
             )}
-          </>
+          </span>
         )}
       </div>
     );
@@ -479,15 +637,24 @@ export function ExactHitsTicker() {
     const qualifiedTeam = getQualifiedTeamInfo(exactHit);
 
     return (
-      <div
+      <motion.div
         key={hit.id}
-        className={`rounded-2xl border p-3 ${
+        variants={cardMotion}
+        className={`relative overflow-hidden rounded-3xl border p-3 shadow-xl shadow-slate-950/25 ${
           golden
             ? "border-amber-300/40 bg-amber-400/10"
             : "border-white/10 bg-slate-950/60"
         }`}
       >
-        <div className="flex items-start justify-between gap-3">
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${
+            golden
+              ? "from-amber-300/10 via-transparent to-transparent"
+              : "from-emerald-300/10 via-transparent to-transparent"
+          }`}
+        />
+
+        <div className="relative flex items-start justify-between gap-3">
           <div>
             <div
               className={`text-sm font-black ${
@@ -497,17 +664,18 @@ export function ExactHitsTicker() {
               {hit.userName}
             </div>
 
-            <div className="mt-1 text-[11px] leading-5 text-slate-300">
+            <div className="mt-1 text-[11px] font-medium leading-5 text-slate-300">
               {golden ? "جاب التوقع الذهبي بالملي" : "جابها صح بالملي"}
             </div>
           </div>
 
-          <div className="shrink-0 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-bold text-slate-200">
-            {formatRelativeHitTime(exactHit)}
+          <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-bold text-slate-200">
+            <Clock3 className="h-3 w-3" />
+            <span>{formatRelativeHitTime(exactHit)}</span>
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-slate-950/70 px-3 py-2 text-xs font-black text-white">
+        <div className="relative mt-3 flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-black text-white shadow-inner">
           <span className="inline-flex items-center gap-1">
             <TeamFlag
               code={hit.homeTeamCode}
@@ -518,7 +686,7 @@ export function ExactHitsTicker() {
             {hit.homeTeamName}
           </span>
 
-          <span className="rounded-lg bg-amber-400 px-2 py-1 text-slate-950">
+          <span className="rounded-xl bg-amber-400 px-2.5 py-1 text-slate-950">
             {hit.homeScore} - {hit.awayScore}
           </span>
 
@@ -534,7 +702,7 @@ export function ExactHitsTicker() {
         </div>
 
         {qualifiedTeam && (
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-1 rounded-xl border border-blue-400/30 bg-blue-400/10 px-3 py-2 text-center text-xs font-black text-blue-100">
+          <div className="relative mt-2 flex flex-wrap items-center justify-center gap-1 rounded-2xl border border-blue-400/30 bg-blue-400/10 px-3 py-2 text-center text-xs font-black text-blue-100">
             <span>المتأهل</span>
             <TeamFlag
               code={qualifiedTeam.code}
@@ -552,153 +720,233 @@ export function ExactHitsTicker() {
         )}
 
         {golden && (
-          <div className="mt-2 inline-flex rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950">
-            ⭐ ذهبي بالملي +6
+          <div className="relative mt-2 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950">
+            <Star className="h-3 w-3 fill-slate-950" />
+            <span>ذهبي بالملي +6</span>
           </div>
         )}
-      </div>
+      </motion.div>
     );
   }
 
+  const exactHitsModal = isMounted
+    ? createPortal(
+        <AnimatePresence>
+          {isListOpen && (
+            <motion.div
+              variants={modalBackdropMotion}
+              initial="hidden"
+              animate="show"
+              exit="exit"
+              className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/85 p-3 backdrop-blur-md md:items-center md:p-4"
+              onClick={() => setIsListOpen(false)}
+            >
+              <motion.div
+                variants={modalMotion}
+                dir="rtl"
+                className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-t-[2rem] border border-emerald-400/30 bg-slate-950 shadow-2xl shadow-slate-950/60 md:max-h-[84vh] md:rounded-[2rem]"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="relative border-b border-white/10 bg-emerald-400/10 px-4 py-3">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/10 via-transparent to-cyan-400/5" />
+
+                  <div className="relative mx-auto mb-2 h-1.5 w-12 rounded-full bg-white/20 md:hidden" />
+
+                  <div className="relative flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-black text-emerald-100">
+                        <Target className="h-3.5 w-3.5" />
+                        <span>آخر 24 ساعة</span>
+                      </div>
+
+                      <h3 className="text-lg font-black text-emerald-100">
+                        قائمة جابها صح
+                      </h3>
+
+                      <p className="mt-1 text-[11px] font-medium leading-5 text-emerald-100/70">
+                        الأحدث أولاً — التوقعات الصحيحة بالملي خلال آخر 24 ساعة.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsListOpen(false)}
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95"
+                      aria-label="إغلاق"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  <div className="relative mt-3 flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/45 px-3 py-2">
+                    <div className="inline-flex items-center gap-1.5 text-[11px] font-black text-emerald-100">
+                      <BadgeCheck className="h-3.5 w-3.5" />
+                      <span>المجموع</span>
+                    </div>
+
+                    <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-black text-emerald-100">
+                      {sortedExactHits.length} توقع
+                    </span>
+                  </div>
+                </div>
+
+                <motion.div
+                  variants={sectionMotion}
+                  initial="hidden"
+                  animate="show"
+                  className="max-h-[62vh] space-y-3 overflow-y-auto p-4 md:max-h-[58vh]"
+                >
+                  {sortedExactHits.length === 0 ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-sm font-bold text-slate-300">
+                      لا توجد توقعات صحيحة خلال آخر 24 ساعة.
+                    </div>
+                  ) : (
+                    sortedExactHits.map((hit) => renderExactHitListItem(hit))
+                  )}
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )
+    : null;
+
   if (loading) {
     return (
-      <section className="mt-5 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 md:mt-6">
-        <div className="text-sm text-slate-300">
-          جاري تحميل شريط جابها صح...
-        </div>
-      </section>
+      <>
+        <section className="relative mt-5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 shadow-xl shadow-slate-950/25 md:mt-6">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-300" />
+            <span>جاري تحميل شريط جابها صح...</span>
+          </div>
+        </section>
+        {exactHitsModal}
+      </>
     );
   }
 
   if (exactHits.length === 0) {
     return (
-      <section className="mt-5 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 md:mt-6">
-        <div className="flex items-center gap-2 text-sm text-slate-300">
-          <span>🎯</span>
-          <span>لم يسجل أحد نتيجة بالملي خلال آخر 24 ساعة.</span>
-        </div>
-      </section>
+      <>
+        <section className="relative mt-5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 shadow-xl shadow-slate-950/25 md:mt-6">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
+            <Target className="h-4 w-4 text-emerald-300" />
+            <span>لم يسجل أحد نتيجة بالملي خلال آخر 24 ساعة.</span>
+          </div>
+        </section>
+        {exactHitsModal}
+      </>
     );
   }
 
   return (
-    <section className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 md:mt-6">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setIsListOpen(true)}
-          className="rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-sm font-black text-emerald-200 transition hover:bg-emerald-400/20"
+    <>
+      <section className="relative mt-5 overflow-hidden rounded-[1.65rem] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:mt-6">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/10 via-transparent to-cyan-300/5" />
+        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-emerald-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
+
+        <motion.div
+          variants={sectionMotion}
+          initial="hidden"
+          animate="show"
+          className="relative"
         >
-          🎯 جابها صح
-        </button>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setIsListOpen(true)}
+              className="group inline-flex min-h-[38px] items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-sm font-black text-emerald-200 shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-400/20 active:scale-95"
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-300/15 text-emerald-200">
+                <Target className="h-4 w-4 transition group-hover:scale-110 group-hover:rotate-[-6deg]" />
+              </span>
+              <span>جابها صح</span>
+            </button>
 
-        <div className="flex items-center gap-2">
-          <span className="hidden text-[11px] text-emerald-100/80 md:inline">
-            السرعة: {getSpeedLabel(speed)}
-          </span>
+            <div className="flex items-center gap-2">
+              <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-emerald-100/80 md:inline-flex">
+                <Gauge className="h-3.5 w-3.5" />
+                <span>السرعة: {getSpeedLabel(speed)}</span>
+              </span>
 
-          <span className="text-[11px] text-emerald-100/80">آخر 24 ساعة</span>
-        </div>
-      </div>
-
-      <div
-        dir="ltr"
-        className="exact-hits-window relative overflow-hidden"
-        onMouseEnter={pauseTicker}
-        onMouseLeave={resumeTicker}
-        onTouchStart={pauseTicker}
-        onTouchEnd={resumeTicker}
-        onTouchCancel={resumeTicker}
-        onPointerDown={pauseTicker}
-        onPointerUp={resumeTicker}
-        onPointerCancel={resumeTicker}
-      >
-        <div
-          className="exact-hits-track flex w-max gap-3"
-          style={{
-            animationDuration: `${duration}s`,
-            animationPlayState: isPaused ? "paused" : "running",
-          }}
-        >
-          <div ref={groupRef} className="flex flex-none gap-3">
-            {repeatedHits.map((hit, index) => renderExactHitCard(hit, index))}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[11px] font-black text-emerald-100">
+                <Clock3 className="h-3.5 w-3.5" />
+                <span>آخر 24 ساعة</span>
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-none gap-3">
-            {repeatedHits.map((hit, index) =>
-              renderExactHitCard(hit, index + repeatedHits.length),
-            )}
-          </div>
-        </div>
-      </div>
-
-      {isListOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
-          onClick={() => setIsListOpen(false)}
-        >
           <div
-            dir="rtl"
-            className="max-h-[80vh] w-full max-w-lg overflow-hidden rounded-3xl border border-emerald-400/30 bg-slate-950 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            dir="ltr"
+            className="exact-hits-window relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65 py-3 shadow-inner"
+            onMouseEnter={pauseTicker}
+            onMouseLeave={resumeTicker}
+            onTouchStart={pauseTicker}
+            onTouchEnd={resumeTicker}
+            onTouchCancel={resumeTicker}
+            onPointerDown={pauseTicker}
+            onPointerUp={resumeTicker}
+            onPointerCancel={resumeTicker}
           >
-            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-emerald-400/10 px-4 py-3">
-              <div>
-                <h3 className="text-lg font-black text-emerald-100">
-                  🎯 قائمة جابها صح
-                </h3>
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-slate-950/90 to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-slate-950/90 to-transparent" />
 
-                <p className="mt-1 text-[11px] text-emerald-100/70">
-                  الأحدث أولاً — آخر 24 ساعة
-                </p>
+            <div
+              className="exact-hits-track flex w-max gap-3"
+              style={{
+                animationDuration: `${duration}s`,
+                animationPlayState: isPaused ? "paused" : "running",
+              }}
+            >
+              <div ref={groupRef} className="flex flex-none gap-3">
+                {repeatedHits.map((hit, index) =>
+                  renderExactHitCard(hit, index)
+                )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsListOpen(false)}
-                className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/20"
-              >
-                إغلاق
-              </button>
-            </div>
-
-            <div className="max-h-[65vh] space-y-3 overflow-y-auto p-4">
-              {sortedExactHits.length === 0 ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-300">
-                  لا توجد توقعات صحيحة خلال آخر 24 ساعة.
-                </div>
-              ) : (
-                sortedExactHits.map((hit) => renderExactHitListItem(hit))
-              )}
+              <div className="flex flex-none gap-3">
+                {repeatedHits.map((hit, index) =>
+                  renderExactHitCard(hit, index + repeatedHits.length)
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      <style jsx>{`
-        .exact-hits-track {
-          animation-name: exactHitsMove;
-          animation-timing-function: linear;
-          animation-iteration-count: infinite;
-          will-change: transform;
-        }
+          <div className="mt-2 flex items-center justify-center gap-1.5 text-[10px] font-bold text-emerald-100/70">
+            <PauseCircle className="h-3.5 w-3.5" />
+            <span>يتوقف الشريط عند اللمس</span>
+          </div>
+        </motion.div>
 
-        .exact-hits-window:hover .exact-hits-track,
-        .exact-hits-window:active .exact-hits-track,
-        .exact-hits-window:focus-within .exact-hits-track {
-          animation-play-state: paused;
-        }
-
-        @keyframes exactHitsMove {
-          0% {
-            transform: translateX(-50%);
+        <style jsx>{`
+          .exact-hits-track {
+            animation-name: exactHitsMove;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            will-change: transform;
           }
 
-          100% {
-            transform: translateX(0%);
+          .exact-hits-window:hover .exact-hits-track,
+          .exact-hits-window:active .exact-hits-track,
+          .exact-hits-window:focus-within .exact-hits-track {
+            animation-play-state: paused;
           }
-        }
-      `}</style>
-    </section>
+
+          @keyframes exactHitsMove {
+            0% {
+              transform: translateX(-50%);
+            }
+
+            100% {
+              transform: translateX(0%);
+            }
+          }
+        `}</style>
+      </section>
+
+      {exactHitsModal}
+    </>
   );
 }

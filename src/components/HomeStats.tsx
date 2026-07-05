@@ -1,6 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { motion, type Variants } from "framer-motion";
+import {
+  BarChart3,
+  Flame,
+  MapPin,
+  Medal,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -10,6 +19,17 @@ type HomeStatsData = {
   exactCorrect: number;
   calculatedMatches: number;
   successRate: number;
+};
+
+type StatsCard = {
+  titleLines: string[];
+  value: number;
+  suffix?: string;
+  decimals?: number;
+  icon: ReactNode;
+  valueClass: string;
+  glowClass: string;
+  borderClass: string;
 };
 
 function toNumber(value: unknown) {
@@ -40,6 +60,106 @@ function isWinnerPrediction(data: Record<string, unknown>) {
     (resultType === "winner" || points === 1 || points === 2)
   );
 }
+
+function CountUpNumber({
+  value,
+  suffix = "",
+  decimals = 0,
+  loading,
+}: {
+  value: number;
+  suffix?: string;
+  decimals?: number;
+  loading: boolean;
+}) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (loading) {
+      setDisplayValue(0);
+      return;
+    }
+
+    const duration = 2200;
+    const frameMs = 16;
+    const totalFrames = Math.max(1, Math.round(duration / frameMs));
+    let frame = 0;
+    let animationFrameId = 0;
+
+    function animate() {
+      frame += 1;
+
+      const progress = Math.min(frame / totalFrames, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      const nextValue = value * easedProgress;
+
+      setDisplayValue(nextValue);
+
+      if (progress < 1) {
+        animationFrameId = window.requestAnimationFrame(animate);
+      } else {
+        setDisplayValue(value);
+      }
+    }
+
+    animationFrameId = window.requestAnimationFrame(animate);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [value, loading]);
+
+  if (loading) {
+    return (
+      <span className="mx-auto block h-5 w-10 animate-pulse rounded-full bg-white/15 md:h-8 md:w-16" />
+    );
+  }
+
+  return (
+    <>
+      {displayValue.toLocaleString("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      })}
+      {suffix}
+    </>
+  );
+}
+
+const sectionMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.38,
+      ease: "easeOut",
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+const cardMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 12,
+    scale: 0.96,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: "easeOut",
+    },
+  },
+};
 
 export default function HomeStats() {
   const [stats, setStats] = useState<HomeStatsData>({
@@ -110,75 +230,121 @@ export default function HomeStats() {
     loadStats();
   }, []);
 
-  const cards = [
-    {
-      titleLines: ["إجمالي", "التوقعات"],
-      value: stats.totalPredictions,
-      icon: "🎯",
-      valueClass: "text-white",
-    },
-    {
-      titleLines: ["الفائز", "الصحيح"],
-      value: stats.winnerCorrect,
-      icon: "🏆",
-      valueClass: "text-amber-300",
-    },
-    {
-      titleLines: ["التوقع", "بالملي"],
-      value: stats.exactCorrect,
-      icon: "🔥",
-      valueClass: "text-emerald-300",
-    },
-    {
-      titleLines: ["نسبة", "النجاح"],
-      value: `${stats.successRate.toFixed(1)}%`,
-      icon: "📊",
-      valueClass: "text-sky-300",
-    },
-    {
-      titleLines: ["المباريات", "المحتسبة"],
-      value: stats.calculatedMatches,
-      icon: "🏟️",
-      valueClass: "text-white",
-    },
-  ];
+  const cards: StatsCard[] = useMemo(
+    () => [
+      {
+        titleLines: ["إجمالي", "التوقعات"],
+        value: stats.totalPredictions,
+        icon: <Target className="h-4 w-4 md:h-6 md:w-6" />,
+        valueClass: "text-white",
+        glowClass: "from-white/15 to-slate-300/5 text-white",
+        borderClass: "border-white/15",
+      },
+      {
+        titleLines: ["الفائز", "الصحيح"],
+        value: stats.winnerCorrect,
+        icon: <Medal className="h-4 w-4 md:h-6 md:w-6" />,
+        valueClass: "text-amber-300",
+        glowClass: "from-amber-300/20 to-amber-500/5 text-amber-200",
+        borderClass: "border-amber-300/25",
+      },
+      {
+        titleLines: ["التوقع", "بالملي"],
+        value: stats.exactCorrect,
+        icon: <Flame className="h-4 w-4 md:h-6 md:w-6" />,
+        valueClass: "text-emerald-300",
+        glowClass: "from-emerald-300/20 to-emerald-500/5 text-emerald-200",
+        borderClass: "border-emerald-300/25",
+      },
+      {
+        titleLines: ["نسبة", "النجاح"],
+        value: stats.successRate,
+        suffix: "%",
+        decimals: 1,
+        icon: <TrendingUp className="h-4 w-4 md:h-6 md:w-6" />,
+        valueClass: "text-sky-300",
+        glowClass: "from-sky-300/20 to-sky-500/5 text-sky-200",
+        borderClass: "border-sky-300/25",
+      },
+      {
+        titleLines: ["المباريات", "المحتسبة"],
+        value: stats.calculatedMatches,
+        icon: <MapPin className="h-4 w-4 md:h-6 md:w-6" />,
+        valueClass: "text-white",
+        glowClass: "from-cyan-300/15 to-cyan-500/5 text-cyan-100",
+        borderClass: "border-cyan-300/20",
+      },
+    ],
+    [stats]
+  );
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:p-5">
-      <div className="mb-3 text-center md:mb-4">
-        <h2 className="text-lg font-black md:text-2xl">📊 إحصائيات المنصة</h2>
-        <p className="mt-1 text-[11px] text-slate-300 md:text-sm">
+    <motion.section
+      variants={sectionMotion}
+      initial="hidden"
+      animate="show"
+      className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-3 shadow-2xl shadow-slate-950/35 backdrop-blur-xl md:p-5"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+      <div className="pointer-events-none absolute -right-20 -top-20 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+
+      <div className="relative mb-3 text-center md:mb-4">
+        <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-300/25 bg-sky-300/10 text-sky-100 shadow-lg shadow-sky-950/20">
+          <BarChart3 className="h-5 w-5" />
+        </div>
+
+        <h2 className="text-lg font-black tracking-tight md:text-2xl">
+          إحصائيات المنصة
+        </h2>
+
+        <p className="mx-auto mt-1 max-w-xl text-[11px] font-medium leading-5 text-slate-300 md:text-sm md:leading-6">
           أرقام مباشرة تتحدث تلقائيًا مع توقعات الأعضاء واحتساب النتائج.
         </p>
       </div>
 
-      <div className="grid grid-cols-5 gap-2">
+      <div className="relative grid grid-cols-5 gap-1.5 md:gap-3">
         {cards.map((card) => (
-          <div
+          <motion.div
             key={card.titleLines.join("-")}
-            className="flex min-h-[118px] flex-col items-center rounded-2xl border border-white/10 bg-slate-950/50 px-1.5 py-2 text-center shadow-lg md:min-h-[145px] md:px-3 md:py-3"
+            variants={cardMotion}
+            whileTap={{ scale: 0.95 }}
+            className={`group relative flex min-h-[106px] flex-col items-center overflow-hidden rounded-2xl border ${card.borderClass} bg-slate-950/45 px-1 py-2 text-center shadow-xl shadow-slate-950/25 backdrop-blur-xl transition duration-200 hover:bg-slate-950/55 md:min-h-[152px] md:rounded-[1.4rem] md:px-3 md:py-4`}
           >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10 text-lg md:h-10 md:w-10 md:text-xl">
+            <div
+              className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${card.glowClass} opacity-80`}
+            />
+
+            <div className="pointer-events-none absolute inset-x-2 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent md:inset-x-5" />
+
+            <div
+              className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 shadow-lg shadow-slate-950/20 transition duration-200 group-hover:scale-105 md:h-12 md:w-12 md:rounded-2xl ${card.valueClass}`}
+            >
               {card.icon}
             </div>
 
-            <div className="mt-2 flex h-[30px] w-full flex-col items-center justify-center gap-0.5 text-center text-[9px] font-bold leading-none text-slate-300 md:h-[36px] md:text-xs">
-              <span className="block w-full text-center whitespace-nowrap">
+            <div className="relative mt-1.5 flex h-[30px] w-full flex-col items-center justify-center gap-0.5 text-center text-[8px] font-black leading-none text-slate-300 md:mt-2 md:h-[40px] md:text-xs">
+              <span className="block w-full whitespace-nowrap text-center">
                 {card.titleLines[0]}
               </span>
-              <span className="block w-full text-center whitespace-nowrap">
+              <span className="block w-full whitespace-nowrap text-center">
                 {card.titleLines[1]}
               </span>
             </div>
 
             <div
-              className={`mt-auto w-full text-center text-[16px] font-black leading-none md:text-3xl ${card.valueClass}`}
+              className={`relative mt-auto w-full text-center text-[15px] font-black leading-none tracking-tight md:text-3xl ${card.valueClass}`}
             >
-              {loading ? "..." : card.value}
+              <CountUpNumber
+                value={card.value}
+                suffix={card.suffix}
+                decimals={card.decimals}
+                loading={loading}
+              />
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
-    </section>
+    </motion.section>
   );
 }

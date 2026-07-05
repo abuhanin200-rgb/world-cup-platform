@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 
 type TeamFlagSize = "xs" | "sm" | "md" | "lg";
 
@@ -126,9 +127,13 @@ export default function TeamFlag({
 
   if (!flagFileName || failed) {
     return (
-      <span
+      <motion.span
         aria-label={altText}
         title={name || undefined}
+        initial={{ opacity: 0, scale: 0.78, y: 4 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        whileTap={{ scale: 0.92 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
         className={[
           "inline-flex shrink-0 items-center justify-center leading-none",
           EMOJI_SIZE_CLASSES[size],
@@ -136,18 +141,22 @@ export default function TeamFlag({
         ].join(" ")}
       >
         {safeEmoji}
-      </span>
+      </motion.span>
     );
   }
 
   return (
-    <img
+    <motion.img
       src={`/flags/${flagFileName}.svg`}
       alt={altText}
       title={name || undefined}
       loading="lazy"
       draggable={false}
       onError={() => setFailed(true)}
+      initial={{ opacity: 0, scale: 0.78, y: 4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      whileTap={{ scale: 0.92 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
       className={[
         "inline-block shrink-0 object-cover shadow-sm ring-1 ring-white/15",
         SIZE_CLASSES[size],

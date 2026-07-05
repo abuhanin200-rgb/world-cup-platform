@@ -1,42 +1,145 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { motion, type Variants } from "framer-motion";
+import {
+  Flag,
+  Gamepad2,
+  Home,
+  LogIn,
+  LogOut,
+  Puzzle,
+  Sparkles,
+  UserCircle,
+  UserPlus,
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import FlagMemoryGame from "@/components/flag-memory/FlagMemoryGame";
+
+const pageMotion: Variants = {
+  hidden: {
+    opacity: 0,
+  },
+  show: {
+    opacity: 1,
+    transition: {
+      duration: 0.35,
+      ease: "easeOut",
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+const headerMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: -18,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.38,
+      ease: "easeOut",
+    },
+  },
+};
+
+const revealMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 30,
+    scale: 0.97,
+    filter: "blur(8px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.5,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+function HeaderButton({
+  children,
+  onClick,
+  variant = "ghost",
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  variant?: "ghost" | "gold" | "danger";
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      whileTap={{ scale: 0.94 }}
+      className={`inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-xs font-bold transition md:px-3 md:text-sm ${
+        variant === "gold"
+          ? "bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/15 hover:bg-amber-300"
+          : variant === "danger"
+            ? "bg-red-500 text-white shadow-lg shadow-red-950/15 hover:bg-red-400"
+            : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+      }`}
+    >
+      {children}
+    </motion.button>
+  );
+}
 
 export default function FlagMemoryPage() {
   const router = useRouter();
   const { user, loading, isLoggedIn, logout } = useAuth();
 
   return (
-    <main
+    <motion.main
       dir="rtl"
-      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
+      variants={pageMotion}
+      initial="hidden"
+      animate="show"
+      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
     >
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.12),transparent_34%),radial-gradient(circle_at_10%_30%,rgba(56,189,248,0.10),transparent_32%),radial-gradient(circle_at_90%_70%,rgba(52,211,153,0.08),transparent_30%)]" />
+
+      <motion.header
+        variants={headerMotion}
+        className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl"
+      >
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="h-10 w-10 overflow-hidden rounded-2xl border border-white/20 bg-white/10 md:h-12 md:w-12">
+          <motion.div
+            whileTap={{ scale: 0.98 }}
+            className="flex min-w-0 items-center gap-2 md:gap-3"
+          >
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-lg shadow-slate-950/20 md:h-12 md:w-12">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 to-transparent" />
+
               <img
                 src="/wc2026-logo.png"
                 alt="شعار منصة توقعات كأس العالم 2026"
-                className="h-full w-full object-contain p-1"
+                className="relative h-full w-full object-contain p-1"
               />
             </div>
 
-            <div>
-              <h1 className="text-xs font-black md:text-xl">
+            <div className="min-w-0">
+              <h1 className="truncate text-xs font-black md:text-xl">
                 منصة توقعات كأس العالم 2026
               </h1>
-              <p className="text-[10px] text-slate-300 md:text-sm">
-                World Cup 2026 Predictions Platform
+
+              <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-slate-300 md:text-sm">
+                <Flag className="h-3 w-3 text-amber-300 md:h-4 md:w-4" />
+                <span>تحدي تطابق الأعلام</span>
               </p>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="flex items-center gap-1.5 md:gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
             {loading ? (
-              <div className="rounded-xl border border-white/10 px-2 py-2 text-[10px] text-slate-300 md:px-3 md:text-xs">
+              <div className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-[10px] text-slate-300 md:px-3 md:text-xs">
                 جاري التحقق...
               </div>
             ) : isLoggedIn && user ? (
@@ -45,108 +148,162 @@ export default function FlagMemoryPage() {
                   يا هلا، {user.fullName}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => router.push("/")}
-                  className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
-                >
-                  الرئيسية
-                </button>
+                <HeaderButton onClick={() => router.push("/")}>
+                  <Home className="h-3.5 w-3.5" />
+                  <span>الرئيسية</span>
+                </HeaderButton>
 
-                <button
-                  type="button"
-                  onClick={() => router.push("/account")}
-                  className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
-                >
-                  حسابي
-                </button>
+                <HeaderButton onClick={() => router.push("/account")}>
+                  <UserCircle className="h-3.5 w-3.5" />
+                  <span>حسابي</span>
+                </HeaderButton>
 
-                <button
-                  type="button"
+                <HeaderButton
+                  variant="danger"
                   onClick={() => {
                     logout();
                     router.push("/");
                   }}
-                  className="rounded-xl bg-red-500 px-2 py-2 text-xs font-bold text-white hover:bg-red-400 md:px-3 md:text-sm"
                 >
-                  خروج
-                </button>
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>خروج</span>
+                </HeaderButton>
               </>
             ) : (
               <>
-                <button
-                  type="button"
-                  onClick={() => router.push("/")}
-                  className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
-                >
-                  الرئيسية
-                </button>
+                <HeaderButton onClick={() => router.push("/")}>
+                  <Home className="h-3.5 w-3.5" />
+                  <span>الرئيسية</span>
+                </HeaderButton>
 
-                <button
-                  type="button"
-                  onClick={() => router.push("/login")}
-                  className="rounded-xl border border-white/10 px-2 py-2 text-xs font-bold hover:bg-white/10 md:px-3 md:text-sm"
-                >
-                  دخول
-                </button>
+                <HeaderButton onClick={() => router.push("/login")}>
+                  <LogIn className="h-3.5 w-3.5" />
+                  <span>دخول</span>
+                </HeaderButton>
 
-                <button
-                  type="button"
+                <HeaderButton
+                  variant="gold"
                   onClick={() => router.push("/register")}
-                  className="rounded-xl bg-amber-400 px-2 py-2 text-xs font-black text-slate-950 hover:bg-amber-300 md:px-3 md:text-sm"
                 >
-                  تسجيل
-                </button>
+                  <UserPlus className="h-3.5 w-3.5" />
+                  <span>تسجيل</span>
+                </HeaderButton>
               </>
             )}
           </div>
         </div>
-      </header>
+      </motion.header>
 
-      <section className="mx-auto max-w-6xl px-3 py-4 md:px-4 md:py-6">
-        <div className="mb-4 rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl md:mb-5 md:p-5">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-3xl border border-amber-400/30 bg-amber-400/10 text-3xl shadow-lg shadow-slate-950/30">
-            🎌
-          </div>
+      <section className="relative mx-auto max-w-6xl px-3 py-4 md:px-4 md:py-6">
+        <motion.div
+          variants={revealMotion}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: false, amount: 0.35 }}
+          whileTap={{ scale: 0.99 }}
+          className="relative mb-4 overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-4 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:mb-5 md:p-5"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
+          <div className="pointer-events-none absolute -right-20 top-0 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
-          <h2 className="mb-2 text-2xl font-black leading-snug md:text-4xl">
-            تحدي تطابق الأعلام
-          </h2>
-
-          <p className="mx-auto max-w-2xl text-sm leading-7 text-slate-200 md:text-base">
-            اختبر ذاكرتك، طابق أعلام المنتخبات، ونافس الأعضاء على أسرع وقت
-            وأعلى نقاط في تحدي يومي جديد.
-          </p>
-
-          <div className="mt-4 flex flex-row justify-center gap-2 md:mt-5 md:gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/")}
-              className="rounded-xl border border-white/10 px-4 py-3 text-sm font-bold hover:bg-white/10 md:px-6"
+          <div className="relative">
+            <motion.div
+              animate={{
+                y: [0, -5, 0],
+                rotate: [0, -2, 2, 0],
+              }}
+              transition={{
+                duration: 2.8,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-3xl border border-amber-400/30 bg-amber-400/10 text-amber-100 shadow-lg shadow-slate-950/30"
             >
-              العودة للرئيسية
-            </button>
+              <Flag className="h-7 w-7" />
+            </motion.div>
 
-            <button
-              type="button"
-              onClick={() => router.push("/word-game")}
-              className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm font-black text-amber-100 hover:bg-amber-400/20 md:px-6"
-            >
-              خمن كلمة اليوم
-            </button>
+            <h2 className="mb-2 inline-flex items-center justify-center gap-2 text-2xl font-black leading-snug md:text-4xl">
+              <span>تحدي تطابق الأعلام</span>
+              <Sparkles className="h-5 w-5 text-amber-300 md:h-7 md:w-7" />
+            </h2>
+
+            <p className="mx-auto max-w-2xl text-sm font-medium leading-7 text-slate-200 md:text-base">
+              اختبر ذاكرتك، طابق أعلام المنتخبات، ونافس الأعضاء على أسرع وقت
+              وأعلى نقاط في تحدي يومي جديد.
+            </p>
+
+            <div className="mt-4 flex flex-row justify-center gap-2 md:mt-5 md:gap-3">
+              <motion.button
+                type="button"
+                onClick={() => router.push("/")}
+                whileTap={{ scale: 0.94 }}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold shadow-lg shadow-slate-950/15 transition hover:bg-white/10 md:px-6"
+              >
+                <Home className="h-4 w-4" />
+                <span>العودة للرئيسية</span>
+              </motion.button>
+
+              <motion.button
+                type="button"
+                onClick={() => router.push("/word-game")}
+                whileTap={{ scale: 0.94 }}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm font-black text-amber-100 shadow-lg shadow-amber-950/10 transition hover:bg-amber-400/20 md:px-6"
+              >
+                <Puzzle className="h-4 w-4" />
+                <span>خمن كلمة اليوم</span>
+              </motion.button>
+            </div>
           </div>
-        </div>
+        </motion.div>
 
-        <FlagMemoryGame />
+        <motion.div
+          variants={revealMotion}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: false, amount: 0.12 }}
+        >
+          <FlagMemoryGame />
+        </motion.div>
       </section>
 
-      <footer className="border-t border-white/10 py-5 text-center text-xs text-slate-400">
-        <div className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-          <span>©</span>
-          <span>برمجة وتصميم</span>
-          <span className="font-bold text-slate-200">عبدالسلام العنزي</span>
-        </div>
-      </footer>
-    </main>
+      <motion.footer
+  variants={revealMotion}
+  initial="hidden"
+  whileInView="show"
+  viewport={{ once: false, amount: 0.45 }}
+  className="relative z-10 mt-6 border-t border-white/10 px-3 py-6 text-center text-xs text-slate-400"
+>
+  <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/40 to-transparent" />
+
+  <motion.div
+    whileTap={{ scale: 0.985 }}
+    className="relative mx-auto flex max-w-xl flex-col items-center justify-center gap-3 overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-xl shadow-slate-950/25 backdrop-blur-xl"
+  >
+    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/5" />
+    <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-amber-300/10 blur-3xl" />
+    <div className="pointer-events-none absolute -left-16 bottom-0 h-32 w-32 rounded-full bg-cyan-300/10 blur-3xl" />
+
+    <div className="relative flex items-center justify-center gap-2 text-slate-300">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[13px]">
+        ©
+      </span>
+      <span>جميع الحقوق محفوظة</span>
+      <span className="font-black text-white">2026</span>
+    </div>
+
+    <div className="relative inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-[11px] font-black text-emerald-100 shadow-lg shadow-emerald-950/10">
+      <span className="text-emerald-300">✓</span>
+      <span>برمجة وتصميم</span>
+      <span className="text-white">عبدالسلام العنزي</span>
+    </div>
+
+    <div className="relative text-[10px] font-bold text-slate-500">
+      World Cup 2026 Predictions Platform
+    </div>
+  </motion.div>
+</motion.footer>
+    </motion.main>
   );
 }

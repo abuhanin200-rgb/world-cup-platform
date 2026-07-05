@@ -1,6 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
+import {
+  ChevronDown,
+  Flame,
+  Gauge,
+  ListFilter,
+  PauseCircle,
+  Star,
+  X,
+} from "lucide-react";
 import { getLatestPredictions, LatestPrediction } from "@/lib/predictions";
 import {
   getSiteSettings,
@@ -113,6 +124,86 @@ function getQualifiedTeamInfo(
   };
 }
 
+const sectionMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.38,
+      ease: "easeOut",
+    },
+  },
+};
+
+const listItemMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 14,
+    scale: 0.97,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.25,
+      ease: "easeOut",
+    },
+  },
+};
+
+const modalBackdropMotion: Variants = {
+  hidden: {
+    opacity: 0,
+  },
+  show: {
+    opacity: 1,
+    transition: {
+      duration: 0.18,
+      ease: "easeOut",
+    },
+  },
+  exit: {
+    opacity: 0,
+    transition: {
+      duration: 0.16,
+      ease: "easeIn",
+    },
+  },
+};
+
+const modalMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 42,
+    scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.28,
+      ease: "easeOut",
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: 28,
+    scale: 0.98,
+    transition: {
+      duration: 0.18,
+      ease: "easeIn",
+    },
+  },
+};
+
 export default function LatestPredictionsTicker() {
   const [predictions, setPredictions] = useState<LatestPrediction[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
@@ -121,9 +212,14 @@ export default function LatestPredictionsTicker() {
   const [groupWidth, setGroupWidth] = useState(0);
   const [isListOpen, setIsListOpen] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState("all");
+  const [isMounted, setIsMounted] = useState(false);
 
   const predictionsSignatureRef = useRef("");
   const groupRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   async function loadPredictions() {
     try {
@@ -256,27 +352,40 @@ export default function LatestPredictionsTicker() {
       <div
         key={`${prediction.id}-${index}`}
         dir="rtl"
-        className={`inline-flex flex-none items-center gap-2 rounded-2xl border px-4 py-2 text-sm ${
+        className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden rounded-2xl border px-3 py-2 text-xs shadow-lg shadow-slate-950/25 backdrop-blur-xl transition duration-200 md:px-4 md:text-sm ${
           golden
             ? "border-amber-300/40 bg-amber-400/15 text-white"
             : "border-white/10 bg-white/10 text-white"
         }`}
       >
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-l ${
+            golden
+              ? "from-amber-300/15 via-transparent to-transparent"
+              : "from-cyan-300/10 via-transparent to-transparent"
+          } opacity-80`}
+        />
+
         {golden && (
-          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 md:text-xs">
-            ⭐ ذهبي
+          <span className="relative inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-950/20 md:text-xs">
+            <Star className="h-3 w-3 fill-slate-950" />
+            <span>ذهبي</span>
           </span>
         )}
 
-        <span className="font-black text-amber-300">
+        <span className="relative font-black text-amber-300">
           {prediction.userName}
         </span>
 
-        <span className={golden ? "text-amber-100/80" : "text-slate-400"}>
+        <span
+          className={
+            golden ? "relative text-amber-100/80" : "relative text-slate-400"
+          }
+        >
           توقع
         </span>
 
-        <span className="inline-flex items-center gap-1.5 font-bold">
+        <span className="relative inline-flex items-center gap-1.5 font-bold">
           <TeamFlag
             code={getPredictionTeamCode(prediction, "home")}
             emoji={prediction.homeTeamEmoji}
@@ -287,16 +396,16 @@ export default function LatestPredictionsTicker() {
         </span>
 
         <span
-          className={`rounded-lg px-2 py-1 font-black ${
+          className={`relative rounded-xl px-2 py-1 font-black shadow-inner ${
             golden
               ? "bg-amber-400 text-slate-950"
-              : "bg-slate-950 text-white"
+              : "bg-slate-950/80 text-white"
           }`}
         >
           {prediction.homeScore} - {prediction.awayScore}
         </span>
 
-        <span className="inline-flex items-center gap-1.5 font-bold">
+        <span className="relative inline-flex items-center gap-1.5 font-bold">
           <span>{prediction.awayTeamName}</span>
           <TeamFlag
             code={getPredictionTeamCode(prediction, "away")}
@@ -317,15 +426,24 @@ export default function LatestPredictionsTicker() {
     );
 
     return (
-      <div
+      <motion.div
         key={prediction.id}
-        className={`rounded-2xl border p-3 ${
+        variants={listItemMotion}
+        className={`relative overflow-hidden rounded-3xl border p-3 shadow-xl shadow-slate-950/25 ${
           golden
             ? "border-amber-300/40 bg-amber-400/10"
             : "border-white/10 bg-slate-950/60"
         }`}
       >
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${
+            golden
+              ? "from-amber-300/10 via-transparent to-transparent"
+              : "from-white/10 via-transparent to-cyan-300/5"
+          }`}
+        />
+
+        <div className="relative mb-3 flex items-center justify-between gap-3">
           <div>
             <div
               className={`text-sm font-black ${
@@ -335,19 +453,20 @@ export default function LatestPredictionsTicker() {
               {prediction.userName}
             </div>
 
-            <div className="mt-1 text-[11px] text-slate-400">
+            <div className="mt-1 text-[11px] font-medium text-slate-400">
               {getMatchLabel(prediction)}
             </div>
           </div>
 
           {golden && (
-            <span className="shrink-0 rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950">
-              ⭐ توقع ذهبي
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-950/20">
+              <Star className="h-3 w-3 fill-slate-950" />
+              <span>توقع ذهبي</span>
             </span>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl bg-slate-950/70 px-3 py-2 text-xs font-black text-white">
+        <div className="relative flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-black text-white shadow-inner">
           <span className="inline-flex items-center gap-1">
             <TeamFlag
               code={prediction.homeTeamCode}
@@ -359,7 +478,7 @@ export default function LatestPredictionsTicker() {
           </span>
 
           <span
-            className={`rounded-lg px-2 py-1 ${
+            className={`rounded-xl px-2.5 py-1 ${
               golden ? "bg-amber-400 text-slate-950" : "bg-white/10 text-white"
             }`}
           >
@@ -378,7 +497,7 @@ export default function LatestPredictionsTicker() {
         </div>
 
         {qualifiedTeam && (
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-1 rounded-xl border border-blue-400/30 bg-blue-400/10 px-3 py-2 text-center text-xs font-black text-blue-100">
+          <div className="relative mt-2 flex flex-wrap items-center justify-center gap-1 rounded-2xl border border-blue-400/30 bg-blue-400/10 px-3 py-2 text-center text-xs font-black text-blue-100">
             <span>المتأهل:</span>
             <TeamFlag
               code={qualifiedTeam.code}
@@ -388,194 +507,274 @@ export default function LatestPredictionsTicker() {
             />
             <span>{qualifiedTeam.name}</span>
 
-            {qualificationMethodLabel && <span>• {qualificationMethodLabel}</span>}
+            {qualificationMethodLabel && (
+              <span>• {qualificationMethodLabel}</span>
+            )}
           </div>
         )}
-      </div>
+      </motion.div>
     );
   }
 
+  const predictionsModal =
+    isMounted &&
+    createPortal(
+      <AnimatePresence>
+        {isListOpen && (
+          <motion.div
+            variants={modalBackdropMotion}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/85 p-3 backdrop-blur-md md:items-center md:p-4"
+            onClick={() => setIsListOpen(false)}
+          >
+            <motion.div
+              variants={modalMotion}
+              dir="rtl"
+              className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-t-[2rem] border border-white/10 bg-slate-950 shadow-2xl shadow-slate-950/60 md:max-h-[84vh] md:rounded-[2rem]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="relative border-b border-white/10 bg-white/[0.06] px-4 py-3">
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+
+                <div className="relative mx-auto mb-2 h-1.5 w-12 rounded-full bg-white/20 md:hidden" />
+
+                <div className="relative flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-orange-300/20 bg-orange-300/10 px-2.5 py-1 text-[10px] font-black text-orange-100">
+                      <Flame className="h-3.5 w-3.5" />
+                      <span>آخر التوقعات</span>
+                    </div>
+
+                    <h3 className="text-lg font-black text-white">
+                      قائمة آخر التوقعات
+                    </h3>
+
+                    <p className="mt-1 text-[11px] font-medium leading-5 text-slate-400">
+                      تظهر التوقعات غير المحسوبة فقط، وتبقى ظاهرة حتى بعد بداية
+                      المباراة إلى أن يتم الاحتساب.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsListOpen(false)}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95"
+                    aria-label="إغلاق"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                <div className="relative mt-3 rounded-2xl border border-white/10 bg-slate-950/55 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label className="flex items-center gap-1.5 text-[11px] font-black text-slate-300">
+                      <ListFilter className="h-3.5 w-3.5" />
+                      <span>فلترة حسب المباراة</span>
+                    </label>
+
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-400">
+                      {filteredPredictions.length} توقع
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      value={selectedMatchId}
+                      onChange={(event) =>
+                        setSelectedMatchId(event.target.value)
+                      }
+                      className="h-12 w-full appearance-none rounded-2xl border border-white/10 bg-slate-950 px-3 pl-10 text-sm font-bold text-white outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15"
+                    >
+                      <option value="all">كل المباريات</option>
+
+                      {matchFilters.map((prediction) => (
+                        <option
+                          key={prediction.matchId}
+                          value={prediction.matchId}
+                        >
+                          {getMatchLabel(prediction)}
+                        </option>
+                      ))}
+                    </select>
+
+                    <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
+                  </div>
+                </div>
+              </div>
+
+              <motion.div
+                variants={sectionMotion}
+                initial="hidden"
+                animate="show"
+                className="max-h-[58vh] space-y-3 overflow-y-auto p-4 md:max-h-[56vh]"
+              >
+                {filteredPredictions.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-sm font-bold text-slate-300">
+                    لا توجد توقعات لهذه المباراة.
+                  </div>
+                ) : (
+                  filteredPredictions.map((prediction) =>
+                    renderPredictionListItem(prediction)
+                  )
+                )}
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>,
+      document.body
+    );
+
   if (loading) {
     return (
-      <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl">
-        <div className="text-center text-sm text-slate-300">
-          جاري تحميل آخر التوقعات...
-        </div>
-      </section>
+      <>
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+          <div className="relative flex items-center justify-center gap-2 text-center text-sm font-bold text-slate-300">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-cyan-300" />
+            <span>جاري تحميل آخر التوقعات...</span>
+          </div>
+        </section>
+        {predictionsModal}
+      </>
     );
   }
 
   if (predictions.length === 0) {
     return (
-      <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => setIsListOpen(true)}
-            className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-base font-black text-white transition hover:bg-white/20 md:text-xl"
-          >
-            🔥 آخر التوقعات
-          </button>
+      <>
+        <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
 
-          <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] text-slate-300">
-            غير محسوبة فقط
-          </span>
-        </div>
+          <div className="relative mb-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setIsListOpen(true)}
+              className="group inline-flex min-h-[38px] items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-base font-black text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95 md:text-xl"
+            >
+              <Flame className="h-5 w-5 text-orange-300 transition group-hover:scale-110" />
+              <span>آخر التوقعات</span>
+            </button>
 
-        <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 p-4 text-center text-sm text-slate-300">
-          لا توجد توقعات غير محسوبة حاليًا.
-        </div>
-      </section>
+            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-slate-300">
+              غير محسوبة فقط
+            </span>
+          </div>
+
+          <div className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/40 p-4 text-center text-sm font-bold text-slate-300">
+            لا توجد توقعات غير محسوبة حاليًا.
+          </div>
+        </section>
+        {predictionsModal}
+      </>
     );
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setIsListOpen(true)}
-          className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-base font-black text-white transition hover:bg-white/20 md:text-xl"
+    <>
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl">
+        <motion.div
+          variants={sectionMotion}
+          initial="hidden"
+          animate="show"
+          className="relative"
         >
-          🔥 آخر التوقعات
-        </button>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+          <div className="pointer-events-none absolute -right-20 top-0 h-44 w-44 rounded-full bg-orange-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
 
-        <div className="flex items-center gap-2">
-          <span className="hidden rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] text-slate-300 md:inline">
-            السرعة: {getSpeedLabel(currentSpeed)}
-          </span>
+          <div className="relative mb-3 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setIsListOpen(true)}
+              className="group inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-base font-black text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95 md:text-xl"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-400/15 text-orange-200">
+                <Flame className="h-5 w-5 transition group-hover:scale-110 group-hover:rotate-[-6deg]" />
+              </span>
+              <span>آخر التوقعات</span>
+              <ChevronDown className="h-4 w-4 text-slate-300 transition group-hover:translate-y-0.5" />
+            </button>
 
-          <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] text-emerald-100">
-            يتوقف عند اللمس
-          </span>
-        </div>
-      </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-bold text-slate-300 md:inline-flex">
+                <Gauge className="h-3.5 w-3.5" />
+                <span>السرعة: {getSpeedLabel(currentSpeed)}</span>
+              </span>
 
-      <div
-        dir="ltr"
-        className="latest-predictions-wrapper relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 py-3"
-        onMouseEnter={pauseTicker}
-        onMouseLeave={resumeTicker}
-        onTouchStart={pauseTicker}
-        onTouchEnd={resumeTicker}
-        onTouchCancel={resumeTicker}
-        onPointerDown={pauseTicker}
-        onPointerUp={resumeTicker}
-        onPointerCancel={resumeTicker}
-      >
-        <div
-          className="latest-predictions-marquee flex w-max gap-3 whitespace-nowrap"
-          style={{
-            animationDuration: `${duration}s`,
-            animationPlayState: isPaused ? "paused" : "running",
-          }}
-        >
-          <div ref={groupRef} className="flex flex-none gap-3">
-            {tickerItems.map((prediction, index) =>
-              renderPredictionCard(prediction, index)
-            )}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-black text-emerald-100 shadow-lg shadow-emerald-950/10">
+                <PauseCircle className="h-3.5 w-3.5" />
+                <span>يتوقف عند اللمس</span>
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-none gap-3">
-            {tickerItems.map((prediction, index) =>
-              renderPredictionCard(prediction, index + tickerItems.length)
-            )}
-          </div>
-        </div>
-      </div>
-
-      {isListOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
-          onClick={() => setIsListOpen(false)}
-        >
           <div
-            dir="rtl"
-            className="max-h-[84vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
+            dir="ltr"
+            className="latest-predictions-wrapper relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65 py-3 shadow-inner"
+            onMouseEnter={pauseTicker}
+            onMouseLeave={resumeTicker}
+            onTouchStart={pauseTicker}
+            onTouchEnd={resumeTicker}
+            onTouchCancel={resumeTicker}
+            onPointerDown={pauseTicker}
+            onPointerUp={resumeTicker}
+            onPointerCancel={resumeTicker}
           >
-            <div className="border-b border-white/10 bg-white/5 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-black text-white">
-                    🔥 قائمة آخر التوقعات
-                  </h3>
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-slate-950/90 to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-slate-950/90 to-transparent" />
 
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    تظهر التوقعات غير المحسوبة فقط، وتبقى ظاهرة حتى بعد بداية
-                    المباراة إلى أن يتم الاحتساب.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsListOpen(false)}
-                  className="rounded-xl bg-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/20"
-                >
-                  إغلاق
-                </button>
+            <div
+              className="latest-predictions-marquee flex w-max gap-3 whitespace-nowrap"
+              style={{
+                animationDuration: `${duration}s`,
+                animationPlayState: isPaused ? "paused" : "running",
+              }}
+            >
+              <div ref={groupRef} className="flex flex-none gap-3">
+                {tickerItems.map((prediction, index) =>
+                  renderPredictionCard(prediction, index)
+                )}
               </div>
 
-              <div className="mt-3">
-                <label className="mb-1 block text-[11px] font-black text-slate-300">
-                  فلترة حسب المباراة
-                </label>
-
-                <select
-                  value={selectedMatchId}
-                  onChange={(event) => setSelectedMatchId(event.target.value)}
-                  className="h-11 w-full rounded-2xl border border-white/10 bg-slate-950 px-3 text-sm font-bold text-white outline-none focus:border-amber-400"
-                >
-                  <option value="all">كل المباريات</option>
-
-                  {matchFilters.map((prediction) => (
-                    <option key={prediction.matchId} value={prediction.matchId}>
-                      {getMatchLabel(prediction)}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-none gap-3">
+                {tickerItems.map((prediction, index) =>
+                  renderPredictionCard(prediction, index + tickerItems.length)
+                )}
               </div>
-            </div>
-
-            <div className="max-h-[62vh] space-y-3 overflow-y-auto p-4">
-              {filteredPredictions.length === 0 ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-sm text-slate-300">
-                  لا توجد توقعات لهذه المباراة.
-                </div>
-              ) : (
-                filteredPredictions.map((prediction) =>
-                  renderPredictionListItem(prediction)
-                )
-              )}
             </div>
           </div>
-        </div>
-      )}
+        </motion.div>
 
-      <style jsx>{`
-        .latest-predictions-marquee {
-          animation-name: latestPredictionsTicker;
-          animation-timing-function: linear;
-          animation-iteration-count: infinite;
-          will-change: transform;
-        }
-
-        .latest-predictions-wrapper:hover .latest-predictions-marquee,
-        .latest-predictions-wrapper:active .latest-predictions-marquee,
-        .latest-predictions-wrapper:focus-within .latest-predictions-marquee {
-          animation-play-state: paused;
-        }
-
-        @keyframes latestPredictionsTicker {
-          0% {
-            transform: translateX(-50%);
+        <style jsx>{`
+          .latest-predictions-marquee {
+            animation-name: latestPredictionsTicker;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            will-change: transform;
           }
 
-          100% {
-            transform: translateX(0%);
+          .latest-predictions-wrapper:hover .latest-predictions-marquee,
+          .latest-predictions-wrapper:active .latest-predictions-marquee,
+          .latest-predictions-wrapper:focus-within .latest-predictions-marquee {
+            animation-play-state: paused;
           }
-        }
-      `}</style>
-    </section>
+
+          @keyframes latestPredictionsTicker {
+            0% {
+              transform: translateX(-50%);
+            }
+
+            100% {
+              transform: translateX(0%);
+            }
+          }
+        `}</style>
+      </section>
+
+      {predictionsModal}
+    </>
   );
 }

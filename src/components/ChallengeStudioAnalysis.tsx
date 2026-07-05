@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import {
   ChallengeStudioChatLike,
   ChallengeStudioChatMessage,
@@ -38,6 +39,79 @@ const CHAT_ADMIN_NAMES = [
   "عبدالسلام بن حمدي العنزي",
   "أبو راكان",
 ];
+
+const sectionMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 30,
+    scale: 0.97,
+    filter: "blur(8px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.5,
+      ease: [0.22, 1, 0.36, 1],
+      staggerChildren: 0.06,
+    },
+  },
+};
+
+const itemMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 14,
+    scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.32,
+      ease: "easeOut",
+    },
+  },
+};
+
+const messageMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.97,
+    filter: "blur(6px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.32,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+const bubbleMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 10,
+    scale: 0.96,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.28,
+      ease: "easeOut",
+    },
+  },
+};
 
 function normalizeText(text: string) {
   return text.replace(/\s+/g, " ").trim();
@@ -543,11 +617,19 @@ export default function ChallengeStudioAnalysis({
   }
 
   return (
-    <section
+    <motion.section
       dir="rtl"
-      className="rounded-[2rem] border border-white/10 bg-slate-950/75 p-4 text-white shadow-xl"
+      variants={sectionMotion}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: false, amount: 0.12 }}
+      className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/75 p-4 text-white shadow-xl shadow-slate-950/30 backdrop-blur-xl"
     >
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-cyan-300/8" />
+      <div className="pointer-events-none absolute -right-24 top-10 h-56 w-56 rounded-full bg-emerald-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-24 bottom-10 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="relative">
+      <motion.div variants={itemMotion} className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-black">🎙️ استديو التحليل</h2>
 
@@ -559,9 +641,9 @@ export default function ChallengeStudioAnalysis({
         <div className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
           {onlineMembers.length} متواجد الآن
         </div>
-      </div>
+      </motion.div>
 
-      <div className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-3">
+      <motion.div variants={itemMotion} className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-3 shadow-lg shadow-slate-950/20">
         <div className="mb-2 text-xs font-bold text-slate-300">
           الأعضاء المتواجدون الآن
         </div>
@@ -569,15 +651,16 @@ export default function ChallengeStudioAnalysis({
         {onlineMembers.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {onlineMembers.map((member) => (
-              <button
+              <motion.button
                 key={member.userId}
                 type="button"
                 onClick={() => insertMention(member)}
+                whileTap={{ scale: 0.94 }}
                 className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-200 transition hover:bg-emerald-400/20"
                 title="اضغط لإضافة منشن"
               >
                 🟢 {member.userName}
-              </button>
+              </motion.button>
             ))}
           </div>
         ) : (
@@ -589,10 +672,17 @@ export default function ChallengeStudioAnalysis({
         <div className="mt-2 text-[11px] font-bold text-slate-500">
           اكتب @ داخل خانة الرسالة لعرض قائمة المنشن. المتواجدون يظهرون أولًا.
         </div>
-      </div>
+      </motion.div>
 
-      {newReplyNotificationIds.length > 0 && (
-        <div className="mb-3 rounded-2xl border border-sky-400/30 bg-sky-400/10 p-3">
+      <AnimatePresence mode="popLayout">
+        {newReplyNotificationIds.length > 0 && (
+        <motion.div
+          variants={itemMotion}
+          initial="hidden"
+          animate="show"
+          exit={{ opacity: 0, y: -10, scale: 0.97 }}
+          className="mb-3 rounded-2xl border border-sky-400/30 bg-sky-400/10 p-3 shadow-lg shadow-sky-950/10"
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm font-black text-sky-100">
               🔔 عندك {newReplyNotificationIds.length} رد جديد على رسائلك
@@ -606,11 +696,19 @@ export default function ChallengeStudioAnalysis({
               عرض الردود
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
+      <AnimatePresence mode="popLayout">
       {newMentionNotificationIds.length > 0 && (
-        <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3">
+        <motion.div
+          variants={itemMotion}
+          initial="hidden"
+          animate="show"
+          exit={{ opacity: 0, y: -10, scale: 0.97 }}
+          className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 shadow-lg shadow-amber-950/10"
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm font-black text-amber-100">
               🚩 عندك {newMentionNotificationIds.length} منشن جديد في استديو
@@ -625,10 +723,12 @@ export default function ChallengeStudioAnalysis({
               عرض المنشن
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
-      <div
+      <motion.div
+        variants={itemMotion}
         ref={messagesBoxRef}
         className="mb-4 h-[58vh] min-h-[520px] space-y-3 overflow-y-auto rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_35%),rgba(0,0,0,0.18)] p-3 md:h-[64vh]"
       >
@@ -642,11 +742,17 @@ export default function ChallengeStudioAnalysis({
               isMine && canEditChallengeStudioMessage(message);
 
             return (
-             <div
+             <motion.div
   key={message.id}
+  variants={messageMotion}
+  initial="hidden"
+  animate="show"
+  layout
   className={`flex w-full ${isMine ? "justify-end" : "justify-start"}`}
 >
-  <div
+  <motion.div
+    variants={bubbleMotion}
+    whileTap={{ scale: 0.99 }}
     className={`relative max-w-[82%] rounded-3xl border px-4 py-3 shadow-lg md:max-w-[68%] ${
       isMine
         ? "rounded-br-md border-emerald-300/30 bg-gradient-to-br from-emerald-500/25 to-emerald-700/20 text-right shadow-emerald-950/30"
@@ -833,8 +939,8 @@ export default function ChallengeStudioAnalysis({
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             );
           })
         ) : (
@@ -842,9 +948,9 @@ export default function ChallengeStudioAnalysis({
             لا توجد رسائل حتى الآن. افتح التحليل يا بطل.
           </div>
         )}
-      </div>
+      </motion.div>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <motion.form variants={itemMotion} onSubmit={handleSubmit} className="space-y-3">
         {replyingToMessage && (
           <div className="rounded-2xl border border-sky-400/25 bg-sky-400/10 p-3">
             <div className="flex items-start justify-between gap-3">
@@ -915,14 +1021,15 @@ export default function ChallengeStudioAnalysis({
               className="max-h-28 min-h-11 flex-1 resize-none rounded-[1.5rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/50"
             />
 
-            <button
+            <motion.button
               type="submit"
               disabled={!canSend}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg font-black text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+              whileTap={canSend ? { scale: 0.9, y: 2 } : undefined}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg font-black text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
               title="إرسال"
             >
               ➤
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -936,12 +1043,22 @@ export default function ChallengeStudioAnalysis({
           متاح لمدة 5 دقائق، وبين كل رسالة ورسالة 5 ثواني.
         </div>
 
-        {error && (
-          <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-sm font-bold text-red-200">
-            {error}
-          </div>
-        )}
-      </form>
-    </section>
+        <AnimatePresence mode="popLayout">
+          {error && (
+            <motion.div
+              key={error}
+              initial={{ opacity: 0, y: 10, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ duration: 0.24, ease: "easeOut" }}
+              className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-sm font-bold text-red-200"
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.form>
+      </div>
+    </motion.section>
   );
 }

@@ -1,12 +1,101 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { motion, type Variants } from "framer-motion";
 import { getLeaderboardUsers, LeaderboardUser } from "@/lib/leaderboard";
 import { getPredictionsByUserId, Prediction } from "@/lib/predictions";
 import TeamFlag from "@/components/TeamFlag";
 
 const USERS_PER_PAGE = 20;
 const MEMBER_PREDICTIONS_PER_PAGE = 6;
+
+const leaderboardSectionMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 22,
+    scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.42,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+const leaderboardRowMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 24,
+    scale: 0.97,
+    filter: "blur(6px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.42,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+const modalCardMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 28,
+    scale: 0.97,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.28,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+const modalOverlayMotion: Variants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.24, ease: "easeOut" } },
+};
+
+const modalPanelMotion: Variants = {
+  hidden: { opacity: 0, y: 34, scale: 0.94, filter: "blur(10px)" },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.42,
+      ease: [0.22, 1, 0.36, 1],
+      staggerChildren: 0.06,
+    },
+  },
+};
+
+const modalItemMotion: Variants = {
+  hidden: { opacity: 0, y: 14, scale: 0.98 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.3, ease: "easeOut" },
+  },
+};
+
+const modalListMotion: Variants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.04 } },
+};
 
 type MemberAchievement = {
   icon: string;
@@ -750,9 +839,19 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm">
-      <div className="max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 text-white shadow-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/10 p-4">
+    <motion.div
+      variants={modalOverlayMotion}
+      initial="hidden"
+      animate="show"
+      className="fixed inset-0 z-[120] flex items-center justify-center overflow-hidden bg-slate-950/80 p-3 backdrop-blur-sm"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(251,191,36,0.16),transparent_35%),radial-gradient(circle_at_15%_80%,rgba(34,211,238,0.10),transparent_32%)]" />
+      <motion.div
+        variants={modalPanelMotion}
+        className="relative max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 text-white shadow-2xl shadow-slate-950/40"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-amber-300/8" />
+        <div className="relative flex items-center justify-between gap-3 border-b border-white/10 bg-white/10 p-4">
           <div>
             <h3 className="text-lg font-black md:text-xl">
               🏅 دليل الألقاب والإنجازات
@@ -763,16 +862,17 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
             </p>
           </div>
 
-          <button
+          <motion.button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-red-500 px-3 py-2 text-xs font-black text-white hover:bg-red-400"
+            whileTap={{ scale: 0.94 }}
+            className="rounded-xl bg-red-500 px-3 py-2 text-xs font-black text-white transition hover:bg-red-400"
           >
             إغلاق
-          </button>
+          </motion.button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto p-4">
+        <div className="relative max-h-[70vh] overflow-y-auto p-4">
           <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
             ارفع عدد توقعاتك، حقق نتائج صحيحة، واستغل التوقع الذهبي عشان تجمع
             نقاط أكثر 🔥
@@ -834,8 +934,8 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -974,31 +1074,56 @@ function MemberStatCard({
   className?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center">
-      <div className="text-[10px] font-bold text-slate-400 md:text-xs">
-        {label}
-      </div>
+    <motion.div
+      variants={modalItemMotion}
+      whileTap={{ scale: 0.96 }}
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center shadow-lg shadow-slate-950/20"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-transparent" />
+      <div className="relative">
+        <div className="text-[10px] font-bold text-slate-400 md:text-xs">
+          {label}
+        </div>
 
-      <div className={`mt-1 text-lg font-black md:text-xl ${className}`}>
-        {value}
+        <motion.div
+          key={String(value)}
+          initial={{ opacity: 0, y: 6, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          className={`mt-1 text-lg font-black tabular-nums md:text-xl ${className}`}
+        >
+          {value}
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function AchievementCard({ achievement }: { achievement: MemberAchievement }) {
   return (
-    <div
-      className={`rounded-2xl border p-3 ${
+    <motion.div
+      variants={modalItemMotion}
+      whileTap={{ scale: 0.98 }}
+      className={`relative overflow-hidden rounded-2xl border p-3 shadow-lg shadow-slate-950/15 ${
         achievement.unlocked
           ? "border-amber-400/25 bg-amber-400/10"
           : "border-white/10 bg-white/5 opacity-55"
       }`}
     >
-      <div className="flex items-center gap-2">
-        <span className="text-xl">
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-transparent" />
+
+      <div className="relative flex items-center gap-2">
+        <motion.span
+          animate={
+            achievement.unlocked
+              ? { y: [0, -2, 0], scale: [1, 1.06, 1] }
+              : undefined
+          }
+          transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}
+          className="text-xl"
+        >
           {achievement.unlocked ? achievement.icon : "🔒"}
-        </span>
+        </motion.span>
 
         <div className="min-w-0">
           <div
@@ -1014,7 +1139,7 @@ function AchievementCard({ achievement }: { achievement: MemberAchievement }) {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1066,9 +1191,19 @@ export function PredictionDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-3 backdrop-blur-sm">
-      <div className="max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 text-white shadow-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/10 p-4">
+    <motion.div
+      variants={modalOverlayMotion}
+      initial="hidden"
+      animate="show"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/80 p-3 backdrop-blur-sm"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(251,191,36,0.14),transparent_35%),radial-gradient(circle_at_15%_80%,rgba(34,211,238,0.10),transparent_32%),radial-gradient(circle_at_90%_75%,rgba(52,211,153,0.08),transparent_28%)]" />
+      <motion.div
+        variants={modalPanelMotion}
+        className="relative max-h-[88vh] w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-slate-950 text-white shadow-2xl shadow-slate-950/40"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-amber-300/8" />
+        <div className="relative flex items-center justify-between gap-3 border-b border-white/10 bg-white/10 p-4">
           <div>
             <h3 className="text-lg font-black md:text-xl">ملف العضو</h3>
 
@@ -1077,17 +1212,18 @@ export function PredictionDetailsModal({
             </p>
           </div>
 
-          <button
+          <motion.button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-red-500 px-3 py-2 text-xs font-black text-white hover:bg-red-400"
+            whileTap={{ scale: 0.94 }}
+            className="rounded-xl bg-red-500 px-3 py-2 text-xs font-black text-white transition hover:bg-red-400"
           >
             إغلاق
-          </button>
+          </motion.button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto p-4">
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-4 text-center">
+        <div className="relative max-h-[70vh] overflow-y-auto p-4">
+          <motion.div variants={modalItemMotion} className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-4 text-center shadow-lg shadow-slate-950/20">
             <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-slate-950/60">
               <TeamFlag
                 code={getLeaderboardUserTeamCode(user)}
@@ -1131,9 +1267,11 @@ export function PredictionDetailsModal({
               </div>
 
               <div className="mt-3 overflow-hidden rounded-full bg-slate-800">
-                <div
+                <motion.div
                   className="h-2 rounded-full bg-amber-400"
-                  style={{ width: `${titleProgress.progressPercent}%` }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${titleProgress.progressPercent}%` }}
+                  transition={{ duration: 0.7, ease: "easeOut" }}
                 />
               </div>
 
@@ -1141,9 +1279,9 @@ export function PredictionDetailsModal({
                 {titleProgress.remainingText}
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <motion.div variants={modalListMotion} initial="hidden" animate="show" className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
             <MemberStatCard
               label="المركز"
               value={user.currentRank || "-"}
@@ -1209,9 +1347,9 @@ export function PredictionDetailsModal({
               value={unlockedAchievements.length}
               className="text-violet-300"
             />
-          </div>
+          </motion.div>
 
-          <div className="mt-5">
+          <motion.div variants={modalItemMotion} initial="hidden" animate="show" className="mt-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-base font-black md:text-lg">
                 🏅 الأوسمة والإنجازات
@@ -1222,17 +1360,17 @@ export function PredictionDetailsModal({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <motion.div variants={modalListMotion} initial="hidden" animate="show" className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {achievements.map((achievement) => (
                 <AchievementCard
                   key={achievement.title}
                   achievement={achievement}
                 />
               ))}
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
-          <div className="mt-5">
+          <motion.div variants={modalItemMotion} initial="hidden" animate="show" className="mt-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="text-base font-black md:text-lg">
                 🔮 توقعات العضو
@@ -1253,7 +1391,7 @@ export function PredictionDetailsModal({
               </div>
             ) : (
               <>
-                <div className="space-y-3">
+                <motion.div variants={modalListMotion} initial="hidden" animate="show" className="space-y-3">
                   {visiblePredictions.map((prediction) => {
                     const status = getPredictionStatus(prediction);
                     const golden = isGoldenPrediction(prediction);
@@ -1263,9 +1401,11 @@ export function PredictionDetailsModal({
                     };
 
                     return (
-                      <div
+                      <motion.div
                         key={prediction.id}
-                        className={`rounded-2xl border p-3 ${
+                        variants={modalItemMotion}
+                        whileTap={{ scale: 0.985 }}
+                        className={`rounded-2xl border p-3 shadow-lg shadow-slate-950/15 ${
                           golden
                             ? "border-amber-300/30 bg-amber-400/10"
                             : "border-white/10 bg-white/5"
@@ -1430,10 +1570,10 @@ export function PredictionDetailsModal({
                             هذا التوقع بانتظار احتساب نتيجة المباراة.
                           </div>
                         )}
-                      </div>
+                      </motion.div>
                     );
                   })}
-                </div>
+                </motion.div>
 
                 {predictions.length > MEMBER_PREDICTIONS_PER_PAGE && (
                   <div className="mt-4 flex items-center justify-between gap-3">
@@ -1464,10 +1604,10 @@ export function PredictionDetailsModal({
                 )}
               </>
             )}
-          </div>
+          </motion.div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -1554,7 +1694,17 @@ export default function LeaderboardTable() {
 
   return (
     <>
-      <section className="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl md:mt-8 md:p-6">
+      <motion.section
+        variants={leaderboardSectionMotion}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: false, amount: 0.18 }}
+        className="relative mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.08] p-3 shadow-2xl shadow-slate-950/35 backdrop-blur-xl md:mt-8 md:p-6"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+        <div className="pointer-events-none absolute -right-24 top-14 h-64 w-64 rounded-full bg-amber-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-24 bottom-14 h-64 w-64 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="relative">
         <div className="mb-4 text-center md:mb-6">
           <h2 className="text-2xl font-black md:text-3xl">لوحة الصدارة</h2>
 
@@ -1565,7 +1715,7 @@ export default function LeaderboardTable() {
           <button
             type="button"
             onClick={() => setShowTitlesGuide(true)}
-            className="mt-3 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100 transition hover:bg-amber-400/20 md:text-sm"
+            className="mt-3 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100 shadow-lg shadow-amber-950/10 transition hover:bg-amber-400/20 active:scale-95 md:text-sm"
           >
             🏅 كيف أحصل على الألقاب؟
           </button>
@@ -1593,7 +1743,13 @@ export default function LeaderboardTable() {
           </div>
         ) : (
           <>
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70">
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 shadow-inner">
+              <motion.div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-amber-200/50 to-transparent"
+                animate={{ opacity: [0.25, 0.9, 0.25] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+              />
               <table className="w-full table-fixed text-center">
                 <thead className="bg-slate-950">
                   <tr className="text-[10px] md:text-sm">
@@ -1632,8 +1788,13 @@ export default function LeaderboardTable() {
                     const style = getTopRankStyle(user.currentRank);
 
                     return (
-                      <tr
+                      <motion.tr
                         key={user.id}
+                        variants={leaderboardRowMotion}
+                        initial="hidden"
+                        whileInView="show"
+                        viewport={{ once: false, amount: 0.45 }}
+                        whileTap={{ scale: 0.995 }}
                         className={`border-t border-white/10 text-[11px] transition md:text-sm ${style.rowClass}`}
                       >
                         <td className="px-1 py-3 md:px-4 md:py-4">
@@ -1689,7 +1850,7 @@ export default function LeaderboardTable() {
                             {user.points}
                           </span>
                         </td>
-                      </tr>
+                      </motion.tr>
                     );
                   })}
                 </tbody>
@@ -1721,7 +1882,8 @@ export default function LeaderboardTable() {
             </div>
           </>
         )}
-      </section>
+        </div>
+      </motion.section>
 
       {showTitlesGuide && (
         <TitlesGuideModal onClose={() => setShowTitlesGuide(false)} />

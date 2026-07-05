@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, type Variants } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import {
   getPublishedChallengeStudioBulletins,
@@ -18,6 +19,66 @@ import { getPredictionsByUserId, type Prediction } from "@/lib/predictions";
 
 const CHALLENGE_STUDIO_LAST_SEEN_KEY = "challengeStudioLastSeenBulletin";
 const ARCHIVE_PAGE_SIZE = 4;
+
+const pageMotion: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { duration: 0.35, ease: "easeOut", staggerChildren: 0.08 },
+  },
+};
+
+const headerMotion: Variants = {
+  hidden: { opacity: 0, y: -18 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.38, ease: "easeOut" },
+  },
+};
+
+const revealMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 30,
+    scale: 0.97,
+    filter: "blur(8px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const studioCardMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 34,
+    scale: 0.96,
+    filter: "blur(8px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: { duration: 0.46, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const softItemMotion: Variants = {
+  hidden: { opacity: 0, y: 16, scale: 0.98 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.32, ease: "easeOut" },
+  },
+};
+
 
 function getChallengeStudioBulletinSeenKey(bulletin: {
   id?: string;
@@ -105,8 +166,13 @@ function StudioCard({
   const style = getCardStyle(card.type);
 
   return (
-    <article
-      className={`relative overflow-hidden rounded-3xl border p-4 shadow-2xl md:p-5 ${
+    <motion.article
+      variants={studioCardMotion}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: false, amount: featured ? 0.22 : 0.3 }}
+      whileTap={{ scale: 0.985 }}
+      className={`relative overflow-hidden rounded-3xl border p-4 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-5 ${
         style.className
       } ${featured ? "md:col-span-2" : ""}`}
     >
@@ -137,7 +203,7 @@ function StudioCard({
           {card.content}
         </p>
       </div>
-    </article>
+    </motion.article>
   );
 }
 
@@ -330,11 +396,15 @@ export default function ChallengeStudioPage() {
     "استوديو التحدي يترقب أحداث المنافسة القادمة بين الأعضاء.";
 
   return (
-    <main
+    <motion.main
       dir="rtl"
-      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
+      variants={pageMotion}
+      initial="hidden"
+      animate="show"
+      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
     >
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.12),transparent_34%),radial-gradient(circle_at_10%_30%,rgba(239,68,68,0.10),transparent_32%),radial-gradient(circle_at_90%_70%,rgba(34,211,238,0.08),transparent_30%)]" />
+      <motion.header variants={headerMotion} className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">
           <div className="flex items-center gap-2 md:gap-3">
             <div className="h-10 w-10 overflow-hidden rounded-2xl border border-white/20 bg-white/10 md:h-12 md:w-12">
@@ -357,21 +427,32 @@ export default function ChallengeStudioPage() {
 
           <a
             href="/"
-            className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold hover:bg-white/10 md:text-sm"
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold transition hover:bg-white/10 active:scale-95 md:text-sm"
           >
             الرئيسية
           </a>
         </div>
-      </header>
+      </motion.header>
 
       <section className="mx-auto max-w-6xl px-3 py-5 md:px-4 md:py-7">
-        <div className="relative mb-5 overflow-hidden rounded-3xl border border-amber-400/25 bg-white/10 p-5 text-center shadow-2xl md:p-7">
+        <motion.div
+          variants={revealMotion}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: false, amount: 0.35 }}
+          whileTap={{ scale: 0.99 }}
+          className="relative mb-5 overflow-hidden rounded-3xl border border-amber-400/25 bg-white/10 p-5 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-7"
+        >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.18),transparent_40%)]" />
 
           <div className="relative">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-400/30 bg-slate-950/50 text-4xl shadow-lg shadow-amber-950/30">
+            <motion.div
+              animate={{ y: [0, -6, 0], rotate: [0, -2, 2, 0] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+              className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-400/30 bg-slate-950/50 text-4xl shadow-lg shadow-amber-950/30"
+            >
               🎙️
-            </div>
+            </motion.div>
 
             <h2 className="text-3xl font-black md:text-5xl">
               استوديو التحدي
@@ -386,10 +467,16 @@ export default function ChallengeStudioPage() {
               المحتوى ترفيهي ومولد بالذكاء الاصطناعي بناءً على بيانات البطولة.
             </p>
           </div>
-        </div>
+        </motion.div>
 
         {currentBulletin && (
-          <div className="mb-5 overflow-hidden rounded-2xl border border-red-400/30 bg-red-500/10 shadow-2xl">
+          <motion.div
+            variants={revealMotion}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: false, amount: 0.4 }}
+            className="mb-5 overflow-hidden rounded-2xl border border-red-400/30 bg-red-500/10 shadow-2xl shadow-red-950/20"
+          >
             <div className="flex items-center gap-3">
               <div className="shrink-0 bg-red-500 px-4 py-3 text-xs font-black text-white md:text-sm">
                 🚨 عاجل
@@ -401,7 +488,7 @@ export default function ChallengeStudioPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {loading ? (
@@ -431,7 +518,7 @@ export default function ChallengeStudioPage() {
           </>
         ) : (
           <>
-            <div ref={bulletinTopRef} className="mb-4 scroll-mt-24">
+            <motion.div ref={bulletinTopRef} variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.35 }} className="mb-4 scroll-mt-24">
               {isViewingArchive && (
                 <div className="mb-4 rounded-2xl border border-amber-400/25 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100 md:text-sm">
                   📚 أنت تشاهد نشرة قديمة: {currentBulletin.date}
@@ -459,23 +546,23 @@ export default function ChallengeStudioPage() {
                   {isViewingArchive ? "أرشيف" : "مباشر"}
                 </span>
               </div>
-            </div>
+            </motion.div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.18 }} className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {mainCard && <StudioCard card={mainCard} featured />}
 
               {otherCards.map((card, index) => (
                 <StudioCard key={`${card.type}-${index}`} card={card} />
               ))}
-            </div>
+            </motion.div>
 
-            <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-3 text-center text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
+            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.35 }} className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-3 text-center text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
               🎙️ تصريحات ومحتوى استوديو التحدي ترفيهية ومولدة بالذكاء
               الاصطناعي، وليست تصريحات حقيقية من الأعضاء.
-            </div>
+            </motion.div>
 
             {archive.length > 0 && (
-              <div className="mt-8">
+              <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.18 }} className="mt-8">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h3 className="text-xl font-black">📚 آخر النشرات</h3>
 
@@ -486,7 +573,9 @@ export default function ChallengeStudioPage() {
 
                 <div className="space-y-3">
                   {visibleArchive.map((item) => (
-                    <button
+                    <motion.button
+                      variants={softItemMotion}
+                      whileTap={{ scale: 0.985 }}
                       type="button"
                       key={item.id}
                       onClick={() => selectBulletin(item.id)}
@@ -511,7 +600,7 @@ export default function ChallengeStudioPage() {
                           {item.cards.length} بطاقات
                         </span>
                       </div>
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
 
@@ -542,17 +631,17 @@ export default function ChallengeStudioPage() {
                     </button>
                   </div>
                 )}
-              </div>
+              </motion.div>
             )}
 
-            <div className="mt-8">
+            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.18 }} className="mt-8">
               <ChallengeStudioAnalysis
                 currentUserId={user?.id || ""}
                 currentUserName={user?.fullName || "عضو"}
                 onlineMembers={onlineMembers}
                 onMemberClick={openMemberProfile}
               />
-            </div>
+            </motion.div>
           </>
         )}
       </section>
@@ -566,13 +655,42 @@ export default function ChallengeStudioPage() {
         />
       )}
 
-      <footer className="border-t border-white/10 py-5 text-center text-xs text-slate-400">
-        <div className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2">
-          <span>©</span>
-          <span>برمجة وتصميم</span>
-          <span className="font-bold text-slate-200">عبدالسلام العنزي</span>
-        </div>
-      </footer>
-    </main>
+      <motion.footer
+  variants={revealMotion}
+  initial="hidden"
+  whileInView="show"
+  viewport={{ once: false, amount: 0.45 }}
+  className="relative z-10 mt-6 border-t border-white/10 px-3 py-6 text-center text-xs text-slate-400"
+>
+  <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/40 to-transparent" />
+
+  <motion.div
+    whileTap={{ scale: 0.985 }}
+    className="relative mx-auto flex max-w-xl flex-col items-center justify-center gap-3 overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-xl shadow-slate-950/25 backdrop-blur-xl"
+  >
+    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/5" />
+    <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-amber-300/10 blur-3xl" />
+    <div className="pointer-events-none absolute -left-16 bottom-0 h-32 w-32 rounded-full bg-cyan-300/10 blur-3xl" />
+
+    <div className="relative flex items-center justify-center gap-2 text-slate-300">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[13px]">
+        ©
+      </span>
+      <span>جميع الحقوق محفوظة</span>
+      <span className="font-black text-white">2026</span>
+    </div>
+
+    <div className="relative inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-[11px] font-black text-emerald-100 shadow-lg shadow-emerald-950/10">
+      <span className="text-emerald-300">✓</span>
+      <span>برمجة وتصميم</span>
+      <span className="text-white">عبدالسلام العنزي</span>
+    </div>
+
+    <div className="relative text-[10px] font-bold text-slate-500">
+      World Cup 2026 Predictions Platform
+    </div>
+  </motion.div>
+</motion.footer>
+    </motion.main>
   );
 }

@@ -1,6 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
+import {
+  AlertCircle,
+  Clock3,
+  Flag,
+  Loader2,
+  Medal,
+  MousePointer2,
+  Play,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Trophy,
+  XCircle,
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
   calculateFlagMemoryScore,
@@ -22,6 +37,93 @@ type MemoryCard = {
 };
 
 type GameStatus = "ready" | "playing" | "finished" | "saved";
+
+const sectionMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 28,
+    scale: 0.97,
+    filter: "blur(8px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.48,
+      ease: [0.22, 1, 0.36, 1],
+      staggerChildren: 0.06,
+    },
+  },
+};
+
+const itemMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 14,
+    scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.32,
+      ease: "easeOut",
+    },
+  },
+};
+
+const cardGridMotion: Variants = {
+  hidden: {
+    opacity: 0,
+  },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.025,
+    },
+  },
+};
+
+const memoryCardMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.9,
+    rotateY: -12,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    rotateY: 0,
+    transition: {
+      duration: 0.34,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
+
+const leaderboardRowMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.96,
+    filter: "blur(6px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.36,
+      ease: [0.22, 1, 0.36, 1],
+    },
+  },
+};
 
 function getRandomValue() {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
@@ -108,7 +210,6 @@ function getSecondsUntilNextMakkahMidnight() {
   const month = Number(makkahParts.find((part) => part.type === "month")?.value);
   const day = Number(makkahParts.find((part) => part.type === "day")?.value);
 
-  // منتصف الليل القادم بتوقيت مكة = الساعة 21:00 UTC من تاريخ اليوم الحالي في مكة
   const nextMakkahMidnightUtcMs = Date.UTC(year, month - 1, day, 21, 0, 0);
 
   const diffMs = nextMakkahMidnightUtcMs - now.getTime();
@@ -117,9 +218,11 @@ function getSecondsUntilNextMakkahMidnight() {
     return Math.floor(diffMs / 1000);
   }
 
-  // احتياط لو دخلنا بعد منتصف الليل مباشرة
   const fallbackNextMidnightUtcMs = Date.UTC(year, month - 1, day + 1, 21, 0, 0);
-  return Math.max(0, Math.floor((fallbackNextMidnightUtcMs - now.getTime()) / 1000));
+  return Math.max(
+    0,
+    Math.floor((fallbackNextMidnightUtcMs - now.getTime()) / 1000)
+  );
 }
 
 function getRankLabel(rank: number) {
@@ -127,6 +230,22 @@ function getRankLabel(rank: number) {
   if (rank === 2) return "🥈";
   if (rank === 3) return "🥉";
   return rank;
+}
+
+function getRankClass(rank: number) {
+  if (rank === 1) {
+    return "border-amber-300/45 bg-gradient-to-br from-amber-300 to-yellow-500 text-slate-950 shadow-amber-400/25";
+  }
+
+  if (rank === 2) {
+    return "border-slate-100/40 bg-gradient-to-br from-slate-100 to-slate-400 text-slate-950 shadow-slate-300/20";
+  }
+
+  if (rank === 3) {
+    return "border-orange-300/40 bg-gradient-to-br from-orange-300 to-orange-600 text-slate-950 shadow-orange-400/20";
+  }
+
+  return "border-amber-400/20 bg-amber-400/10 text-amber-200 shadow-slate-950/20";
 }
 
 function getUserId(user: unknown) {
@@ -137,6 +256,117 @@ function getUserId(user: unknown) {
 function getUserName(user: unknown) {
   const data = user as Record<string, unknown> | null | undefined;
   return String(data?.fullName || data?.name || data?.displayName || "عضو");
+}
+
+function StatusBox({
+  enabled,
+  todayResult,
+  oneAttemptPerDay,
+  saving,
+  status,
+}: {
+  enabled: boolean;
+  todayResult: FlagMemoryResult | null;
+  oneAttemptPerDay: boolean;
+  saving: boolean;
+  status: GameStatus;
+}) {
+  const text = !enabled
+    ? "تحدي الأعلام متوقف مؤقتًا"
+    : todayResult && oneAttemptPerDay
+      ? "نتيجتك اليومية محفوظة"
+      : saving
+        ? "جاري اعتماد النتيجة..."
+        : status === "playing"
+          ? "التحدي بدأ"
+          : "ابدأ التحدي";
+
+  const icon = !enabled ? (
+    <XCircle className="h-4 w-4" />
+  ) : todayResult && oneAttemptPerDay ? (
+    <ShieldCheck className="h-4 w-4" />
+  ) : saving ? (
+    <Loader2 className="h-4 w-4 animate-spin" />
+  ) : status === "playing" ? (
+    <MousePointer2 className="h-4 w-4" />
+  ) : (
+    <Play className="h-4 w-4" />
+  );
+
+  return (
+    <motion.div
+      variants={itemMotion}
+      className={`mb-4 rounded-2xl border px-4 py-3 text-center text-sm font-black shadow-lg md:text-base ${
+        enabled
+          ? "border-amber-400/30 bg-amber-400/10 text-amber-100 shadow-amber-950/10"
+          : "border-red-400/30 bg-red-500/10 text-red-100 shadow-red-950/10"
+      }`}
+    >
+      <span className="inline-flex items-center justify-center gap-2">
+        {icon}
+        <span>{text}</span>
+      </span>
+    </motion.div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+  valueClassName = "text-white",
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <motion.div
+      variants={itemMotion}
+      whileTap={{ scale: 0.96 }}
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center shadow-lg shadow-slate-950/25 md:p-3"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-white/5" />
+
+      <div className="relative">
+        <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-200 md:h-8 md:w-8">
+          {icon}
+        </div>
+
+        <div className="text-[10px] font-bold text-slate-400 md:text-xs">
+          {label}
+        </div>
+
+        <motion.div
+          key={String(value)}
+          initial={{ opacity: 0, y: 6, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          className={`mt-1 text-base font-black tabular-nums md:text-xl ${valueClassName}`}
+        >
+          {value}
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
+function LeaderboardStat({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: string | number;
+  className: string;
+}) {
+  return (
+    <div className={`rounded-xl border p-1.5 text-center ${className}`}>
+      <div className="text-[9px] font-bold opacity-80">{label}</div>
+      <div className="mt-0.5 text-xs font-black tabular-nums">{value}</div>
+    </div>
+  );
 }
 
 export default function FlagMemoryGame() {
@@ -170,7 +400,7 @@ export default function FlagMemoryGame() {
   const [hasStartedInThisSession, setHasStartedInThisSession] = useState(false);
 
   const lockRef = useRef(false);
-const autoSaveRef = useRef(false);
+  const autoSaveRef = useRef(false);
 
   const pairsCount = settings.pairsCount;
   const totalCards = pairsCount * 2;
@@ -245,52 +475,54 @@ const autoSaveRef = useRef(false);
   }, [status]);
 
   useEffect(() => {
-  const completed =
-    cards.length > 0 && cards.every((card) => card.matched === true);
+    const completed =
+      cards.length > 0 && cards.every((card) => card.matched === true);
 
-  if (!completed || status !== "playing") return;
-  if (autoSaveRef.current) return;
+    if (!completed || status !== "playing") return;
+    if (autoSaveRef.current) return;
 
-  autoSaveRef.current = true;
-  setStatus("finished");
-  setMessage("أحسنت! أنهيت تحدي الأعلام بنجاح. جاري اعتماد نتيجتك تلقائيًا...");
+    autoSaveRef.current = true;
+    setStatus("finished");
+    setMessage(
+      "أحسنت! أنهيت تحدي الأعلام بنجاح. جاري اعتماد نتيجتك تلقائيًا..."
+    );
 
-  async function autoSaveResult() {
-    if (!userId) {
-      setMessage("تعذر اعتماد النتيجة لأن بيانات العضو غير مكتملة.");
-      return;
+    async function autoSaveResult() {
+      if (!userId) {
+        setMessage("تعذر اعتماد النتيجة لأن بيانات العضو غير مكتملة.");
+        return;
+      }
+
+      try {
+        setSaving(true);
+
+        await saveFlagMemoryResult({
+          userId,
+          userName,
+          timeSeconds: seconds,
+          moves,
+          mistakes,
+          matchesCount: pairsCount,
+        });
+
+        setStatus("saved");
+        setMessage("تم اعتماد نتيجتك الرسمية تلقائيًا في تحدي الأعلام.");
+        await loadGameData();
+      } catch (error) {
+        console.error("Auto save flag memory result error:", error);
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "تعذر اعتماد نتيجة تحدي الأعلام تلقائيًا."
+        );
+      } finally {
+        setSaving(false);
+      }
     }
 
-    try {
-      setSaving(true);
-
-      await saveFlagMemoryResult({
-        userId,
-        userName,
-        timeSeconds: seconds,
-        moves,
-        mistakes,
-        matchesCount: pairsCount,
-      });
-
-      setStatus("saved");
-      setMessage("تم اعتماد نتيجتك الرسمية تلقائيًا في تحدي الأعلام.");
-      await loadGameData();
-    } catch (error) {
-      console.error("Auto save flag memory result error:", error);
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "تعذر اعتماد نتيجة تحدي الأعلام تلقائيًا."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  autoSaveResult();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [cards, status, userId, userName, seconds, moves, mistakes, pairsCount]);
+    autoSaveResult();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, status, userId, userName, seconds, moves, mistakes, pairsCount]);
 
   function startGame() {
     if (!settings.enabled) {
@@ -325,15 +557,17 @@ const autoSaveRef = useRef(false);
     setSeconds(0);
     setMessage("");
     setHasStartedInThisSession(true);
-lockRef.current = false;
-autoSaveRef.current = false;
+    lockRef.current = false;
+    autoSaveRef.current = false;
   }
 
   function handleCardClick(card: MemoryCard) {
     if (status !== "playing") return;
     if (lockRef.current) return;
     if (card.matched) return;
-    if (selectedCards.some((selected) => selected.cardId === card.cardId)) return;
+    if (selectedCards.some((selected) => selected.cardId === card.cardId)) {
+      return;
+    }
     if (selectedCards.length >= 2) return;
 
     const nextSelected = [...selectedCards, card];
@@ -406,215 +640,397 @@ autoSaveRef.current = false;
     );
   }
 
- const startButtonDisabled =
-  saving ||
-  status === "playing" ||
+  const startButtonDisabled =
+    saving ||
+    status === "playing" ||
     !settings.enabled ||
     (settings.oneAttemptPerDay && Boolean(todayResult)) ||
     (settings.oneAttemptPerDay && hasStartedInThisSession);
 
   if (loading || checkingResult) {
     return (
-      <section
+      <motion.section
         dir="rtl"
-        className="rounded-3xl border border-white/10 bg-white/10 p-6 text-center text-slate-200 shadow-2xl"
+        variants={sectionMotion}
+        initial="hidden"
+        animate="show"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-6 text-center text-slate-200 shadow-2xl shadow-slate-950/30 backdrop-blur-xl"
       >
-        جاري تحميل تحدي الأعلام...
-      </section>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
+
+        <div className="relative inline-flex items-center justify-center gap-2 font-black">
+          <Loader2 className="h-5 w-5 animate-spin text-amber-300" />
+          <span>جاري تحميل تحدي الأعلام...</span>
+        </div>
+      </motion.section>
     );
   }
 
   return (
     <section dir="rtl" className="space-y-5">
-      <div className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
-        <div
-          className={`mb-4 rounded-2xl border px-4 py-3 text-center text-sm font-black md:text-base ${
-            settings.enabled
-              ? "border-amber-400/30 bg-amber-400/10 text-amber-100"
-              : "border-red-400/30 bg-red-500/10 text-red-100"
-          }`}
-        >
-          {!settings.enabled
-            ? "⛔ تحدي الأعلام متوقف مؤقتًا"
-            : todayResult && settings.oneAttemptPerDay
-            ? "✅ نتيجتك اليومية محفوظة"
-           : saving
-? "جاري اعتماد النتيجة..."
-: status === "playing"
-? "التحدي بدأ"
-: "ابدأ التحدي"}
-        </div>
+      <motion.div
+        variants={sectionMotion}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: false, amount: 0.18 }}
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-5"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
+        <div className="pointer-events-none absolute -right-24 top-20 h-56 w-56 rounded-full bg-amber-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-24 bottom-20 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
-        <div className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-center">
-          <div className="text-xs font-bold text-cyan-100/80">
-            تحدي جديد بعد
-          </div>
-          <div className="mt-1 text-2xl font-black text-cyan-100 tabular-nums" dir="ltr">
-            {formatCountdown(nextChallengeSeconds)}
-          </div>
-        </div>
+        <div className="relative">
+          <StatusBox
+            enabled={settings.enabled}
+            todayResult={todayResult}
+            oneAttemptPerDay={settings.oneAttemptPerDay}
+            saving={saving}
+            status={status}
+          />
 
-        <div className="mb-5 rounded-2xl border border-white/10 bg-slate-950/55 p-3 text-center">
-  <div className="mb-2 text-sm font-black text-white">
-    شرح النقاط
-  </div>
-
-  <div className="space-y-1 text-[11px] font-bold leading-5 text-slate-300 md:text-xs">
-    <p>
-      كل زوج أعلام = <span className="text-amber-300">20 نقطة</span>، ومكافأة السرعة تصل إلى{" "}
-      <span className="text-emerald-300">+50</span>.
-    </p>
-
-    <p>
-      الخصم: الخطأ <span className="text-red-300">-3</span>، كل 30 ثانية{" "}
-      <span className="text-red-300">-1</span>، والمحاولة الزائدة{" "}
-      <span className="text-red-300">-2</span>.
-    </p>
-  </div>
-</div>
-
-        <div className="mb-5 grid grid-cols-4 gap-2 md:gap-3">
-          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center md:p-3">
-            <div className="text-[10px] font-bold text-slate-400 md:text-xs">
-              الوقت
-            </div>
-            <div className="mt-1 text-base font-black md:text-xl">
-              {formatTime(seconds)}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center md:p-3">
-            <div className="text-[10px] font-bold text-slate-400 md:text-xs">
-              المحاولات
-            </div>
-            <div className="mt-1 text-base font-black md:text-xl">{moves}</div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center md:p-3">
-            <div className="text-[10px] font-bold text-slate-400 md:text-xs">
-              الأخطاء
-            </div>
-            <div className="mt-1 text-base font-black md:text-xl">
-              {mistakes}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center md:p-3">
-            <div className="text-[10px] font-bold text-slate-400 md:text-xs">
-              النقاط
-            </div>
-            <div className="mt-1 text-base font-black md:text-xl">
-              {currentScore}
-            </div>
-          </div>
-        </div>
-
-        {todayResult && (
-          <div className="mb-5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm font-bold leading-7 text-emerald-100">
-            نتيجتك اليوم: {todayResult.score} نقطة — الوقت{" "}
-            {formatTime(todayResult.timeSeconds)} — المحاولات{" "}
-            {todayResult.moves} — الأخطاء {todayResult.mistakes}.
-          </div>
-        )}
-
-        {message && (
-          <div className="mb-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-sm font-bold leading-6 text-cyan-100">
-            {message}
-          </div>
-        )}
-
-        <div className="mb-5 flex flex-col gap-2 md:flex-row">
-          <button
-            type="button"
-            onClick={startGame}
-            disabled={startButtonDisabled}
-            className="rounded-2xl bg-amber-400 px-5 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+          <motion.div
+            variants={itemMotion}
+            className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-center shadow-lg shadow-cyan-950/10"
           >
-            {!settings.enabled
-              ? "التحدي متوقف"
-              : status === "playing"
-              ? "التحدي بدأ"
-              : "ابدأ التحدي"}
-          </button>
-
+            <div className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-cyan-100/80">
+              <Clock3 className="h-4 w-4" />
+              <span>تحدي جديد بعد</span>
             </div>
 
-        <div className="mb-4 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-sm font-black text-slate-200">
-          المتطابق: {matchedCount} / {pairsCount} — عدد البطاقات: {totalCards}
-        </div>
+            <motion.div
+              key={nextChallengeSeconds}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.16 }}
+              className="mt-1 text-2xl font-black text-cyan-100 tabular-nums"
+              dir="ltr"
+            >
+              {formatCountdown(nextChallengeSeconds)}
+            </motion.div>
+          </motion.div>
 
-        <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:gap-2">
-          {cards.map((card, index) => {
-            const visible = isCardVisible(card);
+          <motion.div
+            variants={itemMotion}
+            className="mb-5 rounded-2xl border border-white/10 bg-slate-950/55 p-3 text-center shadow-lg shadow-slate-950/20"
+          >
+            <div className="mb-2 inline-flex items-center justify-center gap-2 text-sm font-black text-white">
+              <Target className="h-4 w-4 text-amber-300" />
+              <span>شرح النقاط</span>
+            </div>
 
-            return (
-              <button
-                key={card.cardId}
-                type="button"
-                onClick={() => handleCardClick(card)}
-                disabled={status !== "playing" || visible}
-                className={`aspect-[5/4] rounded-xl border p-1 transition md:rounded-2xl ${
-                  visible
-                    ? "border-emerald-400/40 bg-white text-slate-950"
-                    : "border-white/10 bg-slate-950/70 text-white hover:bg-slate-900"
-                } disabled:cursor-default`}
-                aria-label={
-                  visible ? card.team.nameAr : `بطاقة رقم ${index + 1}`
-                }
+            <div className="space-y-1 text-[11px] font-bold leading-5 text-slate-300 md:text-xs">
+              <p>
+                كل زوج أعلام ={" "}
+                <span className="text-amber-300">20 نقطة</span>، ومكافأة
+                السرعة تصل إلى <span className="text-emerald-300">+50</span>.
+              </p>
+
+              <p>
+                الخصم: الخطأ <span className="text-red-300">-3</span>، كل 30
+                ثانية <span className="text-red-300">-1</span>، والمحاولة
+                الزائدة <span className="text-red-300">-2</span>.
+              </p>
+            </div>
+          </motion.div>
+
+          <motion.div
+            variants={itemMotion}
+            className="mb-5 grid grid-cols-4 gap-2 md:gap-3"
+          >
+            <StatCard
+              label="الوقت"
+              value={formatTime(seconds)}
+              icon={<Clock3 className="h-4 w-4 text-cyan-300" />}
+              valueClassName="text-cyan-100"
+            />
+
+            <StatCard
+              label="المحاولات"
+              value={moves}
+              icon={<MousePointer2 className="h-4 w-4 text-amber-300" />}
+              valueClassName="text-amber-200"
+            />
+
+            <StatCard
+              label="الأخطاء"
+              value={mistakes}
+              icon={<AlertCircle className="h-4 w-4 text-red-300" />}
+              valueClassName="text-red-200"
+            />
+
+            <StatCard
+              label="النقاط"
+              value={currentScore}
+              icon={<Trophy className="h-4 w-4 text-emerald-300" />}
+              valueClassName="text-emerald-200"
+            />
+          </motion.div>
+
+          <AnimatePresence mode="popLayout">
+            {todayResult && (
+              <motion.div
+                variants={itemMotion}
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0, y: -10, scale: 0.97 }}
+                className="mb-5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm font-bold leading-7 text-emerald-100 shadow-lg shadow-emerald-950/10"
               >
-                {visible ? (
-                  <div className="flex h-full flex-col items-center justify-center gap-0.5">
-                    <img
-                      src={card.team.flag}
-                      alt={card.team.nameAr}
-                      className="h-8 w-12 rounded object-cover shadow md:h-9 md:w-14"
-                    />
-                    <span className="max-w-full truncate text-[8px] font-black leading-none md:text-[10px]">
-                      {card.team.nameAr}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-0.5">
-                    <span className="text-lg leading-none md:text-2xl">❓</span>
-                    <span className="text-[9px] font-black leading-none text-slate-300 md:text-[10px]">
-                      {index + 1}
-                    </span>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                <span className="inline-flex items-center justify-center gap-2">
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>
+                    نتيجتك اليوم: {todayResult.score} نقطة — الوقت{" "}
+                    {formatTime(todayResult.timeSeconds)} — المحاولات{" "}
+                    {todayResult.moves} — الأخطاء {todayResult.mistakes}.
+                  </span>
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-      <div className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
-        <div className="mb-4 text-center">
+          <AnimatePresence mode="popLayout">
+            {message && (
+              <motion.div
+                key={message}
+                variants={itemMotion}
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0, y: -10, scale: 0.97 }}
+                className="mb-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-sm font-bold leading-6 text-cyan-100 shadow-lg shadow-cyan-950/10"
+              >
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Sparkles className="h-4 w-4 text-cyan-200" />
+                  <span>{message}</span>
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <motion.div
+            variants={itemMotion}
+            className="mb-5 flex flex-col gap-2 md:flex-row"
+          >
+            <motion.button
+              type="button"
+              onClick={startGame}
+              disabled={startButtonDisabled}
+              whileTap={startButtonDisabled ? undefined : { scale: 0.96, y: 2 }}
+              className="group relative inline-flex min-h-[48px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-amber-400 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />
+
+              {!settings.enabled ? (
+                <XCircle className="relative h-4 w-4" />
+              ) : status === "playing" ? (
+                <MousePointer2 className="relative h-4 w-4" />
+              ) : (
+                <Play className="relative h-4 w-4" />
+              )}
+
+              <span className="relative">
+                {!settings.enabled
+                  ? "التحدي متوقف"
+                  : status === "playing"
+                    ? "التحدي بدأ"
+                    : "ابدأ التحدي"}
+              </span>
+            </motion.button>
+          </motion.div>
+
+          <motion.div
+            variants={itemMotion}
+            className="mb-4 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-sm font-black text-slate-200 shadow-lg shadow-slate-950/20"
+          >
+            <span className="inline-flex items-center justify-center gap-2">
+              <Flag className="h-4 w-4 text-amber-300" />
+              <span>
+                المتطابق: {matchedCount} / {pairsCount} — عدد البطاقات:{" "}
+                {totalCards}
+              </span>
+            </span>
+          </motion.div>
+
+          <motion.div
+            variants={cardGridMotion}
+            initial="hidden"
+            animate="show"
+            key={`${status}-${cards.length}`}
+            className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:gap-2"
+          >
+            {cards.map((card, index) => {
+              const visible = isCardVisible(card);
+
+              return (
+                <motion.button
+                  key={card.cardId}
+                  variants={memoryCardMotion}
+                  type="button"
+                  onClick={() => handleCardClick(card)}
+                  disabled={status !== "playing" || visible}
+                  whileTap={
+                    status === "playing" && !visible
+                      ? { scale: 0.92, rotateZ: -1 }
+                      : undefined
+                  }
+                  animate={{
+                    rotateY: visible ? 180 : 0,
+                    scale: card.matched ? [1, 1.06, 1] : 1,
+                  }}
+                  transition={{
+                    rotateY: {
+                      duration: 0.38,
+                      ease: [0.22, 1, 0.36, 1],
+                    },
+                    scale: {
+                      duration: 0.3,
+                      ease: "easeOut",
+                    },
+                  }}
+                  className={`relative aspect-[5/4] overflow-hidden rounded-xl border p-1 shadow-lg transition [transform-style:preserve-3d] md:rounded-2xl ${
+                    visible
+                      ? "border-emerald-400/40 bg-white text-slate-950 shadow-emerald-500/15"
+                      : "border-white/10 bg-slate-950/70 text-white shadow-slate-950/25 hover:bg-slate-900"
+                  } disabled:cursor-default`}
+                  aria-label={
+                    visible ? card.team.nameAr : `بطاقة رقم ${index + 1}`
+                  }
+                >
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent" />
+
+                  {card.matched && (
+                    <motion.span
+                      aria-hidden="true"
+                      initial={{ opacity: 0, scale: 0.7 }}
+                      animate={{
+                        opacity: [0, 0.7, 0],
+                        scale: [0.7, 1.3, 1.8],
+                      }}
+                      transition={{ duration: 0.6, ease: "easeOut" }}
+                      className="pointer-events-none absolute inset-1 rounded-xl border border-emerald-300/60 md:rounded-2xl"
+                    />
+                  )}
+
+                  <div
+                    className="relative h-full w-full"
+                    style={{ transform: visible ? "rotateY(180deg)" : "none" }}
+                  >
+                    {visible ? (
+                      <div className="flex h-full flex-col items-center justify-center gap-0.5">
+                        <img
+                          src={card.team.flag}
+                          alt={card.team.nameAr}
+                          className="h-8 w-12 rounded object-cover shadow md:h-9 md:w-14"
+                        />
+
+                        <span className="max-w-full truncate text-[8px] font-black leading-none md:text-[10px]">
+                          {card.team.nameAr}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex h-full flex-col items-center justify-center gap-0.5">
+                        <motion.span
+                          animate={
+                            status === "playing"
+                              ? {
+                                  y: [0, -2, 0],
+                                  scale: [1, 1.06, 1],
+                                }
+                              : undefined
+                          }
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                          className="text-lg leading-none md:text-2xl"
+                        >
+                          ?
+                        </motion.span>
+
+                        <span className="text-[9px] font-black leading-none text-slate-300 md:text-[10px]">
+                          {index + 1}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        </div>
+      </motion.div>
+
+      <motion.div
+        variants={sectionMotion}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: false, amount: 0.22 }}
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-5"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
+        <div className="pointer-events-none absolute -right-20 top-8 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-8 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+
+        <div className="relative mb-4 text-center">
+          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-lg shadow-amber-950/10">
+            <Trophy className="h-5 w-5" />
+          </div>
+
           <h2 className="text-xl font-black md:text-2xl">
-            🏆 ترتيب تحدي الأعلام اليومي
+            ترتيب تحدي الأعلام اليومي
           </h2>
+
           <p className="mt-1 text-xs font-bold leading-5 text-slate-400">
             الأعلى نقاطًا، ثم الأسرع وقتًا، ثم الأقل محاولات.
           </p>
         </div>
 
         {leaderboard.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/50 p-5 text-center text-sm font-bold text-slate-300">
+          <motion.div
+            variants={itemMotion}
+            className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/50 p-5 text-center text-sm font-bold text-slate-300 shadow-inner"
+          >
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+              <Medal className="h-5 w-5 text-slate-300" />
+            </div>
             لا توجد نتائج اليوم حتى الآن.
-          </div>
+          </motion.div>
         ) : (
-          <div className="space-y-2">
+          <motion.div variants={sectionMotion} className="relative space-y-2">
             {leaderboard.map((result, index) => {
               const rank = index + 1;
 
               return (
-                <article
+                <motion.article
                   key={result.id}
-                  className="rounded-2xl border border-white/10 bg-slate-950/55 p-2.5 shadow-md shadow-slate-950/20"
+                  variants={leaderboardRowMotion}
+                  whileTap={{ scale: 0.985 }}
+                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/55 p-2.5 shadow-md shadow-slate-950/20"
                 >
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className="flex h-8 min-w-8 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10 text-sm font-black text-amber-200">
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-transparent" />
+
+                  <div className="relative mb-2 flex items-center gap-2">
+                    <motion.div
+                      animate={
+                        rank <= 3
+                          ? {
+                              y: [0, -3, 0],
+                              scale: [1, 1.05, 1],
+                            }
+                          : undefined
+                      }
+                      transition={{
+                        duration: 2.2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                      className={`flex h-8 min-w-8 items-center justify-center rounded-xl border text-sm font-black shadow-lg ${getRankClass(
+                        rank
+                      )}`}
+                    >
                       {getRankLabel(rank)}
-                    </div>
+                    </motion.div>
 
                     <div className="min-w-0 flex-1">
                       <div className="text-[10px] font-bold text-slate-400">
@@ -627,49 +1043,37 @@ autoSaveRef.current = false;
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-1.5">
-                    <div className="rounded-xl border border-amber-400/15 bg-amber-400/10 p-1.5 text-center">
-                      <div className="text-[9px] font-bold text-amber-100/80">
-                        النقاط
-                      </div>
-                      <div className="mt-0.5 text-sm font-black text-amber-300">
-                        {result.score}
-                      </div>
-                    </div>
+                  <div className="relative grid grid-cols-4 gap-1.5">
+                    <LeaderboardStat
+                      label="النقاط"
+                      value={result.score}
+                      className="border-amber-400/15 bg-amber-400/10 text-amber-300"
+                    />
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-center">
-                      <div className="text-[9px] font-bold text-slate-400">
-                        الوقت
-                      </div>
-                      <div className="mt-0.5 text-xs font-black text-white" dir="ltr">
-                        {formatTime(result.timeSeconds)}
-                      </div>
-                    </div>
+                    <LeaderboardStat
+                      label="الوقت"
+                      value={formatTime(result.timeSeconds)}
+                      className="border-white/10 bg-white/5 text-white"
+                    />
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-center">
-                      <div className="text-[9px] font-bold text-slate-400">
-                        المحاولات
-                      </div>
-                      <div className="mt-0.5 text-xs font-black text-white">
-                        {result.moves}
-                      </div>
-                    </div>
+                    <LeaderboardStat
+                      label="المحاولات"
+                      value={result.moves}
+                      className="border-white/10 bg-white/5 text-white"
+                    />
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-1.5 text-center">
-                      <div className="text-[9px] font-bold text-slate-400">
-                        الأخطاء
-                      </div>
-                      <div className="mt-0.5 text-xs font-black text-white">
-                        {result.mistakes}
-                      </div>
-                    </div>
+                    <LeaderboardStat
+                      label="الأخطاء"
+                      value={result.mistakes}
+                      className="border-white/10 bg-white/5 text-white"
+                    />
                   </div>
-                </article>
+                </motion.article>
               );
             })}
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </section>
   );
 }
