@@ -47,20 +47,25 @@ type MatchWithKnockout = Match & {
   matchStage?: "group" | "knockout";
 };
 
+const scrollOnceViewport = {
+  once: true,
+  amount: 0.18,
+} as const;
+
 const sectionMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 18,
-    scale: 0.98,
+    y: 14,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.38,
+      duration: 0.32,
       ease: "easeOut",
-      staggerChildren: 0.06,
+      staggerChildren: 0.04,
     },
   },
 };
@@ -68,8 +73,25 @@ const sectionMotion: Variants = {
 const cardMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 16,
+    y: 10,
     scale: 0.98,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.26,
+      ease: "easeOut",
+    },
+  },
+};
+
+const matchCardMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 16,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
@@ -82,46 +104,27 @@ const cardMotion: Variants = {
   },
 };
 
-const matchCardMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 42,
-    scale: 0.94,
-    filter: "blur(8px)",
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    filter: "blur(0px)",
-    transition: {
-      duration: 0.55,
-      ease: [0.22, 1, 0.36, 1],
-    },
-  },
-};
-
 const slideDownMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: -10,
-    scale: 0.98,
+    y: -8,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.28,
+      duration: 0.24,
       ease: "easeOut",
     },
   },
   exit: {
     opacity: 0,
-    y: -8,
-    scale: 0.98,
+    y: -6,
+    scale: 0.99,
     transition: {
-      duration: 0.18,
+      duration: 0.16,
       ease: "easeIn",
     },
   },
@@ -273,18 +276,12 @@ function FloatingTeamFlag({
   delay?: number;
 }) {
   return (
-    <motion.div
-      className="flex justify-center"
-      animate={{ y: [0, -5, 0] }}
-      transition={{
-        duration: 2.8,
-        repeat: Infinity,
-        ease: "easeInOut",
-        delay,
-      }}
+    <div
+      className="flex justify-center transition-transform duration-200"
+      style={{ transitionDelay: `${Math.round(delay * 100)}ms` }}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -614,42 +611,32 @@ export default function MatchesPredictionBox() {
         variants={cardMotion}
         className="grid grid-cols-[1fr_28px_1fr] items-center gap-2"
       >
-        <motion.input
-          whileFocus={{ scale: 1.04, y: -2 }}
-          whileTap={{ scale: 0.98 }}
-          transition={{ type: "spring", stiffness: 380, damping: 22 }}
+        <input
           inputMode="numeric"
           value={inputs[match.id]?.homeScore || ""}
           onChange={(event) =>
             updateInput(match.id, "homeScore", event.target.value)
           }
           placeholder="0"
-          className={`h-14 w-full rounded-2xl border px-3 text-center text-2xl font-black text-white shadow-inner outline-none transition duration-200 focus:ring-2 ${
+          className={`h-14 w-full rounded-2xl border px-3 text-center text-[24px] font-black text-white shadow-inner outline-none transition duration-200 focus:scale-[1.02] focus:ring-2 ${
             golden
               ? "border-amber-300/30 bg-slate-950/90 focus:border-amber-300 focus:ring-amber-300/25"
               : "border-white/10 bg-slate-950/80 focus:border-amber-400 focus:ring-amber-400/25"
           }`}
         />
 
-        <motion.div
-          animate={{ scale: [1, 1.18, 1], opacity: [0.65, 1, 0.65] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-          className="text-center text-xl font-black text-slate-400"
-        >
+        <div className="text-center text-[20px] font-black text-slate-400">
           -
-        </motion.div>
+        </div>
 
-        <motion.input
-          whileFocus={{ scale: 1.04, y: -2 }}
-          whileTap={{ scale: 0.98 }}
-          transition={{ type: "spring", stiffness: 380, damping: 22 }}
+        <input
           inputMode="numeric"
           value={inputs[match.id]?.awayScore || ""}
           onChange={(event) =>
             updateInput(match.id, "awayScore", event.target.value)
           }
           placeholder="0"
-          className={`h-14 w-full rounded-2xl border px-3 text-center text-2xl font-black text-white shadow-inner outline-none transition duration-200 focus:ring-2 ${
+          className={`h-14 w-full rounded-2xl border px-3 text-center text-[24px] font-black text-white shadow-inner outline-none transition duration-200 focus:scale-[1.02] focus:ring-2 ${
             golden
               ? "border-amber-300/30 bg-slate-950/90 focus:border-amber-300 focus:ring-amber-300/25"
               : "border-white/10 bg-slate-950/80 focus:border-amber-400 focus:ring-amber-400/25"
@@ -675,7 +662,7 @@ export default function MatchesPredictionBox() {
               onChange={(event) =>
                 updateInput(match.id, "qualifiedTeamCode", event.target.value)
               }
-              className="h-12 rounded-2xl border border-blue-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-300/20"
+              className="h-12 rounded-2xl border border-blue-300/30 bg-slate-950/90 px-3 text-[14px] font-bold text-white outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-300/20"
             >
               <option value="">اختر المنتخب المتأهل</option>
               <option value={match.homeTeamCode}>{match.homeTeamName}</option>
@@ -687,7 +674,7 @@ export default function MatchesPredictionBox() {
               onChange={(event) =>
                 updateInput(match.id, "qualificationMethod", event.target.value)
               }
-              className="h-12 rounded-2xl border border-blue-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-300/20"
+              className="h-12 rounded-2xl border border-blue-300/30 bg-slate-950/90 px-3 text-[14px] font-bold text-white outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-300/20"
             >
               <option value="">اختر طريقة التأهل</option>
               <option value="extraTime">أشواط إضافية</option>
@@ -703,23 +690,24 @@ export default function MatchesPredictionBox() {
     <motion.section
       variants={sectionMotion}
       initial="hidden"
-      animate="show"
-      className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.08] p-4 shadow-2xl shadow-slate-950/35 backdrop-blur-xl md:p-5"
+      whileInView="show"
+      viewport={scrollOnceViewport}
+      className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.08] p-4 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-5"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 top-16 h-52 w-52 rounded-full bg-amber-300/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-20 bottom-20 h-52 w-52 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 top-16 h-44 w-44 rounded-full bg-amber-300/10 blur-2xl" />
+      <div className="pointer-events-none absolute -left-20 bottom-20 h-44 w-44 rounded-full bg-cyan-300/10 blur-2xl" />
 
       <div className="relative mb-4 text-center">
-        <div className="mx-auto mb-2 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-lg shadow-amber-950/20">
+        <div className="mx-auto mb-2 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/15">
           <PencilLine className="h-5 w-5" />
         </div>
 
-        <h2 className="text-2xl font-black tracking-tight md:text-3xl">
+        <h2 className="text-[24px] font-black tracking-tight md:text-3xl">
           شاركنا توقعك
         </h2>
 
-        <p className="mx-auto mt-2 max-w-2xl text-sm font-medium leading-7 text-slate-200 md:text-base">
+        <p className="mx-auto mt-2 max-w-2xl text-[14px] font-medium leading-7 text-slate-200 md:text-base">
           سجّل توقعك قبل بداية المباراة وتابع نقاطك في لوحة الصدارة.
         </p>
       </div>
@@ -729,7 +717,7 @@ export default function MatchesPredictionBox() {
           variants={cardMotion}
           className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300 shadow-inner"
         >
-          <div className="inline-flex items-center gap-2 text-sm font-bold">
+          <div className="inline-flex items-center gap-2 text-[14px] font-bold">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-300" />
             <span>جاري تحميل المباريات...</span>
           </div>
@@ -739,7 +727,7 @@ export default function MatchesPredictionBox() {
           variants={cardMotion}
           className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/60 p-6 text-center text-slate-300 shadow-inner"
         >
-          <div className="inline-flex items-center justify-center gap-2 text-sm font-bold">
+          <div className="inline-flex items-center justify-center gap-2 text-[14px] font-bold">
             <CalendarDays className="h-4 w-4 text-slate-300" />
             <span>لا توجد مباريات متاحة للتوقع حاليًا.</span>
           </div>
@@ -763,16 +751,16 @@ export default function MatchesPredictionBox() {
 
             return (
               <motion.article
-  key={match.id}
-  variants={matchCardMotion}
-  initial="hidden"
-  whileInView="show"
-  viewport={{ once: false, amount: 0.28 }}
-  whileTap={{ scale: 0.995 }}
-                className={`relative overflow-hidden rounded-3xl border p-4 shadow-xl transition duration-200 will-change-transform ${
+                key={match.id}
+                variants={matchCardMotion}
+                initial="hidden"
+                whileInView="show"
+                viewport={{ once: true, amount: 0.24 }}
+                whileTap={{ scale: 0.997 }}
+                className={`relative transform-gpu overflow-hidden rounded-3xl border p-4 shadow-lg transition duration-200 ${
                   golden
                     ? "border-amber-300/40 bg-gradient-to-br from-amber-400/20 via-slate-950/80 to-yellow-500/10 shadow-amber-400/10"
-                    : "border-white/10 bg-slate-950/60 shadow-slate-950/25"
+                    : "border-white/10 bg-slate-950/60 shadow-slate-950/20"
                 }`}
               >
                 <div
@@ -783,16 +771,14 @@ export default function MatchesPredictionBox() {
                   }`}
                 />
 
-                <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-
-               
+                <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
 
                 {golden && (
                   <motion.div
                     variants={cardMotion}
-                    className="relative mb-4 overflow-hidden rounded-2xl border border-amber-300/40 bg-slate-950/70 shadow-lg shadow-amber-950/10"
+                    className="relative mb-4 overflow-hidden rounded-2xl border border-amber-300/40 bg-slate-950/70 shadow-md shadow-amber-950/10"
                   >
-                    <div className="flex items-center justify-center gap-2 bg-amber-400 px-4 py-2 text-center text-sm font-black text-slate-950 md:text-base">
+                    <div className="flex items-center justify-center gap-2 bg-amber-400 px-4 py-2 text-center text-[14px] font-black text-slate-950 md:text-base">
                       <Crown className="h-4 w-4" />
                       <span>التوقع الذهبي</span>
                     </div>
@@ -817,7 +803,7 @@ export default function MatchesPredictionBox() {
                 <div className="relative mb-4 space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div
-                      className={`inline-flex items-center gap-1.5 text-right text-sm font-black md:text-base ${
+                      className={`inline-flex items-center gap-1.5 text-right text-[14px] font-black md:text-base ${
                         golden ? "text-amber-100" : "text-slate-200"
                       }`}
                     >
@@ -836,7 +822,7 @@ export default function MatchesPredictionBox() {
                   </div>
 
                   <div
-                    className={`relative w-full overflow-hidden rounded-full border px-3 py-1.5 text-center text-xs font-black shadow-lg ${
+                    className={`relative w-full overflow-hidden rounded-full border px-3 py-1.5 text-center text-xs font-black shadow-md ${
                       closed
                         ? "border-red-400/20 bg-red-500/10 text-red-100 shadow-red-950/10"
                         : golden
@@ -844,32 +830,11 @@ export default function MatchesPredictionBox() {
                           : "border-amber-400/20 bg-amber-400/10 text-amber-100 shadow-amber-950/10"
                     }`}
                   >
-                    {!closed && (
-                      <motion.span
-                        className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-transparent via-white/15 to-transparent"
-                        animate={{ x: ["120%", "-850%"] }}
-                        transition={{
-                          duration: 2.6,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                        }}
-                      />
-                    )}
-
                     <span className="relative inline-flex items-center justify-center gap-1.5">
                       {closed ? (
                         <Lock className="h-3.5 w-3.5" />
                       ) : (
-                        <motion.span
-                          animate={{ scale: [1, 1.18, 1] }}
-                          transition={{
-                            duration: 1.2,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }}
-                        >
-                          <Timer className="h-3.5 w-3.5" />
-                        </motion.span>
+                        <Timer className="h-3.5 w-3.5" />
                       )}
 
                       <span>
@@ -892,7 +857,7 @@ export default function MatchesPredictionBox() {
                       />
                     </FloatingTeamFlag>
 
-                    <div className="mt-2 text-lg font-black leading-none text-white md:text-xl">
+                    <div className="mt-2 text-[18px] font-black leading-none text-white md:text-xl">
                       {match.homeTeamCode}
                     </div>
 
@@ -901,28 +866,15 @@ export default function MatchesPredictionBox() {
                     </div>
                   </div>
 
-                  <motion.div
-                    animate={{
-                      scale: [1, 1.08, 1],
-                      boxShadow: [
-                        "0 0 0 0 rgba(251, 191, 36, 0)",
-                        "0 0 24px 0 rgba(251, 191, 36, 0.24)",
-                        "0 0 0 0 rgba(251, 191, 36, 0)",
-                      ],
-                    }}
-                    transition={{
-                      duration: 2.1,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                    className={`mx-auto flex h-11 w-11 items-center justify-center rounded-full border text-xs font-black shadow-lg ${
+                  <div
+                    className={`mx-auto flex h-11 w-11 items-center justify-center rounded-full border text-xs font-black shadow-md ${
                       golden
-                        ? "border-amber-300/40 bg-amber-400/20 text-amber-200 shadow-amber-950/20"
-                        : "border-white/10 bg-white/10 text-amber-300 shadow-slate-950/20"
+                        ? "border-amber-300/40 bg-amber-400/20 text-amber-200 shadow-amber-950/15"
+                        : "border-white/10 bg-white/10 text-amber-300 shadow-slate-950/15"
                     }`}
                   >
                     VS
-                  </motion.div>
+                  </div>
 
                   <div className="min-w-0 text-center">
                     <FloatingTeamFlag delay={0.35}>
@@ -934,7 +886,7 @@ export default function MatchesPredictionBox() {
                       />
                     </FloatingTeamFlag>
 
-                    <div className="mt-2 text-lg font-black leading-none text-white md:text-xl">
+                    <div className="mt-2 text-[18px] font-black leading-none text-white md:text-xl">
                       {match.awayTeamCode}
                     </div>
 
@@ -951,7 +903,7 @@ export default function MatchesPredictionBox() {
                     animate="show"
                     className="relative mt-5"
                   >
-                    <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100 shadow-lg shadow-amber-950/10">
+                    <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100 shadow-md shadow-amber-950/10">
                       <span className="inline-flex items-center justify-center gap-1.5">
                         <Edit3 className="h-4 w-4" />
                         <span>تعديل التوقع متاح حتى بداية المباراة</span>
@@ -966,7 +918,7 @@ export default function MatchesPredictionBox() {
                         type="button"
                         disabled={savingMatchId === match.id}
                         onClick={() => handleUpdatePrediction(match)}
-                        className={`inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-slate-950 shadow-lg transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        className={`inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[14px] font-black text-slate-950 shadow-md transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
                           golden
                             ? "bg-amber-300 shadow-amber-400/10 hover:bg-amber-200"
                             : "bg-amber-400 shadow-amber-950/10 hover:bg-amber-300"
@@ -984,7 +936,7 @@ export default function MatchesPredictionBox() {
                         type="button"
                         disabled={savingMatchId === match.id}
                         onClick={() => cancelEditingPrediction(match.id)}
-                        className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-black text-slate-200 shadow-lg shadow-slate-950/10 transition hover:bg-white/10 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-[14px] font-black text-slate-200 shadow-md shadow-slate-950/10 transition hover:bg-white/10 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <X className="h-4 w-4" />
                         <span>إلغاء</span>
@@ -999,7 +951,7 @@ export default function MatchesPredictionBox() {
                     className="relative mt-5 space-y-2"
                   >
                     {isGoldenPrediction(savedPrediction) && (
-                      <div className="rounded-2xl border border-amber-300/40 bg-amber-400 px-3 py-2 text-center text-xs font-black text-slate-950 shadow-lg shadow-amber-950/10">
+                      <div className="rounded-2xl border border-amber-300/40 bg-amber-400 px-3 py-2 text-center text-xs font-black text-slate-950 shadow-md shadow-amber-950/10">
                         <span className="inline-flex items-center justify-center gap-1.5">
                           <Crown className="h-4 w-4" />
                           <span>تم اعتماد التوقع الذهبي</span>
@@ -1007,14 +959,14 @@ export default function MatchesPredictionBox() {
                       </div>
                     )}
 
-                    <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-sm font-black text-emerald-100 shadow-lg shadow-emerald-950/10">
+                    <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-[14px] font-black text-emerald-100 shadow-md shadow-emerald-950/10">
                       <span className="inline-flex items-center justify-center gap-1.5">
                         <CheckCircle2 className="h-4 w-4" />
                         <span>وصل توقعك واعتمدناه</span>
                       </span>
                     </div>
 
-                    <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-base font-black text-emerald-100 shadow-lg shadow-emerald-950/10">
+                    <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-[16px] font-black text-emerald-100 shadow-md shadow-emerald-950/10">
                       توقعك المعتمد: {savedPrediction.homeScore} -{" "}
                       {savedPrediction.awayScore}
                     </div>
@@ -1027,7 +979,7 @@ export default function MatchesPredictionBox() {
                         );
 
                         return (
-                          <div className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-xs font-bold leading-6 text-blue-100 shadow-lg shadow-blue-950/10 md:text-sm">
+                          <div className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-xs font-bold leading-6 text-blue-100 shadow-md shadow-blue-950/10 md:text-sm">
                             المتأهل:{" "}
                             <span className="inline-flex items-center justify-center gap-1.5 font-black text-white">
                               {qualifiedTeam && (
@@ -1059,7 +1011,7 @@ export default function MatchesPredictionBox() {
                       })()}
 
                     {editable && (
-                      <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center shadow-lg shadow-amber-950/10">
+                      <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center shadow-md shadow-amber-950/10">
                         <div className="text-xs font-black text-amber-100 md:text-sm">
                           <span className="inline-flex items-center justify-center gap-1.5">
                             <Edit3 className="h-4 w-4" />
@@ -1072,7 +1024,7 @@ export default function MatchesPredictionBox() {
                           onClick={() =>
                             startEditingPrediction(match, savedPrediction)
                           }
-                          className="mt-2 inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-slate-950 shadow-lg shadow-amber-950/10 transition hover:bg-amber-300 active:scale-95"
+                          className="mt-2 inline-flex min-h-[40px] items-center justify-center gap-2 rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-slate-950 shadow-md shadow-amber-950/10 transition hover:bg-amber-300 active:scale-95"
                         >
                           <PencilLine className="h-4 w-4" />
                           <span>تعديل التوقع</span>
@@ -1081,7 +1033,7 @@ export default function MatchesPredictionBox() {
                     )}
                   </motion.div>
                 ) : closed ? (
-                  <div className="relative mt-5 rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-center text-sm font-bold text-red-100 shadow-lg shadow-red-950/10">
+                  <div className="relative mt-5 rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-center text-[14px] font-bold text-red-100 shadow-md shadow-red-950/10">
                     <span className="inline-flex items-center justify-center gap-1.5">
                       <Lock className="h-4 w-4" />
                       <span>انتهى وقت استقبال التوقعات لهذه المباراة.</span>
@@ -1101,13 +1053,13 @@ export default function MatchesPredictionBox() {
                       type="button"
                       disabled={savingMatchId === match.id}
                       onClick={() => handleSubmitPrediction(match)}
-                      className={`group relative mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl px-4 py-3 text-sm font-black text-slate-950 shadow-lg transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`group relative mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl px-4 py-3 text-[14px] font-black text-slate-950 shadow-md transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
                         golden
                           ? "bg-amber-300 shadow-amber-400/10 hover:bg-amber-200"
                           : "bg-amber-400 shadow-amber-950/10 hover:bg-amber-300"
                       }`}
                     >
-                      <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/35 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />
+                      <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />
 
                       {savingMatchId === match.id ? (
                         <>

@@ -38,31 +38,16 @@ type MemoryCard = {
 
 type GameStatus = "ready" | "playing" | "finished" | "saved";
 
+const scrollOnceViewport = {
+  once: true,
+  amount: 0.18,
+} as const;
+
 const sectionMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 28,
-    scale: 0.97,
-    filter: "blur(8px)",
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    filter: "blur(0px)",
-    transition: {
-      duration: 0.48,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.06,
-    },
-  },
-};
-
-const itemMotion: Variants = {
-  hidden: {
-    opacity: 0,
     y: 14,
-    scale: 0.98,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
@@ -75,6 +60,23 @@ const itemMotion: Variants = {
   },
 };
 
+const itemMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 8,
+    scale: 0.99,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.22,
+      ease: "easeOut",
+    },
+  },
+};
+
 const cardGridMotion: Variants = {
   hidden: {
     opacity: 0,
@@ -82,7 +84,9 @@ const cardGridMotion: Variants = {
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.025,
+      duration: 0.18,
+      ease: "easeOut",
+      staggerChildren: 0.012,
     },
   },
 };
@@ -90,9 +94,9 @@ const cardGridMotion: Variants = {
 const memoryCardMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 18,
-    scale: 0.9,
-    rotateY: -12,
+    y: 8,
+    scale: 0.98,
+    rotateY: -6,
   },
   show: {
     opacity: 1,
@@ -100,8 +104,8 @@ const memoryCardMotion: Variants = {
     scale: 1,
     rotateY: 0,
     transition: {
-      duration: 0.34,
-      ease: [0.22, 1, 0.36, 1],
+      duration: 0.22,
+      ease: "easeOut",
     },
   },
 };
@@ -109,18 +113,16 @@ const memoryCardMotion: Variants = {
 const leaderboardRowMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 18,
-    scale: 0.96,
-    filter: "blur(6px)",
+    y: 10,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
     transition: {
-      duration: 0.36,
-      ease: [0.22, 1, 0.36, 1],
+      duration: 0.24,
+      ease: "easeOut",
     },
   },
 };
@@ -296,7 +298,7 @@ function StatusBox({
   return (
     <motion.div
       variants={itemMotion}
-      className={`mb-4 rounded-2xl border px-4 py-3 text-center text-sm font-black shadow-lg md:text-base ${
+      className={`mb-4 rounded-2xl border px-4 py-3 text-center text-[14px] font-black shadow-lg md:text-base ${
         enabled
           ? "border-amber-400/30 bg-amber-400/10 text-amber-100 shadow-amber-950/10"
           : "border-red-400/30 bg-red-500/10 text-red-100 shadow-red-950/10"
@@ -324,8 +326,8 @@ function StatCard({
   return (
     <motion.div
       variants={itemMotion}
-      whileTap={{ scale: 0.96 }}
-      className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center shadow-lg shadow-slate-950/25 md:p-3"
+      whileTap={{ scale: 0.98 }}
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center shadow-md shadow-slate-950/20 md:p-3"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-white/5" />
 
@@ -343,7 +345,7 @@ function StatCard({
           initial={{ opacity: 0, y: 6, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.22, ease: "easeOut" }}
-          className={`mt-1 text-base font-black tabular-nums md:text-xl ${valueClassName}`}
+          className={`mt-1 text-[16px] font-black tabular-nums md:text-xl ${valueClassName}`}
         >
           {value}
         </motion.div>
@@ -364,7 +366,7 @@ function LeaderboardStat({
   return (
     <div className={`rounded-xl border p-1.5 text-center ${className}`}>
       <div className="text-[9px] font-bold opacity-80">{label}</div>
-      <div className="mt-0.5 text-xs font-black tabular-nums">{value}</div>
+      <div className="mt-0.5 text-[12px] font-black tabular-nums">{value}</div>
     </div>
   );
 }
@@ -654,7 +656,7 @@ export default function FlagMemoryGame() {
         variants={sectionMotion}
         initial="hidden"
         animate="show"
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-6 text-center text-slate-200 shadow-2xl shadow-slate-950/30 backdrop-blur-xl"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-6 text-center text-[14px] text-slate-200 shadow-md shadow-slate-950/20 backdrop-blur-sm"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
 
@@ -672,12 +674,12 @@ export default function FlagMemoryGame() {
         variants={sectionMotion}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: false, amount: 0.18 }}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-5"
+        viewport={scrollOnceViewport}
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-        <div className="pointer-events-none absolute -right-24 top-20 h-56 w-56 rounded-full bg-amber-300/10 blur-3xl" />
-        <div className="pointer-events-none absolute -left-24 bottom-20 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 top-20 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-24 bottom-20 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
         <div className="relative">
@@ -691,30 +693,26 @@ export default function FlagMemoryGame() {
 
           <motion.div
             variants={itemMotion}
-            className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-center shadow-lg shadow-cyan-950/10"
+            className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-center shadow-md shadow-cyan-950/10"
           >
             <div className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-cyan-100/80">
               <Clock3 className="h-4 w-4" />
               <span>تحدي جديد بعد</span>
             </div>
 
-            <motion.div
-              key={nextChallengeSeconds}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.16 }}
-              className="mt-1 text-2xl font-black text-cyan-100 tabular-nums"
+            <div
+              className="mt-1 text-[24px] font-black text-cyan-100 tabular-nums"
               dir="ltr"
             >
               {formatCountdown(nextChallengeSeconds)}
-            </motion.div>
+            </div>
           </motion.div>
 
           <motion.div
             variants={itemMotion}
-            className="mb-5 rounded-2xl border border-white/10 bg-slate-950/55 p-3 text-center shadow-lg shadow-slate-950/20"
+            className="mb-5 rounded-2xl border border-white/10 bg-slate-950/55 p-3 text-center shadow-md shadow-slate-950/15"
           >
-            <div className="mb-2 inline-flex items-center justify-center gap-2 text-sm font-black text-white">
+            <div className="mb-2 inline-flex items-center justify-center gap-2 text-[14px] font-black text-white">
               <Target className="h-4 w-4 text-amber-300" />
               <span>شرح النقاط</span>
             </div>
@@ -774,7 +772,7 @@ export default function FlagMemoryGame() {
                 initial="hidden"
                 animate="show"
                 exit={{ opacity: 0, y: -10, scale: 0.97 }}
-                className="mb-5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm font-bold leading-7 text-emerald-100 shadow-lg shadow-emerald-950/10"
+                className="mb-5 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-[14px] font-bold leading-7 text-emerald-100 shadow-md shadow-emerald-950/10"
               >
                 <span className="inline-flex items-center justify-center gap-2">
                   <ShieldCheck className="h-4 w-4" />
@@ -796,7 +794,7 @@ export default function FlagMemoryGame() {
                 initial="hidden"
                 animate="show"
                 exit={{ opacity: 0, y: -10, scale: 0.97 }}
-                className="mb-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-sm font-bold leading-6 text-cyan-100 shadow-lg shadow-cyan-950/10"
+                className="mb-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-[14px] font-bold leading-6 text-cyan-100 shadow-md shadow-cyan-950/10"
               >
                 <span className="inline-flex items-center justify-center gap-2">
                   <Sparkles className="h-4 w-4 text-cyan-200" />
@@ -815,7 +813,7 @@ export default function FlagMemoryGame() {
               onClick={startGame}
               disabled={startButtonDisabled}
               whileTap={startButtonDisabled ? undefined : { scale: 0.96, y: 2 }}
-              className="group relative inline-flex min-h-[48px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-amber-400 px-5 py-3 text-sm font-black text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="group relative inline-flex min-h-[48px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-amber-400 px-5 py-3 text-[14px] font-black text-slate-950 shadow-md shadow-amber-500/15 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />
 
@@ -839,7 +837,7 @@ export default function FlagMemoryGame() {
 
           <motion.div
             variants={itemMotion}
-            className="mb-4 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-sm font-black text-slate-200 shadow-lg shadow-slate-950/20"
+            className="mb-4 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-[14px] font-black text-slate-200 shadow-md shadow-slate-950/15"
           >
             <span className="inline-flex items-center justify-center gap-2">
               <Flag className="h-4 w-4 text-amber-300" />
@@ -869,20 +867,20 @@ export default function FlagMemoryGame() {
                   disabled={status !== "playing" || visible}
                   whileTap={
                     status === "playing" && !visible
-                      ? { scale: 0.92, rotateZ: -1 }
+                      ? { scale: 0.96 }
                       : undefined
                   }
                   animate={{
                     rotateY: visible ? 180 : 0,
-                    scale: card.matched ? [1, 1.06, 1] : 1,
+                    scale: 1,
                   }}
                   transition={{
                     rotateY: {
-                      duration: 0.38,
-                      ease: [0.22, 1, 0.36, 1],
+                      duration: 0.26,
+                      ease: "easeOut",
                     },
                     scale: {
-                      duration: 0.3,
+                      duration: 0.18,
                       ease: "easeOut",
                     },
                   }}
@@ -898,15 +896,9 @@ export default function FlagMemoryGame() {
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent" />
 
                   {card.matched && (
-                    <motion.span
+                    <span
                       aria-hidden="true"
-                      initial={{ opacity: 0, scale: 0.7 }}
-                      animate={{
-                        opacity: [0, 0.7, 0],
-                        scale: [0.7, 1.3, 1.8],
-                      }}
-                      transition={{ duration: 0.6, ease: "easeOut" }}
-                      className="pointer-events-none absolute inset-1 rounded-xl border border-emerald-300/60 md:rounded-2xl"
+                      className="pointer-events-none absolute inset-1 rounded-xl border border-emerald-300/45 md:rounded-2xl"
                     />
                   )}
 
@@ -928,24 +920,9 @@ export default function FlagMemoryGame() {
                       </div>
                     ) : (
                       <div className="flex h-full flex-col items-center justify-center gap-0.5">
-                        <motion.span
-                          animate={
-                            status === "playing"
-                              ? {
-                                  y: [0, -2, 0],
-                                  scale: [1, 1.06, 1],
-                                }
-                              : undefined
-                          }
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut",
-                          }}
-                          className="text-lg leading-none md:text-2xl"
-                        >
+                        <span className="text-lg leading-none md:text-2xl">
                           ?
-                        </motion.span>
+                        </span>
 
                         <span className="text-[9px] font-black leading-none text-slate-300 md:text-[10px]">
                           {index + 1}
@@ -964,20 +941,20 @@ export default function FlagMemoryGame() {
         variants={sectionMotion}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: false, amount: 0.22 }}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-5"
+        viewport={scrollOnceViewport}
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-        <div className="pointer-events-none absolute -right-20 top-8 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 bottom-8 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 top-8 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-8 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
         <div className="relative mb-4 text-center">
-          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-lg shadow-amber-950/10">
+          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/10">
             <Trophy className="h-5 w-5" />
           </div>
 
-          <h2 className="text-xl font-black md:text-2xl">
+          <h2 className="text-[20px] font-black md:text-2xl">
             ترتيب تحدي الأعلام اليومي
           </h2>
 
@@ -989,7 +966,7 @@ export default function FlagMemoryGame() {
         {leaderboard.length === 0 ? (
           <motion.div
             variants={itemMotion}
-            className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/50 p-5 text-center text-sm font-bold text-slate-300 shadow-inner"
+            className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/50 p-5 text-center text-[14px] font-bold text-slate-300 shadow-inner"
           >
             <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
               <Medal className="h-5 w-5 text-slate-300" />
@@ -1011,33 +988,20 @@ export default function FlagMemoryGame() {
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-transparent" />
 
                   <div className="relative mb-2 flex items-center gap-2">
-                    <motion.div
-                      animate={
-                        rank <= 3
-                          ? {
-                              y: [0, -3, 0],
-                              scale: [1, 1.05, 1],
-                            }
-                          : undefined
-                      }
-                      transition={{
-                        duration: 2.2,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      }}
-                      className={`flex h-8 min-w-8 items-center justify-center rounded-xl border text-sm font-black shadow-lg ${getRankClass(
+                    <div
+                      className={`flex h-8 min-w-8 items-center justify-center rounded-xl border text-[14px] font-black shadow-md ${getRankClass(
                         rank
                       )}`}
                     >
                       {getRankLabel(rank)}
-                    </motion.div>
+                    </div>
 
                     <div className="min-w-0 flex-1">
                       <div className="text-[10px] font-bold text-slate-400">
                         العضو
                       </div>
 
-                      <div className="mt-0.5 whitespace-normal break-words text-right text-sm font-black leading-5 text-white">
+                      <div className="mt-0.5 whitespace-normal break-words text-right text-[14px] font-black leading-5 text-white">
                         {result.userName}
                       </div>
                     </div>

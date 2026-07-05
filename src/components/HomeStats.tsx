@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { motion, type Variants } from "framer-motion";
+import { motion, type Variants, useReducedMotion } from "framer-motion";
 import {
   BarChart3,
   Flame,
@@ -73,6 +73,7 @@ function CountUpNumber({
   loading: boolean;
 }) {
   const [displayValue, setDisplayValue] = useState(0);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (loading) {
@@ -80,16 +81,18 @@ function CountUpNumber({
       return;
     }
 
-    const duration = 2200;
-    const frameMs = 16;
-    const totalFrames = Math.max(1, Math.round(duration / frameMs));
-    let frame = 0;
+    if (shouldReduceMotion) {
+      setDisplayValue(value);
+      return;
+    }
+
+    const duration = 850;
+    const startTime = window.performance.now();
     let animationFrameId = 0;
 
-    function animate() {
-      frame += 1;
-
-      const progress = Math.min(frame / totalFrames, 1);
+    function animate(currentTime: number) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
       const easedProgress = 1 - Math.pow(1 - progress, 3);
       const nextValue = value * easedProgress;
 
@@ -107,7 +110,7 @@ function CountUpNumber({
     return () => {
       window.cancelAnimationFrame(animationFrameId);
     };
-  }, [value, loading]);
+  }, [value, loading, shouldReduceMotion]);
 
   if (loading) {
     return (
@@ -126,20 +129,25 @@ function CountUpNumber({
   );
 }
 
+const scrollOnceViewport = {
+  once: true,
+  amount: 0.18,
+} as const;
+
 const sectionMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 18,
-    scale: 0.98,
+    y: 14,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.38,
+      duration: 0.32,
       ease: "easeOut",
-      staggerChildren: 0.05,
+      staggerChildren: 0.035,
     },
   },
 };
@@ -147,15 +155,15 @@ const sectionMotion: Variants = {
 const cardMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 12,
-    scale: 0.96,
+    y: 10,
+    scale: 0.98,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.3,
+      duration: 0.26,
       ease: "easeOut",
     },
   },
@@ -237,7 +245,7 @@ export default function HomeStats() {
         value: stats.totalPredictions,
         icon: <Target className="h-4 w-4 md:h-6 md:w-6" />,
         valueClass: "text-white",
-        glowClass: "from-white/15 to-slate-300/5 text-white",
+        glowClass: "from-white/14 to-slate-300/5 text-white",
         borderClass: "border-white/15",
       },
       {
@@ -245,7 +253,7 @@ export default function HomeStats() {
         value: stats.winnerCorrect,
         icon: <Medal className="h-4 w-4 md:h-6 md:w-6" />,
         valueClass: "text-amber-300",
-        glowClass: "from-amber-300/20 to-amber-500/5 text-amber-200",
+        glowClass: "from-amber-300/18 to-amber-500/5 text-amber-200",
         borderClass: "border-amber-300/25",
       },
       {
@@ -253,7 +261,7 @@ export default function HomeStats() {
         value: stats.exactCorrect,
         icon: <Flame className="h-4 w-4 md:h-6 md:w-6" />,
         valueClass: "text-emerald-300",
-        glowClass: "from-emerald-300/20 to-emerald-500/5 text-emerald-200",
+        glowClass: "from-emerald-300/18 to-emerald-500/5 text-emerald-200",
         borderClass: "border-emerald-300/25",
       },
       {
@@ -263,7 +271,7 @@ export default function HomeStats() {
         decimals: 1,
         icon: <TrendingUp className="h-4 w-4 md:h-6 md:w-6" />,
         valueClass: "text-sky-300",
-        glowClass: "from-sky-300/20 to-sky-500/5 text-sky-200",
+        glowClass: "from-sky-300/18 to-sky-500/5 text-sky-200",
         borderClass: "border-sky-300/25",
       },
       {
@@ -271,7 +279,7 @@ export default function HomeStats() {
         value: stats.calculatedMatches,
         icon: <MapPin className="h-4 w-4 md:h-6 md:w-6" />,
         valueClass: "text-white",
-        glowClass: "from-cyan-300/15 to-cyan-500/5 text-cyan-100",
+        glowClass: "from-cyan-300/14 to-cyan-500/5 text-cyan-100",
         borderClass: "border-cyan-300/20",
       },
     ],
@@ -282,19 +290,20 @@ export default function HomeStats() {
     <motion.section
       variants={sectionMotion}
       initial="hidden"
-      animate="show"
-      className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-3 shadow-2xl shadow-slate-950/35 backdrop-blur-xl md:p-5"
+      whileInView="show"
+      viewport={scrollOnceViewport}
+      className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem] md:p-5"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 -top-20 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
 
       <div className="relative mb-3 text-center md:mb-4">
-        <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-300/25 bg-sky-300/10 text-sky-100 shadow-lg shadow-sky-950/20">
+        <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-300/25 bg-sky-300/10 text-sky-100 shadow-md shadow-sky-950/15">
           <BarChart3 className="h-5 w-5" />
         </div>
 
-        <h2 className="text-lg font-black tracking-tight md:text-2xl">
+        <h2 className="text-[18px] font-black tracking-tight md:text-2xl">
           إحصائيات المنصة
         </h2>
 
@@ -308,22 +317,22 @@ export default function HomeStats() {
           <motion.div
             key={card.titleLines.join("-")}
             variants={cardMotion}
-            whileTap={{ scale: 0.95 }}
-            className={`group relative flex min-h-[106px] flex-col items-center overflow-hidden rounded-2xl border ${card.borderClass} bg-slate-950/45 px-1 py-2 text-center shadow-xl shadow-slate-950/25 backdrop-blur-xl transition duration-200 hover:bg-slate-950/55 md:min-h-[152px] md:rounded-[1.4rem] md:px-3 md:py-4`}
+            whileTap={{ scale: 0.98 }}
+            className={`group relative flex min-h-[104px] transform-gpu flex-col items-center overflow-hidden rounded-2xl border ${card.borderClass} bg-slate-950/45 px-1 py-2 text-center shadow-md shadow-slate-950/20 backdrop-blur-sm transition duration-200 hover:bg-slate-950/55 md:min-h-[152px] md:rounded-[1.4rem] md:px-3 md:py-4`}
           >
             <div
               className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${card.glowClass} opacity-80`}
             />
 
-            <div className="pointer-events-none absolute inset-x-2 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent md:inset-x-5" />
+            <div className="pointer-events-none absolute inset-x-2 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent md:inset-x-5" />
 
             <div
-              className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 shadow-lg shadow-slate-950/20 transition duration-200 group-hover:scale-105 md:h-12 md:w-12 md:rounded-2xl ${card.valueClass}`}
+              className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 shadow-sm shadow-slate-950/15 transition duration-200 group-hover:scale-105 md:h-12 md:w-12 md:rounded-2xl ${card.valueClass}`}
             >
               {card.icon}
             </div>
 
-            <div className="relative mt-1.5 flex h-[30px] w-full flex-col items-center justify-center gap-0.5 text-center text-[8px] font-black leading-none text-slate-300 md:mt-2 md:h-[40px] md:text-xs">
+            <div className="relative mt-1.5 flex h-[30px] w-full flex-col items-center justify-center gap-0.5 text-center text-[9px] font-black leading-none text-slate-300 md:mt-2 md:h-[40px] md:text-xs">
               <span className="block w-full whitespace-nowrap text-center">
                 {card.titleLines[0]}
               </span>
@@ -333,7 +342,7 @@ export default function HomeStats() {
             </div>
 
             <div
-              className={`relative mt-auto w-full text-center text-[15px] font-black leading-none tracking-tight md:text-3xl ${card.valueClass}`}
+              className={`relative mt-auto w-full text-center text-[15px] font-black leading-none tracking-tight tabular-nums md:text-3xl ${card.valueClass}`}
             >
               <CountUpNumber
                 value={card.value}

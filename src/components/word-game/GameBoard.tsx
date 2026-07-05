@@ -17,7 +17,9 @@ const boardMotion: Variants = {
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.045,
+      duration: 0.18,
+      ease: "easeOut",
+      staggerChildren: 0.025,
     },
   },
 };
@@ -25,35 +27,35 @@ const boardMotion: Variants = {
 const rowMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 12,
-    scale: 0.98,
+    y: 8,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.28,
+      duration: 0.22,
       ease: "easeOut",
-      staggerChildren: 0.035,
+      staggerChildren: 0.02,
     },
   },
 };
 
 function getTileClass(status: WordGameGuess["letters"][number]["status"]) {
   if (status === "correct") {
-    return "border-emerald-400 bg-emerald-500 text-white shadow-emerald-500/20";
+    return "border-emerald-400 bg-emerald-500 text-white shadow-emerald-500/15";
   }
 
   if (status === "present") {
-    return "border-amber-300 bg-amber-400 text-slate-950 shadow-amber-400/20";
+    return "border-amber-300 bg-amber-400 text-slate-950 shadow-amber-400/15";
   }
 
   if (status === "absent") {
-    return "border-slate-500 bg-slate-600 text-white shadow-slate-700/20";
+    return "border-slate-500 bg-slate-600 text-white shadow-slate-700/15";
   }
 
-  return "border-white/10 bg-slate-950/60 text-white shadow-slate-950/25";
+  return "border-white/10 bg-slate-950/60 text-white shadow-slate-950/20";
 }
 
 export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
@@ -94,9 +96,9 @@ export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
                   initial={
                     isSavedTile
                       ? {
-                          rotateX: -90,
-                          scale: 0.94,
-                          opacity: 0.6,
+                          rotateX: -72,
+                          scale: 0.98,
+                          opacity: 0.75,
                         }
                       : false
                   }
@@ -109,28 +111,26 @@ export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
                         }
                       : hasLetter
                         ? {
-                            scale: [1, 1.13, 1],
-                            y: [0, -2, 0],
+                            scale: [1, 1.06, 1],
                           }
                         : {
                             scale: 1,
-                            y: 0,
                           }
                   }
                   transition={
                     isSavedTile
                       ? {
-                          delay: letterIndex * 0.12,
-                          duration: 0.42,
-                          ease: [0.22, 1, 0.36, 1],
+                          delay: letterIndex * 0.075,
+                          duration: 0.28,
+                          ease: "easeOut",
                         }
                       : {
-                          duration: 0.18,
+                          duration: 0.14,
                           ease: "easeOut",
                         }
                   }
                   className={[
-                    "relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border text-2xl font-black shadow-lg transition-colors duration-300 will-change-transform [transform-style:preserve-3d]",
+                    "relative flex aspect-square transform-gpu items-center justify-center overflow-hidden rounded-2xl border text-[24px] font-black shadow-md transition-colors duration-200 [transform-style:preserve-3d]",
                     getTileClass(item.status),
                     isCurrentRow && hasLetter
                       ? "border-amber-300/45 bg-slate-950/80 shadow-amber-400/10"
@@ -140,16 +140,9 @@ export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
                   <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent" />
 
                   {item.status === "correct" && (
-                    <motion.span
+                    <span
                       aria-hidden="true"
-                      initial={{ opacity: 0, scale: 0.7 }}
-                      animate={{ opacity: [0, 0.7, 0], scale: [0.7, 1.35, 1.8] }}
-                      transition={{
-                        delay: letterIndex * 0.12 + 0.15,
-                        duration: 0.6,
-                        ease: "easeOut",
-                      }}
-                      className="pointer-events-none absolute inset-1 rounded-2xl border border-white/40"
+                      className="pointer-events-none absolute inset-1 rounded-2xl border border-white/25"
                     />
                   )}
 

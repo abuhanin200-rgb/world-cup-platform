@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import {
@@ -42,6 +42,11 @@ type QualifiedTeamInfo = {
   emoji?: string;
   name: string;
 };
+
+const scrollOnceViewport = {
+  once: true,
+  amount: 0.16,
+} as const;
 
 const sectionMotion: Variants = {
   hidden: {
@@ -127,9 +132,10 @@ const modalMotion: Variants = {
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
     <motion.div
-      variants={cardMotion}
-      whileTap={{ scale: 0.97 }}
-      className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-xl shadow-slate-950/25 backdrop-blur-xl md:p-3"
+      initial={false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileTap={{ scale: 0.98 }}
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-3"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-300/5" />
 
@@ -153,7 +159,7 @@ function HighlightCard({
   emptyText,
 }: {
   title: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   user: HomeHighlightUser | null;
   valueText: string;
   accentClass: string;
@@ -169,9 +175,10 @@ function HighlightCard({
 
   return (
     <motion.div
-      variants={cardMotion}
-      whileTap={{ scale: 0.97 }}
-      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-xl shadow-slate-950/25 backdrop-blur-xl transition duration-200 hover:bg-white/[0.11] md:p-3"
+      initial={false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileTap={{ scale: 0.98 }}
+      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-md shadow-slate-950/20 backdrop-blur-sm transition duration-200 hover:bg-white/[0.11] md:p-3"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-300/5" />
       <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
@@ -350,8 +357,9 @@ export default function HomeHighlights() {
       <motion.section
         variants={sectionMotion}
         initial="hidden"
-        animate="show"
-        className="relative mt-4 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-3 shadow-2xl shadow-slate-950/35 backdrop-blur-xl md:mt-5 md:p-4"
+        whileInView="show"
+        viewport={scrollOnceViewport}
+        className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 backdrop-blur-sm md:mt-5 md:rounded-[2rem] md:p-4"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
 
@@ -379,15 +387,16 @@ export default function HomeHighlights() {
     <motion.section
       variants={sectionMotion}
       initial="hidden"
-      animate="show"
-      className="relative mt-4 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.08] p-3 shadow-2xl shadow-slate-950/35 backdrop-blur-xl md:mt-5 md:p-4"
+      whileInView="show"
+      viewport={scrollOnceViewport}
+      className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 backdrop-blur-sm md:mt-5 md:rounded-[2rem] md:p-4"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 top-0 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
 
       <div className="relative mb-3 text-center">
-        <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-lg shadow-amber-950/20">
+        <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/20">
           <Trophy className="h-5 w-5" />
         </div>
 
@@ -552,7 +561,7 @@ export function ExactHitsTicker() {
       <div
         key={`${hit.id}-${index}`}
         dir="rtl"
-        className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border px-3 py-2 text-xs text-white shadow-lg shadow-slate-950/25 backdrop-blur-xl md:px-4 md:text-sm ${
+        className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border px-3 py-2 text-xs text-white shadow-md shadow-slate-950/25 backdrop-blur-xl md:px-4 md:text-sm ${
           golden
             ? "border-amber-300/40 bg-amber-400/15"
             : "border-emerald-300/20 bg-slate-950/70"
@@ -567,7 +576,7 @@ export function ExactHitsTicker() {
         />
 
         {golden && (
-          <span className="relative inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-950/20 md:text-xs">
+          <span className="relative inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md shadow-amber-950/20 md:text-xs">
             <Star className="h-3 w-3 fill-slate-950" />
             <span>ذهبي بالملي +6</span>
           </span>
@@ -738,13 +747,13 @@ export function ExactHitsTicker() {
               initial="hidden"
               animate="show"
               exit="exit"
-              className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/85 p-3 backdrop-blur-md md:items-center md:p-4"
+              className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/85 p-3 backdrop-blur-sm md:items-center md:p-4"
               onClick={() => setIsListOpen(false)}
             >
               <motion.div
                 variants={modalMotion}
                 dir="rtl"
-                className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-t-[2rem] border border-emerald-400/30 bg-slate-950 shadow-2xl shadow-slate-950/60 md:max-h-[84vh] md:rounded-[2rem]"
+                className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-t-[2rem] border border-emerald-400/30 bg-slate-950 shadow-xl shadow-slate-950/45 md:max-h-[84vh] md:rounded-[2rem]"
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="relative border-b border-white/10 bg-emerald-400/10 px-4 py-3">
@@ -771,7 +780,7 @@ export function ExactHitsTicker() {
                     <button
                       type="button"
                       onClick={() => setIsListOpen(false)}
-                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white shadow-lg shadow-slate-950/20 transition hover:bg-white/20 active:scale-95"
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white shadow-md shadow-slate-950/20 transition hover:bg-white/20 active:scale-95"
                       aria-label="إغلاق"
                     >
                       <X className="h-5 w-5" />
@@ -842,10 +851,10 @@ export function ExactHitsTicker() {
 
   return (
     <>
-      <section className="relative mt-5 overflow-hidden rounded-[1.65rem] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:mt-6">
+      <section className="relative mt-5 overflow-hidden rounded-[1.65rem] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 shadow-md shadow-slate-950/25 backdrop-blur-sm md:mt-6">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/10 via-transparent to-cyan-300/5" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-emerald-300/10 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-emerald-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
 
         <motion.div
           variants={sectionMotion}
@@ -857,7 +866,7 @@ export function ExactHitsTicker() {
             <button
               type="button"
               onClick={() => setIsListOpen(true)}
-              className="group inline-flex min-h-[38px] items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-sm font-black text-emerald-200 shadow-lg shadow-emerald-950/10 transition hover:bg-emerald-400/20 active:scale-95"
+              className="group inline-flex min-h-[38px] items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-sm font-black text-emerald-200 shadow-md shadow-emerald-950/10 transition hover:bg-emerald-400/20 active:scale-95"
             >
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-300/15 text-emerald-200">
                 <Target className="h-4 w-4 transition group-hover:scale-110 group-hover:rotate-[-6deg]" />

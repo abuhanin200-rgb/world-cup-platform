@@ -130,12 +130,12 @@ export default function TeamFlag({
       <motion.span
         aria-label={altText}
         title={name || undefined}
-        initial={{ opacity: 0, scale: 0.78, y: 4 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        whileTap={{ scale: 0.92 }}
-        transition={{ duration: 0.22, ease: "easeOut" }}
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileTap={{ scale: 0.97 }}
+        transition={{ duration: 0.14, ease: "easeOut" }}
         className={[
-          "inline-flex shrink-0 items-center justify-center leading-none",
+          "inline-flex shrink-0 transform-gpu items-center justify-center leading-none",
           EMOJI_SIZE_CLASSES[size],
           className,
         ].join(" ")}
@@ -151,14 +151,15 @@ export default function TeamFlag({
       alt={altText}
       title={name || undefined}
       loading="lazy"
+      decoding="async"
       draggable={false}
       onError={() => setFailed(true)}
-      initial={{ opacity: 0, scale: 0.78, y: 4 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      whileTap={{ scale: 0.92 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
+      initial={{ opacity: 0, scale: 0.94 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ duration: 0.14, ease: "easeOut" }}
       className={[
-        "inline-block shrink-0 object-cover shadow-sm ring-1 ring-white/15",
+        "inline-block shrink-0 transform-gpu object-cover shadow-sm ring-1 ring-white/15",
         SIZE_CLASSES[size],
         className,
       ].join(" ")}

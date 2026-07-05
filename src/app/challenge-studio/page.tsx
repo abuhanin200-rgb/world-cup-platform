@@ -24,58 +24,59 @@ const pageMotion: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { duration: 0.35, ease: "easeOut", staggerChildren: 0.08 },
+    transition: { duration: 0.24, ease: "easeOut" },
   },
 };
 
 const headerMotion: Variants = {
-  hidden: { opacity: 0, y: -18 },
+  hidden: { opacity: 0, y: -10 },
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.38, ease: "easeOut" },
+    transition: { duration: 0.26, ease: "easeOut" },
   },
 };
+
+const scrollOnceViewport = {
+  once: true,
+  amount: 0.18,
+} as const;
 
 const revealMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 30,
-    scale: 0.97,
-    filter: "blur(8px)",
+    y: 14,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.32, ease: "easeOut" },
   },
 };
 
 const studioCardMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 34,
-    scale: 0.96,
-    filter: "blur(8px)",
+    y: 12,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
-    transition: { duration: 0.46, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.28, ease: "easeOut" },
   },
 };
 
 const softItemMotion: Variants = {
-  hidden: { opacity: 0, y: 16, scale: 0.98 },
+  hidden: { opacity: 0, y: 10, scale: 0.99 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { duration: 0.32, ease: "easeOut" },
+    transition: { duration: 0.24, ease: "easeOut" },
   },
 };
 
@@ -170,13 +171,13 @@ function StudioCard({
       variants={studioCardMotion}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: false, amount: featured ? 0.22 : 0.3 }}
-      whileTap={{ scale: 0.985 }}
-      className={`relative overflow-hidden rounded-3xl border p-4 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-5 ${
+      viewport={{ once: true, amount: featured ? 0.22 : 0.24 }}
+      whileTap={{ scale: 0.99 }}
+      className={`relative overflow-hidden rounded-3xl border p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-5 ${
         style.className
       } ${featured ? "md:col-span-2" : ""}`}
     >
-      <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
 
       <div className="relative">
         <div className="mb-4 flex items-center justify-between gap-3">
@@ -192,14 +193,14 @@ function StudioCard({
                 {style.label}
               </span>
 
-              <h3 className="mt-2 text-base font-black md:text-xl">
+              <h3 className="mt-2 text-[16px] font-black md:text-xl">
                 {card.title}
               </h3>
             </div>
           </div>
         </div>
 
-        <p className="whitespace-pre-line text-sm font-bold leading-8 text-slate-100 md:text-base">
+        <p className="whitespace-pre-line text-[14px] font-bold leading-8 text-slate-100 md:text-base">
           {card.content}
         </p>
       </div>
@@ -401,10 +402,10 @@ export default function ChallengeStudioPage() {
       variants={pageMotion}
       initial="hidden"
       animate="show"
-      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white"
+      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-[15px] text-white antialiased [text-size-adjust:100%]"
     >
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.12),transparent_34%),radial-gradient(circle_at_10%_30%,rgba(239,68,68,0.10),transparent_32%),radial-gradient(circle_at_90%_70%,rgba(34,211,238,0.08),transparent_30%)]" />
-      <motion.header variants={headerMotion} className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+      <motion.header variants={headerMotion} className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 shadow-lg shadow-slate-950/20 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">
           <div className="flex items-center gap-2 md:gap-3">
             <div className="h-10 w-10 overflow-hidden rounded-2xl border border-white/20 bg-white/10 md:h-12 md:w-12">
@@ -439,26 +440,22 @@ export default function ChallengeStudioPage() {
           variants={revealMotion}
           initial="hidden"
           whileInView="show"
-          viewport={{ once: false, amount: 0.35 }}
+          viewport={scrollOnceViewport}
           whileTap={{ scale: 0.99 }}
-          className="relative mb-5 overflow-hidden rounded-3xl border border-amber-400/25 bg-white/10 p-5 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-7"
+          className="relative mb-5 overflow-hidden rounded-3xl border border-amber-400/25 bg-white/[0.09] p-5 text-center shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-7"
         >
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.22),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.18),transparent_40%)]" />
 
           <div className="relative">
-            <motion.div
-              animate={{ y: [0, -6, 0], rotate: [0, -2, 2, 0] }}
-              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-              className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-400/30 bg-slate-950/50 text-4xl shadow-lg shadow-amber-950/30"
-            >
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-3xl border border-amber-400/30 bg-slate-950/50 text-4xl shadow-md shadow-amber-950/20">
               🎙️
-            </motion.div>
+            </div>
 
-            <h2 className="text-3xl font-black md:text-5xl">
+            <h2 className="text-[30px] font-black md:text-5xl">
               استوديو التحدي
             </h2>
 
-            <p className="mx-auto mt-3 max-w-2xl text-sm font-bold leading-7 text-amber-100 md:text-base">
+            <p className="mx-auto mt-3 max-w-2xl text-[14px] font-bold leading-7 text-amber-100 md:text-base">
               القناة الرسمية لأخبار الأعضاء، التصريحات، الأوسمة، والطقطقة
               الرياضية الخفيفة.
             </p>
@@ -474,8 +471,8 @@ export default function ChallengeStudioPage() {
             variants={revealMotion}
             initial="hidden"
             whileInView="show"
-            viewport={{ once: false, amount: 0.4 }}
-            className="mb-5 overflow-hidden rounded-2xl border border-red-400/30 bg-red-500/10 shadow-2xl shadow-red-950/20"
+            viewport={scrollOnceViewport}
+            className="mb-5 overflow-hidden rounded-2xl border border-red-400/30 bg-red-500/10 shadow-lg shadow-red-950/15"
           >
             <div className="flex items-center gap-3">
               <div className="shrink-0 bg-red-500 px-4 py-3 text-xs font-black text-white md:text-sm">
@@ -483,7 +480,7 @@ export default function ChallengeStudioPage() {
               </div>
 
               <div className="min-w-0 flex-1 overflow-hidden py-3">
-                <div className="animate-pulse truncate text-xs font-black text-red-100 md:text-sm">
+                <div className="truncate text-xs font-black text-red-100 md:text-sm">
                   {breakingText}
                 </div>
               </div>
@@ -492,7 +489,7 @@ export default function ChallengeStudioPage() {
         )}
 
         {loading ? (
-          <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center text-slate-300">
+          <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center text-[14px] text-slate-300">
             جاري تحميل النشرة...
           </div>
         ) : !currentBulletin ? (
@@ -500,7 +497,7 @@ export default function ChallengeStudioPage() {
             <div className="rounded-3xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
               <div className="text-4xl">🎙️</div>
 
-              <h3 className="mt-3 text-xl font-black">النشرة لم تُنشر بعد</h3>
+              <h3 className="mt-3 text-[20px] font-black">النشرة لم تُنشر بعد</h3>
 
               <p className="mt-2 text-sm text-slate-300">
                 قريبًا تظهر هنا أخبار الأعضاء وتحدياتهم.
@@ -518,7 +515,7 @@ export default function ChallengeStudioPage() {
           </>
         ) : (
           <>
-            <motion.div ref={bulletinTopRef} variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.35 }} className="mb-4 scroll-mt-24">
+            <motion.div ref={bulletinTopRef} variants={revealMotion} initial="hidden" whileInView="show" viewport={scrollOnceViewport} className="mb-4 scroll-mt-24">
               {isViewingArchive && (
                 <div className="mb-4 rounded-2xl border border-amber-400/25 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100 md:text-sm">
                   📚 أنت تشاهد نشرة قديمة: {currentBulletin.date}
@@ -534,7 +531,7 @@ export default function ChallengeStudioPage() {
 
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xl font-black md:text-2xl">
+                  <h3 className="text-[20px] font-black md:text-2xl">
                     {isViewingArchive ? "نشرة من الأرشيف" : "نشرة اليوم"}
                   </h3>
                   <p className="mt-1 text-xs text-slate-300">
@@ -548,7 +545,7 @@ export default function ChallengeStudioPage() {
               </div>
             </motion.div>
 
-            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.18 }} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={scrollOnceViewport} className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {mainCard && <StudioCard card={mainCard} featured />}
 
               {otherCards.map((card, index) => (
@@ -556,15 +553,15 @@ export default function ChallengeStudioPage() {
               ))}
             </motion.div>
 
-            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.35 }} className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-3 text-center text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
+            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={scrollOnceViewport} className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-3 text-center text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
               🎙️ تصريحات ومحتوى استوديو التحدي ترفيهية ومولدة بالذكاء
               الاصطناعي، وليست تصريحات حقيقية من الأعضاء.
             </motion.div>
 
             {archive.length > 0 && (
-              <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.18 }} className="mt-8">
+              <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={scrollOnceViewport} className="mt-8">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <h3 className="text-xl font-black">📚 آخر النشرات</h3>
+                  <h3 className="text-[20px] font-black">📚 آخر النشرات</h3>
 
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-300">
                     {archivePage + 1} / {archiveTotalPages}
@@ -575,7 +572,7 @@ export default function ChallengeStudioPage() {
                   {visibleArchive.map((item) => (
                     <motion.button
                       variants={softItemMotion}
-                      whileTap={{ scale: 0.985 }}
+                      whileTap={{ scale: 0.99 }}
                       type="button"
                       key={item.id}
                       onClick={() => selectBulletin(item.id)}
@@ -587,7 +584,7 @@ export default function ChallengeStudioPage() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-sm font-black">
+                          <div className="text-[14px] font-black">
                             {item.summary || "نشرة استوديو التحدي"}
                           </div>
 
@@ -634,7 +631,7 @@ export default function ChallengeStudioPage() {
               </motion.div>
             )}
 
-            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={{ once: false, amount: 0.18 }} className="mt-8">
+            <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={scrollOnceViewport} className="mt-8">
               <ChallengeStudioAnalysis
                 currentUserId={user?.id || ""}
                 currentUserName={user?.fullName || "عضو"}
@@ -656,41 +653,41 @@ export default function ChallengeStudioPage() {
       )}
 
       <motion.footer
-  variants={revealMotion}
-  initial="hidden"
-  whileInView="show"
-  viewport={{ once: false, amount: 0.45 }}
-  className="relative z-10 mt-6 border-t border-white/10 px-3 py-6 text-center text-xs text-slate-400"
->
-  <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/40 to-transparent" />
+        variants={revealMotion}
+        initial="hidden"
+        whileInView="show"
+        viewport={scrollOnceViewport}
+        className="relative z-10 mt-6 border-t border-white/10 px-3 py-6 text-center text-xs text-slate-400"
+      >
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/40 to-transparent" />
 
-  <motion.div
-    whileTap={{ scale: 0.985 }}
-    className="relative mx-auto flex max-w-xl flex-col items-center justify-center gap-3 overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-xl shadow-slate-950/25 backdrop-blur-xl"
-  >
-    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/5" />
-    <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-amber-300/10 blur-3xl" />
-    <div className="pointer-events-none absolute -left-16 bottom-0 h-32 w-32 rounded-full bg-cyan-300/10 blur-3xl" />
+        <motion.div
+          whileTap={{ scale: 0.99 }}
+          className="relative mx-auto flex max-w-xl flex-col items-center justify-center gap-3 overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-lg shadow-slate-950/20 backdrop-blur-sm"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/5" />
+          <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-amber-300/10 blur-2xl" />
+          <div className="pointer-events-none absolute -left-16 bottom-0 h-32 w-32 rounded-full bg-cyan-300/10 blur-2xl" />
 
-    <div className="relative flex items-center justify-center gap-2 text-slate-300">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[13px]">
-        ©
-      </span>
-      <span>جميع الحقوق محفوظة</span>
-      <span className="font-black text-white">2026</span>
-    </div>
+          <div className="relative flex items-center justify-center gap-2 text-slate-300">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[13px]">
+              ©
+            </span>
+            <span>جميع الحقوق محفوظة</span>
+            <span className="font-black text-white">2026</span>
+          </div>
 
-    <div className="relative inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-[11px] font-black text-emerald-100 shadow-lg shadow-emerald-950/10">
-      <span className="text-emerald-300">✓</span>
-      <span>برمجة وتصميم</span>
-      <span className="text-white">عبدالسلام العنزي</span>
-    </div>
+          <div className="relative inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-[11px] font-black text-emerald-100 shadow-md shadow-emerald-950/10">
+            <span className="text-emerald-300">✓</span>
+            <span>برمجة وتطوير</span>
+            <span className="text-white">عبدالسلام العنزي</span>
+          </div>
 
-    <div className="relative text-[10px] font-bold text-slate-500">
-      World Cup 2026 Predictions Platform
-    </div>
-  </motion.div>
-</motion.footer>
+          <div className="relative text-[10px] font-bold text-slate-500">
+            World Cup 2026 Predictions Platform
+          </div>
+        </motion.div>
+      </motion.footer>
     </motion.main>
   );
 }

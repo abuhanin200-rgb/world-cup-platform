@@ -62,28 +62,30 @@ const containerMotion: Variants = {
   show: {
     opacity: 1,
     transition: {
-      duration: 0.3,
+      duration: 0.24,
       ease: "easeOut",
-      staggerChildren: 0.08,
     },
   },
 };
 
+const scrollOnceViewport = {
+  once: true,
+  amount: 0.18,
+} as const;
+
 const revealMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 30,
-    scale: 0.97,
-    filter: "blur(8px)",
+    y: 14,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
     transition: {
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1],
+      duration: 0.32,
+      ease: "easeOut",
     },
   },
 };
@@ -91,15 +93,15 @@ const revealMotion: Variants = {
 const smallRevealMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 16,
-    scale: 0.98,
+    y: 8,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.34,
+      duration: 0.24,
       ease: "easeOut",
     },
   },
@@ -108,24 +110,24 @@ const smallRevealMotion: Variants = {
 const messageMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 12,
-    scale: 0.96,
+    y: 8,
+    scale: 0.98,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.28,
+      duration: 0.22,
       ease: "easeOut",
     },
   },
   exit: {
     opacity: 0,
-    y: -8,
-    scale: 0.97,
+    y: -6,
+    scale: 0.98,
     transition: {
-      duration: 0.18,
+      duration: 0.16,
       ease: "easeIn",
     },
   },
@@ -134,24 +136,21 @@ const messageMotion: Variants = {
 const celebrationMotion: Variants = {
   hidden: {
     opacity: 0,
-    scale: 0.75,
-    filter: "blur(10px)",
+    scale: 0.88,
   },
   show: {
     opacity: 1,
     scale: 1,
-    filter: "blur(0px)",
     transition: {
-      duration: 0.42,
-      ease: [0.22, 1, 0.36, 1],
+      duration: 0.28,
+      ease: "easeOut",
     },
   },
   exit: {
     opacity: 0,
-    scale: 0.9,
-    filter: "blur(8px)",
+    scale: 0.94,
     transition: {
-      duration: 0.22,
+      duration: 0.18,
       ease: "easeIn",
     },
   },
@@ -164,7 +163,7 @@ function getCategoryIcon(label: string) {
 }
 
 function buildMiniConfetti() {
-  return Array.from({ length: 28 }).map((_, index) => {
+  return Array.from({ length: 18 }).map((_, index) => {
     return {
       id: index,
       left: (index * 37) % 100,
@@ -350,11 +349,11 @@ export default function WordGame() {
         variants={revealMotion}
         initial="hidden"
         animate="show"
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-6 text-center shadow-lg shadow-slate-950/25 backdrop-blur-sm"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
 
-        <div className="relative inline-flex items-center justify-center gap-2 font-bold text-slate-200">
+        <div className="relative inline-flex items-center justify-center gap-2 text-[14px] font-bold text-slate-200">
           <Loader2 className="h-5 w-5 animate-spin text-amber-300" />
           <span>جاري تحميل اللعبة...</span>
         </div>
@@ -368,11 +367,11 @@ export default function WordGame() {
         variants={revealMotion}
         initial="hidden"
         animate="show"
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-6 text-center shadow-lg shadow-slate-950/25 backdrop-blur-sm"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-red-300/10" />
 
-        <p className="relative font-bold text-slate-200">
+        <p className="relative text-[14px] font-bold text-slate-200">
           سجل دخولك أولًا عشان تلعب خمن كلمة اليوم.
         </p>
       </motion.div>
@@ -414,18 +413,12 @@ export default function WordGame() {
             </div>
 
             <motion.div
-              animate={{
-                scale: [1, 1.14, 1],
-                rotate: [0, -4, 4, 0],
-              }}
-              transition={{
-                duration: 0.9,
-                repeat: 2,
-                ease: "easeInOut",
-              }}
-              className="relative flex h-32 w-32 items-center justify-center rounded-[2rem] border border-amber-300/40 bg-slate-950/80 text-6xl shadow-2xl shadow-amber-500/20"
+              initial={{ scale: 0.94, rotate: -3 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="relative flex h-28 w-28 items-center justify-center rounded-[2rem] border border-amber-300/40 bg-slate-950/80 text-6xl shadow-lg shadow-amber-500/20 md:h-32 md:w-32"
             >
-              <PartyPopper className="h-16 w-16 text-amber-300" />
+              <PartyPopper className="h-14 w-14 text-amber-300 md:h-16 md:w-16" />
             </motion.div>
 
             <style jsx>{`
@@ -484,13 +477,13 @@ export default function WordGame() {
         variants={revealMotion}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: false, amount: 0.22 }}
+        viewport={scrollOnceViewport}
         whileTap={{ scale: 0.995 }}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl shadow-slate-950/30 backdrop-blur-xl"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-5"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-        <div className="pointer-events-none absolute -right-24 top-10 h-52 w-52 rounded-full bg-amber-300/10 blur-3xl" />
-        <div className="pointer-events-none absolute -left-24 bottom-10 h-52 w-52 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 top-10 h-44 w-44 rounded-full bg-amber-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-24 bottom-10 h-44 w-44 rounded-full bg-cyan-300/10 blur-2xl" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
         <div className="relative">
@@ -498,22 +491,11 @@ export default function WordGame() {
             variants={smallRevealMotion}
             className="mb-4 flex justify-center"
           >
-            <motion.div
-              animate={{
-                y: [0, -4, 0],
-                scale: [1, 1.03, 1],
-              }}
-              transition={{
-                duration: 2.4,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-4 py-2 text-sm font-black text-amber-100 shadow-lg shadow-amber-950/10"
-            >
+            <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-4 py-2 text-[14px] font-black text-amber-100 shadow-md shadow-amber-950/10">
               <span>{categoryIcon}</span>
               <span>كلمة اليوم: {categoryLabel}</span>
               <Sparkles className="h-4 w-4 text-amber-300" />
-            </motion.div>
+            </div>
           </motion.div>
 
           <motion.div variants={smallRevealMotion}>
@@ -545,7 +527,7 @@ export default function WordGame() {
                 initial="hidden"
                 animate="show"
                 exit="exit"
-                className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-center text-sm font-black text-amber-100 shadow-lg shadow-amber-950/10"
+                className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-center text-[14px] font-black leading-6 text-amber-100 shadow-md shadow-amber-950/10"
               >
                 <span className="inline-flex items-center justify-center gap-2">
                   {game?.status === "won" ? (
@@ -602,7 +584,7 @@ export default function WordGame() {
         variants={revealMotion}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: false, amount: 0.25 }}
+        viewport={scrollOnceViewport}
       >
         <TomorrowCountdown />
       </motion.div>
@@ -611,7 +593,7 @@ export default function WordGame() {
         variants={revealMotion}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: false, amount: 0.25 }}
+        viewport={scrollOnceViewport}
       >
         <WordGameStats stats={stats} />
       </motion.div>
@@ -620,7 +602,7 @@ export default function WordGame() {
         variants={revealMotion}
         initial="hidden"
         whileInView="show"
-        viewport={{ once: false, amount: 0.2 }}
+        viewport={scrollOnceViewport}
       >
         <DailyLeaderboard items={leaderboard} />
       </motion.div>

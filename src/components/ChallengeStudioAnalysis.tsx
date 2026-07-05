@@ -40,31 +40,16 @@ const CHAT_ADMIN_NAMES = [
   "أبو راكان",
 ];
 
+const scrollOnceViewport = {
+  once: true,
+  amount: 0.14,
+} as const;
+
 const sectionMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 30,
-    scale: 0.97,
-    filter: "blur(8px)",
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    filter: "blur(0px)",
-    transition: {
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.06,
-    },
-  },
-};
-
-const itemMotion: Variants = {
-  hidden: {
-    opacity: 0,
     y: 14,
-    scale: 0.98,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
@@ -77,21 +62,36 @@ const itemMotion: Variants = {
   },
 };
 
-const messageMotion: Variants = {
+const itemMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 18,
-    scale: 0.97,
-    filter: "blur(6px)",
+    y: 8,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
     transition: {
-      duration: 0.32,
-      ease: [0.22, 1, 0.36, 1],
+      duration: 0.22,
+      ease: "easeOut",
+    },
+  },
+};
+
+const messageMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 8,
+    scale: 0.99,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.2,
+      ease: "easeOut",
     },
   },
 };
@@ -99,15 +99,15 @@ const messageMotion: Variants = {
 const bubbleMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 10,
-    scale: 0.96,
+    y: 5,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.28,
+      duration: 0.18,
       ease: "easeOut",
     },
   },
@@ -347,7 +347,7 @@ export default function ChallengeStudioAnalysis({
   const shouldShowMentionList =
     mentionSearch !== null && mentionCandidates.length > 0;
 
-    const canManageChat = CHAT_ADMIN_NAMES.includes(normalizeText(currentUserName));
+  const canManageChat = CHAT_ADMIN_NAMES.includes(normalizeText(currentUserName));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -622,12 +622,12 @@ export default function ChallengeStudioAnalysis({
       variants={sectionMotion}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: false, amount: 0.12 }}
-      className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/75 p-4 text-white shadow-xl shadow-slate-950/30 backdrop-blur-xl"
+      viewport={scrollOnceViewport}
+      className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/75 p-4 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-cyan-300/8" />
-      <div className="pointer-events-none absolute -right-24 top-10 h-56 w-56 rounded-full bg-emerald-300/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-24 bottom-10 h-56 w-56 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 top-10 h-44 w-44 rounded-full bg-emerald-300/10 blur-2xl" />
+      <div className="pointer-events-none absolute -left-24 bottom-10 h-44 w-44 rounded-full bg-cyan-300/10 blur-2xl" />
       <div className="relative">
       <motion.div variants={itemMotion} className="mb-4 flex items-center justify-between gap-3">
         <div>
@@ -643,7 +643,7 @@ export default function ChallengeStudioAnalysis({
         </div>
       </motion.div>
 
-      <motion.div variants={itemMotion} className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-3 shadow-lg shadow-slate-950/20">
+      <motion.div variants={itemMotion} className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-3 shadow-md shadow-slate-950/15">
         <div className="mb-2 text-xs font-bold text-slate-300">
           الأعضاء المتواجدون الآن
         </div>
@@ -655,7 +655,7 @@ export default function ChallengeStudioAnalysis({
                 key={member.userId}
                 type="button"
                 onClick={() => insertMention(member)}
-                whileTap={{ scale: 0.94 }}
+                whileTap={{ scale: 0.98 }}
                 className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-200 transition hover:bg-emerald-400/20"
                 title="اضغط لإضافة منشن"
               >
@@ -681,10 +681,10 @@ export default function ChallengeStudioAnalysis({
           initial="hidden"
           animate="show"
           exit={{ opacity: 0, y: -10, scale: 0.97 }}
-          className="mb-3 rounded-2xl border border-sky-400/30 bg-sky-400/10 p-3 shadow-lg shadow-sky-950/10"
+          className="mb-3 rounded-2xl border border-sky-400/30 bg-sky-400/10 p-3 shadow-md shadow-sky-950/10"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm font-black text-sky-100">
+            <div className="text-[14px] font-black text-sky-100">
               🔔 عندك {newReplyNotificationIds.length} رد جديد على رسائلك
             </div>
 
@@ -707,10 +707,10 @@ export default function ChallengeStudioAnalysis({
           initial="hidden"
           animate="show"
           exit={{ opacity: 0, y: -10, scale: 0.97 }}
-          className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 shadow-lg shadow-amber-950/10"
+          className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 shadow-md shadow-amber-950/10"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm font-black text-amber-100">
+            <div className="text-[14px] font-black text-amber-100">
               🚩 عندك {newMentionNotificationIds.length} منشن جديد في استديو
               التحليل
             </div>
@@ -730,7 +730,7 @@ export default function ChallengeStudioAnalysis({
       <motion.div
         variants={itemMotion}
         ref={messagesBoxRef}
-        className="mb-4 h-[58vh] min-h-[520px] space-y-3 overflow-y-auto rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_35%),rgba(0,0,0,0.18)] p-3 md:h-[64vh]"
+        className="mb-4 h-[56vh] min-h-[460px] space-y-3 overflow-y-auto rounded-[2rem] border border-white/10 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.08),_transparent_35%),rgba(0,0,0,0.18)] p-3 md:h-[64vh] md:min-h-[520px]"
       >
         {messages.length > 0 ? (
           messages.map((message) => {
@@ -753,7 +753,7 @@ export default function ChallengeStudioAnalysis({
   <motion.div
     variants={bubbleMotion}
     whileTap={{ scale: 0.99 }}
-    className={`relative max-w-[82%] rounded-3xl border px-4 py-3 shadow-lg md:max-w-[68%] ${
+    className={`relative max-w-[82%] rounded-3xl border px-4 py-3 shadow-md md:max-w-[68%] ${
       isMine
         ? "rounded-br-md border-emerald-300/30 bg-gradient-to-br from-emerald-500/25 to-emerald-700/20 text-right shadow-emerald-950/30"
         : "rounded-bl-md border-sky-300/15 bg-gradient-to-br from-slate-800/90 to-slate-950/80 text-right shadow-slate-950/40"
@@ -763,7 +763,7 @@ export default function ChallengeStudioAnalysis({
                     <button
   type="button"
   onClick={() => onMemberClick(message.userId)}
-  className={`text-sm font-black hover:underline ${
+  className={`text-[14px] font-black hover:underline ${
     isMine ? "text-emerald-100" : "text-sky-300"
   }`}
 >
@@ -799,7 +799,7 @@ export default function ChallengeStudioAnalysis({
                         }}
                         maxLength={MAX_MESSAGE_LENGTH}
                         placeholder="عدّل رسالتك..."
-                        className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-xs text-white outline-none placeholder:text-slate-500 focus:border-amber-400/50"
+                        className="min-h-20 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-[12px] text-white outline-none placeholder:text-slate-500 focus:border-amber-400/50"
                       />
 
                       <div className="mt-2 flex items-center justify-between gap-3">
@@ -835,7 +835,7 @@ export default function ChallengeStudioAnalysis({
                     </div>
                   ) : (
                     <p
-  className={`whitespace-pre-wrap break-words text-sm leading-7 ${
+  className={`whitespace-pre-wrap break-words text-[14px] leading-7 ${
     isMine ? "text-emerald-50" : "text-slate-100"
   }`}
 >
@@ -902,7 +902,7 @@ export default function ChallengeStudioAnalysis({
 
                       {openLikesMessageId === message.id &&
                         messageLikes.length > 0 && (
-                          <div className="absolute bottom-9 right-0 z-20 w-52 rounded-2xl border border-white/10 bg-slate-950 p-3 shadow-2xl">
+                          <div className="absolute bottom-9 right-0 z-20 w-52 rounded-2xl border border-white/10 bg-slate-950 p-3 shadow-lg">
                             <div className="mb-2 text-[11px] font-black text-slate-300">
                               أعجب بهذه الرسالة
                             </div>
@@ -944,7 +944,7 @@ export default function ChallengeStudioAnalysis({
             );
           })
         ) : (
-          <div className="flex h-full items-center justify-center text-center text-sm text-slate-500">
+          <div className="flex h-full items-center justify-center text-center text-[14px] text-slate-500">
             لا توجد رسائل حتى الآن. افتح التحليل يا بطل.
           </div>
         )}
@@ -977,7 +977,7 @@ export default function ChallengeStudioAnalysis({
 
         <div className="relative">
           {shouldShowMentionList && (
-            <div className="absolute bottom-full right-2 z-30 mb-2 w-72 rounded-3xl border border-white/10 bg-slate-950 p-2 shadow-2xl">
+            <div className="absolute bottom-full right-2 z-30 mb-2 w-72 rounded-3xl border border-white/10 bg-slate-950 p-2 shadow-lg">
               <div className="mb-2 px-2 text-[11px] font-black text-slate-400">
                 اختر عضو للمنشن
               </div>
@@ -1018,14 +1018,14 @@ export default function ChallengeStudioAnalysis({
               placeholder={
                 replyingToMessage ? "اكتب ردك..." : "اكتب رسالتك..."
               }
-              className="max-h-28 min-h-11 flex-1 resize-none rounded-[1.5rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/50"
+              className="max-h-28 min-h-11 flex-1 resize-none rounded-[1.5rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-[14px] text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/50"
             />
 
             <motion.button
               type="submit"
               disabled={!canSend}
-              whileTap={canSend ? { scale: 0.9, y: 2 } : undefined}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg font-black text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+              whileTap={canSend ? { scale: 0.96, y: 1 } : undefined}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg font-black text-slate-950 shadow-md shadow-emerald-500/15 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
               title="إرسال"
             >
               ➤
@@ -1051,7 +1051,7 @@ export default function ChallengeStudioAnalysis({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97 }}
               transition={{ duration: 0.24, ease: "easeOut" }}
-              className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-sm font-bold text-red-200"
+              className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-[14px] font-bold text-red-200"
             >
               {error}
             </motion.div>

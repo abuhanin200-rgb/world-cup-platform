@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { motion, type Variants } from "framer-motion";
 import { Clock3, Flame, ListChecks, Medal, Trophy } from "lucide-react";
 import type { WordGameLeaderboardItem } from "@/types/wordGame";
@@ -7,22 +8,24 @@ type DailyLeaderboardProps = {
   items: WordGameLeaderboardItem[];
 };
 
+const scrollOnceViewport = {
+  once: true,
+  amount: 0.18,
+} as const;
+
 const sectionMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 30,
-    scale: 0.97,
-    filter: "blur(8px)",
+    y: 14,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
     transition: {
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.06,
+      duration: 0.32,
+      ease: "easeOut",
     },
   },
 };
@@ -30,28 +33,8 @@ const sectionMotion: Variants = {
 const rowMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 24,
-    scale: 0.96,
-    filter: "blur(6px)",
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    filter: "blur(0px)",
-    transition: {
-      duration: 0.42,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.045,
-    },
-  },
-};
-
-const statMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 8,
-    scale: 0.96,
+    y: 10,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
@@ -59,6 +42,24 @@ const statMotion: Variants = {
     scale: 1,
     transition: {
       duration: 0.24,
+      ease: "easeOut",
+      staggerChildren: 0.025,
+    },
+  },
+};
+
+const statMotion: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 6,
+    scale: 0.99,
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.2,
       ease: "easeOut",
     },
   },
@@ -73,18 +74,18 @@ function getRankLabel(rank: number) {
 
 function getRankClass(rank: number) {
   if (rank === 1) {
-    return "border-amber-300/45 bg-gradient-to-br from-amber-300 to-yellow-500 text-slate-950 shadow-amber-400/25";
+    return "border-amber-300/45 bg-gradient-to-br from-amber-300 to-yellow-500 text-slate-950 shadow-amber-400/20";
   }
 
   if (rank === 2) {
-    return "border-slate-100/40 bg-gradient-to-br from-slate-100 to-slate-400 text-slate-950 shadow-slate-300/20";
+    return "border-slate-100/40 bg-gradient-to-br from-slate-100 to-slate-400 text-slate-950 shadow-slate-300/15";
   }
 
   if (rank === 3) {
-    return "border-orange-300/40 bg-gradient-to-br from-orange-300 to-orange-600 text-slate-950 shadow-orange-400/20";
+    return "border-orange-300/40 bg-gradient-to-br from-orange-300 to-orange-600 text-slate-950 shadow-orange-400/15";
   }
 
-  return "border-amber-400/30 bg-amber-400/10 text-white shadow-slate-950/20";
+  return "border-amber-400/30 bg-amber-400/10 text-white shadow-slate-950/15";
 }
 
 function getCardClass(rank: number) {
@@ -121,7 +122,7 @@ function StatBox({
 }: {
   label: string;
   value: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
   className: string;
 }) {
   return (
@@ -152,16 +153,16 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
       variants={sectionMotion}
       initial="hidden"
       whileInView="show"
-      viewport={{ once: false, amount: 0.22 }}
-      className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/10 p-3 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-4"
+      viewport={scrollOnceViewport}
+      className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.09] p-3 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-4"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-      <div className="pointer-events-none absolute -right-20 top-8 h-44 w-44 rounded-full bg-amber-300/10 blur-3xl" />
-      <div className="pointer-events-none absolute -left-20 bottom-8 h-44 w-44 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 top-8 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
+      <div className="pointer-events-none absolute -left-20 bottom-8 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
       <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
       <div className="relative mb-4 text-center">
-        <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-lg shadow-amber-950/10">
+        <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/10">
           <Trophy className="h-5 w-5" />
         </div>
 
@@ -177,7 +178,7 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
       {items.length === 0 ? (
         <motion.div
           variants={rowMotion}
-          className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-sm font-bold text-slate-300 shadow-inner"
+          className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-[14px] font-bold text-slate-300 shadow-inner"
         >
           <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
             <Medal className="h-5 w-5 text-slate-300" />
@@ -191,50 +192,28 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
             <motion.div
               key={item.userId}
               variants={rowMotion}
-              whileTap={{ scale: 0.985 }}
-              className={`relative overflow-hidden rounded-[18px] border p-3 shadow-lg shadow-slate-950/25 ${getCardClass(
+              whileTap={{ scale: 0.99 }}
+              className={`relative overflow-hidden rounded-[18px] border p-3 shadow-md shadow-slate-950/20 ${getCardClass(
                 item.rank
               )}`}
             >
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
 
               {item.rank <= 3 && (
-                <motion.div
+                <div
                   aria-hidden="true"
                   className="pointer-events-none absolute -left-10 -top-10 h-24 w-24 rounded-full bg-amber-300/10 blur-2xl"
-                  animate={{
-                    opacity: [0.35, 0.9, 0.35],
-                    scale: [1, 1.15, 1],
-                  }}
-                  transition={{
-                    duration: 2.4,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
                 />
               )}
 
               <div className="relative mb-3 flex items-start justify-between gap-2.5">
-                <motion.div
-                  animate={
-                    item.rank <= 3
-                      ? {
-                          y: [0, -3, 0],
-                          scale: [1, 1.05, 1],
-                        }
-                      : undefined
-                  }
-                  transition={{
-                    duration: 2.2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-base font-black shadow-lg ${getRankClass(
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-base font-black shadow-md ${getRankClass(
                     item.rank
                   )}`}
                 >
                   {getRankLabel(item.rank)}
-                </motion.div>
+                </div>
 
                 <div className="min-w-0 flex-1 text-right">
                   <div className="text-[10px] font-bold text-slate-400">
