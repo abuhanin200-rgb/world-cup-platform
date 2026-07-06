@@ -18,6 +18,7 @@ import AdminSettingsPanel from "@/components/AdminSettingsPanel";
 import AdminMatchesPanel from "@/components/AdminMatchesPanel";
 import AdminLogsPanel from "@/components/AdminLogsPanel";
 import AdminPredictionsPanel from "@/components/AdminPredictionsPanel";
+import AdminMissingPredictionsPanel from "@/components/AdminMissingPredictionsPanel";
 import AdminHomeBannerPanel from "@/components/AdminHomeBannerPanel";
 import AdminGamesPanel from "@/components/AdminGamesPanel";
 import AdminChallengeStudioPanel from "@/components/AdminChallengeStudioPanel";
@@ -30,6 +31,7 @@ type AdminTab =
   | "notices"
   | "members"
   | "predictions"
+  | "missingPredictions"
   | "matches"
   | "games"
   | "challengeStudio"
@@ -598,6 +600,7 @@ export default function AdminPage() {
             ["notices", "🔔 إشعارات الأعضاء"],
             ["members", "👥 إدارة الأعضاء"],
             ["predictions", "🔮 توقعات الأعضاء"],
+            ["missingPredictions", "📩 غير المتوقّعين"],
             ["matches", "📅 المباريات"],
             ["games", "🎮 الألعاب"],
             ["challengeStudio", "🎙️ استوديو التحدي"],
@@ -1034,13 +1037,18 @@ export default function AdminPage() {
         {activeTab === "notices" && <AdminHomeBannerPanel />}
         {activeTab === "members" && <AdminMembersPanel />}
         {activeTab === "predictions" && <AdminPredictionsPanel />}
-        {activeTab === "matches" && (
-          <AdminMatchesPanel
-            matches={matches}
-            loading={loading}
-            onChanged={loadData}
-          />
-        )}
+
+{activeTab === "missingPredictions" && (
+  <AdminMissingPredictionsPanel matches={matches} />
+)}
+
+{activeTab === "matches" && (
+  <AdminMatchesPanel
+    matches={matches}
+    loading={loading}
+    onChanged={loadData}
+  />
+)}
         {activeTab === "games" && <AdminGamesPanel />}
         {activeTab === "challengeStudio" && <AdminChallengeStudioPanel />}
         {activeTab === "logs" && <AdminLogsPanel />}
