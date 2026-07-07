@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
+import { Copyright, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -21,37 +22,31 @@ const pageMotion: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { duration: 0.35, ease: "easeOut", staggerChildren: 0.08 },
+    transition: { duration: 0.18, ease: "easeOut", staggerChildren: 0.025 },
   },
 };
 
 const revealMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 30,
-    scale: 0.97,
-    filter: "blur(8px)",
+    y: 8,
   },
   show: {
     opacity: 1,
     y: 0,
-    scale: 1,
-    filter: "blur(0px)",
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.18, ease: "easeOut" },
   },
 };
 
 const cardMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 18,
-    scale: 0.96,
+    y: 8,
   },
   show: {
     opacity: 1,
     y: 0,
-    scale: 1,
-    transition: { duration: 0.34, ease: "easeOut" },
+    transition: { duration: 0.16, ease: "easeOut" },
   },
 };
 
@@ -59,7 +54,7 @@ const listMotion: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.045 },
+    transition: { staggerChildren: 0.018 },
   },
 };
 
@@ -101,11 +96,11 @@ function isGoldenPrediction(prediction: AccountPrediction) {
 }
 
 function getExactPoints(prediction: AccountPrediction) {
-  return isGoldenPrediction(prediction) ? 6 : 3;
+  return isGoldenPrediction(prediction) ? 10 : 3;
 }
 
 function getWinnerPoints(prediction: AccountPrediction) {
-  return isGoldenPrediction(prediction) ? 2 : 1;
+  return isGoldenPrediction(prediction) ? 4 : 1;
 }
 
 function getQualificationMethodLabel(value?: string | null) {
@@ -250,11 +245,11 @@ function normalizeTeamCode(value?: string | null) {
 }
 
 function getQualifiedTeamPoints(prediction: AccountPrediction) {
-  return isGoldenPrediction(prediction) ? 4 : 2;
+  return isGoldenPrediction(prediction) ? 6 : 2;
 }
 
 function getQualificationMethodPoints(prediction: AccountPrediction) {
-  return isGoldenPrediction(prediction) ? 2 : 1;
+  return isGoldenPrediction(prediction) ? 4 : 1;
 }
 
 function getKnockoutPointsBreakdown(prediction: AccountPrediction) {
@@ -384,7 +379,9 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
   if (prediction.resultType === "exact") {
     return (
       <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-black text-emerald-300">
-        النتيجة بالملي
+        {isGoldenPrediction(prediction)
+          ? `سوبر ذهبي بالملي +${getExactPoints(prediction)}`
+          : `النتيجة بالملي +${getExactPoints(prediction)}`}
       </span>
     );
   }
@@ -393,7 +390,7 @@ function ResultBadge({ prediction }: { prediction: AccountPrediction }) {
     return (
       <span className="rounded-full bg-amber-400/15 px-3 py-1 text-[11px] font-black text-amber-300">
         {isGoldenPrediction(prediction)
-          ? `الفائز صحيح ذهبي +${getWinnerPoints(prediction)}`
+          ? `الفائز صحيح سوبر ذهبي +${getWinnerPoints(prediction)}`
           : `الفائز صحيح +${getWinnerPoints(prediction)}`}
       </span>
     );
@@ -422,7 +419,7 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
       whileTap={{ scale: 0.985 }}
       className={`relative overflow-hidden rounded-2xl border p-4 shadow-lg shadow-slate-950/25 ${
         isGolden
-          ? "border-amber-400/30 bg-amber-400/10"
+          ? "border-fuchsia-300/35 bg-gradient-to-br from-amber-400/15 via-fuchsia-500/10 to-slate-950/80 shadow-amber-500/10"
           : "border-white/10 bg-slate-950/70"
       }`}
     >
@@ -431,8 +428,8 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
           <ResultBadge prediction={prediction} />
 
           {isGolden && (
-            <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
-              ⭐ توقع ذهبي
+            <span className="rounded-full border border-amber-200/40 bg-gradient-to-r from-amber-300 via-fuchsia-300 to-violet-300 px-3 py-1 text-[11px] font-black text-slate-950 shadow-lg shadow-amber-500/20">
+              🚀 توقع سوبر ذهبي
             </span>
           )}
         </div>
@@ -878,8 +875,8 @@ function getAccountAchievements({
     },
     {
       icon: "🟡",
-      title: "ذهبي بالملي",
-      description: `حقق ${goldenExactHits} توقع ذهبي مطابق للنتيجة`,
+      title: "سوبر ذهبي بالملي",
+      description: `حقق ${goldenExactHits} توقع سوبر ذهبي مطابق للنتيجة`,
       unlocked: goldenExactHits > 0,
     },
     {
@@ -1002,8 +999,7 @@ function MyAchievementsSection({
     <motion.section
       variants={revealMotion}
       initial="hidden"
-      whileInView="show"
-      viewport={{ once: false, amount: 0.18 }}
+      animate="show"
       className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-950/40 p-4 shadow-lg shadow-slate-950/25 md:p-5"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-amber-300/8" />
@@ -1370,8 +1366,7 @@ export default function AccountPage() {
         <motion.section
           variants={revealMotion}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.35 }}
+          animate="show"
           whileTap={{ scale: 0.99 }}
           className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-5 text-center shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-8"
         >
@@ -1407,8 +1402,7 @@ export default function AccountPage() {
         <motion.section
           variants={listMotion}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.25 }}
+          animate="show"
           className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4"
         >
           <StatCard
@@ -1435,8 +1429,7 @@ export default function AccountPage() {
         <motion.section
           variants={listMotion}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.3 }}
+          animate="show"
           className="mt-4 grid grid-cols-2 gap-3"
         >
           <StatCard
@@ -1455,8 +1448,7 @@ export default function AccountPage() {
         <motion.section
           variants={revealMotion}
           initial="hidden"
-          whileInView="show"
-          viewport={{ once: false, amount: 0.18 }}
+          animate="show"
           className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl shadow-slate-950/30 backdrop-blur-xl md:p-5"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-cyan-300/8" />
@@ -1745,6 +1737,27 @@ export default function AccountPage() {
           </div>
         </motion.section>
       </div>
+
+      <footer className="relative z-10 mt-6 border-t border-white/10 px-3 py-6 text-center text-xs text-slate-400">
+        <motion.div
+          variants={revealMotion}
+          initial="hidden"
+          animate="show"
+          className="mx-auto flex max-w-xl transform-gpu flex-col items-center justify-center gap-3 rounded-[1.7rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-lg shadow-slate-950/20 backdrop-blur-sm"
+        >
+          <div className="flex items-center justify-center gap-2 text-slate-300">
+            <Copyright className="h-3.5 w-3.5" />
+            <span>جميع الحقوق محفوظة</span>
+            <span className="font-black text-white">2026</span>
+          </div>
+
+          <div className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-[11px] font-black text-emerald-100 shadow-md shadow-emerald-950/10">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
+            <span>برمجة وتطوير</span>
+            <span className="text-white">عبدالسلام العنزي</span>
+          </div>
+        </motion.div>
+      </footer>
     </motion.main>
   );
 }

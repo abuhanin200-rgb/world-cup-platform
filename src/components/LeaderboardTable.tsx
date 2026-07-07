@@ -2,6 +2,29 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, type Variants } from "framer-motion";
+import {
+  Award,
+  BarChart3,
+  Brain,
+  CheckCircle2,
+  CircleDot,
+  Clock3,
+  Crown,
+  Dumbbell,
+  Flame,
+  Gem,
+  Hand,
+  Lock,
+  Medal,
+  Rocket,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Target,
+  TrendingUp,
+  Trophy,
+  Zap,
+} from "lucide-react";
 import { getLeaderboardUsers, LeaderboardUser } from "@/lib/leaderboard";
 import { getPredictionsByUserId, Prediction } from "@/lib/predictions";
 import TeamFlag from "@/components/TeamFlag";
@@ -109,6 +132,87 @@ type MemberAchievement = {
   description: string;
   unlocked: boolean;
 };
+
+function MemberIcon({
+  icon,
+  className = "h-5 w-5",
+}: {
+  icon: string;
+  className?: string;
+}) {
+  const props = {
+    className,
+    strokeWidth: 2.4,
+    "aria-hidden": true,
+  } as const;
+
+  if (icon === "🥇") return <Crown {...props} />;
+  if (icon === "🥈" || icon === "🥉" || icon === "🏅") return <Medal {...props} />;
+  if (icon === "⭐") return <Star {...props} />;
+  if (icon === "🏆") return <Trophy {...props} />;
+  if (icon === "🎯") return <Target {...props} />;
+  if (icon === "⚽") return <CircleDot {...props} />;
+  if (icon === "🔥") return <Flame {...props} />;
+  if (icon === "📊") return <BarChart3 {...props} />;
+  if (icon === "📈") return <TrendingUp {...props} />;
+  if (icon === "🔮") return <Sparkles {...props} />;
+  if (icon === "👋") return <Hand {...props} />;
+  if (icon === "💪") return <Dumbbell {...props} />;
+  if (icon === "🧠") return <Brain {...props} />;
+  if (icon === "💎") return <Gem {...props} />;
+  if (icon === "⚡") return <Zap {...props} />;
+  if (icon === "🚀") return <Rocket {...props} />;
+  if (icon === "✅") return <CheckCircle2 {...props} />;
+  if (icon === "⏳") return <Clock3 {...props} />;
+  if (icon === "🟡") return <Award {...props} />;
+  if (icon === "🔒") return <Lock {...props} />;
+
+  return <ShieldCheck {...props} />;
+}
+
+function getTitleIcon(title: string) {
+  if (title.includes("متصدر")) return "🥇";
+  if (title.includes("منافس شرس")) return "🏅";
+  if (title.includes("النخبة")) return "💪";
+  if (title.includes("أسطورة")) return "⭐";
+  if (title.includes("محترف")) return "🏆";
+  if (title.includes("خبير")) return "🧠";
+  if (title.includes("صياد")) return "🎯";
+  if (title.includes("حاضر")) return "⚽";
+  if (title.includes("نشيط")) return "🔥";
+  if (title.includes("محلل")) return "📊";
+  if (title.includes("مبتدئ")) return "🔮";
+  if (title.includes("مشجع")) return "👋";
+
+  return "🏅";
+}
+
+function cleanTitleText(value: string) {
+  return value
+    .replace(/[🥇🥈🥉🏅⭐🏆🎯⚽🔥📊📈🔮👋💪🧠💎⚡🚀✅⏳🟡🔒]/gu, "")
+    .trim();
+}
+
+function TitleProgressLabel({
+  value,
+  iconClassName = "h-4 w-4",
+}: {
+  value: string;
+  iconClassName?: string;
+}) {
+  if (value === "أنت وصلت لأعلى لقب حاليًا") {
+    return <span>{value}</span>;
+  }
+
+  const cleanValue = cleanTitleText(value);
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <MemberIcon icon={getTitleIcon(cleanValue)} className={iconClassName} />
+      <span>{cleanValue}</span>
+    </span>
+  );
+}
 
 function RankMovement({ user }: { user: LeaderboardUser }) {
   if (user.rankDirection === "up") {
@@ -411,19 +515,19 @@ function getQualifiedTeamEmoji(
 }
 
 function getExactPoints(prediction: Prediction) {
-  return isGoldenPrediction(prediction) ? 6 : 3;
+  return isGoldenPrediction(prediction) ? 10 : 3;
 }
 
 function getWinnerPoints(prediction: Prediction) {
-  return isGoldenPrediction(prediction) ? 2 : 1;
+  return isGoldenPrediction(prediction) ? 4 : 1;
 }
 
 function getQualifiedTeamPoints(prediction: Prediction) {
-  return isGoldenPrediction(prediction) ? 4 : 2;
+  return isGoldenPrediction(prediction) ? 6 : 2;
 }
 
 function getQualificationMethodPoints(prediction: Prediction) {
-  return isGoldenPrediction(prediction) ? 2 : 1;
+  return isGoldenPrediction(prediction) ? 4 : 1;
 }
 
 function getKnockoutPointsBreakdown(prediction: Prediction) {
@@ -552,23 +656,19 @@ function getPredictionStatus(prediction: Prediction) {
   }
 
   if (prediction.resultType === "exact") {
-  return {
-    text: "النتيجة بالملي",
-    className: golden
-      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
-      : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-  };
-}
-
-  if (
-    prediction.resultType === "winner" ||
-    prediction.points === 1 ||
-    prediction.points === 2
-  ) {
     return {
-      text: golden ? "فائز ذهبي " : "الفائز صحيح",
+      text: golden ? `سوبر ذهبي بالملي +${getExactPoints(prediction)}` : "النتيجة بالملي",
       className: golden
-        ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+        ? "border-fuchsia-300/35 bg-gradient-to-r from-fuchsia-500/15 via-amber-400/15 to-yellow-300/10 text-amber-100"
+        : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+    };
+  }
+
+  if (prediction.resultType === "winner") {
+    return {
+      text: golden ? `فائز سوبر ذهبي +${getWinnerPoints(prediction)}` : "الفائز صحيح",
+      className: golden
+        ? "border-fuchsia-300/35 bg-gradient-to-r from-fuchsia-500/15 via-amber-400/15 to-yellow-300/10 text-amber-100"
         : "border-amber-400/30 bg-amber-400/10 text-amber-100",
     };
   }
@@ -680,7 +780,7 @@ function getTitleProgress(user: LeaderboardUser) {
     return {
       currentTitle: "🥇 متصدر التحدي",
       nextTitle: "أنت وصلت لأعلى لقب حاليًا",
-      remainingText: "حافظ على الصدارة يا بطل 🔥",
+      remainingText: "حافظ على الصدارة يا بطل",
       progressPercent: 100,
     };
   }
@@ -819,13 +919,13 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
     },
     {
       icon: "⭐",
-      title: "ذهبي بالملي",
-      condition: "حقق توقع ذهبي مطابق للنتيجة ويحصل على +6",
+      title: "سوبر ذهبي بالملي",
+      condition: "حقق توقع سوبر ذهبي مطابق للنتيجة ويحصل على +10",
     },
     {
       icon: "🟡",
-      title: "فائز ذهبي",
-      condition: "توقع الفائز الصحيح في توقع ذهبي ويحصل على +2",
+      title: "فائز سوبر ذهبي",
+      condition: "توقع الفائز الصحيح في توقع سوبر ذهبي ويحصل على +4",
     },
     {
       icon: "⚡",
@@ -880,8 +980,8 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
 
         <div className="relative max-h-[70vh] overflow-y-auto p-4">
           <div className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
-            ارفع عدد توقعاتك، حقق نتائج صحيحة، واستغل التوقع الذهبي عشان تجمع
-            نقاط أكثر 🔥
+            ارفع عدد توقعاتك، حقق نتائج صحيحة، واستغل السوبر ذهبي عشان تجمع
+            نقاط أكثر
           </div>
 
           <h4 className="mb-2 text-[14px] font-black text-white">الألقاب</h4>
@@ -893,8 +993,8 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
                 className="rounded-2xl border border-white/10 bg-white/5 p-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/70 text-xl">
-                    {item.icon}
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/70 text-amber-200">
+                    <MemberIcon icon={item.icon} className="h-5 w-5" />
                   </div>
 
                   <div>
@@ -922,8 +1022,8 @@ function TitlesGuideModal({ onClose }: { onClose: () => void }) {
                 className="rounded-2xl border border-white/10 bg-white/5 p-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/70 text-xl">
-                    {item.icon}
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/70 text-amber-200">
+                    <MemberIcon icon={item.icon} className="h-5 w-5" />
                   </div>
 
                   <div>
@@ -965,7 +1065,7 @@ const goldenExactHits = predictions.filter((prediction) => {
     return (
       prediction.isCalculated &&
       prediction.predictionType === "golden" &&
-      (prediction.resultType === "winner" || prediction.points === 2)
+      prediction.resultType === "winner"
     );
   }).length;
 
@@ -990,20 +1090,20 @@ const goldenExactHits = predictions.filter((prediction) => {
     },
     {
       icon: "⭐",
-      title: "ذهبي بالملي",
-      description: `حقق ${goldenExactHits} توقع ذهبي مطابق للنتيجة`,
+      title: "سوبر ذهبي بالملي",
+      description: `حقق ${goldenExactHits} توقع سوبر ذهبي مطابق للنتيجة`,
       unlocked: goldenExactHits > 0,
     },
     {
       icon: "🟡",
-      title: "فائز ذهبي",
-      description: `حقق ${goldenWinnerHits} توقع ذهبي بالفائز الصحيح`,
+      title: "فائز سوبر ذهبي",
+      description: `حقق ${goldenWinnerHits} توقع سوبر ذهبي بالفائز الصحيح`,
       unlocked: goldenWinnerHits > 0,
     },
     {
       icon: "🏆",
       title: "دخل الذهب",
-      description: `شارك في ${goldenPredictions} توقع ذهبي`,
+      description: `شارك في ${goldenPredictions} توقع سوبر ذهبي`,
       unlocked: goldenPredictions > 0,
     },
     {
@@ -1115,8 +1215,17 @@ function AchievementCard({ achievement }: { achievement: MemberAchievement }) {
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-transparent" />
 
       <div className="relative flex items-center gap-2">
-        <span className="text-xl">
-          {achievement.unlocked ? achievement.icon : "🔒"}
+        <span
+          className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+            achievement.unlocked
+              ? "bg-amber-400/15 text-amber-200"
+              : "bg-slate-500/15 text-slate-400"
+          }`}
+        >
+          <MemberIcon
+            icon={achievement.unlocked ? achievement.icon : "🔒"}
+            className="h-[18px] w-[18px]"
+          />
         </span>
 
         <div className="min-w-0">
@@ -1235,7 +1344,7 @@ export function PredictionDetailsModal({
             <div
               className={`mx-auto mt-3 inline-flex items-center justify-center gap-2 rounded-full border px-4 py-2 text-sm font-black ${memberTitle.className}`}
             >
-              <span>{memberTitle.icon}</span>
+              <MemberIcon icon={memberTitle.icon} className="h-4 w-4" />
               <span>{memberTitle.title}</span>
             </div>
 
@@ -1248,7 +1357,7 @@ export function PredictionDetailsModal({
                 <span className="font-bold text-slate-300">اللقب الحالي</span>
 
                 <span className="font-black text-white">
-                  {titleProgress.currentTitle}
+                  <TitleProgressLabel value={titleProgress.currentTitle} />
                 </span>
               </div>
 
@@ -1256,7 +1365,7 @@ export function PredictionDetailsModal({
                 <span className="font-bold text-slate-300">اللقب القادم</span>
 
                 <span className="font-black text-amber-300">
-                  {titleProgress.nextTitle}
+                  <TitleProgressLabel value={titleProgress.nextTitle} />
                 </span>
               </div>
 
@@ -1366,8 +1475,9 @@ export function PredictionDetailsModal({
 
           <motion.div variants={modalItemMotion} initial="hidden" animate="show" className="mt-5">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-base font-black md:text-lg">
-                🔮 توقعات العضو
+              <h3 className="inline-flex items-center gap-2 text-base font-black md:text-lg">
+                <Sparkles className="h-4 w-4 text-amber-200" aria-hidden="true" />
+                <span>توقعات العضو</span>
               </h3>
 
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-bold text-slate-300 md:text-xs">
@@ -1401,7 +1511,7 @@ export function PredictionDetailsModal({
                         whileTap={{ scale: 0.99 }}
                         className={`rounded-2xl border p-3 shadow-md shadow-slate-950/15 ${
                           golden
-                            ? "border-amber-300/30 bg-amber-400/10"
+                            ? "border-fuchsia-300/35 bg-gradient-to-br from-fuchsia-500/15 via-amber-400/10 to-slate-950/70 shadow-lg shadow-fuchsia-950/20"
                             : "border-white/10 bg-white/5"
                         }`}
                       >
@@ -1414,8 +1524,9 @@ export function PredictionDetailsModal({
                             </span>
 
                             {golden && (
-                              <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
-                                ⭐ توقع ذهبي
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-fuchsia-500 via-amber-300 to-yellow-300 px-3 py-1 text-[11px] font-black text-slate-950 shadow-lg shadow-fuchsia-500/20 ring-1 ring-amber-100/50">
+                                <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
+                                <span>توقع سوبر ذهبي</span>
                               </span>
                             )}
                           </div>
@@ -1423,7 +1534,7 @@ export function PredictionDetailsModal({
                           <span
                             className={`rounded-full px-3 py-1 text-[11px] font-black ${
                               golden
-                                ? "bg-amber-300 text-slate-950"
+                                ? "bg-gradient-to-r from-fuchsia-500 via-amber-300 to-yellow-300 text-slate-950 shadow-md shadow-fuchsia-500/20"
                                 : "bg-amber-400 text-slate-950"
                             }`}
                           >
@@ -1450,7 +1561,7 @@ export function PredictionDetailsModal({
                           <div
                             className={`rounded-xl border px-2 py-2 text-sm font-black ${
                               golden
-                                ? "border-amber-300/30 bg-slate-950/80 text-amber-200"
+                                ? "border-fuchsia-300/30 bg-slate-950/85 text-amber-100 shadow-inner shadow-fuchsia-950/20"
                                 : "border-white/10 bg-slate-950/70 text-white"
                             }`}
                           >
@@ -1629,9 +1740,15 @@ export default function LeaderboardTable() {
   }, [users, currentPage]);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadLeaderboard() {
+      if (document.visibilityState === "hidden") return;
+
       try {
         const data = await getLeaderboardUsers();
+
+        if (!isMounted) return;
 
         setUsers(data);
 
@@ -1644,15 +1761,28 @@ export default function LeaderboardTable() {
       } catch (error) {
         console.error("فشل تحميل لوحة الصدارة:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        loadLeaderboard();
       }
     }
 
     loadLeaderboard();
 
     const interval = setInterval(loadLeaderboard, 30000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   async function openUserPredictions(user: LeaderboardUser) {
@@ -1711,7 +1841,10 @@ export default function LeaderboardTable() {
             onClick={() => setShowTitlesGuide(true)}
             className="mt-3 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs font-black text-amber-100 shadow-md shadow-amber-950/10 transition hover:bg-amber-400/20 active:scale-95 md:text-sm"
           >
-            🏅 كيف أحصل على الألقاب؟
+            <span className="inline-flex items-center gap-2">
+              <Medal className="h-4 w-4" aria-hidden="true" />
+              <span>كيف أحصل على الألقاب؟</span>
+            </span>
           </button>
 
           <div className="mx-auto mt-3 max-w-md rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
@@ -1727,7 +1860,9 @@ export default function LeaderboardTable() {
           </div>
         ) : users.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-[14px] text-slate-300">
-            <div className="mb-2 text-3xl">🏆</div>
+            <div className="mb-2 flex justify-center text-amber-200">
+              <Trophy className="h-8 w-8" aria-hidden="true" />
+            </div>
 
             <div className="font-black">لا يوجد أعضاء حتى الآن</div>
 

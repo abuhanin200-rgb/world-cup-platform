@@ -6,7 +6,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
-  Crown,
+  Rocket,
   Edit3,
   Lock,
   LogIn,
@@ -363,12 +363,16 @@ export default function MatchesPredictionBox() {
   }, [authLoading, user?.id, matches.length]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTick((current) => current + 1);
+    if (matches.length === 0) return;
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        setTick((current) => current + 1);
+      }
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => window.clearInterval(interval);
+  }, [matches.length]);
 
   const sortedMatches = useMemo(() => {
     return [...matches].sort((a, b) => {
@@ -775,14 +779,14 @@ export default function MatchesPredictionBox() {
                 whileTap={{ scale: 0.997 }}
                 className={`relative transform-gpu overflow-hidden rounded-3xl border p-4 shadow-lg transition duration-200 ${
                   golden
-                    ? "border-amber-300/40 bg-gradient-to-br from-amber-400/20 via-slate-950/80 to-yellow-500/10 shadow-amber-400/10"
+                    ? "border-fuchsia-300/40 bg-gradient-to-br from-fuchsia-500/20 via-slate-950/85 to-amber-400/20 shadow-fuchsia-500/10"
                     : "border-white/10 bg-slate-950/60 shadow-slate-950/20"
                 }`}
               >
                 <div
                   className={`pointer-events-none absolute inset-0 ${
                     golden
-                      ? "bg-gradient-to-br from-amber-300/10 via-transparent to-transparent"
+                      ? "bg-gradient-to-br from-fuchsia-300/12 via-transparent to-amber-300/10"
                       : "bg-gradient-to-br from-white/7 via-transparent to-cyan-300/5"
                   }`}
                 />
@@ -792,19 +796,21 @@ export default function MatchesPredictionBox() {
                 {golden && (
                   <motion.div
                     variants={cardMotion}
-                    className="relative mb-4 overflow-hidden rounded-2xl border border-amber-300/40 bg-slate-950/70 shadow-md shadow-amber-950/10"
+                    className="relative mb-4 overflow-hidden rounded-2xl border border-fuchsia-300/40 bg-slate-950/75 shadow-md shadow-fuchsia-950/20"
                   >
-                    <div className="flex items-center justify-center gap-2 bg-amber-400 px-4 py-2 text-center text-[14px] font-black text-slate-950 md:text-base">
-                      <Crown className="h-4 w-4" />
-                      <span>التوقع الذهبي</span>
+                    <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-fuchsia-400 via-amber-300 to-orange-300 px-4 py-2 text-center text-[14px] font-black text-slate-950 md:text-base">
+                      <Rocket className="h-4 w-4" />
+                      <span>السوبر ذهبي</span>
                     </div>
 
-                    <div className="px-4 py-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
-                      فرصة مضاعفة للنقاط: إذا جبتها بالملي تحصل على{" "}
-                      <span className="font-black text-amber-300">+6</span>،
-                      وإذا توقعت الفائز الصحيح تحصل على{" "}
-                      <span className="font-black text-amber-300">+2</span>،
-                      والخطأ <span className="font-black">0</span>.
+                    <div className="space-y-2 px-4 py-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
+                      <div>فرصة الريمونتادا الكبرى في المراحل الحاسمة.</div>
+                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                        <span className="rounded-full bg-amber-300 px-2 py-0.5 font-black text-slate-950">الملي +10</span>
+                        <span className="rounded-full bg-fuchsia-300 px-2 py-0.5 font-black text-slate-950">الفائز +4</span>
+                        <span className="rounded-full bg-blue-300 px-2 py-0.5 font-black text-slate-950">المتأهل +6</span>
+                        <span className="rounded-full bg-emerald-300 px-2 py-0.5 font-black text-slate-950">الطريقة +4</span>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -969,8 +975,8 @@ export default function MatchesPredictionBox() {
                     {isGoldenPrediction(savedPrediction) && (
                       <div className="rounded-2xl border border-amber-300/40 bg-amber-400 px-3 py-2 text-center text-xs font-black text-slate-950 shadow-md shadow-amber-950/10">
                         <span className="inline-flex items-center justify-center gap-1.5">
-                          <Crown className="h-4 w-4" />
-                          <span>تم اعتماد التوقع الذهبي</span>
+                          <Rocket className="h-4 w-4" />
+                          <span>تم اعتماد السوبر ذهبي</span>
                         </span>
                       </div>
                     )}
@@ -1085,8 +1091,8 @@ export default function MatchesPredictionBox() {
                       ) : isLoggedIn ? (
                         golden ? (
                           <>
-                            <Crown className="h-4 w-4" />
-                            <span>اعتماد التوقع الذهبي</span>
+                            <Rocket className="h-4 w-4" />
+                            <span>اعتماد السوبر ذهبي</span>
                           </>
                         ) : (
                           <>

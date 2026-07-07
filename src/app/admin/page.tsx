@@ -66,12 +66,12 @@ function formatCalculateMatchLabel(match: Match) {
 }
 
 function getPredictionTypeLabel(type?: PredictionType) {
-  return type === "golden" ? "توقع ذهبي" : "توقع عادي";
+  return type === "golden" ? "توقع سوبر ذهبي" : "توقع عادي";
 }
 
 function getPredictionTypeHint(type?: PredictionType) {
   return type === "golden"
-    ? "بالملي +6 | الفائز الصحيح +2 | الخطأ 0"
+    ? "بالملي +10 | الفائز الصحيح +4 | المتأهل +6 | الطريقة +4 | الخطأ 0"
     : "حسب نظام النقاط العادي الحالي";
 }
 
@@ -715,12 +715,12 @@ export default function AdminPage() {
                     className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
                   >
                     <option value="normal">توقع عادي</option>
-                    <option value="golden">توقع ذهبي</option>
+                    <option value="golden">توقع سوبر ذهبي</option>
                   </select>
 
                   <div className="mt-2 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs leading-6 text-amber-100">
                     {predictionType === "golden"
-                      ? "التوقع الذهبي: بالملي +6، الفائز الصحيح +2، الخطأ 0"
+                      ? "السوبر ذهبي: بالملي +10، الفائز الصحيح +4، المتأهل +6، الطريقة +4، الخطأ 0"
                       : "التوقع العادي: يبقى على نظام النقاط الحالي بدون تغيير"}
                   </div>
                 </label>

@@ -9,15 +9,11 @@ import {
   Gauge,
   ListFilter,
   PauseCircle,
-  Star,
+  Rocket,
   X,
 } from "lucide-react";
 import { getLatestPredictions, LatestPrediction } from "@/lib/predictions";
-import {
-  getSiteSettings,
-  SiteSettings,
-  TickerSpeed,
-} from "@/lib/siteSettings";
+import { getSiteSettings, SiteSettings, TickerSpeed } from "@/lib/siteSettings";
 import TeamFlag from "@/components/TeamFlag";
 
 type QualifiedTeamInfo = {
@@ -52,7 +48,7 @@ function isGoldenPrediction(prediction: LatestPrediction) {
 
 function getPredictionTeamCode(
   prediction: LatestPrediction,
-  side: "home" | "away"
+  side: "home" | "away",
 ) {
   return side === "home" ? prediction.homeTeamCode : prediction.awayTeamCode;
 }
@@ -97,7 +93,7 @@ function getMatchLabel(prediction: LatestPrediction) {
 }
 
 function getQualifiedTeamInfo(
-  prediction: LatestPrediction
+  prediction: LatestPrediction,
 ): QualifiedTeamInfo | null {
   if (!prediction.qualifiedTeamCode) return null;
 
@@ -263,12 +259,31 @@ export default function LatestPredictionsTicker() {
     loadPredictions();
     loadSettings();
 
-    const predictionsInterval = setInterval(loadPredictions, 15000);
-    const settingsInterval = setInterval(loadSettings, 10000);
+    function refreshWhenVisible() {
+      if (document.visibilityState !== "visible") return;
+
+      loadPredictions();
+      loadSettings();
+    }
+
+    const predictionsInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadPredictions();
+      }
+    }, 15000);
+
+    const settingsInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadSettings();
+      }
+    }, 10000);
+
+    document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
       clearInterval(predictionsInterval);
       clearInterval(settingsInterval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 
@@ -334,7 +349,7 @@ export default function LatestPredictionsTicker() {
 
   const duration = Math.max(
     25,
-    Math.round((groupWidth || 1200) / pixelsPerSecond)
+    Math.round((groupWidth || 1200) / pixelsPerSecond),
   );
 
   function pauseTicker() {
@@ -354,22 +369,22 @@ export default function LatestPredictionsTicker() {
         dir="rtl"
         className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden rounded-2xl border px-3 py-2 text-[12px] shadow-md shadow-slate-950/20 backdrop-blur-sm transition duration-200 md:px-4 md:text-sm ${
           golden
-            ? "border-amber-300/40 bg-amber-400/15 text-white"
+            ? "border-fuchsia-300/40 bg-gradient-to-l from-amber-400/18 via-fuchsia-500/14 to-violet-500/14 text-white"
             : "border-white/10 bg-white/10 text-white"
         }`}
       >
         <div
           className={`pointer-events-none absolute inset-0 bg-gradient-to-l ${
             golden
-              ? "from-amber-300/15 via-transparent to-transparent"
+              ? "from-amber-300/18 via-fuchsia-400/12 to-transparent"
               : "from-cyan-300/10 via-transparent to-transparent"
           } opacity-80`}
         />
 
         {golden && (
-          <span className="relative inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md shadow-amber-950/15 md:text-xs">
-            <Star className="h-3 w-3 fill-slate-950" />
-            <span>ذهبي</span>
+          <span className="relative inline-flex items-center gap-1 rounded-full bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md shadow-fuchsia-950/20 ring-1 ring-white/25 md:text-xs">
+            <Rocket className="h-3 w-3" />
+            <span>سوبر ذهبي</span>
           </span>
         )}
 
@@ -379,7 +394,7 @@ export default function LatestPredictionsTicker() {
 
         <span
           className={
-            golden ? "relative text-amber-100/80" : "relative text-slate-400"
+            golden ? "relative text-fuchsia-100/85" : "relative text-slate-400"
           }
         >
           توقع
@@ -398,7 +413,7 @@ export default function LatestPredictionsTicker() {
         <span
           className={`relative rounded-xl px-2 py-1 font-black shadow-inner ${
             golden
-              ? "bg-amber-400 text-slate-950"
+              ? "bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 text-slate-950"
               : "bg-slate-950/80 text-white"
           }`}
         >
@@ -422,7 +437,7 @@ export default function LatestPredictionsTicker() {
     const golden = isGoldenPrediction(prediction);
     const qualifiedTeam = getQualifiedTeamInfo(prediction);
     const qualificationMethodLabel = getQualificationMethodLabel(
-      prediction.qualificationMethod
+      prediction.qualificationMethod,
     );
 
     return (
@@ -431,14 +446,14 @@ export default function LatestPredictionsTicker() {
         variants={listItemMotion}
         className={`relative transform-gpu overflow-hidden rounded-3xl border p-3 shadow-md shadow-slate-950/20 ${
           golden
-            ? "border-amber-300/40 bg-amber-400/10"
+            ? "border-fuchsia-300/40 bg-gradient-to-br from-amber-400/10 via-fuchsia-500/10 to-violet-500/10"
             : "border-white/10 bg-slate-950/60"
         }`}
       >
         <div
           className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${
             golden
-              ? "from-amber-300/10 via-transparent to-transparent"
+              ? "from-amber-300/14 via-fuchsia-400/10 to-transparent"
               : "from-white/10 via-transparent to-cyan-300/5"
           }`}
         />
@@ -447,7 +462,7 @@ export default function LatestPredictionsTicker() {
           <div>
             <div
               className={`text-[14px] font-black ${
-                golden ? "text-amber-200" : "text-white"
+                golden ? "text-fuchsia-100" : "text-white"
               }`}
             >
               {prediction.userName}
@@ -459,9 +474,9 @@ export default function LatestPredictionsTicker() {
           </div>
 
           {golden && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950 shadow-md shadow-amber-950/15">
-              <Star className="h-3 w-3 fill-slate-950" />
-              <span>توقع ذهبي</span>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 px-2 py-1 text-[10px] font-black text-slate-950 shadow-md shadow-fuchsia-950/20 ring-1 ring-white/20">
+              <Rocket className="h-3 w-3" />
+              <span>توقع سوبر ذهبي</span>
             </span>
           )}
         </div>
@@ -479,7 +494,9 @@ export default function LatestPredictionsTicker() {
 
           <span
             className={`rounded-xl px-2.5 py-1 ${
-              golden ? "bg-amber-400 text-slate-950" : "bg-white/10 text-white"
+              golden
+                ? "bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 text-slate-950"
+                : "bg-white/10 text-white"
             }`}
           >
             {prediction.homeScore} - {prediction.awayScore}
@@ -616,7 +633,7 @@ export default function LatestPredictionsTicker() {
                   </div>
                 ) : (
                   filteredPredictions.map((prediction) =>
-                    renderPredictionListItem(prediction)
+                    renderPredictionListItem(prediction),
                   )
                 )}
               </motion.div>
@@ -624,7 +641,7 @@ export default function LatestPredictionsTicker() {
           </motion.div>
         )}
       </AnimatePresence>,
-      document.body
+      document.body,
     );
 
   if (loading) {
@@ -745,13 +762,13 @@ export default function LatestPredictionsTicker() {
             >
               <div ref={groupRef} className="flex flex-none gap-3">
                 {tickerItems.map((prediction, index) =>
-                  renderPredictionCard(prediction, index)
+                  renderPredictionCard(prediction, index),
                 )}
               </div>
 
               <div className="flex flex-none gap-3">
                 {tickerItems.map((prediction, index) =>
-                  renderPredictionCard(prediction, index + tickerItems.length)
+                  renderPredictionCard(prediction, index + tickerItems.length),
                 )}
               </div>
             </div>

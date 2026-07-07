@@ -70,7 +70,8 @@ function isExactPrediction(prediction: AdminPredictionWithType) {
     prediction.isCalculated &&
     (prediction.resultType === "exact" ||
       prediction.points === 3 ||
-      prediction.points === 6)
+      prediction.points === 6 ||
+      prediction.points === 10)
   );
 }
 
@@ -79,7 +80,8 @@ function isWinnerPrediction(prediction: AdminPredictionWithType) {
     prediction.isCalculated &&
     (prediction.resultType === "winner" ||
       prediction.points === 1 ||
-      prediction.points === 2)
+      prediction.points === 2 ||
+      prediction.points === 4)
   );
 }
 
@@ -96,10 +98,10 @@ function getPredictionResultLabel(prediction: AdminPredictionWithType) {
 
   if (!prediction.isCalculated) return "لم يُحتسب";
   if (isExactPrediction(prediction)) {
-    return golden ? "ذهبي بالملي +6" : "بالملي +3";
+    return golden ? "سوبر ذهبي بالملي +10" : "بالملي +3";
   }
   if (isWinnerPrediction(prediction)) {
-    return golden ? "فائز ذهبي +2" : "الفائز +1";
+    return golden ? "فائز سوبر ذهبي +4" : "الفائز +1";
   }
 
   return "خطأ +0";
@@ -110,19 +112,19 @@ function getPredictionResultClass(prediction: AdminPredictionWithType) {
 
   if (!prediction.isCalculated) {
     return golden
-      ? "border-amber-300/30 bg-amber-400/10 text-amber-100"
+      ? "border-fuchsia-300/30 bg-gradient-to-r from-amber-400/15 via-fuchsia-500/10 to-violet-500/10 text-amber-100"
       : "border-slate-400/20 bg-slate-400/10 text-slate-200";
   }
 
   if (isExactPrediction(prediction)) {
     return golden
-      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      ? "border-fuchsia-300/40 bg-gradient-to-r from-amber-400/20 via-fuchsia-500/15 to-violet-500/15 text-amber-100"
       : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200";
   }
 
   if (isWinnerPrediction(prediction)) {
     return golden
-      ? "border-amber-300/40 bg-amber-400/15 text-amber-100"
+      ? "border-fuchsia-300/40 bg-gradient-to-r from-amber-400/20 via-fuchsia-500/15 to-violet-500/15 text-amber-100"
       : "border-amber-400/30 bg-amber-400/10 text-amber-100";
   }
 
@@ -282,7 +284,7 @@ const [qualificationMethod, setQualificationMethod] = useState<
 
     return predictions.filter((prediction) => {
       const predictionTypeText = isGoldenPrediction(prediction)
-        ? "ذهبي توقع ذهبي"
+        ? "سوبر ذهبي توقع سوبر ذهبي ذهبي توقع ذهبي"
         : "";
 
       const duplicateText = isDuplicatePrediction(prediction) ? "مكرر" : "";
@@ -611,22 +613,22 @@ await submitPrediction({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-amber-300/30 bg-amber-400/15 p-3 text-center">
-          <div className="text-[11px] text-amber-100">ذهبي</div>
+        <div className="rounded-2xl border border-fuchsia-300/30 bg-gradient-to-br from-amber-400/15 via-fuchsia-500/10 to-violet-500/10 p-3 text-center">
+          <div className="text-[11px] text-fuchsia-100">سوبر ذهبي</div>
           <div className="mt-1 text-2xl font-black text-amber-200">
             {totalGolden}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-amber-300/30 bg-amber-400/15 p-3 text-center">
-          <div className="text-[11px] text-amber-100">ذهبي بالملي</div>
+        <div className="rounded-2xl border border-fuchsia-300/30 bg-gradient-to-br from-amber-400/15 via-fuchsia-500/10 to-violet-500/10 p-3 text-center">
+          <div className="text-[11px] text-fuchsia-100">سوبر ذهبي بالملي</div>
           <div className="mt-1 text-2xl font-black text-amber-200">
             {totalGoldenExact}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-amber-300/30 bg-amber-400/15 p-3 text-center">
-          <div className="text-[11px] text-amber-100">فائز ذهبي</div>
+        <div className="rounded-2xl border border-fuchsia-300/30 bg-gradient-to-br from-amber-400/15 via-fuchsia-500/10 to-violet-500/10 p-3 text-center">
+          <div className="text-[11px] text-fuchsia-100">فائز سوبر ذهبي</div>
           <div className="mt-1 text-2xl font-black text-amber-200">
             {totalGoldenWinner}
           </div>
@@ -674,9 +676,9 @@ await submitPrediction({
           <option value="winner">الفائز</option>
           <option value="wrong">خطأ +0</option>
           <option value="edited">التوقعات المعدلة</option>
-          <option value="golden">التوقعات الذهبية</option>
-          <option value="goldenExact">ذهبي بالملي +6</option>
-          <option value="goldenWinner">فائز ذهبي +2</option>
+          <option value="golden">توقعات السوبر ذهبي</option>
+          <option value="goldenExact">سوبر ذهبي بالملي +10</option>
+          <option value="goldenWinner">فائز سوبر ذهبي +4</option>
         </select>
       </div>
 
@@ -821,7 +823,7 @@ await submitPrediction({
                     <tr
                       key={prediction.id}
                       className={`border-b border-white/10 transition hover:bg-white/5 ${
-                        golden ? "bg-amber-400/5" : ""
+                        golden ? "bg-fuchsia-500/5" : ""
                       } ${duplicate ? "bg-red-500/5" : ""}`}
                     >
                       <td className="px-3 py-3 text-slate-400">
@@ -832,7 +834,7 @@ await submitPrediction({
                         <div
                           className={
                             golden
-                              ? "font-black text-amber-200"
+                              ? "font-black text-fuchsia-100"
                               : "font-black text-amber-300"
                           }
                         >
@@ -866,7 +868,7 @@ await submitPrediction({
                         <span
                           className={`inline-flex rounded-lg px-3 py-1 font-black ${
                             golden
-                              ? "bg-amber-400 text-slate-950"
+                              ? "bg-gradient-to-r from-amber-300 via-fuchsia-300 to-violet-300 text-slate-950"
                               : "bg-white/10 text-white"
                           }`}
                         >
@@ -876,8 +878,8 @@ await submitPrediction({
 
                       <td className="px-3 py-3 text-center">
                         {golden ? (
-                          <span className="inline-flex rounded-full bg-amber-400 px-3 py-1 text-[11px] font-black text-slate-950">
-                            ⭐ ذهبي
+                          <span className="inline-flex rounded-full bg-gradient-to-r from-amber-300 via-fuchsia-300 to-violet-300 px-3 py-1 text-[11px] font-black text-slate-950 shadow-md shadow-fuchsia-950/20">
+                            🚀 سوبر ذهبي
                           </span>
                         ) : (
                           <span className="text-[11px] text-slate-500">—</span>
@@ -904,7 +906,7 @@ await submitPrediction({
                         <span
                           className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 font-black ${
                             golden
-                              ? "bg-amber-400 text-slate-950"
+                              ? "bg-gradient-to-r from-amber-300 via-fuchsia-300 to-violet-300 text-slate-950"
                               : "bg-white/10 text-white"
                           }`}
                         >

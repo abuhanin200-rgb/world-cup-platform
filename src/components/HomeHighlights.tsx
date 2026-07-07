@@ -184,7 +184,7 @@ function HighlightCard({
       <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 
       <h2 className="relative flex items-center justify-center gap-1.5 text-[11px] font-black leading-5 text-white md:text-sm">
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-amber-200 transition group-hover:scale-105 md:h-7 md:w-7">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-fuchsia-100 transition group-hover:scale-105 md:h-7 md:w-7">
           {icon}
         </span>
         <span>{title}</span>
@@ -347,9 +347,24 @@ export default function HomeHighlights() {
 
     loadHighlights();
 
-    const interval = setInterval(loadHighlights, 30000);
+    function loadHighlightsWhenVisible() {
+      if (document.visibilityState !== "visible") return;
+      loadHighlights();
+    }
 
-    return () => clearInterval(interval);
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        loadHighlights();
+      }
+    }
+
+    const interval = setInterval(loadHighlightsWhenVisible, 30000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   if (loading) {
@@ -365,7 +380,7 @@ export default function HomeHighlights() {
 
         <div className="relative mb-3 text-center">
           <h2 className="inline-flex items-center justify-center gap-2 text-base font-black md:text-xl">
-            <Trophy className="h-5 w-5 text-amber-200" />
+            <Trophy className="h-5 w-5 text-fuchsia-100" />
             <span>أبطال التحدي الآن</span>
           </h2>
 
@@ -481,12 +496,31 @@ export function ExactHitsTicker() {
     loadExactHits();
     loadTickerSettings();
 
-    const exactHitsInterval = setInterval(loadExactHits, 30000);
-    const settingsInterval = setInterval(loadTickerSettings, 15000);
+    function loadExactHitsWhenVisible() {
+      if (document.visibilityState !== "visible") return;
+      loadExactHits();
+    }
+
+    function loadTickerSettingsWhenVisible() {
+      if (document.visibilityState !== "visible") return;
+      loadTickerSettings();
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        loadExactHits();
+        loadTickerSettings();
+      }
+    }
+
+    const exactHitsInterval = setInterval(loadExactHitsWhenVisible, 30000);
+    const settingsInterval = setInterval(loadTickerSettingsWhenVisible, 15000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearInterval(exactHitsInterval);
       clearInterval(settingsInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -563,29 +597,29 @@ export function ExactHitsTicker() {
         dir="rtl"
         className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border px-3 py-2 text-xs text-white shadow-md shadow-slate-950/25 backdrop-blur-xl md:px-4 md:text-sm ${
           golden
-            ? "border-amber-300/40 bg-amber-400/15"
+            ? "border-fuchsia-300/40 bg-gradient-to-l from-amber-400/20 via-fuchsia-400/15 to-amber-300/10"
             : "border-emerald-300/20 bg-slate-950/70"
         }`}
       >
         <div
           className={`pointer-events-none absolute inset-0 bg-gradient-to-l ${
             golden
-              ? "from-amber-300/15 via-transparent to-transparent"
+              ? "from-fuchsia-300/20 via-amber-300/10 to-transparent"
               : "from-emerald-300/10 via-transparent to-transparent"
           }`}
         />
 
         {golden && (
-          <span className="relative inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md shadow-amber-950/20 md:text-xs">
-            <Star className="h-3 w-3 fill-slate-950" />
-            <span>ذهبي بالملي +6</span>
+          <span className="relative inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 via-fuchsia-300 to-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md shadow-fuchsia-950/20 md:text-xs">
+            <Rocket className="h-3 w-3" />
+            <span>سوبر ذهبي بالملي +10</span>
           </span>
         )}
 
         <span
           className={
             golden
-              ? "relative font-black text-amber-300"
+              ? "relative font-black text-fuchsia-200"
               : "relative font-black text-emerald-300"
           }
         >
@@ -593,7 +627,7 @@ export function ExactHitsTicker() {
         </span>
 
         <span className="relative text-slate-300">
-          {golden ? "جاب التوقع الذهبي بالملي" : "جابها صح بالملي"}
+          {golden ? "جاب السوبر ذهبي بالملي" : "جابها صح بالملي"}
         </span>
 
         <span className="relative inline-flex items-center gap-1 align-middle font-bold">
@@ -651,14 +685,14 @@ export function ExactHitsTicker() {
         variants={cardMotion}
         className={`relative overflow-hidden rounded-3xl border p-3 shadow-xl shadow-slate-950/25 ${
           golden
-            ? "border-amber-300/40 bg-amber-400/10"
+            ? "border-fuchsia-300/40 bg-gradient-to-br from-amber-400/12 via-fuchsia-400/10 to-slate-950/60"
             : "border-white/10 bg-slate-950/60"
         }`}
       >
         <div
           className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${
             golden
-              ? "from-amber-300/10 via-transparent to-transparent"
+              ? "from-fuchsia-300/15 via-amber-300/10 to-transparent"
               : "from-emerald-300/10 via-transparent to-transparent"
           }`}
         />
@@ -667,14 +701,14 @@ export function ExactHitsTicker() {
           <div>
             <div
               className={`text-sm font-black ${
-                golden ? "text-amber-200" : "text-emerald-200"
+                golden ? "text-fuchsia-100" : "text-emerald-200"
               }`}
             >
               {hit.userName}
             </div>
 
             <div className="mt-1 text-[11px] font-medium leading-5 text-slate-300">
-              {golden ? "جاب التوقع الذهبي بالملي" : "جابها صح بالملي"}
+              {golden ? "جاب السوبر ذهبي بالملي" : "جابها صح بالملي"}
             </div>
           </div>
 
@@ -729,9 +763,9 @@ export function ExactHitsTicker() {
         )}
 
         {golden && (
-          <div className="relative mt-2 inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950">
-            <Star className="h-3 w-3 fill-slate-950" />
-            <span>ذهبي بالملي +6</span>
+          <div className="relative mt-2 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 via-fuchsia-300 to-amber-400 px-2 py-1 text-[10px] font-black text-slate-950">
+            <Rocket className="h-3 w-3" />
+            <span>سوبر ذهبي بالملي +10</span>
           </div>
         )}
       </motion.div>

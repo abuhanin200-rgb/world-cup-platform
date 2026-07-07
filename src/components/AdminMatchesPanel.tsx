@@ -25,7 +25,7 @@ function normalizeMatchStage(value?: MatchStage): MatchStage {
 }
 
 function getPredictionTypeLabel(type?: PredictionType) {
-  return type === "golden" ? "توقع ذهبي" : "توقع عادي";
+  return type === "golden" ? "توقع سوبر ذهبي" : "توقع عادي";
 }
 
 function getMatchStageLabel(stage?: MatchStage) {
@@ -34,7 +34,7 @@ function getMatchStageLabel(stage?: MatchStage) {
 
 function getPredictionTypeHint(type?: PredictionType) {
   return type === "golden"
-    ? "بالملي +6 | الفائز الصحيح +2 | الخطأ 0"
+    ? "بالملي +10 | الفائز الصحيح +4 | المتأهل +6 | الطريقة +4 | الخطأ 0"
     : "بالملي +3 | الفائز الصحيح +1 | الخطأ 0";
 }
 
@@ -46,7 +46,7 @@ function getMatchStageHint(stage?: MatchStage) {
 
 function getPredictionTypeBadgeClass(type?: PredictionType) {
   return type === "golden"
-    ? "rounded-full bg-amber-400 px-3 py-1 text-slate-950"
+    ? "rounded-full border border-fuchsia-300/40 bg-gradient-to-r from-amber-300 via-yellow-300 to-fuchsia-400 px-3 py-1 text-slate-950 shadow-lg shadow-fuchsia-950/20"
     : "rounded-full bg-white/10 px-3 py-1 text-slate-300";
 }
 
@@ -454,13 +454,17 @@ export default function AdminMatchesPanel({
               return (
                 <div
                   key={match.id}
-                  className={`rounded-2xl border p-4 ${
+                  className={`relative overflow-hidden rounded-2xl border p-4 ${
                     predictionType === "golden"
-                      ? "border-amber-400/30 bg-slate-950/80"
+                      ? "border-fuchsia-300/35 bg-gradient-to-br from-slate-950 via-amber-950/45 to-fuchsia-950/35 shadow-lg shadow-fuchsia-950/20"
                       : "border-white/10 bg-slate-950/70"
                   }`}
                 >
-                  <div className="mb-3 flex items-center justify-between gap-2 text-xs">
+                  {predictionType === "golden" && (
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.18),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(217,70,239,0.14),transparent_30%)]" />
+                  )}
+
+                  <div className="relative mb-3 flex items-center justify-between gap-2 text-xs">
                     <span className="rounded-full bg-white/10 px-3 py-1 text-slate-300">
                       {match.matchDay}
                     </span>
@@ -526,7 +530,13 @@ export default function AdminMatchesPanel({
                   </div>
 
                   <div className="mt-3 space-y-2">
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-slate-300">
+                    <div
+                      className={`rounded-xl border p-3 text-[11px] leading-5 ${
+                        predictionType === "golden"
+                          ? "border-fuchsia-300/25 bg-fuchsia-400/10 text-amber-100"
+                          : "border-white/10 bg-white/5 text-slate-300"
+                      }`}
+                    >
                       {getPredictionTypeHint(predictionType)}
                     </div>
 
@@ -583,7 +593,7 @@ export default function AdminMatchesPanel({
                           className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-slate-950 outline-none focus:border-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <option value="normal">توقع عادي</option>
-                          <option value="golden">توقع ذهبي</option>
+                          <option value="golden">🚀 توقع سوبر ذهبي</option>
                         </select>
 
                         <div className="mt-2 rounded-xl border border-white/10 bg-slate-950/60 p-3 text-[11px] leading-5 text-slate-200">
