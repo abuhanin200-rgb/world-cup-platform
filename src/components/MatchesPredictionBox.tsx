@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Match, getVisibleMatches } from "@/lib/matches";
+import { Match, getAllMatches } from "@/lib/matches";
 import {
   getPredictionEditWindowRemainingMs,
   getUserPredictionForMatch,
@@ -303,9 +303,18 @@ export default function MatchesPredictionBox() {
     try {
       setLoading(true);
 
-      const data = await getVisibleMatches();
+      const data = await getAllMatches();
 
-      setMatches(data);
+      const availableMatches = data.filter((match) => {
+        const matchStatus = match as Match & {
+          isActive?: boolean;
+          resultCalculated?: boolean;
+        };
+
+        return matchStatus.isActive !== false && !matchStatus.resultCalculated;
+      });
+
+      setMatches(availableMatches);
     } catch (error) {
       console.error("Load matches error:", error);
       setMatches([]);
@@ -363,7 +372,14 @@ export default function MatchesPredictionBox() {
 
   const sortedMatches = useMemo(() => {
     return [...matches].sort((a, b) => {
-      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+      const firstTime = new Date(a.startAt).getTime();
+      const secondTime = new Date(b.startAt).getTime();
+
+      if (!Number.isFinite(firstTime) && !Number.isFinite(secondTime)) return 0;
+      if (!Number.isFinite(firstTime)) return 1;
+      if (!Number.isFinite(secondTime)) return -1;
+
+      return firstTime - secondTime;
     });
   }, [matches]);
 
@@ -708,7 +724,7 @@ export default function MatchesPredictionBox() {
         </h2>
 
         <p className="mx-auto mt-2 max-w-2xl text-[14px] font-medium leading-7 text-slate-200 md:text-base">
-          سجّل توقعك قبل بداية المباراة وتابع نقاطك في لوحة الصدارة.
+          كل المباريات المضافة تظهر هنا حتى يتم احتسابها من لوحة التحكم.
         </p>
       </div>
 
@@ -718,7 +734,7 @@ export default function MatchesPredictionBox() {
           className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300 shadow-inner"
         >
           <div className="inline-flex items-center gap-2 text-[14px] font-bold">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-300" />
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
             <span>جاري تحميل المباريات...</span>
           </div>
         </motion.div>
@@ -729,7 +745,7 @@ export default function MatchesPredictionBox() {
         >
           <div className="inline-flex items-center justify-center gap-2 text-[14px] font-bold">
             <CalendarDays className="h-4 w-4 text-slate-300" />
-            <span>لا توجد مباريات متاحة للتوقع حاليًا.</span>
+            <span>لا توجد مباريات غير محتسبة حاليًا.</span>
           </div>
         </motion.div>
       ) : (
