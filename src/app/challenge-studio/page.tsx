@@ -20,6 +20,17 @@ import { getPredictionsByUserId, type Prediction } from "@/lib/predictions";
 const CHALLENGE_STUDIO_LAST_SEEN_KEY = "challengeStudioLastSeenBulletin";
 const ARCHIVE_PAGE_SIZE = 4;
 
+const STUDIO_TERMS = [
+  "🚀 السوبر ذهبي",
+  "🔥 فرصة الريمونتادا",
+  "🎯 ضربة بالملي",
+  "📈 قفزة الترتيب",
+  "🧨 قنبلة الجولة",
+  "🐎 الحصان الأسود",
+  "🚨 إنذار للمتصدر",
+  "🌪️ عاصفة الجولة",
+];
+
 const pageMotion: Variants = {
   hidden: { opacity: 0 },
   show: {
@@ -106,7 +117,7 @@ function markLatestChallengeStudioBulletinAsSeen(
 function getCardStyle(type: ChallengeStudioCard["type"]) {
   if (type === "main") {
     return {
-      label: "الخبر الرئيسي",
+      label: "خبر عاجل",
       className:
         "border-red-400/30 bg-gradient-to-br from-red-500/20 to-slate-950/60",
       iconBox: "border-red-400/30 bg-red-500/20",
@@ -115,7 +126,7 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
 
   if (type === "quote") {
     return {
-      label: "مؤتمر صحفي",
+      label: "تصريح الجولة",
       className:
         "border-amber-400/30 bg-gradient-to-br from-amber-400/15 to-slate-950/60",
       iconBox: "border-amber-400/30 bg-amber-400/20",
@@ -124,7 +135,7 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
 
   if (type === "number") {
     return {
-      label: "إحصائية اليوم",
+      label: "رقم الجولة",
       className:
         "border-sky-400/30 bg-gradient-to-br from-sky-400/15 to-slate-950/60",
       iconBox: "border-sky-400/30 bg-sky-400/20",
@@ -133,7 +144,7 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
 
   if (type === "badge") {
     return {
-      label: "وسام اليوم",
+      label: "وسام الاستوديو",
       className:
         "border-emerald-400/30 bg-gradient-to-br from-emerald-400/15 to-slate-950/60",
       iconBox: "border-emerald-400/30 bg-emerald-400/20",
@@ -142,7 +153,7 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
 
   if (type === "funny") {
     return {
-      label: "لقطة اليوم",
+      label: "لقطة الجولة",
       className:
         "border-violet-400/30 bg-gradient-to-br from-violet-400/15 to-slate-950/60",
       iconBox: "border-violet-400/30 bg-violet-400/20",
@@ -150,7 +161,7 @@ function getCardStyle(type: ChallengeStudioCard["type"]) {
   }
 
   return {
-    label: "تحت المجهر",
+    label: "رادار المنافسة",
     className:
       "border-cyan-400/30 bg-gradient-to-br from-cyan-400/15 to-slate-950/60",
     iconBox: "border-cyan-400/30 bg-cyan-400/20",
@@ -352,13 +363,24 @@ export default function ChallengeStudioPage() {
 
     loadOnlineMembers();
 
+    function handleVisibilityChange() {
+      if (!document.hidden) {
+        loadOnlineMembers();
+      }
+    }
+
     const intervalId = window.setInterval(() => {
-      loadOnlineMembers();
+      if (!document.hidden) {
+        loadOnlineMembers();
+      }
     }, 10000);
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [authLoading, user]);
 
@@ -456,13 +478,24 @@ export default function ChallengeStudioPage() {
             </h2>
 
             <p className="mx-auto mt-3 max-w-2xl text-[14px] font-bold leading-7 text-amber-100 md:text-base">
-              القناة الرسمية لأخبار الأعضاء، التصريحات، الأوسمة، والطقطقة
-              الرياضية الخفيفة.
+              القناة الرسمية لأخبار الأعضاء، قفزات الترتيب، السوبر ذهبي،
+              التصريحات، والأوسمة بروح رياضية خفيفة.
             </p>
 
             <p className="mt-2 text-[11px] text-slate-300 md:text-xs">
-              المحتوى ترفيهي ومولد بالذكاء الاصطناعي بناءً على بيانات البطولة.
+              محتوى ترفيهي مبني على بيانات البطولة وحركة المنافسة بين الأعضاء.
             </p>
+
+            <div className="mx-auto mt-4 flex max-w-3xl flex-wrap items-center justify-center gap-2">
+              {STUDIO_TERMS.map((term) => (
+                <span
+                  key={term}
+                  className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1.5 text-[10px] font-black text-amber-100 shadow-sm shadow-slate-950/20 md:text-xs"
+                >
+                  {term}
+                </span>
+              ))}
+            </div>
           </div>
         </motion.div>
 
@@ -476,7 +509,7 @@ export default function ChallengeStudioPage() {
           >
             <div className="flex items-center gap-3">
               <div className="shrink-0 bg-red-500 px-4 py-3 text-xs font-black text-white md:text-sm">
-                🚨 عاجل
+                🚨 عاجل من الاستوديو
               </div>
 
               <div className="min-w-0 flex-1 overflow-hidden py-3">
@@ -554,14 +587,14 @@ export default function ChallengeStudioPage() {
             </motion.div>
 
             <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={scrollOnceViewport} className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-3 text-center text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
-              🎙️ تصريحات ومحتوى استوديو التحدي ترفيهية ومولدة بالذكاء
-              الاصطناعي، وليست تصريحات حقيقية من الأعضاء.
+              🎙️ محتوى استوديو التحدي ترفيهي مبني على بيانات المنافسة،
+              ويهدف لزيادة الحماس بين الأعضاء بروح رياضية.
             </motion.div>
 
             {archive.length > 0 && (
               <motion.div variants={revealMotion} initial="hidden" whileInView="show" viewport={scrollOnceViewport} className="mt-8">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <h3 className="text-[20px] font-black">📚 آخر النشرات</h3>
+                  <h3 className="text-[20px] font-black">📚 أرشيف الاستوديو</h3>
 
                   <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-slate-300">
                     {archivePage + 1} / {archiveTotalPages}

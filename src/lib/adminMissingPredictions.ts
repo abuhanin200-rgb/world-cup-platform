@@ -37,18 +37,25 @@ function getUserPhone(data: Record<string, unknown>) {
   );
 }
 
+function formatWhatsappMatchLabel(match: Match) {
+  const homeLabel = `${match.homeTeamEmoji} ${match.homeTeamName}`;
+  const awayLabel = `${match.awayTeamEmoji} ${match.awayTeamName}`;
+
+  return `${homeLabel} × ${awayLabel}`;
+}
+
 export function buildMissingPredictionMessage(match: Match) {
   const isGolden = match.predictionType === "golden";
 
   const pointsLine = isGolden
-    ? "🔥 لا تفوّت الفرصة:\nتوقع صح ودبّل نقاطك في التوقع الذهبي!"
+    ? "🔥 لا تفوّت الفرصة:\nالسوبر ذهبي فرصة الريمونتادا الكبرى.. توقع صح واقلب الترتيب!"
     : "🔥 لا تفوّت الفرصة:\nتوقع صح وزِد نقاطك في جدول الترتيب!";
 
   return `🚨 تنبيه مهم يا بطل
 
 لاحظنا إنك ما سجلت توقعك حتى الآن لمباراة:
 
-${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamName} ${match.awayTeamEmoji}
+${formatWhatsappMatchLabel(match)}
 
 ${pointsLine}
 
@@ -70,7 +77,9 @@ export async function getMembersMissingPrediction(
 
   const [usersSnapshot, predictionsSnapshot] = await Promise.all([
     getDocs(collection(db, "users")),
-    getDocs(query(collection(db, "predictions"), where("matchId", "==", matchId))),
+    getDocs(
+      query(collection(db, "predictions"), where("matchId", "==", matchId))
+    ),
   ]);
 
   const predictedUserIds = new Set(

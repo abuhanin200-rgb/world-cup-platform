@@ -45,28 +45,25 @@ const overlayMotion: Variants = {
 const cardMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 36,
-    scale: 0.9,
-    filter: "blur(10px)",
+    y: 30,
+    scale: 0.92,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    filter: "blur(0px)",
     transition: {
-      duration: 0.52,
+      duration: 0.36,
       ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.08,
+      staggerChildren: 0.06,
     },
   },
   exit: {
     opacity: 0,
-    y: 24,
-    scale: 0.94,
-    filter: "blur(8px)",
+    y: 18,
+    scale: 0.96,
     transition: {
-      duration: 0.22,
+      duration: 0.2,
       ease: "easeIn",
     },
   },
@@ -75,15 +72,15 @@ const cardMotion: Variants = {
 const itemMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 14,
-    scale: 0.97,
+    y: 10,
+    scale: 0.98,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.34,
+      duration: 0.24,
       ease: "easeOut",
     },
   },
@@ -175,7 +172,7 @@ export default function ExactPredictionCelebration() {
   if (!prediction) return null;
 
   const golden = isGoldenPrediction(prediction);
-  const points = golden ? 6 : 3;
+  const points = golden ? 10 : 3;
 
   return (
     <AnimatePresence>
@@ -194,9 +191,9 @@ export default function ExactPredictionCelebration() {
             animate={{
               background: golden
                 ? [
-                    "radial-gradient(circle at 50% 22%, rgba(251,191,36,0.22), transparent 32%), radial-gradient(circle at 15% 85%, rgba(245,158,11,0.14), transparent 30%)",
-                    "radial-gradient(circle at 55% 18%, rgba(253,230,138,0.24), transparent 34%), radial-gradient(circle at 85% 80%, rgba(245,158,11,0.13), transparent 28%)",
-                    "radial-gradient(circle at 50% 22%, rgba(251,191,36,0.22), transparent 32%), radial-gradient(circle at 15% 85%, rgba(245,158,11,0.14), transparent 30%)",
+                    "radial-gradient(circle at 50% 22%, rgba(217,70,239,0.20), transparent 32%), radial-gradient(circle at 15% 85%, rgba(251,191,36,0.16), transparent 30%)",
+                    "radial-gradient(circle at 55% 18%, rgba(251,191,36,0.22), transparent 34%), radial-gradient(circle at 85% 80%, rgba(192,38,211,0.16), transparent 28%)",
+                    "radial-gradient(circle at 50% 22%, rgba(217,70,239,0.20), transparent 32%), radial-gradient(circle at 15% 85%, rgba(251,191,36,0.16), transparent 30%)",
                   ]
                 : [
                     "radial-gradient(circle at 50% 22%, rgba(251,191,36,0.18), transparent 32%), radial-gradient(circle at 15% 85%, rgba(56,189,248,0.14), transparent 30%)",
@@ -237,13 +234,13 @@ export default function ExactPredictionCelebration() {
             exit="exit"
             className={`relative w-full max-w-md overflow-hidden rounded-[2rem] p-5 text-center text-white shadow-2xl ${
               golden
-                ? "border border-amber-300/50 bg-gradient-to-br from-amber-500/20 via-slate-950 to-yellow-700/20 shadow-amber-500/20"
+                ? "border border-fuchsia-300/45 bg-gradient-to-br from-fuchsia-500/25 via-slate-950 to-amber-500/25 shadow-fuchsia-500/20"
                 : "border border-amber-300/30 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-950 shadow-slate-950/40"
             }`}
           >
             <div
               className={`absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full blur-3xl ${
-                golden ? "bg-amber-300/35" : "bg-amber-300/20"
+                golden ? "bg-fuchsia-300/25" : "bg-amber-300/20"
               }`}
             />
 
@@ -260,7 +257,7 @@ export default function ExactPredictionCelebration() {
 
             {golden && (
               <motion.div
-                className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-yellow-300 via-amber-400 to-yellow-600"
+                className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-fuchsia-400 via-amber-300 to-yellow-400"
                 animate={{ opacity: [0.7, 1, 0.7] }}
                 transition={{
                   duration: 1.5,
@@ -275,7 +272,7 @@ export default function ExactPredictionCelebration() {
                 variants={itemMotion}
                 className={`mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-full border shadow-xl ${
                   golden
-                    ? "border-amber-200/70 bg-amber-300/25 text-amber-200 shadow-amber-400/30"
+                    ? "border-fuchsia-200/60 bg-fuchsia-400/20 text-amber-100 shadow-fuchsia-400/25"
                     : "border-amber-300/40 bg-amber-300/15 text-amber-300"
                 }`}
                 animate={{
@@ -298,20 +295,20 @@ export default function ExactPredictionCelebration() {
               {golden && (
                 <motion.div
                   variants={itemMotion}
-                  className="mx-auto mb-3 inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-400 px-4 py-1 text-xs font-black text-slate-950 shadow-lg shadow-amber-500/20"
+                  className="mx-auto mb-3 inline-flex items-center justify-center gap-1.5 rounded-full border border-fuchsia-200/50 bg-gradient-to-l from-fuchsia-400 via-amber-300 to-yellow-400 px-4 py-1 text-xs font-black text-slate-950 shadow-lg shadow-fuchsia-500/20"
                 >
                   <Star className="h-3.5 w-3.5" />
-                  <span>التوقع الذهبي</span>
+                  <span>السوبر ذهبي</span>
                 </motion.div>
               )}
 
               <motion.h2
                 variants={itemMotion}
                 className={`text-2xl font-black ${
-                  golden ? "text-amber-200" : "text-amber-300"
+                  golden ? "text-fuchsia-100" : "text-amber-300"
                 }`}
               >
-                {golden ? "جبتها ذهبية بالملي!" : "جبتها بالملي!"}
+                {golden ? "جبتها سوبر ذهبية بالملي!" : "جبتها بالملي!"}
               </motion.h2>
 
               <motion.p
@@ -320,7 +317,7 @@ export default function ExactPredictionCelebration() {
               >
                 مبروك يا {prediction.userName || user?.fullName}،{" "}
                 {golden
-                  ? "توقّعك الذهبي طلع صحيح بالملي"
+                  ? "توقّعك السوبر ذهبي طلع صحيح بالملي"
                   : "توقّعك طلع صحيح بالملي"}{" "}
                 وحصلت على {points} نقاط.
               </motion.p>
@@ -329,7 +326,7 @@ export default function ExactPredictionCelebration() {
                 variants={itemMotion}
                 className={`mt-5 overflow-hidden rounded-3xl border p-4 ${
                   golden
-                    ? "border-amber-300/30 bg-amber-400/10"
+                    ? "border-fuchsia-300/30 bg-fuchsia-400/10"
                     : "border-white/10 bg-white/10"
                 }`}
               >
@@ -355,7 +352,7 @@ export default function ExactPredictionCelebration() {
                     }}
                     className={`rounded-2xl px-3 py-2 text-lg font-black shadow-lg ${
                       golden
-                        ? "bg-amber-400 text-slate-950 shadow-amber-500/20"
+                        ? "bg-gradient-to-l from-fuchsia-400 via-amber-300 to-yellow-400 text-slate-950 shadow-fuchsia-500/20"
                         : "bg-slate-950 text-amber-300 shadow-slate-950/30"
                     }`}
                   >
@@ -378,7 +375,7 @@ export default function ExactPredictionCelebration() {
                 variants={itemMotion}
                 className={`mt-4 rounded-2xl border p-3 text-sm font-black ${
                   golden
-                    ? "border-amber-300/30 bg-amber-400/15 text-amber-100"
+                    ? "border-fuchsia-300/30 bg-fuchsia-400/15 text-fuchsia-100"
                     : "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
                 }`}
               >
@@ -395,7 +392,7 @@ export default function ExactPredictionCelebration() {
                 whileTap={{ scale: 0.96 }}
                 className={`group relative mt-5 inline-flex min-h-[48px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl px-4 py-3 text-sm font-black text-slate-950 shadow-lg transition ${
                   golden
-                    ? "bg-amber-300 shadow-amber-400/20 hover:bg-amber-200"
+                    ? "bg-gradient-to-l from-fuchsia-400 via-amber-300 to-yellow-400 shadow-fuchsia-500/20 hover:brightness-110"
                     : "bg-amber-400 shadow-amber-500/20 hover:bg-amber-300"
                 }`}
               >
@@ -440,7 +437,7 @@ export default function ExactPredictionCelebration() {
             }
 
             .celebration-confetti.golden-confetti:nth-child(5n + 2) {
-              background: #f59e0b;
+              background: #d946ef;
             }
 
             .celebration-confetti.golden-confetti:nth-child(5n + 3) {
@@ -448,7 +445,7 @@ export default function ExactPredictionCelebration() {
             }
 
             .celebration-confetti.golden-confetti:nth-child(5n + 4) {
-              background: #facc15;
+              background: #a855f7;
             }
 
             .celebration-confetti.golden-confetti:nth-child(5n + 5) {

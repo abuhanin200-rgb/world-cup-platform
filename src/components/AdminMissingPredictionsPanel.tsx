@@ -17,6 +17,16 @@ function formatMatchLabel(match: Match) {
   return `${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamName} ${match.awayTeamEmoji}`;
 }
 
+function getPredictionTypeLabel(predictionType?: Match["predictionType"]) {
+  return predictionType === "golden" ? "توقع سوبر ذهبي" : "توقع عادي";
+}
+
+function getPredictionTypeMessageHint(predictionType?: Match["predictionType"]) {
+  return predictionType === "golden"
+    ? "توقع سوبر ذهبي — الرسالة: فرصة الريمونتادا"
+    : "توقع عادي — الرسالة: زِد نقاطك";
+}
+
 export default function AdminMissingPredictionsPanel({ matches }: Props) {
   const availableMatches = useMemo(() => {
     return [...matches]
@@ -82,10 +92,7 @@ export default function AdminMissingPredictionsPanel({ matches }: Props) {
           >
             {availableMatches.map((match) => (
               <option key={match.id} value={match.id}>
-                {formatMatchLabel(match)} —{" "}
-                {match.predictionType === "golden"
-                  ? "توقع ذهبي"
-                  : "توقع عادي"}
+                {formatMatchLabel(match)} — {getPredictionTypeLabel(match.predictionType)}
               </option>
             ))}
           </select>
@@ -103,12 +110,7 @@ export default function AdminMissingPredictionsPanel({ matches }: Props) {
 
       {selectedMatch && (
         <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
-          نوع المباراة:{" "}
-          <strong>
-            {selectedMatch.predictionType === "golden"
-              ? "توقع ذهبي — الرسالة: دبّل نقاطك"
-              : "توقع عادي — الرسالة: زِد نقاطك"}
-          </strong>
+          نوع المباراة: <strong>{getPredictionTypeMessageHint(selectedMatch.predictionType)}</strong>
         </div>
       )}
 

@@ -135,7 +135,7 @@ function buildGoldenPredictionAlertEvent(matches: Match[]) {
   return {
     id: `golden_prediction_alert_${nextGoldenMatch.id}`,
     type: "golden_prediction_alert" as const,
-    title: "التوقع الذهبي يشعل الجولة",
+    title: "السوبر ذهبي يشعل الجولة",
     priority: hoursUntilStart <= 24 ? 115 : 98,
     members: [],
     data: {
@@ -145,6 +145,11 @@ function buildGoldenPredictionAlertEvent(matches: Match[]) {
       awayTeamName: nextGoldenMatch.awayTeamName,
       predictionType: nextGoldenMatch.predictionType,
       matchStage: nextGoldenMatch.matchStage,
+      superGoldenExactPoints: 10,
+      superGoldenWinnerPoints: 4,
+      superGoldenQualifiedPoints: 6,
+      superGoldenMethodPoints: 4,
+      superGoldenMaxKnockoutPoints: 20,
     },
   };
 }
@@ -317,7 +322,7 @@ function buildChasingPackEvent(users: LeaderboardUser[]) {
   return {
     id: `chasing_pack_${chaser.id}`,
     type: "chasing_pack" as const,
-    title: "جاي من الخلف",
+    title: "حكاية الريمونتادا",
     priority: 84,
     members: [chaser.fullName],
     data: {
@@ -342,7 +347,7 @@ function buildBiggestClimbEvent(users: LeaderboardUser[]) {
   return {
     id: `biggest_climb_${climber.id}_${climber.rankChange}`,
     type: "biggest_climb" as const,
-    title: "صاروخ الجولة",
+    title: "قفزة الترتيب",
     priority: climber.rankChange >= 10 ? 96 : climber.rankChange >= 6 ? 90 : 80,
     members: [climber.fullName],
     data: {
@@ -493,11 +498,7 @@ function buildRoundStarEvent(predictions: RawPrediction[]) {
     current.roundPoints += prediction.points;
     current.calculatedCount += 1;
 
-    if (
-      prediction.resultType === "exact" ||
-      prediction.points === 3 ||
-      prediction.points === 6
-    ) {
+    if (prediction.resultType === "exact") {
       current.exactCount += 1;
     }
 
@@ -764,9 +765,7 @@ function buildExactAfterCalculationEvent(predictions: RawPrediction[]) {
 
       return (
         item.isCalculated &&
-        (item.resultType === "exact" ||
-          item.points === 3 ||
-          item.points === 6) &&
+        item.resultType === "exact" &&
         calculatedTime > 0 &&
         now - calculatedTime <= 24 * 60 * 60 * 1000
       );
@@ -778,8 +777,8 @@ function buildExactAfterCalculationEvent(predictions: RawPrediction[]) {
   return {
     id: `exact_after_calculation_${prediction.id}`,
     type: "exact_after_calculation" as const,
-    title: "جابها بالملي بعد الاحتساب",
-    priority: prediction.points >= 6 ? 112 : 94,
+    title: "ضربة بالملي بعد الاحتساب",
+    priority: prediction.points >= 10 ? 112 : 94,
     members: [prediction.userName],
     data: {
       memberName: prediction.userName,
@@ -801,9 +800,7 @@ function buildWinnerAfterCalculationEvent(predictions: RawPrediction[]) {
 
       return (
         item.isCalculated &&
-        (item.resultType === "winner" ||
-          item.points === 1 ||
-          item.points === 2) &&
+        item.resultType === "winner" &&
         calculatedTime > 0 &&
         now - calculatedTime <= 24 * 60 * 60 * 1000
       );

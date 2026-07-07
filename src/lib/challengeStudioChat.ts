@@ -133,7 +133,7 @@ function validateMessageText(text: string): ValidationResult {
   if (hasLink(cleanText)) {
     return {
       ok: false,
-      error: "الروابط غير مسموحة في 🎙️ استديو التحليل.",
+      error: "الروابط غير مسموحة في رادار استوديو التحدي.",
     };
   }
 

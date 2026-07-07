@@ -25,13 +25,28 @@ type AiGenerateResponse = {
 };
 
 const cardTypes: { value: ChallengeStudioCardType; label: string }[] = [
-  { value: "main", label: "خبر رئيسي" },
-  { value: "quote", label: "تصريح" },
-  { value: "number", label: "رقم" },
-  { value: "badge", label: "وسام" },
-  { value: "funny", label: "لقطة" },
-  { value: "watch", label: "تحت المجهر" },
+  { value: "main", label: "خبر عاجل" },
+  { value: "quote", label: "تصريح الجولة" },
+  { value: "number", label: "رقم الجولة" },
+  { value: "badge", label: "وسام الاستوديو" },
+  { value: "funny", label: "لقطة الجولة" },
+  { value: "watch", label: "رادار المنافسة" },
 ];
+
+const studioTerms = [
+  "🚀 السوبر ذهبي",
+  "🔥 فرصة الريمونتادا",
+  "🎯 ضربة بالملي",
+  "📈 قفزة الترتيب",
+  "🧨 قنبلة الجولة",
+  "🐎 الحصان الأسود",
+  "🚨 إنذار للمتصدر",
+  "🌪️ عاصفة الجولة",
+];
+
+function getCardTypeLabel(type: ChallengeStudioCardType) {
+  return cardTypes.find((item) => item.value === type)?.label || "بطاقة";
+}
 
 export default function AdminChallengeStudioPanel() {
   const [bulletins, setBulletins] = useState<ChallengeStudioBulletin[]>([]);
@@ -112,8 +127,8 @@ export default function AdminChallengeStudioPanel() {
       {
         type: "watch",
         icon: "🎙️",
-        title: "بطاقة جديدة",
-        content: "اكتب نص البطاقة هنا.",
+        title: "رادار المنافسة",
+        content: "اكتب نص البطاقة هنا بأسلوب صحفي واضح، مع ذكر الأسماء الحقيقية إذا كانت موجودة.",
         priority: 40,
       },
     ]);
@@ -275,8 +290,8 @@ export default function AdminChallengeStudioPanel() {
               🎙️ استوديو التحدي
             </h2>
             <p className="mt-1 text-sm text-slate-300">
-              توليد نشرات مبنية على بيانات البطولة الحقيقية، ثم تعديلها
-              ومعاينتها ونشرها.
+              توليد أخبار استوديو التحدي بمصطلحات السوبر ذهبي، ثم تعديلها
+              ومعاينتها ونشرها للأعضاء.
             </p>
           </div>
 
@@ -288,8 +303,8 @@ export default function AdminChallengeStudioPanel() {
               className="rounded-2xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {generatingAi
-                ? "جاري كتابة النشرة..."
-                : "🤖 توليد بالذكاء الاصطناعي"}
+                ? "جاري كتابة أخبار الاستوديو..."
+                : "🤖 توليد نشرة ذكية"}
             </button>
 
             <button
@@ -298,14 +313,34 @@ export default function AdminChallengeStudioPanel() {
               disabled={generating || generatingAi || Boolean(editingId)}
               className="rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100 hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {generating ? "جاري تحليل البطولة..." : "⚙️ توليد احتياطي"}
+              {generating
+                ? "جاري تحليل البطولة..."
+                : "⚙️ توليد احتياطي من الأحداث"}
             </button>
           </div>
         </div>
 
         <div className="mb-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-xs font-bold leading-6 text-cyan-100 md:text-sm">
           الآن تقدر تولّد النشرة، تعدّل النصوص والبطاقات قبل النشر، ثم تنشرها
-          للأعضاء.
+          للأعضاء. التوليد الجديد يدعم أخبار السوبر ذهبي، الريمونتادا، القفزات،
+          واللقطات الصحفية بدون تغيير الحسبة أو النقاط.
+        </div>
+
+        <div className="mb-5 rounded-2xl border border-amber-400/20 bg-slate-950/50 p-3">
+          <div className="mb-2 text-xs font-black text-amber-100 md:text-sm">
+            مصطلحات الاستوديو الجديدة
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {studioTerms.map((term) => (
+              <span
+                key={term}
+                className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-[11px] font-black text-amber-100"
+              >
+                {term}
+              </span>
+            ))}
+          </div>
         </div>
 
         {editingId && (
@@ -489,7 +524,7 @@ export default function AdminChallengeStudioPanel() {
                       </span>
 
                       <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-bold text-slate-300">
-                        {bulletin.generatedByAI ? "AI" : "محرك الأحداث"}
+                        {bulletin.generatedByAI ? "ذكاء اصطناعي" : "محرك الأحداث"}
                       </span>
                     </div>
 
@@ -547,8 +582,11 @@ export default function AdminChallengeStudioPanel() {
                         card.type === "main" ? "md:col-span-2" : ""
                       }`}
                     >
-                      <div className="mb-2 flex items-center gap-2">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
                         <span className="text-xl">{card.icon}</span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-black text-slate-300">
+                          {getCardTypeLabel(card.type)}
+                        </span>
                         <span className="text-sm font-black">
                           {card.title}
                         </span>

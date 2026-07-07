@@ -40,6 +40,17 @@ const CHAT_ADMIN_NAMES = [
   "أبو راكان",
 ];
 
+const STUDIO_TERMS = [
+  "🚀 السوبر ذهبي",
+  "🔥 فرصة الريمونتادا",
+  "🎯 ضربة بالملي",
+  "📈 قفزة الترتيب",
+  "🧨 قنبلة الجولة",
+  "🐎 الحصان الأسود",
+  "🚨 إنذار للمتصدر",
+  "🌪️ عاصفة الجولة",
+];
+
 const scrollOnceViewport = {
   once: true,
   amount: 0.14,
@@ -170,7 +181,7 @@ export default function ChallengeStudioAnalysis({
         setMessages(newMessages);
       },
       () => {
-        setError("تعذر تحميل رسائل 🎙️ استديو التحليل.");
+        setError("تعذر تحميل رسائل 🎙️ استوديو التحليل.");
       }
     );
 
@@ -183,7 +194,7 @@ export default function ChallengeStudioAnalysis({
         setLikes(newLikes);
       },
       () => {
-        setError("تعذر تحميل تفاعلات 🎙️ استديو التحليل.");
+        setError("تعذر تحميل تفاعلات 🎙️ استوديو التحليل.");
       }
     );
 
@@ -355,7 +366,7 @@ export default function ChallengeStudioAnalysis({
     setError("");
 
     if (!currentUserId) {
-      setError("سجّل دخولك أولًا للمشاركة في 🎙️ استديو التحليل.");
+      setError("سجّل دخولك أولًا للمشاركة في 🎙️ استوديو التحليل.");
       return;
     }
 
@@ -621,8 +632,7 @@ export default function ChallengeStudioAnalysis({
       dir="rtl"
       variants={sectionMotion}
       initial="hidden"
-      whileInView="show"
-      viewport={scrollOnceViewport}
+      animate="show"
       className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/75 p-4 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-cyan-300/8" />
@@ -631,15 +641,32 @@ export default function ChallengeStudioAnalysis({
       <div className="relative">
       <motion.div variants={itemMotion} className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black">🎙️ استديو التحليل</h2>
+          <h2 className="text-xl font-black">🎙️ رادار استوديو التحدي</h2>
 
           <p className="mt-1 text-xs text-slate-400">
-            مساحة سريعة لتحليلات الأعضاء أثناء التحدي.
+            ساحة سريعة للتحليل، المنشن، الردود، والطقطقة الرياضية الخفيفة.
           </p>
         </div>
 
         <div className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-300">
           {onlineMembers.length} متواجد الآن
+        </div>
+      </motion.div>
+
+      <motion.div variants={itemMotion} className="mb-4 rounded-3xl border border-amber-400/20 bg-amber-400/10 p-3 shadow-md shadow-amber-950/10">
+        <div className="mb-2 text-xs font-black text-amber-100">
+          مصطلحات الاستوديو الجديدة
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {STUDIO_TERMS.map((term) => (
+            <span
+              key={term}
+              className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1 text-[11px] font-black text-amber-50"
+            >
+              {term}
+            </span>
+          ))}
         </div>
       </motion.div>
 
@@ -711,7 +738,7 @@ export default function ChallengeStudioAnalysis({
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[14px] font-black text-amber-100">
-              🚩 عندك {newMentionNotificationIds.length} منشن جديد في استديو
+              🚩 عندك {newMentionNotificationIds.length} منشن جديد في استوديو
               التحليل
             </div>
 
@@ -945,7 +972,7 @@ export default function ChallengeStudioAnalysis({
           })
         ) : (
           <div className="flex h-full items-center justify-center text-center text-[14px] text-slate-500">
-            لا توجد رسائل حتى الآن. افتح التحليل يا بطل.
+            لا توجد رسائل حتى الآن. افتح رادار الاستوديو يا بطل.
           </div>
         )}
       </motion.div>
@@ -1039,8 +1066,9 @@ export default function ChallengeStudioAnalysis({
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-[11px] font-bold leading-6 text-slate-400 md:text-xs">
-          شروط 🎙️ استديو التحليل: الرسالة 250 حرف، بدون روابط، تعديل الرسالة
-          متاح لمدة 5 دقائق، وبين كل رسالة ورسالة 5 ثواني.
+          شروط 🎙️ رادار الاستوديو: الرسالة 250 حرف، بدون روابط، تعديل الرسالة
+          متاح لمدة 5 دقائق، وبين كل رسالة ورسالة 5 ثواني. استخدم المنشن بحماس
+          وخل التحليل رياضيًا ومحترمًا.
         </div>
 
         <AnimatePresence mode="popLayout">

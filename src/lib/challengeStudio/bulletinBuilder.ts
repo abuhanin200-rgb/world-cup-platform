@@ -87,13 +87,13 @@ function buildMainCard(event: ChallengeStudioEvent): ChallengeStudioCard {
   if (event.type === "golden_prediction_alert") {
     return {
       type: "main",
-      icon: "⭐",
-      title: "التوقع الذهبي يفتح باب التحولات",
+      icon: "🚀",
+      title: "السوبر ذهبي يفتح باب الريمونتادا",
       content: `تتجه أنظار استوديو التحدي إلى مباراة ${getText(
         event.data.matchName
-      )}، حيث تحمل بطاقة التوقع الذهبي قيمة مضاعفة في حسابات المنافسة.
+      )}، حيث تحمل بطاقة السوبر ذهبي قيمة أعلى وقد تغيّر حسابات المنافسة بالكامل.
 
-النتيجة الدقيقة هنا ليست تفصيلًا عابرًا؛ فقد تعيد ترتيب المشهد وتمنح المطاردين فرصة حقيقية للدخول بقوة. تبقّى نحو ${getNumber(
+النتيجة الدقيقة هنا ليست تفصيلًا عابرًا؛ فهي تمنح 10 نقاط، وفي مباريات خروج المغلوب قد تصل الضربة الكاملة إلى 20 نقطة. هذه فرصة حقيقية للمطاردين لقلب الطاولة. تبقّى نحو ${getNumber(
         event.data.hoursUntilStart
       )} ساعة على صافرة البداية، والقراءة الصحيحة قد تصنع فارقًا كبيرًا.`,
       priority: 115,
@@ -104,7 +104,7 @@ function buildMainCard(event: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "main",
       icon: "🎯",
-      title: "نتيجة دقيقة تغيّر المشهد",
+      title: "ضربة بالملي تغيّر المشهد",
       content: `${getText(
         event.data.memberName
       )} تصدّر العنوان الأبرز بعد احتساب مباراة ${getText(
@@ -144,7 +144,7 @@ function buildMainCard(event: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "main",
       icon: "🔥",
-      title: "الصدارة تحت الضغط",
+      title: "إنذار للمتصدر",
       content: `${getText(
         event.data.leaderName
       )} لا يزال في الواجهة، لكن الفارق مع أقرب المطاردين لم يعد مريحًا؛ إذ يقف ${getText(
@@ -160,7 +160,7 @@ function buildMainCard(event: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "main",
       icon: "🚀",
-      title: "أسرع صعود في الجولة",
+      title: "قفزة الترتيب الأقوى",
       content: `${getText(
         event.data.memberName
       )} قدّم واحدة من أبرز حركات الترتيب، بعدما تقدّم ${getNumber(
@@ -190,7 +190,7 @@ function buildMainCard(event: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "main",
       icon: "⚽",
-      title: "مباراة قد تعيد ترتيب الأوراق",
+      title: "قنبلة الجولة على الأبواب",
       content: `استوديو التحدي يضع مباراة ${getText(
         event.data.matchName
       )} في واجهة المتابعة.
@@ -231,7 +231,7 @@ function buildQuoteCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "quote",
       icon: "🎙️",
-      title: "تعليق الاستوديو",
+      title: "تصريح الجولة",
       content: `القراءة الفنية للمشهد تقول إن الصدارة لم تعد منطقة آمنة. الفارق بين ${getText(
         event.data.leaderName
       )} وأقرب منافسيه لا يتجاوز ${getNumber(
@@ -245,7 +245,7 @@ function buildQuoteCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "quote",
       icon: "🎙️",
-      title: "تعليق الاستوديو",
+      title: "تصريح الجولة",
       content: `عودة ${getText(
         event.data.memberName
       )} تحمل رسالة واضحة: التأخر في الترتيب لا يعني الخروج من المنافسة. الصعود المتدرج قد يكون أخطر من الظهور المفاجئ.`,
@@ -273,7 +273,7 @@ function buildQuoteCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "quote",
       icon: "🎙️",
-      title: "تعليق الاستوديو",
+      title: "تصريح الجولة",
       content: `${memberName} يدخل نشرة اليوم من زاوية مستحقة، فالأرقام المرتبطة به تمنحه حضورًا واضحًا في المشهد. المنافسة لا تكافئ الظهور فقط، بل تكافئ التوقيت والدقة.`,
       priority: 82,
     };
@@ -282,7 +282,7 @@ function buildQuoteCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
   return {
     type: "quote",
     icon: "🎙️",
-    title: "تعليق الاستوديو",
+    title: "تصريح الجولة",
     content:
       "لغة الأرقام في لوحة الصدارة تؤكد أن المنافسة لم تصل إلى مرحلة الاستقرار بعد. كل جولة تضيف اسمًا جديدًا إلى دائرة المتابعة.",
     priority: 82,
@@ -294,7 +294,7 @@ function buildNumberCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "number",
       icon: "📊",
-      title: "رقم اليوم",
+      title: "رقم الجولة",
       content: `${getText(event.data.memberName)} جمع ${getNumber(
         event.data.roundPoints
       )} نقاط في آخر النتائج المحتسبة، مع ${getNumber(
@@ -308,7 +308,7 @@ function buildNumberCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "number",
       icon: "📊",
-      title: "رقم اليوم",
+      title: "رقم الجولة",
       content: `${getText(event.data.memberName)} يملك دقة تبلغ ${getNumber(
         event.data.accuracy
       )}% من أصل ${getNumber(
@@ -322,7 +322,7 @@ function buildNumberCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "number",
       icon: "🎯",
-      title: "رقم اليوم",
+      title: "رقم الجولة",
       content: `${getText(event.data.memberName)} وصل إلى ${getNumber(
         event.data.exact
       )} توقعات دقيقة بالملي. هذا النوع من الأرقام يصنع الفارق في المراحل الحاسمة.`,
@@ -334,7 +334,7 @@ function buildNumberCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "number",
       icon: "📈",
-      title: "رقم اليوم",
+      title: "رقم الجولة",
       content: `أكبر حركة صعود جاءت عبر ${getText(
         event.data.memberName
       )} بعد تقدمه ${getNumber(
@@ -361,7 +361,7 @@ function buildNumberCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
   return {
     type: "number",
     icon: "📊",
-    title: "رقم اليوم",
+    title: "رقم الجولة",
     content:
       "كل نقطة في لوحة الصدارة أصبحت ذات وزن واضح. الفارق البسيط قد يتحول بعد مباراة واحدة إلى قفزة أو تراجع مؤثر.",
     priority: 76,
@@ -440,7 +440,7 @@ function buildBadgeCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
   return {
     type: "badge",
     icon: "🏅",
-    title: "وسام اليوم",
+    title: "وسام الاستوديو",
     content:
       "وسام اليوم لكل عضو يحافظ على حضوره في التوقعات. الاستمرارية لا تظهر دائمًا في العناوين، لكنها تصنع الفارق مع الوقت.",
     priority: 72,
@@ -501,7 +501,7 @@ function buildFunnyCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
   return {
     type: "funny",
     icon: "😅",
-    title: "لقطة اليوم",
+    title: "لقطة الجولة",
     content:
       "الاستوديو يذكّر الجميع بأن التوقع قبل المباراة أهم من الندم بعدها. بعض النقاط تضيع لأن صاحبها تأخر خطوة واحدة فقط.",
     priority: 66,
@@ -513,7 +513,7 @@ function buildWatchCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "watch",
       icon: "🔟",
-      title: "عين الاستوديو على التوب 10",
+      title: "رادار التوب 10",
       content: `${getText(event.data.memberName)} يقف في المركز ${getNumber(
         event.data.currentRank
       )} ومعه ${getNumber(
@@ -541,7 +541,7 @@ function buildWatchCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "watch",
       icon: "🎲",
-      title: "توقع تحت المجهر",
+      title: "توقع على الرادار",
       content: `${getText(event.data.memberName)} اختار نتيجة جريئة في مباراة ${getText(
         event.data.matchName
       )}: ${getNumber(event.data.homeScore)} - ${getNumber(
@@ -566,7 +566,7 @@ function buildWatchCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
   return {
     type: "watch",
     icon: "👀",
-    title: "تحت المجهر",
+    title: "رادار المنافسة",
     content:
       "استوديو التحدي يراقب المنافسة عن قرب. الجولات القادمة ستكشف من يملك قراءة ثابتة، ومن ينتظر لحظة الانفجار.",
     priority: 62,
@@ -615,7 +615,7 @@ function buildBattleCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
   return {
     type: "watch",
     icon: "⚔️",
-    title: "التحدي المباشر",
+    title: "مطاردة الصدارة",
     content:
       "الصدارة لم تعد منطقة مغلقة. أي مباراة قادمة قد تصنع مواجهة جديدة وتعيد توزيع الضغط بين الأعضاء.",
     priority: 60,
@@ -627,7 +627,7 @@ function buildMovementCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "number",
       icon: "📈",
-      title: "حركة الترتيب",
+      title: "قفزة الترتيب",
       content: `${getText(
         event.data.memberName
       )} كان صاحب الحركة الأبرز في الجدول، بعدما صعد ${getNumber(
@@ -641,7 +641,7 @@ function buildMovementCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
     return {
       type: "funny",
       icon: "📉",
-      title: "حركة الترتيب",
+      title: "قفزة الترتيب",
       content: `${getText(event.data.memberName)} تراجع ${getNumber(
         event.data.rankChange
       )} مراكز. المنافسة طويلة، والرد الحقيقي يكون في الجولة القادمة.`,
@@ -664,7 +664,7 @@ function buildMovementCard(event?: ChallengeStudioEvent): ChallengeStudioCard {
   return {
     type: "number",
     icon: "📈",
-    title: "حركة الترتيب",
+    title: "قفزة الترتيب",
     content:
       "الجدول يتحرك بهدوء، لكن الهدوء قد يكون مؤقتًا. نتيجة دقيقة واحدة كفيلة بتغيير أكثر من مركز دفعة واحدة.",
     priority: 58,
@@ -756,9 +756,9 @@ export async function generateChallengeStudioBulletinFromEvents() {
     pushCard(cards, {
       type: "number",
       icon: "💥",
-      title: "قيمة التوقع الذهبي",
+      title: "قيمة السوبر ذهبي",
       content:
-        "النتيجة الدقيقة في التوقع الذهبي تمنح دفعة قوية في النقاط، وقد تكون الفاصل بين البقاء في منطقة المطاردة والدخول إلى دائرة المنافسة المباشرة.",
+        "النتيجة الدقيقة في السوبر ذهبي تمنح 10 نقاط، وفي مباريات خروج المغلوب قد تصل الضربة الكاملة إلى 20 نقطة. هذه ليست مباراة عادية؛ إنها فرصة الريمونتادا الكبرى لمن يحسن قراءة التفاصيل.",
       priority: 90,
     });
   }
@@ -841,7 +841,10 @@ export async function generateChallengeStudioBulletinFromEvents() {
 
   const bulletinId = await addChallengeStudioBulletin({
     date: getTodaySaudiDate(),
-    summary: mainEvent.title,
+    summary:
+      mainEvent.type === "golden_prediction_alert"
+        ? "السوبر ذهبي يشعل الجولة"
+        : mainEvent.title,
     cards: finalCards,
     mentionedMembers: Array.from(usedMembers),
     published: false,

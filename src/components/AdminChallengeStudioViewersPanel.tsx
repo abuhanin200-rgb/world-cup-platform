@@ -14,7 +14,23 @@ function formatLastSeen(lastSeen: number) {
   if (diffSeconds < 60) return `قبل ${diffSeconds} ثانية`;
 
   const minutes = Math.floor(diffSeconds / 60);
-  return `قبل ${minutes} دقيقة`;
+
+  if (minutes < 60) {
+    return `قبل ${minutes} دقيقة`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) {
+    return `قبل ${hours} ساعة`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  if (days === 1) return "قبل يوم";
+  if (days === 2) return "قبل يومين";
+
+  return `قبل ${days} أيام`;
 }
 
 export default function AdminChallengeStudioViewersPanel() {
@@ -22,9 +38,11 @@ export default function AdminChallengeStudioViewersPanel() {
   const [onlineViewers, setOnlineViewers] = useState<OnlinePresence[]>([]);
   const [todayVisitors, setTodayVisitors] = useState<OnlinePresence[]>([]);
 
-  async function loadData() {
+  async function loadData(showLoading = true) {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
 
       const [online, today] = await Promise.all([
         getChallengeStudioOnlineViewers(),
@@ -35,17 +53,54 @@ export default function AdminChallengeStudioViewersPanel() {
       setTodayVisitors(today);
     } catch (error) {
       console.error("Challenge studio viewers load error:", error);
-      console.error("Challenge studio viewers load error:", error);
-setOnlineViewers([]);
-setTodayVisitors([]);
+      setOnlineViewers([]);
+      setTodayVisitors([]);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }
 
- useEffect(() => {
-  loadData();
-}, []);
+  useEffect(() => {
+    let intervalId: number | null = null;
+
+    function startAutoRefresh() {
+      if (intervalId) return;
+
+      intervalId = window.setInterval(() => {
+        if (document.hidden) return;
+        loadData(false);
+      }, 30000);
+    }
+
+    function stopAutoRefresh() {
+      if (!intervalId) return;
+
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        stopAutoRefresh();
+        return;
+      }
+
+      loadData(false);
+      startAutoRefresh();
+    }
+
+    loadData(true);
+    startAutoRefresh();
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      stopAutoRefresh();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   const onlineIds = new Set(onlineViewers.map((item) => item.userId));
 
@@ -56,6 +111,7 @@ setTodayVisitors([]);
           <h2 className="text-xl font-black md:text-2xl">
             👀 مشاهدو استوديو التحدي
           </h2>
+
           <p className="mt-1 text-sm text-cyan-100">
             يعرض من يشاهد الاستوديو الآن، ومن دخل الصفحة خلال اليوم.
           </p>
@@ -63,7 +119,7 @@ setTodayVisitors([]);
 
         <button
           type="button"
-          onClick={loadData}
+          onClick={() => loadData(true)}
           disabled={loading}
           className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10 disabled:opacity-50"
         >
@@ -74,6 +130,7 @@ setTodayVisitors([]);
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
           <div className="text-sm text-emerald-100">يشاهد الآن</div>
+
           <div className="mt-2 text-3xl font-black text-white">
             {onlineViewers.length}
           </div>
@@ -81,6 +138,7 @@ setTodayVisitors([]);
 
         <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
           <div className="text-sm text-amber-100">دخلوا اليوم</div>
+
           <div className="mt-2 text-3xl font-black text-white">
             {todayVisitors.length}
           </div>
