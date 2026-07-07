@@ -68,6 +68,7 @@ export default function RootLayout({
         <AuthProvider>
           <PresenceTracker />
           <MaintenanceGate>{children}</MaintenanceGate>
+          <SuperGoldenNotice />
         </AuthProvider>
       </body>
     </html>
