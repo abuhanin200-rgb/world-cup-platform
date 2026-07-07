@@ -509,7 +509,7 @@ export default function ChallengeStudioPage() {
           >
             <div className="flex items-center gap-3">
               <div className="shrink-0 bg-red-500 px-4 py-3 text-xs font-black text-white md:text-sm">
-                🚨 عاجل من الاستوديو
+                🚨 عاجل
               </div>
 
               <div className="min-w-0 flex-1 overflow-hidden py-3">

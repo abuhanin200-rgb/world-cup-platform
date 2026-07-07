@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import PresenceTracker from "@/components/PresenceTracker";
+import SuperGoldenNotice from "@/components/SuperGoldenNotice";
 
 const siteUrl = "https://world-cup-platform.vercel.app";
 
