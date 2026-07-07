@@ -339,13 +339,20 @@ function normalizeActualQualifiedTeamCode(params: {
 }
 
 function getPointValues(predictionType: PredictionType) {
-  const multiplier = predictionType === "golden" ? 2 : 1;
+  if (predictionType === "golden") {
+    return {
+      exact: 10,
+      winner: 4,
+      qualified: 6,
+      method: 4,
+    };
+  }
 
   return {
-    exact: 3 * multiplier,
-    winner: 1 * multiplier,
-    qualified: 2 * multiplier,
-    method: 1 * multiplier,
+    exact: 3,
+    winner: 1,
+    qualified: 2,
+    method: 1,
   };
 }
 
