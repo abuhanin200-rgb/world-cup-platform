@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AnimatePresence, motion, type Variants } from "framer-motion";
 import {
   CalendarDays,
   CheckCircle2,
@@ -45,52 +44,6 @@ type SavedPredictions = Record<string, Prediction>;
 
 type MatchWithKnockout = Match & {
   matchStage?: "group" | "knockout";
-};
-
-const scrollOnceViewport = {
-  once: true,
-  amount: 0.18,
-} as const;
-
-const sectionMotion: Variants = {
-  hidden: { opacity: 1, y: 0, scale: 1 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0, ease: "linear" },
-  },
-};
-
-const cardMotion: Variants = {
-  hidden: { opacity: 1, y: 0, scale: 1 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0, ease: "linear" },
-  },
-};
-
-const matchCardMotion: Variants = {
-  hidden: { opacity: 1, y: 0, scale: 1 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0, ease: "linear" },
-  },
-};
-
-const slideDownMotion: Variants = {
-  hidden: { opacity: 1, y: 0, scale: 1 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0, ease: "linear" },
-  },
-  exit: { opacity: 1, y: 0, scale: 1, transition: { duration: 0 } },
 };
 
 function formatDate(matchDate: string) {
@@ -233,19 +186,11 @@ function getQualifiedTeamFlagData(
 
 function FloatingTeamFlag({
   children,
-  delay = 0,
 }: {
   children: ReactNode;
   delay?: number;
 }) {
-  return (
-    <div
-      className="flex justify-center transition-transform duration-200"
-      style={{ transitionDelay: `${Math.round(delay * 100)}ms` }}
-    >
-      {children}
-    </div>
-  );
+  return <div className="flex justify-center">{children}</div>;
 }
 
 export default function MatchesPredictionBox() {
@@ -590,8 +535,7 @@ export default function MatchesPredictionBox() {
 
   function renderScoreInputs(match: Match, golden: boolean) {
     return (
-      <motion.div
-        variants={cardMotion}
+      <div
         className="grid grid-cols-[1fr_28px_1fr] items-center gap-2"
       >
         <input
@@ -625,21 +569,15 @@ export default function MatchesPredictionBox() {
               : "border-white/10 bg-slate-950/80 focus:border-amber-400 focus:ring-amber-400/25"
           }`}
         />
-      </motion.div>
+      </div>
     );
   }
 
   function renderQualificationFields(match: Match, visible: boolean) {
     return (
-      <AnimatePresence>
+      <>
         {visible && (
-          <motion.div
-            variants={slideDownMotion}
-            initial="hidden"
-            animate="show"
-            exit="exit"
-            className="mt-3 grid gap-2 md:grid-cols-2"
-          >
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
             <select
               value={inputs[match.id]?.qualifiedTeamCode || ""}
               onChange={(event) =>
@@ -663,18 +601,14 @@ export default function MatchesPredictionBox() {
               <option value="extraTime">أشواط إضافية</option>
               <option value="penalties">ركلات ترجيح</option>
             </select>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </>
     );
   }
 
   return (
-    <motion.section
-      variants={sectionMotion}
-      initial="hidden"
-      whileInView="show"
-      viewport={scrollOnceViewport}
+    <section
       className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.08] p-4 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-5"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
@@ -696,27 +630,25 @@ export default function MatchesPredictionBox() {
       </div>
 
       {loading ? (
-        <motion.div
-          variants={cardMotion}
+        <div
           className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300 shadow-inner"
         >
           <div className="inline-flex items-center gap-2 text-[14px] font-bold">
             <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
             <span>جاري تحميل المباريات...</span>
           </div>
-        </motion.div>
+        </div>
       ) : sortedMatches.length === 0 ? (
-        <motion.div
-          variants={cardMotion}
+        <div
           className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/60 p-6 text-center text-slate-300 shadow-inner"
         >
           <div className="inline-flex items-center justify-center gap-2 text-[14px] font-bold">
             <CalendarDays className="h-4 w-4 text-slate-300" />
             <span>لا توجد مباريات غير محتسبة حاليًا.</span>
           </div>
-        </motion.div>
+        </div>
       ) : (
-        <motion.div variants={sectionMotion} className="relative space-y-4">
+        <div className="relative space-y-4">
           {sortedMatches.map((match) => {
             const savedPrediction = savedPredictions[match.id];
             const closed = isPredictionClosed(match.startAt);
@@ -733,13 +665,8 @@ export default function MatchesPredictionBox() {
             const editing = editingMatchId === match.id && Boolean(editable);
 
             return (
-              <motion.article
+              <article
                 key={match.id}
-                variants={matchCardMotion}
-                initial="hidden"
-                whileInView="show"
-                viewport={{ once: true, amount: 0.24 }}
-                whileTap={{ scale: 0.997 }}
                 className={`relative transform-gpu overflow-hidden rounded-3xl border p-4 shadow-lg transition duration-200 ${
                   golden
                     ? "border-fuchsia-300/40 bg-gradient-to-br from-fuchsia-500/20 via-slate-950/85 to-amber-400/20 shadow-fuchsia-500/10"
@@ -757,8 +684,7 @@ export default function MatchesPredictionBox() {
                 <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
 
                 {golden && (
-                  <motion.div
-                    variants={cardMotion}
+                  <div
                     className="relative mb-4 overflow-hidden rounded-2xl border border-fuchsia-300/40 bg-slate-950/75 shadow-md shadow-fuchsia-950/20"
                   >
                     <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-fuchsia-400 via-amber-300 to-orange-300 px-4 py-2 text-center text-[14px] font-black text-slate-950 md:text-base">
@@ -775,7 +701,7 @@ export default function MatchesPredictionBox() {
                         <span className="rounded-full bg-emerald-300 px-2 py-0.5 font-black text-slate-950">الطريقة +4</span>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )}
 
                 {knockout && (
@@ -882,10 +808,7 @@ export default function MatchesPredictionBox() {
                 </div>
 
                 {editing ? (
-                  <motion.div
-                    variants={sectionMotion}
-                    initial="hidden"
-                    animate="show"
+                  <div
                     className="relative mt-5"
                   >
                     <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100 shadow-md shadow-amber-950/10">
@@ -927,12 +850,9 @@ export default function MatchesPredictionBox() {
                         <span>إلغاء</span>
                       </button>
                     </div>
-                  </motion.div>
+                  </div>
                 ) : savedPrediction ? (
-                  <motion.div
-                    variants={sectionMotion}
-                    initial="hidden"
-                    animate="show"
+                  <div
                     className="relative mt-5 space-y-2"
                   >
                     {isGoldenPrediction(savedPrediction) && (
@@ -1016,7 +936,7 @@ export default function MatchesPredictionBox() {
                         </button>
                       </div>
                     )}
-                  </motion.div>
+                  </div>
                 ) : closed ? (
                   <div className="relative mt-5 rounded-2xl border border-red-400/20 bg-red-500/10 p-3 text-center text-[14px] font-bold text-red-100 shadow-md shadow-red-950/10">
                     <span className="inline-flex items-center justify-center gap-1.5">
@@ -1025,10 +945,7 @@ export default function MatchesPredictionBox() {
                     </span>
                   </div>
                 ) : (
-                  <motion.div
-                    variants={sectionMotion}
-                    initial="hidden"
-                    animate="show"
+                  <div
                     className="relative mt-5"
                   >
                     {renderScoreInputs(match, golden)}
@@ -1070,13 +987,13 @@ export default function MatchesPredictionBox() {
                         </>
                       )}
                     </button>
-                  </motion.div>
+                  </div>
                 )}
-              </motion.article>
+              </article>
             );
           })}
-        </motion.div>
+        </div>
       )}
-    </motion.section>
+    </section>
   );
 }

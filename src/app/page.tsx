@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, type Variants } from "framer-motion";
 import {
   BadgeCheck,
   BookOpen,
@@ -49,31 +48,6 @@ const forgotPasswordMessage = `السلام عليكم، نسيت الرقم ا�
 const forgotPasswordWhatsappUrl = `https://wa.me/966542180200?text=${encodeURIComponent(
   forgotPasswordMessage
 )}`;
-
-const scrollOnceViewport = {
-  once: true,
-  amount: 0.16,
-} as const;
-
-const fadeUpMotion: Variants = {
-  hidden: { opacity: 1, y: 0, scale: 1 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0, ease: "linear" },
-  },
-};
-
-const softPopMotion: Variants = {
-  hidden: { opacity: 1, y: 0, scale: 1 },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0, ease: "linear" },
-  },
-};
 
 function getChallengeStudioBulletinSeenKey(bulletin: {
   id?: string;
@@ -131,11 +105,8 @@ export default function HomePage() {
   }, []);
 
   return (
-    <motion.main
+    <main
       dir="rtl"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
       className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-[15px] text-white antialiased [text-size-adjust:100%]"
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -145,17 +116,14 @@ export default function HomePage() {
       </div>
 
       <ExactPredictionCelebration />
-<PredictionEditNotice />
-<KhaledDabousMarriageNotice />
+      <PredictionEditNotice />
+      <KhaledDabousMarriageNotice />
 
-{isLoggedIn && user && <MemberNoticeRenderer userId={user.id} />}
+      {isLoggedIn && user && <MemberNoticeRenderer userId={user.id} />}
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 shadow-lg shadow-slate-950/25 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">
-          <motion.div
-            variants={softPopMotion}
-            initial="hidden"
-            animate="show"
+          <div
             className="flex min-w-0 items-center gap-2 md:gap-3"
           >
             <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-white/10 shadow-md shadow-cyan-950/20 ring-1 ring-white/10 md:h-12 md:w-12">
@@ -176,12 +144,9 @@ export default function HomePage() {
                 World Cup 2026 Predictions Platform
               </p>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            variants={softPopMotion}
-            initial="hidden"
-            animate="show"
+          <div
             className="flex shrink-0 items-center gap-1.5 md:gap-2"
           >
             {loading ? (
@@ -236,16 +201,12 @@ export default function HomePage() {
                 </button>
               </>
             )}
-          </motion.div>
+          </div>
         </div>
       </header>
 
       <section className="relative z-10 mx-auto max-w-6xl px-3 py-4 md:px-4 md:py-6">
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
+        <div
           className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-white/[0.08] p-4 text-center shadow-xl shadow-slate-950/30 backdrop-blur-md md:rounded-[2rem] md:p-6"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
@@ -302,8 +263,7 @@ export default function HomePage() {
           )}
 
           {isLoggedIn && user && (
-            <motion.div
-              variants={softPopMotion}
+            <div
               className="relative mt-4 rounded-3xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-[14px] font-bold text-emerald-100 shadow-lg shadow-emerald-950/15 md:mt-5 md:p-4 md:text-base"
             >
               <div className="inline-flex items-center justify-center gap-2">
@@ -313,7 +273,7 @@ export default function HomePage() {
                   <strong>{user.points}</strong>
                 </span>
               </div>
-            </motion.div>
+            </div>
           )}
 
           <div className="relative mt-3">
@@ -327,79 +287,50 @@ export default function HomePage() {
               <ChevronLeft className="h-4 w-4 opacity-80 transition group-hover:-translate-x-0.5" />
             </button>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="transform-gpu"
+        <div
+          className=""
         >
           <HomeBanner />
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="mt-4 transform-gpu md:mt-5"
+        <div
+          className="mt-4 md:mt-5"
         >
           <HomeStats />
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="mt-4 transform-gpu md:mt-5"
+        <div
+          className="mt-4 md:mt-5"
         >
           <LatestPredictionsTicker />
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="transform-gpu"
+        <div
+          className=""
         >
           <HomeHighlights />
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="mt-4 transform-gpu md:mt-5"
+        <div
+          className="mt-4 md:mt-5"
         >
           <MatchesPredictionBox />
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="transform-gpu"
+        <div
+          className=""
         >
           <ExactHitsTicker />
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="mt-5 grid transform-gpu grid-cols-1 gap-3 sm:grid-cols-3 md:mt-6"
+        <div
+          className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3 md:mt-6"
         >
-          <motion.button
+          <button
             type="button"
             onClick={() => router.push("/word-game")}
-            whileTap={{ scale: 0.98 }}
             className="group relative min-h-[92px] overflow-hidden rounded-[1.45rem] border border-amber-400/30 bg-slate-950/55 p-3 text-right shadow-lg shadow-slate-950/25 backdrop-blur-sm transition duration-200 hover:border-amber-300/60 hover:bg-amber-400/10"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-300/12 via-transparent to-white/5" />
@@ -432,12 +363,11 @@ export default function HomePage() {
                 <ChevronLeft className="h-4 w-4 transition group-hover:-translate-x-1" />
               </div>
             </div>
-          </motion.button>
+          </button>
 
-          <motion.button
+          <button
             type="button"
             onClick={() => router.push("/flag-memory")}
-            whileTap={{ scale: 0.98 }}
             className="group relative min-h-[92px] overflow-hidden rounded-[1.45rem] border border-emerald-400/30 bg-slate-950/55 p-3 text-right shadow-lg shadow-slate-950/25 backdrop-blur-sm transition duration-200 hover:border-emerald-300/60 hover:bg-emerald-400/10"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/12 via-transparent to-white/5" />
@@ -470,12 +400,11 @@ export default function HomePage() {
                 <ChevronLeft className="h-4 w-4 transition group-hover:-translate-x-1" />
               </div>
             </div>
-          </motion.button>
+          </button>
 
-          <motion.button
+          <button
             type="button"
             onClick={() => router.push("/challenge-studio")}
-            whileTap={{ scale: 0.98 }}
             className="group relative min-h-[92px] overflow-hidden rounded-[1.45rem] border border-cyan-400/30 bg-slate-950/55 p-3 text-right shadow-lg shadow-slate-950/25 backdrop-blur-sm transition duration-200 hover:border-cyan-300/60 hover:bg-cyan-400/10"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cyan-300/12 via-transparent to-white/5" />
@@ -514,37 +443,25 @@ export default function HomePage() {
                 <ChevronLeft className="h-4 w-4 transition group-hover:-translate-x-1" />
               </div>
             </div>
-          </motion.button>
-        </motion.div>
+          </button>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="transform-gpu"
+        <div
+          className=""
         >
           <LeaderboardTable />
-        </motion.div>
+        </div>
 
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="mt-4 flex transform-gpu items-center justify-center"
+        <div
+          className="mt-4 flex items-center justify-center"
         >
           <OnlineMembersCounter />
-        </motion.div>
+        </div>
       </section>
 
       <footer className="relative z-10 mt-6 border-t border-white/10 px-3 py-6 text-center text-xs text-slate-400">
-        <motion.div
-          variants={fadeUpMotion}
-          initial="hidden"
-          whileInView="show"
-          viewport={scrollOnceViewport}
-          className="mx-auto flex max-w-xl transform-gpu flex-col items-center justify-center gap-3 rounded-[1.7rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-lg shadow-slate-950/20 backdrop-blur-sm"
+        <div
+          className="mx-auto flex max-w-xl flex-col items-center justify-center gap-3 rounded-[1.7rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-lg shadow-slate-950/20 backdrop-blur-sm"
         >
           <div className="flex items-center justify-center gap-2 text-slate-300">
             <Copyright className="h-3.5 w-3.5" />
@@ -557,8 +474,8 @@ export default function HomePage() {
             <span>برمجة وتطوير</span>
             <span className="text-white">عبدالسلام العنزي</span>
           </div>
-        </motion.div>
+        </div>
       </footer>
-    </motion.main>
+    </main>
   );
 }
