@@ -49,37 +49,22 @@ const scrollOnceViewport = {
 } as const;
 
 const sectionMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 18,
-    scale: 0.98,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.38,
-      ease: "easeOut",
-      staggerChildren: 0.06,
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
 const cardMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 14,
-    scale: 0.96,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.3,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
@@ -106,24 +91,24 @@ const modalBackdropMotion: Variants = {
 const modalMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 42,
-    scale: 0.98,
+    y: 22,
+    scale: 0.99,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.28,
+      duration: 0.22,
       ease: "easeOut",
     },
   },
   exit: {
     opacity: 0,
-    y: 28,
-    scale: 0.98,
+    y: 16,
+    scale: 0.99,
     transition: {
-      duration: 0.18,
+      duration: 0.14,
       ease: "easeIn",
     },
   },
@@ -674,6 +659,35 @@ export function ExactHitsTicker() {
     );
   }
 
+  function renderEmptyTickerCard(index: number) {
+    return (
+      <div
+        key={`empty-exact-hit-${index}`}
+        dir="rtl"
+        className="group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border border-emerald-300/20 bg-slate-950/70 px-3 py-2 text-xs text-white shadow-md shadow-slate-950/25 backdrop-blur-xl md:px-4 md:text-sm"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-l from-emerald-300/10 via-transparent to-cyan-300/5" />
+
+        <span className="relative inline-flex items-center gap-1 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-0.5 text-[10px] font-black text-emerald-100 md:text-xs">
+          <Target className="h-3 w-3" />
+          <span>بانتظار أول إصابة</span>
+        </span>
+
+        <span className="relative font-black text-emerald-300">
+          جابها صح
+        </span>
+
+        <span className="relative text-slate-300">
+          لم يسجل أحد نتيجة بالملي خلال آخر 24 ساعة
+        </span>
+
+        <span className="relative rounded-xl bg-emerald-400 px-2 py-1 font-black text-slate-950 shadow-inner">
+          قريبًا
+        </span>
+      </div>
+    );
+  }
+
   function renderExactHitListItem(hit: ExactHit) {
     const exactHit = hit as ExactHitWithPredictionType;
     const golden = isGoldenExactHit(exactHit);
@@ -781,16 +795,16 @@ export function ExactHitsTicker() {
               initial="hidden"
               animate="show"
               exit="exit"
-              className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/85 p-3 backdrop-blur-sm md:items-center md:p-4"
+              className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/88 p-0 backdrop-blur-sm md:items-center md:p-4"
               onClick={() => setIsListOpen(false)}
             >
               <motion.div
                 variants={modalMotion}
                 dir="rtl"
-                className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-t-[2rem] border border-emerald-400/30 bg-slate-950 shadow-xl shadow-slate-950/45 md:max-h-[84vh] md:rounded-[2rem]"
+                className="flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-[2rem] border border-emerald-400/30 bg-slate-950 shadow-xl shadow-slate-950/45 md:max-h-[84vh] md:rounded-[2rem]"
                 onClick={(event) => event.stopPropagation()}
               >
-                <div className="relative border-b border-white/10 bg-emerald-400/10 px-4 py-3">
+                <div className="relative shrink-0 border-b border-white/10 bg-emerald-400/10 px-4 py-3">
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/10 via-transparent to-cyan-400/5" />
 
                   <div className="relative mx-auto mb-2 h-1.5 w-12 rounded-full bg-white/20 md:hidden" />
@@ -837,7 +851,7 @@ export function ExactHitsTicker() {
                   variants={sectionMotion}
                   initial="hidden"
                   animate="show"
-                  className="max-h-[62vh] space-y-3 overflow-y-auto p-4 md:max-h-[58vh]"
+                  className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pb-3"
                 >
                   {sortedExactHits.length === 0 ? (
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-sm font-bold text-slate-300">
@@ -847,6 +861,22 @@ export function ExactHitsTicker() {
                     sortedExactHits.map((hit) => renderExactHitListItem(hit))
                   )}
                 </motion.div>
+
+                <div
+                  className="shrink-0 border-t border-white/10 bg-slate-950/95 p-3"
+                  style={{
+                    paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsListOpen(false)}
+                    className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300 active:scale-95"
+                  >
+                    <X className="h-4 w-4" />
+                    <span>إغلاق القائمة</span>
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           )}
@@ -862,20 +892,6 @@ export function ExactHitsTicker() {
           <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-300" />
             <span>جاري تحميل شريط جابها صح...</span>
-          </div>
-        </section>
-        {exactHitsModal}
-      </>
-    );
-  }
-
-  if (exactHits.length === 0) {
-    return (
-      <>
-        <section className="relative mt-5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 shadow-xl shadow-slate-950/25 md:mt-6">
-          <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
-            <Target className="h-4 w-4 text-emerald-300" />
-            <span>لم يسجل أحد نتيجة بالملي خلال آخر 24 ساعة.</span>
           </div>
         </section>
         {exactHitsModal}
@@ -944,15 +960,23 @@ export function ExactHitsTicker() {
               }}
             >
               <div ref={groupRef} className="flex flex-none gap-3">
-                {repeatedHits.map((hit, index) =>
-                  renderExactHitCard(hit, index)
-                )}
+                {exactHits.length === 0
+                  ? Array.from({ length: 8 }).map((_, index) =>
+                      renderEmptyTickerCard(index)
+                    )
+                  : repeatedHits.map((hit, index) =>
+                      renderExactHitCard(hit, index)
+                    )}
               </div>
 
               <div className="flex flex-none gap-3">
-                {repeatedHits.map((hit, index) =>
-                  renderExactHitCard(hit, index + repeatedHits.length)
-                )}
+                {exactHits.length === 0
+                  ? Array.from({ length: 8 }).map((_, index) =>
+                      renderEmptyTickerCard(index + 8)
+                    )
+                  : repeatedHits.map((hit, index) =>
+                      renderExactHitCard(hit, index + repeatedHits.length)
+                    )}
               </div>
             </div>
           </div>

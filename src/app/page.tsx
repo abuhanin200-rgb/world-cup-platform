@@ -56,36 +56,22 @@ const scrollOnceViewport = {
 } as const;
 
 const fadeUpMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 16,
-    scale: 0.99,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.34,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
 const softPopMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 10,
-    scale: 0.98,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.28,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
@@ -276,7 +262,7 @@ export default function HomePage() {
 
           <p className="relative mx-auto max-w-2xl text-[14px] font-medium leading-7 text-slate-200 md:text-base">
             سجّل توقعاتك، تابع نقاطك، وتحدّى أصحابك لمعرفة من يملك أقوى قراءة
-            لنتائج المباريات.
+            لنتائج المباريات
           </p>
 
           {!isLoggedIn && !loading && (

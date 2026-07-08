@@ -310,7 +310,7 @@ export default function HomeStats() {
         </h2>
 
         <p className="mx-auto mt-1 max-w-xl text-[11px] font-medium leading-5 text-slate-300 md:text-sm md:leading-6">
-          أرقام مباشرة تتحدث تلقائيًا مع توقعات الأعضاء واحتساب النتائج.
+          أرقام مباشرة تتحدث تلقائيًا مع توقعات الأعضاء واحتساب النتائج
         </p>
       </div>
 

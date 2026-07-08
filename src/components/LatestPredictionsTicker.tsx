@@ -139,16 +139,16 @@ const sectionMotion: Variants = {
 
 const listItemMotion: Variants = {
   hidden: {
-    opacity: 0,
-    y: 10,
-    scale: 0.98,
+    opacity: 1,
+    y: 0,
+    scale: 1,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.24,
+      duration: 0.08,
       ease: "easeOut",
     },
   },
@@ -177,24 +177,24 @@ const modalBackdropMotion: Variants = {
 const modalMotion: Variants = {
   hidden: {
     opacity: 0,
-    y: 32,
-    scale: 0.99,
+    y: 14,
+    scale: 1,
   },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: 0.24,
+      duration: 0.18,
       ease: "easeOut",
     },
   },
   exit: {
     opacity: 0,
-    y: 22,
-    scale: 0.99,
+    y: 10,
+    scale: 1,
     transition: {
-      duration: 0.16,
+      duration: 0.14,
       ease: "easeIn",
     },
   },
@@ -543,16 +543,16 @@ export default function LatestPredictionsTicker() {
             initial="hidden"
             animate="show"
             exit="exit"
-            className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/88 p-3 backdrop-blur-sm md:items-center md:p-4"
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/88 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-sm md:items-center md:p-4"
             onClick={() => setIsListOpen(false)}
           >
             <motion.div
               variants={modalMotion}
               dir="rtl"
-              className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-t-[2rem] border border-white/10 bg-slate-950 shadow-xl shadow-slate-950/45 md:max-h-[84vh] md:rounded-[2rem]"
+              className="flex max-h-[calc(100svh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[2rem] border border-white/10 bg-slate-950 shadow-xl shadow-slate-950/45 md:max-h-[84vh] md:rounded-[2rem]"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="relative border-b border-white/10 bg-white/[0.06] px-4 py-3">
+              <div className="relative shrink-0 border-b border-white/10 bg-white/[0.06] px-4 py-3">
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
 
                 <div className="relative mx-auto mb-2 h-1.5 w-12 rounded-full bg-white/20 md:hidden" />
@@ -577,7 +577,7 @@ export default function LatestPredictionsTicker() {
                   <button
                     type="button"
                     onClick={() => setIsListOpen(false)}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-white shadow-md shadow-slate-950/15 transition hover:bg-white/20 active:scale-95"
+                    className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white shadow-md shadow-slate-950/15 transition hover:bg-white/20 active:scale-95"
                     aria-label="إغلاق"
                   >
                     <X className="h-5 w-5" />
@@ -623,9 +623,9 @@ export default function LatestPredictionsTicker() {
 
               <motion.div
                 variants={sectionMotion}
-                initial="hidden"
+                initial={false}
                 animate="show"
-                className="max-h-[58vh] space-y-3 overflow-y-auto p-4 md:max-h-[56vh]"
+                className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4"
               >
                 {filteredPredictions.length === 0 ? (
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-[14px] font-bold text-slate-300">
@@ -637,6 +637,17 @@ export default function LatestPredictionsTicker() {
                   )
                 )}
               </motion.div>
+
+              <div className="shrink-0 border-t border-white/10 bg-slate-950/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <button
+                  type="button"
+                  onClick={() => setIsListOpen(false)}
+                  className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-black text-white shadow-md shadow-slate-950/20 transition hover:bg-white/15 active:scale-95"
+                >
+                  <X className="h-4 w-4" />
+                  <span>إغلاق القائمة</span>
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

@@ -38,53 +38,32 @@ const scrollOnceViewport = {
 } as const;
 
 const leaderboardSectionMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 14,
-    scale: 0.99,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.32,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
 const leaderboardRowMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 10,
-    scale: 0.99,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.24,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
 const modalCardMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 12,
-    scale: 0.99,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.24,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
@@ -1833,7 +1812,7 @@ export default function LeaderboardTable() {
           <h2 className="text-[24px] font-black md:text-3xl">لوحة الصدارة</h2>
 
           <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
-            ترتيب جميع الأعضاء حسب النقاط ثم عدد التوقعات الصحيحة.
+            ترتيب جميع الأعضاء حسب النقاط ثم عدد التوقعات الصحيحة
           </p>
 
           <button

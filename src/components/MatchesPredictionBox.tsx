@@ -53,81 +53,44 @@ const scrollOnceViewport = {
 } as const;
 
 const sectionMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 14,
-    scale: 0.99,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.32,
-      ease: "easeOut",
-      staggerChildren: 0.04,
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
 const cardMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 10,
-    scale: 0.98,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.26,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
 const matchCardMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 16,
-    scale: 0.99,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.32,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
 };
 
 const slideDownMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: -8,
-    scale: 0.99,
-  },
+  hidden: { opacity: 1, y: 0, scale: 1 },
   show: {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: {
-      duration: 0.24,
-      ease: "easeOut",
-    },
+    transition: { duration: 0, ease: "linear" },
   },
-  exit: {
-    opacity: 0,
-    y: -6,
-    scale: 0.99,
-    transition: {
-      duration: 0.16,
-      ease: "easeIn",
-    },
-  },
+  exit: { opacity: 1, y: 0, scale: 1, transition: { duration: 0 } },
 };
 
 function formatDate(matchDate: string) {
@@ -728,7 +691,7 @@ export default function MatchesPredictionBox() {
         </h2>
 
         <p className="mx-auto mt-2 max-w-2xl text-[14px] font-medium leading-7 text-slate-200 md:text-base">
-          كل المباريات المضافة تظهر هنا حتى يتم احتسابها من لوحة التحكم.
+          كل المباريات المضافة تظهر هنا حتى يتم احتسابها من لوحة التحكم
         </p>
       </div>
 
@@ -804,7 +767,7 @@ export default function MatchesPredictionBox() {
                     </div>
 
                     <div className="space-y-2 px-4 py-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
-                      <div>فرصة الريمونتادا الكبرى في المراحل الحاسمة.</div>
+                      <div>فرصة الريمونتادا الكبرى في المراحل الحاسمة</div>
                       <div className="flex flex-wrap items-center justify-center gap-1.5">
                         <span className="rounded-full bg-amber-300 px-2 py-0.5 font-black text-slate-950">الملي +10</span>
                         <span className="rounded-full bg-fuchsia-300 px-2 py-0.5 font-black text-slate-950">الفائز +4</span>
