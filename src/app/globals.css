@@ -1,9 +1,19 @@
 @import "tailwindcss";
 
-/* خلفية عامة تمنع ظهور الفراغ الأبيض عند السحب فوق/تحت بالجوال */
-html,
-body {
+:root {
+  background: #020617;
+  color: #ffffff;
+}
+
+html {
   min-height: 100%;
+  background: #020617;
+  scroll-behavior: auto;
+  overscroll-behavior-y: none;
+}
+
+body {
+  min-height: 100dvh;
   margin: 0;
   padding: 0;
   background: #020617;
@@ -24,23 +34,18 @@ body {
     sans-serif;
 }
 
-/* مهم للجوال خصوصًا Safari */
-#__next {
-  min-height: 100%;
+/* خلفية احتياطية للجوال وسفاري */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
   background: #020617;
 }
 
-@supports (-webkit-touch-callout: none) {
-  html,
-  body {
-    background: #020617;
-    overscroll-behavior-y: none;
-  }
-}
-
-/* إلغاء الحركة الناعمة العامة للسكرول لأنها أحيانًا تعطي إحساس تقطيع بالجوال */
-html {
-  scroll-behavior: auto;
+/* Next.js App Router */
+main {
+  background: transparent;
 }
 
 /* تحسين شكل قوائم التمرير */

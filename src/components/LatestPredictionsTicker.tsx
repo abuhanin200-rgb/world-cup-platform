@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion, type Variants } from "framer-motion";
 import {
   ChevronDown,
   Flame,
@@ -119,86 +118,6 @@ function getQualifiedTeamInfo(
     name: prediction.qualifiedTeamCode,
   };
 }
-
-const sectionMotion: Variants = {
-  hidden: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.18,
-      ease: "easeOut",
-    },
-  },
-};
-
-const listItemMotion: Variants = {
-  hidden: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.08,
-      ease: "easeOut",
-    },
-  },
-};
-
-const modalBackdropMotion: Variants = {
-  hidden: {
-    opacity: 0,
-  },
-  show: {
-    opacity: 1,
-    transition: {
-      duration: 0.16,
-      ease: "easeOut",
-    },
-  },
-  exit: {
-    opacity: 0,
-    transition: {
-      duration: 0.14,
-      ease: "easeIn",
-    },
-  },
-};
-
-const modalMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 14,
-    scale: 1,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.18,
-      ease: "easeOut",
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: 10,
-    scale: 1,
-    transition: {
-      duration: 0.14,
-      ease: "easeIn",
-    },
-  },
-};
 
 export default function LatestPredictionsTicker() {
   const [predictions, setPredictions] = useState<LatestPrediction[]>([]);
@@ -441,9 +360,8 @@ export default function LatestPredictionsTicker() {
     );
 
     return (
-      <motion.div
+      <div
         key={prediction.id}
-        variants={listItemMotion}
         className={`relative transform-gpu overflow-hidden rounded-3xl border p-3 shadow-md shadow-slate-950/20 ${
           golden
             ? "border-fuchsia-300/40 bg-gradient-to-br from-amber-400/10 via-fuchsia-500/10 to-violet-500/10"
@@ -529,25 +447,19 @@ export default function LatestPredictionsTicker() {
             )}
           </div>
         )}
-      </motion.div>
+      </div>
     );
   }
 
   const predictionsModal =
     isMounted &&
     createPortal(
-      <AnimatePresence>
-        {isListOpen && (
-          <motion.div
-            variants={modalBackdropMotion}
-            initial="hidden"
-            animate="show"
-            exit="exit"
+      isListOpen ? (
+          <div
             className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/88 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-sm md:items-center md:p-4"
             onClick={() => setIsListOpen(false)}
           >
-            <motion.div
-              variants={modalMotion}
+            <div
               dir="rtl"
               className="flex max-h-[calc(100svh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[2rem] border border-white/10 bg-slate-950 shadow-xl shadow-slate-950/45 md:max-h-[84vh] md:rounded-[2rem]"
               onClick={(event) => event.stopPropagation()}
@@ -621,10 +533,7 @@ export default function LatestPredictionsTicker() {
                 </div>
               </div>
 
-              <motion.div
-                variants={sectionMotion}
-                initial={false}
-                animate="show"
+              <div
                 className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4"
               >
                 {filteredPredictions.length === 0 ? (
@@ -636,7 +545,7 @@ export default function LatestPredictionsTicker() {
                     renderPredictionListItem(prediction),
                   )
                 )}
-              </motion.div>
+              </div>
 
               <div className="shrink-0 border-t border-white/10 bg-slate-950/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
@@ -648,20 +557,16 @@ export default function LatestPredictionsTicker() {
                   <span>إغلاق القائمة</span>
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>,
+            </div>
+          </div>
+      ) : null,
       document.body,
     );
 
   if (loading) {
     return (
       <>
-        <motion.section
-          variants={sectionMotion}
-          initial={false}
-          animate="show"
+        <section
           className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2.25rem]"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
@@ -669,7 +574,7 @@ export default function LatestPredictionsTicker() {
             <span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />
             <span>جاري تحميل آخر التوقعات...</span>
           </div>
-        </motion.section>
+        </section>
         {predictionsModal}
       </>
     );
@@ -678,10 +583,7 @@ export default function LatestPredictionsTicker() {
   if (predictions.length === 0) {
     return (
       <>
-        <motion.section
-          variants={sectionMotion}
-          initial={false}
-          animate="show"
+        <section
           className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem]"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
@@ -704,7 +606,7 @@ export default function LatestPredictionsTicker() {
           <div className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/40 p-4 text-center text-[14px] font-bold text-slate-300">
             لا توجد توقعات غير محسوبة حاليًا.
           </div>
-        </motion.section>
+        </section>
         {predictionsModal}
       </>
     );
@@ -712,10 +614,7 @@ export default function LatestPredictionsTicker() {
 
   return (
     <>
-      <motion.section
-        variants={sectionMotion}
-        initial={false}
-        animate="show"
+      <section
         className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem]"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
@@ -810,7 +709,7 @@ export default function LatestPredictionsTicker() {
             }
           }
         `}</style>
-      </motion.section>
+      </section>
 
       {predictionsModal}
     </>

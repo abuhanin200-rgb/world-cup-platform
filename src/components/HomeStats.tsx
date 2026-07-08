@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { motion, type Variants, useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "framer-motion";
 import {
   BarChart3,
   Flame,
@@ -138,40 +138,6 @@ function CountUpNumber({
   );
 }
 
-const sectionMotion: Variants = {
-  hidden: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.18,
-      ease: "easeOut",
-    },
-  },
-};
-
-const cardMotion: Variants = {
-  hidden: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.16,
-      ease: "easeOut",
-    },
-  },
-};
-
 export default function HomeStats() {
   const [stats, setStats] = useState<HomeStatsData>({
     totalPredictions: 0,
@@ -290,10 +256,7 @@ export default function HomeStats() {
   );
 
   return (
-    <motion.section
-      variants={sectionMotion}
-      initial={false}
-      animate="show"
+    <section
       className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem] md:p-5"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
@@ -316,11 +279,9 @@ export default function HomeStats() {
 
       <div className="relative grid grid-cols-5 gap-1.5 md:gap-3">
         {cards.map((card) => (
-          <motion.div
+          <div
             key={card.titleLines.join("-")}
-            variants={cardMotion}
-            whileTap={{ scale: 0.98 }}
-            className={`group relative flex min-h-[104px] transform-gpu flex-col items-center overflow-hidden rounded-2xl border ${card.borderClass} bg-slate-950/45 px-1 py-2 text-center shadow-md shadow-slate-950/20 backdrop-blur-sm transition duration-200 hover:bg-slate-950/55 md:min-h-[152px] md:rounded-[1.4rem] md:px-3 md:py-4`}
+            className={`group relative flex min-h-[104px] flex-col items-center overflow-hidden rounded-2xl border ${card.borderClass} bg-slate-950/45 px-1 py-2 text-center shadow-md shadow-slate-950/20 backdrop-blur-sm md:min-h-[152px] md:rounded-[1.4rem] md:px-3 md:py-4`}
           >
             <div
               className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${card.glowClass} opacity-80`}
@@ -353,9 +314,9 @@ export default function HomeStats() {
                 loading={loading}
               />
             </div>
-          </motion.div>
+          </div>
         ))}
       </div>
-    </motion.section>
+    </section>
   );
 }
