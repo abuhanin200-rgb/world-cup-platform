@@ -502,6 +502,9 @@ function calculateKnockoutPredictionPoints(params: {
 
   const actualWinnerTeamCode = getOutcomeTeamCode(match, actualOutcome);
 
+  // حالة خاصة في خروج المغلوب:
+  // إذا توقع العضو التعادل واختار المتأهل الصحيح، لكن المباراة انتهت فوزًا مباشرًا،
+  // تُحسب مثل الفائز الصحيح فقط، ولا تُحسب كنقاط متأهل كاملة.
   if (
     prediction.qualifiedTeamCode &&
     actualWinnerTeamCode &&

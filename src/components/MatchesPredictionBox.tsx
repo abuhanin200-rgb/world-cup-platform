@@ -700,6 +700,10 @@ export default function MatchesPredictionBox() {
                         <span className="rounded-full bg-blue-300 px-2 py-0.5 font-black text-slate-950">المتأهل +6</span>
                         <span className="rounded-full bg-emerald-300 px-2 py-0.5 font-black text-slate-950">الطريقة +4</span>
                       </div>
+
+                      <div className="mx-auto mt-2 max-w-md rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[10px] font-bold leading-5 text-amber-100/85 md:text-xs">
+                        حالة خاصة: إذا توقعت تعادلًا واخترت المتأهل الصحيح، والمباراة انتهت فوزًا مباشرًا، تُحسب +4 فقط
+                      </div>
                     </div>
                   </div>
                 )}

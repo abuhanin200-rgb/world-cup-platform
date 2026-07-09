@@ -519,47 +519,87 @@ function getKnockoutPointsBreakdown(prediction: Prediction) {
   const actualHomeScore = normalizeNumberValue(prediction.actualHomeScore);
   const actualAwayScore = normalizeNumberValue(prediction.actualAwayScore);
 
-  const predictionWasDraw =
-    homeScore !== null && awayScore !== null && homeScore === awayScore;
-
-  const actualWasDraw =
-    actualHomeScore !== null &&
-    actualAwayScore !== null &&
-    actualHomeScore === actualAwayScore;
-
   if (
-    !predictionWasDraw ||
-    !actualWasDraw ||
-    !knockoutPrediction.actualQualifiedTeamCode ||
-    !knockoutPrediction.actualQualificationMethod
+    homeScore === null ||
+    awayScore === null ||
+    actualHomeScore === null ||
+    actualAwayScore === null
   ) {
+    return null;
+  }
+
+  const predictionWasDraw = homeScore === awayScore;
+  const actualWasDraw = actualHomeScore === actualAwayScore;
+
+  if (!predictionWasDraw) {
     return null;
   }
 
   const scoreCorrect =
     homeScore === actualHomeScore && awayScore === actualAwayScore;
 
+  const qualifiedTeamCode = getQualifiedTeamCode(
+    prediction,
+    knockoutPrediction.qualifiedTeamCode,
+  );
+
+  const actualQualifiedTeamCode = getQualifiedTeamCode(
+    prediction,
+    knockoutPrediction.actualQualifiedTeamCode,
+  );
+
   const qualifiedTeamCorrect =
-    normalizeTeamCode(knockoutPrediction.qualifiedTeamCode) !== "" &&
-    normalizeTeamCode(knockoutPrediction.qualifiedTeamCode) ===
-      normalizeTeamCode(knockoutPrediction.actualQualifiedTeamCode);
+    qualifiedTeamCode !== "" &&
+    actualQualifiedTeamCode !== "" &&
+    qualifiedTeamCode === actualQualifiedTeamCode;
 
   const qualificationMethodCorrect =
     Boolean(knockoutPrediction.qualificationMethod) &&
     knockoutPrediction.qualificationMethod ===
       knockoutPrediction.actualQualificationMethod;
 
+  if (actualWasDraw) {
+    if (
+      !knockoutPrediction.actualQualifiedTeamCode ||
+      !knockoutPrediction.actualQualificationMethod
+    ) {
+      return null;
+    }
+
+    return {
+      scorePoints: scoreCorrect
+        ? getExactPoints(prediction)
+        : getWinnerPoints(prediction),
+      qualifiedTeamLabel: "المتأهل",
+      qualifiedTeamPoints: qualifiedTeamCorrect
+        ? getQualifiedTeamPoints(prediction)
+        : 0,
+      qualificationMethodPoints: qualificationMethodCorrect
+        ? getQualificationMethodPoints(prediction)
+        : 0,
+    };
+  }
+
+  const homeTeamCode = getPredictionHomeTeamCode(prediction);
+  const awayTeamCode = getPredictionAwayTeamCode(prediction);
+  const actualWinnerTeamCode =
+    actualHomeScore > actualAwayScore ? homeTeamCode : awayTeamCode;
+
+  const qualifiedTeamMatchesDirectWinner =
+    qualifiedTeamCode !== "" &&
+    actualWinnerTeamCode !== "" &&
+    qualifiedTeamCode === actualWinnerTeamCode;
+
+  if (!qualifiedTeamMatchesDirectWinner) {
+    return null;
+  }
+
   return {
-  scorePoints: scoreCorrect
-    ? getExactPoints(prediction)
-    : getWinnerPoints(prediction),
-  qualifiedTeamPoints: qualifiedTeamCorrect
-    ? getQualifiedTeamPoints(prediction)
-    : 0,
-  qualificationMethodPoints: qualificationMethodCorrect
-    ? getQualificationMethodPoints(prediction)
-    : 0,
-};
+    scorePoints: 0,
+    qualifiedTeamLabel: "المتأهل في فوز مباشر",
+    qualifiedTeamPoints: getWinnerPoints(prediction),
+    qualificationMethodPoints: 0,
+  };
 }
 
 function PointsBreakdownItem({
@@ -609,7 +649,7 @@ function PointsBreakdown({ prediction }: { prediction: Prediction }) {
         <PointsBreakdownItem label="النتيجة" points={breakdown.scorePoints} />
 
         <PointsBreakdownItem
-          label="المتأهل"
+          label={breakdown.qualifiedTeamLabel || "المتأهل"}
           points={breakdown.qualifiedTeamPoints}
         />
 
