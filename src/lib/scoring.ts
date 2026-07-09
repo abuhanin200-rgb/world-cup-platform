@@ -65,6 +65,8 @@ type UserStats = {
   bestStreak: number;
 };
 
+type GamePointsByUser = Record<string, number>;
+
 type UserDoc = {
   id: string;
   fullName: string;
@@ -544,6 +546,28 @@ async function getAllUsers(): Promise<UserDoc[]> {
   });
 }
 
+async function getTenSecondsGamePointsByUser(): Promise<GamePointsByUser> {
+  const resultsRef = collection(db, "tenSecondsChallengeDaily");
+  const q = query(resultsRef, where("pointsAwarded", "==", true));
+  const snapshot = await getDocs(q);
+
+  const gamePointsByUser: GamePointsByUser = {};
+
+  snapshot.docs.forEach((docSnap) => {
+    const data = docSnap.data();
+    const userId = String(data.userId || "");
+    const awardedPoints = Number(data.awardedPoints || 0);
+
+    if (!userId || !Number.isFinite(awardedPoints) || awardedPoints <= 0) {
+      return;
+    }
+
+    gamePointsByUser[userId] = (gamePointsByUser[userId] || 0) + awardedPoints;
+  });
+
+  return gamePointsByUser;
+}
+
 async function getAllCalculatedPredictions(): Promise<PredictionDoc[]> {
   const predictionsRef = collection(db, "predictions");
   const q = query(predictionsRef, where("isCalculated", "==", true));
@@ -645,7 +669,8 @@ function mergeCalculatedPredictions(
 
 function buildRankedUsers(
   allUsers: UserDoc[],
-  statsByUser: Record<string, UserStats>
+  statsByUser: Record<string, UserStats>,
+  gamePointsByUser: GamePointsByUser
 ) {
   return allUsers
     .map((user) => {
@@ -658,9 +683,14 @@ function buildRankedUsers(
         bestStreak: 0,
       };
 
+      const gamePoints = gamePointsByUser[user.id] || 0;
+
       return {
         ...user,
         ...stats,
+        predictionPoints: stats.points,
+        gamePoints,
+        points: stats.points + gamePoints,
       };
     })
     .sort((a, b) => {
@@ -788,6 +818,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
 
   const allUsers = await getAllUsers();
   const allCalculatedPredictions = await getAllCalculatedPredictions();
+  const gamePointsByUser = await getTenSecondsGamePointsByUser();
 
   const mergedPredictions = mergeCalculatedPredictions(
     allCalculatedPredictions,
@@ -796,7 +827,11 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
   );
 
   const statsByUser = buildUserStats(mergedPredictions);
-  const rankedUsers = buildRankedUsers(allUsers, statsByUser);
+  const rankedUsers = buildRankedUsers(
+    allUsers,
+    statsByUser,
+    gamePointsByUser
+  );
 
   const batch = writeBatch(db);
   const now = new Date().toISOString();
@@ -910,13 +945,18 @@ export async function undoMatchCalculation(matchId: string) {
 
   const allUsers = await getAllUsers();
   const allCalculatedPredictions = await getAllCalculatedPredictions();
+  const gamePointsByUser = await getTenSecondsGamePointsByUser();
 
   const remainingCalculatedPredictions = allCalculatedPredictions.filter(
     (prediction) => prediction.matchId !== matchId
   );
 
   const statsByUser = buildUserStats(remainingCalculatedPredictions);
-  const rankedUsers = buildRankedUsers(allUsers, statsByUser);
+  const rankedUsers = buildRankedUsers(
+    allUsers,
+    statsByUser,
+    gamePointsByUser
+  );
 
   const batch = writeBatch(db);
   const now = new Date().toISOString();
