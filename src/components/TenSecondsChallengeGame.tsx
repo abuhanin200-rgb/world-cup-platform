@@ -387,7 +387,18 @@ export default function TenSecondsChallengeGame() {
           mapRealtimeResult(docSnap.id, docSnap.data())
         );
 
-        setLeaderboard(sortTenSecondsResults(results).slice(0, 30));
+        const sortedResults = sortTenSecondsResults(results).slice(0, 30);
+
+        setLeaderboard((current) => {
+          const currentSignature = current
+            .map((item) => `${item.id}-${item.bestDiffMs}-${item.attemptsCount}-${item.won}`)
+            .join("|");
+          const nextSignature = sortedResults
+            .map((item) => `${item.id}-${item.bestDiffMs}-${item.attemptsCount}-${item.won}`)
+            .join("|");
+
+          return currentSignature === nextSignature ? current : sortedResults;
+        });
       },
       (error) => {
         console.error("Ten seconds realtime leaderboard error:", error);
@@ -510,6 +521,11 @@ export default function TenSecondsChallengeGame() {
 
       setTodayResult(result);
 
+      setLeaderboard((current) => {
+        const filtered = current.filter((item) => item.userId !== result.userId);
+
+        return sortTenSecondsResults([...filtered, result]).slice(0, 30);
+      });
 
       setStatus("finished");
     } catch (error) {

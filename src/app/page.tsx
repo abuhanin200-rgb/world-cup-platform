@@ -32,6 +32,7 @@ import OnlineMembersCounter from "@/components/OnlineMembersCounter";
 import PredictionEditNotice from "../components/PredictionEditNotice";
 import KhaledDabousMarriageNotice from "@/components/KhaledDabousMarriageNotice";
 import MemberNoticeRenderer from "@/components/MemberNoticeRenderer";
+import TenSecondsChallengeNotice from "@/components/TenSecondsChallengeNotice";
 import { getPublishedChallengeStudioBulletins } from "@/lib/challengeStudio";
 
 const CHALLENGE_STUDIO_LAST_SEEN_KEY = "challengeStudioLastSeenBulletin";
@@ -121,6 +122,8 @@ export default function HomePage() {
       <KhaledDabousMarriageNotice />
 
       {isLoggedIn && user && <MemberNoticeRenderer userId={user.id} />}
+
+      <TenSecondsChallengeNotice isLoggedIn={isLoggedIn} />
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 shadow-lg shadow-slate-950/25 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-3 py-3 md:px-4 md:py-4">
