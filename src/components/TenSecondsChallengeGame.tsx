@@ -17,15 +17,18 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { db } from "@/lib/firebase";
 import {
   DEFAULT_TEN_SECONDS_SETTINGS,
   formatTenSecondsTime,
-  getTenSecondsDailyLeaderboard,
+  getMakkahDateKey,
   getTenSecondsSettings,
   getTodayTenSecondsResult,
   saveTenSecondsAttempt,
   sortTenSecondsResults,
+  type TenSecondsAttempt,
   type TenSecondsDailyResult,
   type TenSecondsSettings,
 } from "@/lib/tenSecondsChallenge";
@@ -237,6 +240,61 @@ function StatCard({
   );
 }
 
+function toNumber(value: unknown) {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function toNullableNumber(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function mapAttempt(value: unknown): TenSecondsAttempt | null {
+  if (!value || typeof value !== "object") return null;
+
+  const data = value as Record<string, unknown>;
+
+  return {
+    attemptNumber: toNumber(data.attemptNumber),
+    elapsedMs: toNumber(data.elapsedMs),
+    diffMs: toNumber(data.diffMs),
+    displayTime: String(data.displayTime || ""),
+    won: Boolean(data.won),
+    createdAt: String(data.createdAt || ""),
+  };
+}
+
+function mapRealtimeResult(
+  id: string,
+  data: Record<string, unknown>
+): TenSecondsDailyResult {
+  const attempts = Array.isArray(data.attempts)
+    ? data.attempts
+        .map((attempt) => mapAttempt(attempt))
+        .filter((attempt): attempt is TenSecondsAttempt => Boolean(attempt))
+    : [];
+
+  return {
+    id,
+    userId: String(data.userId || ""),
+    userName: String(data.userName || ""),
+    dateKey: String(data.dateKey || ""),
+    attemptsCount: toNumber(data.attemptsCount),
+    attempts,
+    bestElapsedMs: toNullableNumber(data.bestElapsedMs),
+    bestDiffMs: toNullableNumber(data.bestDiffMs),
+    bestDisplayTime: String(data.bestDisplayTime || ""),
+    won: Boolean(data.won),
+    pointsAwarded: Boolean(data.pointsAwarded),
+    awardedPoints: toNumber(data.awardedPoints),
+    createdAt: data.createdAt,
+    updatedAt: data.updatedAt,
+  };
+}
+
 export default function TenSecondsChallengeGame() {
   const { user, loading, isLoggedIn, refreshUser } = useAuth();
 
@@ -299,13 +357,6 @@ export default function TenSecondsChallengeGame() {
         setTodayResult(null);
       }
 
-      try {
-        const leaders = await getTenSecondsDailyLeaderboard(30);
-        setLeaderboard(leaders);
-      } catch (leaderboardError) {
-        console.error("Load ten seconds leaderboard error:", leaderboardError);
-        setLeaderboard([]);
-      }
     } catch (error) {
       console.error("Load ten seconds challenge data error:", error);
       setMessage(getFriendlyErrorMessage(error));
@@ -319,6 +370,32 @@ export default function TenSecondsChallengeGame() {
     loadGameData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, userId]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    const dateKey = getMakkahDateKey();
+    const resultsQuery = query(
+      collection(db, "tenSecondsChallengeDaily"),
+      where("dateKey", "==", dateKey)
+    );
+
+    const unsubscribe = onSnapshot(
+      resultsQuery,
+      (snapshot) => {
+        const results = snapshot.docs.map((docSnap) =>
+          mapRealtimeResult(docSnap.id, docSnap.data())
+        );
+
+        setLeaderboard(sortTenSecondsResults(results).slice(0, 30));
+      },
+      (error) => {
+        console.error("Ten seconds realtime leaderboard error:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [loading]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -433,12 +510,6 @@ export default function TenSecondsChallengeGame() {
 
       setTodayResult(result);
 
-      try {
-        const leaders = await getTenSecondsDailyLeaderboard(30);
-        setLeaderboard(leaders);
-      } catch (leaderboardError) {
-        console.error("Refresh ten seconds leaderboard error:", leaderboardError);
-      }
 
       setStatus("finished");
     } catch (error) {

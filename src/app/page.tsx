@@ -108,7 +108,7 @@ export default function HomePage() {
   return (
     <main
       dir="rtl"
-      className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-[15px] text-white antialiased [text-size-adjust:100%]"
+      className="relative min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-[15px] text-white antialiased [text-size-adjust:100%]"
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -right-24 top-16 h-64 w-64 rounded-full bg-cyan-400/10 blur-2xl" />
