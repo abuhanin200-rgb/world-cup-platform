@@ -3,8 +3,9 @@
 import { useState } from "react";
 import AdminWordGamePanel from "@/components/AdminWordGamePanel";
 import AdminFlagMemoryPanel from "@/components/AdminFlagMemoryPanel";
+import AdminTenSecondsChallengePanel from "./AdminTenSecondsChallengePanel";
 
-type GamesAdminTab = "wordGame" | "flagMemory";
+type GamesAdminTab = "wordGame" | "flagMemory" | "tenSeconds";
 
 export default function AdminGamesPanel() {
   const [activeGameTab, setActiveGameTab] =
@@ -45,12 +46,26 @@ export default function AdminGamesPanel() {
           >
             🎌 تحدي الأعلام
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveGameTab("tenSeconds")}
+            className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+              activeGameTab === "tenSeconds"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            ⏱️ تحدي العشر ثواني
+          </button>
         </div>
       </div>
 
       {activeGameTab === "wordGame" && <AdminWordGamePanel />}
 
       {activeGameTab === "flagMemory" && <AdminFlagMemoryPanel />}
+
+      {activeGameTab === "tenSeconds" && <AdminTenSecondsChallengePanel />}
     </section>
   );
 }

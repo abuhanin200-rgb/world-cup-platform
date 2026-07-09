@@ -14,6 +14,7 @@ import {
   Mic2,
   ShieldCheck,
   Sparkles,
+  Timer,
   Trophy,
   UserCircle,
   UserPlus,
@@ -326,7 +327,7 @@ export default function HomePage() {
         </div>
 
         <div
-          className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3 md:mt-6"
+          className="mt-5 grid grid-cols-2 gap-3 md:mt-6 md:grid-cols-4"
         >
           <button
             type="button"
@@ -397,6 +398,43 @@ export default function HomePage() {
 
               <div className="flex items-center justify-between gap-2 text-[11px] font-black text-emerald-200">
                 <span>ادخل التحدي</span>
+                <ChevronLeft className="h-4 w-4 transition group-hover:-translate-x-1" />
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/ten-seconds-challenge")}
+            className="group relative min-h-[92px] overflow-hidden rounded-[1.45rem] border border-violet-400/30 bg-slate-950/55 p-3 text-right shadow-lg shadow-slate-950/25 backdrop-blur-sm transition duration-200 hover:border-violet-300/60 hover:bg-violet-400/10"
+          >
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-300/12 via-transparent to-white/5" />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-violet-300/15 blur-2xl transition duration-300 group-hover:scale-110" />
+            <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-violet-200/50 to-transparent" />
+
+            <div className="relative flex h-full flex-col justify-between gap-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-violet-300/30 bg-violet-300/15 text-violet-100 shadow-md shadow-violet-950/15 transition duration-200 group-hover:-translate-y-0.5">
+                  <Timer className="h-5 w-5" />
+                </div>
+
+                <span className="rounded-full border border-violet-300/25 bg-violet-300/10 px-2.5 py-1 text-[10px] font-black text-violet-100">
+                  10 ثواني
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-base font-black text-white md:text-lg">
+                  تحدي العشر ثواني
+                </h3>
+
+                <p className="mt-0.5 text-[11px] font-bold leading-5 text-violet-50/90">
+                  أوقف المؤقت عند 00:10.000.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 text-[11px] font-black text-violet-200">
+                <span>جرّب التحدي</span>
                 <ChevronLeft className="h-4 w-4 transition group-hover:-translate-x-1" />
               </div>
             </div>
