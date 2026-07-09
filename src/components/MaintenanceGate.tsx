@@ -186,7 +186,7 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
             variants={itemMotion}
             className="relative text-2xl font-black leading-snug"
           >
-            جاري تحميل المنصة...
+             اللهم صل وسلم على نبينا محمد
           </motion.h1>
 
           <motion.p

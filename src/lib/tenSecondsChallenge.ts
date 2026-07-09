@@ -368,14 +368,22 @@ export async function saveTenSecondsAttempt(
         userId,
         userName,
         dateKey,
-        attemptsCount: won ? 0 : 1,
+
+        // مهم:
+        // المحاولة الخاطئة فقط تُستهلك.
+        // الفوز لا يستهلك محاولة، لكنه يوقف لعب اليوم عبر won=true.
+        attemptsCount: won ? 0 : firstAttempt.attemptNumber,
+
         attempts: [firstAttempt],
+
         bestElapsedMs: elapsedMs,
         bestDiffMs: diffMs,
         bestDisplayTime: displayTime,
+
         won,
         pointsAwarded: won,
         awardedPoints: won ? settings.awardedPoints : 0,
+
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -421,14 +429,22 @@ export async function saveTenSecondsAttempt(
 
     transaction.update(resultRef, {
       userName,
-      attemptsCount: won ? current.attemptsCount : current.attemptsCount + 1,
+
+      // مهم:
+      // نربط عدد المحاولات الخاطئة برقم المحاولة الحالي بدل +1 اليدوية.
+      // هذا يمنع تصفير أو عدم تطابق العد بعد تحديث الصفحة.
+      attemptsCount: won ? current.attemptsCount : attemptNumber,
+
       attempts: arrayUnion(nextAttempt),
+
       bestElapsedMs: shouldUpdateBest ? elapsedMs : current.bestElapsedMs,
       bestDiffMs: shouldUpdateBest ? diffMs : current.bestDiffMs,
       bestDisplayTime: shouldUpdateBest ? displayTime : current.bestDisplayTime,
+
       won,
       pointsAwarded: won ? true : current.pointsAwarded,
       awardedPoints: won ? settings.awardedPoints : current.awardedPoints || 0,
+
       updatedAt: serverTimestamp(),
     });
 
