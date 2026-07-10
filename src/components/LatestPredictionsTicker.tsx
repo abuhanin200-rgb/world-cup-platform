@@ -367,7 +367,7 @@ export default function LatestPredictionsTicker() {
       <div
         key={`${prediction.id}-${index}`}
         dir="rtl"
-        className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden rounded-2xl border px-3 py-2 text-[12px] shadow-md shadow-slate-950/20 backdrop-blur-sm transition duration-200 md:px-4 md:text-sm ${
+        className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden rounded-2xl border px-3 py-2 text-[12px] shadow-md shadow-slate-950/20 md:px-4 md:text-sm ${
           golden
             ? "border-fuchsia-300/40 bg-gradient-to-l from-amber-400/18 via-fuchsia-500/14 to-violet-500/14 text-white"
             : "border-white/10 bg-white/10 text-white"
@@ -658,18 +658,15 @@ export default function LatestPredictionsTicker() {
   if (loading) {
     return (
       <>
-        <motion.section
-          variants={sectionMotion}
-          initial={false}
-          animate="show"
-          className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2.25rem]"
+        <section
+          className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2.25rem]"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
           <div className="relative flex items-center justify-center gap-2 text-center text-[14px] font-bold text-slate-300">
             <span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />
             <span>جاري تحميل آخر التوقعات...</span>
           </div>
-        </motion.section>
+        </section>
         {predictionsModal}
       </>
     );
@@ -678,11 +675,8 @@ export default function LatestPredictionsTicker() {
   if (predictions.length === 0) {
     return (
       <>
-        <motion.section
-          variants={sectionMotion}
-          initial={false}
-          animate="show"
-          className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem]"
+        <section
+          className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2rem]"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
 
@@ -704,7 +698,7 @@ export default function LatestPredictionsTicker() {
           <div className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/40 p-4 text-center text-[14px] font-bold text-slate-300">
             لا توجد توقعات غير محسوبة حاليًا.
           </div>
-        </motion.section>
+        </section>
         {predictionsModal}
       </>
     );
@@ -712,11 +706,8 @@ export default function LatestPredictionsTicker() {
 
   return (
     <>
-      <motion.section
-        variants={sectionMotion}
-        initial={false}
-        animate="show"
-        className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem]"
+      <section
+        className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2rem]"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
         <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-orange-300/10 blur-2xl" />
@@ -754,9 +745,6 @@ export default function LatestPredictionsTicker() {
             className="latest-predictions-wrapper relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-slate-950/65 py-3 shadow-inner"
             onMouseEnter={pauseTicker}
             onMouseLeave={resumeTicker}
-            onTouchStart={pauseTicker}
-            onTouchEnd={resumeTicker}
-            onTouchCancel={resumeTicker}
             onPointerDown={pauseTicker}
             onPointerUp={resumeTicker}
             onPointerCancel={resumeTicker}
@@ -765,7 +753,7 @@ export default function LatestPredictionsTicker() {
             <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 rounded-r-[1.65rem] bg-gradient-to-l from-slate-950/90 to-transparent" />
 
             <div
-              className="latest-predictions-marquee flex w-max transform-gpu gap-3 whitespace-nowrap"
+              className="latest-predictions-marquee flex w-max gap-3 whitespace-nowrap"
               style={{
                 animationDuration: `${duration}s`,
                 animationPlayState: isPaused ? "paused" : "running",
@@ -787,11 +775,20 @@ export default function LatestPredictionsTicker() {
         </div>
 
         <style jsx>{`
+          .latest-predictions-wrapper {
+            isolation: isolate;
+            contain: layout paint;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+          }
+
           .latest-predictions-marquee {
             animation-name: latestPredictionsTicker;
             animation-timing-function: linear;
             animation-iteration-count: infinite;
             will-change: transform;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
           }
 
           .latest-predictions-wrapper:hover .latest-predictions-marquee,
@@ -802,15 +799,15 @@ export default function LatestPredictionsTicker() {
 
           @keyframes latestPredictionsTicker {
             0% {
-              transform: translateX(-50%);
+              transform: translate3d(-50%, 0, 0);
             }
 
             100% {
-              transform: translateX(0%);
+              transform: translate3d(0, 0, 0);
             }
           }
         `}</style>
-      </motion.section>
+      </section>
 
       {predictionsModal}
     </>

@@ -1,14 +1,19 @@
 @import "tailwindcss";
 
-/* خلفية عامة تمنع ظهور الفراغ الأبيض عند السحب فوق/تحت بالجوال */
+/*
+  الخلفية الأساسية للصفحة.
+  تثبيت اللون على html و body يمنع ظهور ومضة أو فراغ بلون مختلف
+  عند السحب أعلى وأسفل الصفحة في Safari على iPhone.
+*/
 html,
 body {
   min-height: 100%;
   margin: 0;
   padding: 0;
-  background: #020617;
+  background-color: #020617;
   color: #ffffff;
   overflow-x: hidden;
+  overscroll-behavior-x: none;
   overscroll-behavior-y: none;
   font-family:
     system-ui,
@@ -24,23 +29,46 @@ body {
     sans-serif;
 }
 
-/* مهم للجوال خصوصًا Safari */
-#__next {
-  min-height: 100%;
+html {
+  background: #020617;
+  scroll-behavior: auto;
+}
+
+body {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
   background: #020617;
 }
 
-@supports (-webkit-touch-callout: none) {
-  html,
-  body {
-    background: #020617;
-    overscroll-behavior-y: none;
-  }
+/* دعم المشاريع التي تستخدم حاوية Next.js التقليدية */
+#__next {
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
+  background: #020617;
+  isolation: isolate;
 }
 
-/* إلغاء الحركة الناعمة العامة للسكرول لأنها أحيانًا تعطي إحساس تقطيع بالجوال */
-html {
-  scroll-behavior: auto;
+/* تحسين خاص بـ Safari على أجهزة Apple */
+@supports (-webkit-touch-callout: none) {
+  html {
+    min-height: 100%;
+    background: #020617;
+  }
+
+  body {
+    min-height: 100svh;
+    background: #020617;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #__next {
+    min-height: 100svh;
+    background: #020617;
+  }
 }
 
 /* تحسين شكل قوائم التمرير */
@@ -73,18 +101,20 @@ html {
   scrollbar-width: none;
 }
 
-/* حركة عامة للماركي القديم إن كان مستخدم في مكان ثاني */
+/* حركة عامة للماركي القديم إن كان مستخدمًا في مكان آخر */
 @keyframes marquee {
   0% {
-    transform: translateX(100%);
+    transform: translate3d(100%, 0, 0);
   }
 
   100% {
-    transform: translateX(-100%);
+    transform: translate3d(-100%, 0, 0);
   }
 }
 
 .animate-marquee {
   animation: marquee 25s linear infinite;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   will-change: transform;
 }
