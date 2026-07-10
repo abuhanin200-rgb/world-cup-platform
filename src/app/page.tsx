@@ -112,9 +112,9 @@ export default function HomePage() {
       className="relative min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-[15px] text-white antialiased [text-size-adjust:100%]"
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden [contain:paint]">
-        <div className="absolute -right-24 top-16 h-64 w-64 rounded-full bg-cyan-400/[0.06]" />
-        <div className="absolute -left-24 top-80 h-72 w-72 rounded-full bg-amber-400/[0.06]" />
-        <div className="absolute bottom-20 right-1/2 h-72 w-72 translate-x-1/2 rounded-full bg-blue-500/[0.06]" />
+        <div className="absolute -right-24 top-16 h-64 w-64 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(34,211,238,0.16) 0%, rgba(34,211,238,0.08) 38%, rgba(34,211,238,0.025) 62%, transparent 82%)" }} />
+        <div className="absolute -left-24 top-80 h-72 w-72 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(251,191,36,0.15) 0%, rgba(251,191,36,0.075) 38%, rgba(251,191,36,0.025) 62%, transparent 82%)" }} />
+        <div className="absolute bottom-20 right-1/2 h-72 w-72 translate-x-1/2 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(59,130,246,0.14) 0%, rgba(59,130,246,0.07) 38%, rgba(59,130,246,0.022) 62%, transparent 82%)" }} />
       </div>
 
       <ExactPredictionCelebration />
@@ -214,7 +214,7 @@ export default function HomePage() {
           className="relative overflow-hidden rounded-[1.8rem] border border-white/10 bg-slate-900/70 p-4 text-center shadow-xl shadow-slate-950/30 md:rounded-[2rem] md:p-6"
         >
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-          <div className="pointer-events-none absolute -top-20 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full bg-amber-300/[0.06]" />
+          <div className="pointer-events-none absolute -top-20 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(252,211,77,0.16) 0%, rgba(252,211,77,0.08) 38%, rgba(252,211,77,0.025) 62%, transparent 82%)" }} />
 
           <div className="relative mx-auto mb-3 inline-flex items-center justify-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1.5 text-[11px] font-black text-amber-100 shadow-md shadow-amber-950/20 md:text-xs">
             <Sparkles className="h-3.5 w-3.5" />
@@ -338,7 +338,7 @@ export default function HomePage() {
             className="group relative min-h-[92px] overflow-hidden rounded-[1.45rem] border border-amber-400/30 bg-slate-950/55 p-3 text-right shadow-lg shadow-slate-950/25 transition duration-200 hover:border-amber-300/60 hover:bg-amber-400/10"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-300/12 via-transparent to-white/5" />
-            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-amber-300/15 transition duration-300 group-hover:scale-110" />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full transition duration-300 group-hover:scale-110" style={{ background: "radial-gradient(circle at center, rgba(252,211,77,0.24) 0%, rgba(252,211,77,0.12) 38%, rgba(252,211,77,0.035) 62%, transparent 82%)" }} />
             <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/50 to-transparent" />
 
             <div className="relative flex h-full flex-col justify-between gap-2">
@@ -375,7 +375,7 @@ export default function HomePage() {
             className="group relative min-h-[92px] overflow-hidden rounded-[1.45rem] border border-emerald-400/30 bg-slate-950/55 p-3 text-right shadow-lg shadow-slate-950/25 transition duration-200 hover:border-emerald-300/60 hover:bg-emerald-400/10"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/12 via-transparent to-white/5" />
-            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-emerald-300/15 transition duration-300 group-hover:scale-110" />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full transition duration-300 group-hover:scale-110" style={{ background: "radial-gradient(circle at center, rgba(110,231,183,0.24) 0%, rgba(110,231,183,0.12) 38%, rgba(110,231,183,0.035) 62%, transparent 82%)" }} />
             <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-emerald-200/50 to-transparent" />
 
             <div className="relative flex h-full flex-col justify-between gap-2">
@@ -412,7 +412,7 @@ export default function HomePage() {
             className="group relative min-h-[92px] overflow-hidden rounded-[1.45rem] border border-violet-400/30 bg-slate-950/55 p-3 text-right shadow-lg shadow-slate-950/25 transition duration-200 hover:border-violet-300/60 hover:bg-violet-400/10"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-violet-300/12 via-transparent to-white/5" />
-            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-violet-300/15 transition duration-300 group-hover:scale-110" />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full transition duration-300 group-hover:scale-110" style={{ background: "radial-gradient(circle at center, rgba(196,181,253,0.24) 0%, rgba(196,181,253,0.12) 38%, rgba(196,181,253,0.035) 62%, transparent 82%)" }} />
             <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-violet-200/50 to-transparent" />
 
             <div className="relative flex h-full flex-col justify-between gap-2">
@@ -449,7 +449,7 @@ export default function HomePage() {
             className="group relative min-h-[92px] overflow-hidden rounded-[1.45rem] border border-cyan-400/30 bg-slate-950/55 p-3 text-right shadow-lg shadow-slate-950/25 transition duration-200 hover:border-cyan-300/60 hover:bg-cyan-400/10"
           >
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-cyan-300/12 via-transparent to-white/5" />
-            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full bg-cyan-300/15 transition duration-300 group-hover:scale-110" />
+            <div className="pointer-events-none absolute -right-10 -top-10 h-20 w-20 rounded-full transition duration-300 group-hover:scale-110" style={{ background: "radial-gradient(circle at center, rgba(103,232,249,0.24) 0%, rgba(103,232,249,0.12) 38%, rgba(103,232,249,0.035) 62%, transparent 82%)" }} />
             <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/50 to-transparent" />
 
             {hasUnreadChallengeStudio && (

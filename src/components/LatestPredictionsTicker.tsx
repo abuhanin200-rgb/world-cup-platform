@@ -710,8 +710,8 @@ export default function LatestPredictionsTicker() {
         className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2rem]"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-orange-300/10 blur-2xl" />
-        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(253,186,116,0.18) 0%, rgba(253,186,116,0.085) 38%, rgba(253,186,116,0.024) 62%, transparent 82%)" }} />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(103,232,249,0.18) 0%, rgba(103,232,249,0.085) 38%, rgba(103,232,249,0.024) 62%, transparent 82%)" }} />
 
         <div className="relative">
           <div className="relative mb-3 flex items-center justify-between gap-3">

@@ -612,8 +612,8 @@ export default function MatchesPredictionBox() {
       className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/85 p-4 text-white shadow-lg shadow-slate-950/25 md:p-5 [contain:layout_paint] [isolation:isolate]"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 top-16 h-44 w-44 rounded-full bg-amber-300/[0.04]" />
-      <div className="pointer-events-none absolute -left-20 bottom-20 h-44 w-44 rounded-full bg-cyan-300/[0.04]" />
+      <div className="pointer-events-none absolute -right-20 top-16 h-44 w-44 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(252,211,77,0.16) 0%, rgba(252,211,77,0.075) 38%, rgba(252,211,77,0.02) 62%, transparent 82%)" }} />
+      <div className="pointer-events-none absolute -left-20 bottom-20 h-44 w-44 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(103,232,249,0.16) 0%, rgba(103,232,249,0.075) 38%, rgba(103,232,249,0.02) 62%, transparent 82%)" }} />
 
       <div className="relative mb-4 text-center">
         <div className="mx-auto mb-2 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/15">

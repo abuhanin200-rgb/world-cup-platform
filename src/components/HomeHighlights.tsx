@@ -363,8 +363,8 @@ export default function HomeHighlights() {
   return (
     <section className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 md:mt-5 md:rounded-[2rem] md:p-4">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-amber-300/[0.05]" />
-      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/[0.05]" />
+      <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(252,211,77,0.17) 0%, rgba(252,211,77,0.08) 38%, rgba(252,211,77,0.022) 62%, transparent 82%)" }} />
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(103,232,249,0.17) 0%, rgba(103,232,249,0.08) 38%, rgba(103,232,249,0.022) 62%, transparent 82%)" }} />
 
       <div className="relative mb-3 text-center">
         <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/20">
@@ -874,8 +874,8 @@ export function ExactHitsTicker() {
     <>
       <section className="relative mt-5 overflow-hidden rounded-[1.65rem] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 shadow-md shadow-slate-950/25 md:mt-6">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/10 via-transparent to-cyan-300/5" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-emerald-300/[0.05]" />
-        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/[0.05]" />
+        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(110,231,183,0.17) 0%, rgba(110,231,183,0.08) 38%, rgba(110,231,183,0.022) 62%, transparent 82%)" }} />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(103,232,249,0.17) 0%, rgba(103,232,249,0.08) 38%, rgba(103,232,249,0.022) 62%, transparent 82%)" }} />
 
         <div className="relative">
           <div className="mb-2 flex items-center justify-between gap-3">
