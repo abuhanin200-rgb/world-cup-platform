@@ -609,11 +609,11 @@ export default function MatchesPredictionBox() {
 
   return (
     <section
-      className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.08] p-4 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-5"
+      className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/85 p-4 text-white shadow-lg shadow-slate-950/25 md:p-5 [contain:layout_paint] [isolation:isolate]"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 top-16 h-44 w-44 rounded-full bg-amber-300/10 blur-2xl" />
-      <div className="pointer-events-none absolute -left-20 bottom-20 h-44 w-44 rounded-full bg-cyan-300/10 blur-2xl" />
+      <div className="pointer-events-none absolute -right-20 top-16 h-44 w-44 rounded-full bg-amber-300/[0.04]" />
+      <div className="pointer-events-none absolute -left-20 bottom-20 h-44 w-44 rounded-full bg-cyan-300/[0.04]" />
 
       <div className="relative mb-4 text-center">
         <div className="mx-auto mb-2 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/15">
@@ -667,7 +667,7 @@ export default function MatchesPredictionBox() {
             return (
               <article
                 key={match.id}
-                className={`relative transform-gpu overflow-hidden rounded-3xl border p-4 shadow-lg transition duration-200 ${
+                className={`relative overflow-hidden rounded-3xl border p-4 shadow-lg transition duration-200 [backface-visibility:hidden] ${
                   golden
                     ? "border-fuchsia-300/40 bg-gradient-to-br from-fuchsia-500/20 via-slate-950/85 to-amber-400/20 shadow-fuchsia-500/10"
                     : "border-white/10 bg-slate-950/60 shadow-slate-950/20"

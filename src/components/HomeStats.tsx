@@ -257,11 +257,11 @@ export default function HomeStats() {
 
   return (
     <section
-      className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:rounded-[2rem] md:p-5"
+      className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-slate-900/85 p-3 text-white shadow-lg shadow-slate-950/25 md:rounded-[2rem] md:p-5 [contain:layout_paint] [isolation:isolate]"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
-      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
+      <div className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-cyan-300/[0.04]" />
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-amber-300/[0.04]" />
 
       <div className="relative mb-3 text-center md:mb-4">
         <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-300/25 bg-sky-300/10 text-sky-100 shadow-md shadow-sky-950/15">
@@ -281,7 +281,7 @@ export default function HomeStats() {
         {cards.map((card) => (
           <div
             key={card.titleLines.join("-")}
-            className={`group relative flex min-h-[104px] flex-col items-center overflow-hidden rounded-2xl border ${card.borderClass} bg-slate-950/45 px-1 py-2 text-center shadow-md shadow-slate-950/20 backdrop-blur-sm md:min-h-[152px] md:rounded-[1.4rem] md:px-3 md:py-4`}
+            className={`group relative flex min-h-[104px] flex-col items-center overflow-hidden rounded-2xl border ${card.borderClass} bg-slate-950/70 px-1 py-2 text-center shadow-md shadow-slate-950/20 [backface-visibility:hidden] md:min-h-[152px] md:rounded-[1.4rem] md:px-3 md:py-4`}
           >
             <div
               className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${card.glowClass} opacity-80`}

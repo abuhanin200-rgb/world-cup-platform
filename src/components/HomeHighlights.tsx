@@ -10,8 +10,6 @@ import {
   Gauge,
   PauseCircle,
   Rocket,
-  Sparkles,
-  Star,
   Target,
   Trophy,
   X,
@@ -42,11 +40,6 @@ type QualifiedTeamInfo = {
   emoji?: string;
   name: string;
 };
-
-const scrollOnceViewport = {
-  once: true,
-  amount: 0.16,
-} as const;
 
 const sectionMotion: Variants = {
   hidden: { opacity: 1, y: 0, scale: 1 },
@@ -116,12 +109,7 @@ const modalMotion: Variants = {
 
 function EmptyCard({ title, text }: { title: string; text: string }) {
   return (
-    <motion.div
-      initial={false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      whileTap={{ scale: 0.98 }}
-      className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-3"
-    >
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-md shadow-slate-950/20 md:p-3">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-300/5" />
 
       <div className="relative text-[11px] font-black leading-5 text-slate-200 md:text-sm">
@@ -131,7 +119,7 @@ function EmptyCard({ title, text }: { title: string; text: string }) {
       <p className="relative mt-1 text-[9px] leading-4 text-slate-300 md:text-xs">
         {text}
       </p>
-    </motion.div>
+    </div>
   );
 }
 
@@ -159,12 +147,7 @@ function HighlightCard({
     userWithTeamCode.favoriteTeamCode || userWithTeamCode.teamCode;
 
   return (
-    <motion.div
-      initial={false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      whileTap={{ scale: 0.98 }}
-      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-md shadow-slate-950/20 backdrop-blur-sm transition duration-200 hover:bg-white/[0.11] md:p-3"
-    >
+    <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-2 text-center shadow-md shadow-slate-950/20 transition duration-200 hover:bg-white/[0.11] md:p-3">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-300/5" />
       <div className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 
@@ -199,7 +182,7 @@ function HighlightCard({
           {valueText}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -276,7 +259,7 @@ function getQualificationMethodLabel(value?: string | null) {
 }
 
 function getQualifiedTeamInfo(
-  hit: ExactHitWithPredictionType
+  hit: ExactHitWithPredictionType,
 ): QualifiedTeamInfo | null {
   if (!hit.qualifiedTeamCode) return null;
 
@@ -354,13 +337,7 @@ export default function HomeHighlights() {
 
   if (loading) {
     return (
-      <motion.section
-        variants={sectionMotion}
-        initial="hidden"
-        whileInView="show"
-        viewport={scrollOnceViewport}
-        className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 backdrop-blur-sm md:mt-5 md:rounded-[2rem] md:p-4"
-      >
+      <section className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 md:mt-5 md:rounded-[2rem] md:p-4">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
 
         <div className="relative mb-3 text-center">
@@ -379,21 +356,15 @@ export default function HomeHighlights() {
           <EmptyCard title="أفضل سلسلة" text="جاري التحميل..." />
           <EmptyCard title="أول الواصلين" text="جاري التحميل..." />
         </div>
-      </motion.section>
+      </section>
     );
   }
 
   return (
-    <motion.section
-      variants={sectionMotion}
-      initial="hidden"
-      whileInView="show"
-      viewport={scrollOnceViewport}
-      className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 backdrop-blur-sm md:mt-5 md:rounded-[2rem] md:p-4"
-    >
+    <section className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 md:mt-5 md:rounded-[2rem] md:p-4">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
-      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
+      <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-amber-300/[0.05]" />
+      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/[0.05]" />
 
       <div className="relative mb-3 text-center">
         <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/20">
@@ -437,7 +408,7 @@ export default function HomeHighlights() {
           emptyText="تظهر بعد أول توقع"
         />
       </div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -560,7 +531,7 @@ export function ExactHitsTicker() {
 
   const duration = Math.max(
     25,
-    Math.round((groupWidth || 1200) / pixelsPerSecond)
+    Math.round((groupWidth || 1200) / pixelsPerSecond),
   );
 
   function pauseTicker() {
@@ -580,7 +551,7 @@ export function ExactHitsTicker() {
       <div
         key={`${hit.id}-${index}`}
         dir="rtl"
-        className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border px-3 py-2 text-xs text-white shadow-md shadow-slate-950/25 backdrop-blur-xl md:px-4 md:text-sm ${
+        className={`group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border px-3 py-2 text-xs text-white shadow-md shadow-slate-950/25 md:px-4 md:text-sm ${
           golden
             ? "border-fuchsia-300/40 bg-gradient-to-l from-amber-400/20 via-fuchsia-400/15 to-amber-300/10"
             : "border-emerald-300/20 bg-slate-950/70"
@@ -651,7 +622,9 @@ export function ExactHitsTicker() {
             <span>{qualifiedTeam.name}</span>
 
             {exactHit.qualificationMethod && (
-              <span>• {getQualificationMethodLabel(exactHit.qualificationMethod)}</span>
+              <span>
+                • {getQualificationMethodLabel(exactHit.qualificationMethod)}
+              </span>
             )}
           </span>
         )}
@@ -664,7 +637,7 @@ export function ExactHitsTicker() {
       <div
         key={`empty-exact-hit-${index}`}
         dir="rtl"
-        className="group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border border-emerald-300/20 bg-slate-950/70 px-3 py-2 text-xs text-white shadow-md shadow-slate-950/25 backdrop-blur-xl md:px-4 md:text-sm"
+        className="group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden whitespace-nowrap rounded-2xl border border-emerald-300/20 bg-slate-950/70 px-3 py-2 text-xs text-white shadow-md shadow-slate-950/25 md:px-4 md:text-sm"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-l from-emerald-300/10 via-transparent to-cyan-300/5" />
 
@@ -673,9 +646,7 @@ export function ExactHitsTicker() {
           <span>بانتظار أول إصابة</span>
         </span>
 
-        <span className="relative font-black text-emerald-300">
-          جابها صح
-        </span>
+        <span className="relative font-black text-emerald-300">جابها صح</span>
 
         <span className="relative text-slate-300">
           لم يسجل أحد نتيجة بالملي خلال آخر 24 ساعة
@@ -881,7 +852,7 @@ export function ExactHitsTicker() {
             </motion.div>
           )}
         </AnimatePresence>,
-        document.body
+        document.body,
       )
     : null;
 
@@ -901,17 +872,12 @@ export function ExactHitsTicker() {
 
   return (
     <>
-      <section className="relative mt-5 overflow-hidden rounded-[1.65rem] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 shadow-md shadow-slate-950/25 backdrop-blur-sm md:mt-6">
+      <section className="relative mt-5 overflow-hidden rounded-[1.65rem] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 shadow-md shadow-slate-950/25 md:mt-6">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/10 via-transparent to-cyan-300/5" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-emerald-300/10 blur-2xl" />
-        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full bg-emerald-300/[0.05]" />
+        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full bg-cyan-300/[0.05]" />
 
-        <motion.div
-          variants={sectionMotion}
-          initial="hidden"
-          animate="show"
-          className="relative"
-        >
+        <div className="relative">
           <div className="mb-2 flex items-center justify-between gap-3">
             <button
               type="button"
@@ -939,12 +905,9 @@ export function ExactHitsTicker() {
 
           <div
             dir="ltr"
-            className="exact-hits-window relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65 py-3 shadow-inner"
+            className="exact-hits-window relative isolate overflow-hidden rounded-2xl border border-white/10 bg-slate-950/65 py-3 shadow-inner"
             onMouseEnter={pauseTicker}
             onMouseLeave={resumeTicker}
-            onTouchStart={pauseTicker}
-            onTouchEnd={resumeTicker}
-            onTouchCancel={resumeTicker}
             onPointerDown={pauseTicker}
             onPointerUp={resumeTicker}
             onPointerCancel={resumeTicker}
@@ -962,20 +925,20 @@ export function ExactHitsTicker() {
               <div ref={groupRef} className="flex flex-none gap-3">
                 {exactHits.length === 0
                   ? Array.from({ length: 8 }).map((_, index) =>
-                      renderEmptyTickerCard(index)
+                      renderEmptyTickerCard(index),
                     )
                   : repeatedHits.map((hit, index) =>
-                      renderExactHitCard(hit, index)
+                      renderExactHitCard(hit, index),
                     )}
               </div>
 
               <div className="flex flex-none gap-3">
                 {exactHits.length === 0
                   ? Array.from({ length: 8 }).map((_, index) =>
-                      renderEmptyTickerCard(index + 8)
+                      renderEmptyTickerCard(index + 8),
                     )
                   : repeatedHits.map((hit, index) =>
-                      renderExactHitCard(hit, index + repeatedHits.length)
+                      renderExactHitCard(hit, index + repeatedHits.length),
                     )}
               </div>
             </div>
@@ -985,14 +948,21 @@ export function ExactHitsTicker() {
             <PauseCircle className="h-3.5 w-3.5" />
             <span>يتوقف الشريط عند اللمس</span>
           </div>
-        </motion.div>
+        </div>
 
         <style jsx>{`
+          .exact-hits-window {
+            contain: layout paint;
+          }
+
           .exact-hits-track {
             animation-name: exactHitsMove;
             animation-timing-function: linear;
             animation-iteration-count: infinite;
             will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transform-style: preserve-3d;
           }
 
           .exact-hits-window:hover .exact-hits-track,
@@ -1003,11 +973,11 @@ export function ExactHitsTicker() {
 
           @keyframes exactHitsMove {
             0% {
-              transform: translateX(-50%);
+              transform: translate3d(-50%, 0, 0);
             }
 
             100% {
-              transform: translateX(0%);
+              transform: translate3d(0, 0, 0);
             }
           }
         `}</style>
