@@ -17,7 +17,7 @@ type AiCard = {
 };
 
 const AI_MODEL = "gpt-4.1-mini";
-const REQUIRED_CARDS_COUNT = 8;
+const REQUIRED_CARDS_COUNT = 10;
 
 const EXCEPTIONAL_EVENT_TYPES = new Set<ChallengeStudioEvent["type"]>([
   "golden_prediction_alert",
@@ -30,6 +30,10 @@ const EXCEPTIONAL_EVENT_TYPES = new Set<ChallengeStudioEvent["type"]>([
   "round_star",
   "best_comeback",
   "most_exact_results",
+  "flag_memory_champion",
+  "word_game_champion",
+  "ten_seconds_exact",
+  "ten_seconds_points_boost",
 ]);
 
 const GENERIC_MEMBER_WORDS = [
@@ -73,149 +77,18 @@ const EDITORIAL_SECTIONS = [
     title: "الحصان الأسود",
     goal: "إبراز عضو صاعد أو مفاجئ من البيانات.",
   },
-  {
-    icon: "🚀",
-    title: "قفزة الترتيب",
-    goal: "إبراز قفزة الترتيب حقيقي في الترتيب.",
-  },
-  {
-    icon: "📉",
-    title: "أكبر تراجع",
-    goal: "تناول أكبر تراجع بلغة محترمة.",
-  },
-  {
-    icon: "🎯",
-    title: "قناص النتائج",
-    goal: "إبراز من أصاب نتائج دقيقة.",
-  },
-  {
-    icon: "🔥",
-    title: "نجم الجولة",
-    goal: "اختيار صاحب أفضل أثر في الجولة.",
-  },
+  { icon: "🚀", title: "أسرع صعود", goal: "إبراز أكبر صعود حقيقي في الترتيب." },
+  { icon: "📉", title: "أكبر تراجع", goal: "تناول أكبر تراجع بلغة محترمة." },
+  { icon: "🎯", title: "قناص النتائج", goal: "إبراز من أصاب نتائج دقيقة." },
+  { icon: "🔥", title: "نجم الجولة", goal: "اختيار صاحب أفضل أثر في الجولة." },
   {
     icon: "⚡",
     title: "أفضل عودة",
     goal: "إبراز من عاد للمنافسة بعد تحسن واضح.",
   },
-  {
-    icon: "📈",
-    title: "جدار الثبات",
-    goal: "إبراز عضو يحافظ على مستواه.",
-  },
-  {
-    icon: "👀",
-    title: "تحت المجهر",
-    goal: "متابعة عضو أو توقع أو مواجهة.",
-  },
-  {
-    icon: "🎙️",
-    title: "كلمة الاستوديو",
-    goal: "خاتمة تحريرية قصيرة.",
-  },
-];
-
-const STUDIO_TERMS = [
-  {
-    term: "🚀 السوبر ذهبي",
-    meaning:
-      "مباراة نقاطها عالية وقد تقلب الترتيب؛ بالملي +10، الفائز +4، المتأهل +6، الطريقة +4، والسقف في خروج المغلوب 20 نقطة.",
-  },
-  {
-    term: "🔥 فرصة الريمونتادا",
-    meaning: "نافذة عودة للعضو المتأخر أو المطارد إذا أحسن قراءة مباراة مؤثرة.",
-  },
-  {
-    term: "⚡ قفزة الترتيب",
-    meaning: "صعود واضح في المراكز بعد احتساب نتيجة أو سلسلة توقعات ناجحة.",
-  },
-  {
-    term: "🎯 ضربة بالملي",
-    meaning: "توقع نتيجة صحيحة بالملي يمنح صاحبه أثرًا قويًا في السباق.",
-  },
-  {
-    term: "🧊 سقوط مفاجئ",
-    meaning: "تراجع عضو كان قريبًا من القمة أو في موقع متقدم.",
-  },
-  {
-    term: "👑 حارس الصدارة",
-    meaning: "المتصدر الذي يحاول حماية المركز الأول من ضغط المطاردين.",
-  },
-  {
-    term: "🐎 الحصان الأسود",
-    meaning: "عضو يتحرك بهدوء ويملك أرقامًا تجعله مرشحًا للمفاجأة.",
-  },
-  {
-    term: "🧨 قنبلة الجولة",
-    meaning: "نتيجة أو توقع غيّر شكل المنافسة بشكل واضح.",
-  },
-  {
-    term: "🛡️ دفاع المتصدر",
-    meaning: "قراءة حالة المتصدر عندما يكون تحت ضغط مباشر.",
-  },
-  {
-    term: "🚨 إنذار للمتصدر",
-    meaning: "اقتراب مطارد أو وصيف من الصدارة بفارق مؤثر.",
-  },
-  {
-    term: "🧠 قراءة ذكية",
-    meaning: "توقع صحيح أو اختيار جريء مبني على قراءة ممتازة.",
-  },
-  {
-    term: "😅 زلة توقع",
-    meaning: "توقع لم ينجح لكن يذكر بروح خفيفة ومحترمة.",
-  },
-  {
-    term: "💥 انقلاب الطاولة",
-    meaning: "تحول كبير في الترتيب بعد احتساب مباراة مؤثرة.",
-  },
-  {
-    term: "🏹 صائد النقاط",
-    meaning: "عضو يجمع نقاطًا باستمرار حتى لو لم يخطف كل الأضواء.",
-  },
-  {
-    term: "🌪️ عاصفة السوبر ذهبي",
-    meaning: "تأثير مباراة سوبر ذهبي على الصدارة والمطاردين.",
-  },
-  {
-    term: "📉 نزيف النقاط",
-    meaning: "فترة ضياع فرص متكررة تحتاج إلى تصحيح سريع.",
-  },
-  {
-    term: "📈 مؤشر الصعود",
-    meaning: "أرقام حديثة تشير إلى تحسن واضح في المسار.",
-  },
-  {
-    term: "🧱 جدار الثبات",
-    meaning: "عضو يحافظ على موقعه أو مستواه رغم ضغط المنافسة.",
-  },
-  {
-    term: "🥶 تجميد الرصيد",
-    meaning: "عضو لم يضيف نقاطًا في لقطة أو جولة مهمة.",
-  },
-  {
-    term: "🔥 عودة الكبار",
-    meaning: "عضو يعود للمشهد بعد تحسن أو صعود مؤثر.",
-  },
-];
-
-const NEWS_ANGLES = [
-  "خبر عاجل",
-  "مؤتمر صحفي",
-  "تقرير الجولة",
-  "لقطة اليوم",
-  "رادار المنافسة",
-  "تحت المجهر",
-  "غرفة التحليل",
-  "رسالة للمتصدر",
-  "مطاردة الوصيف",
-  "حكاية الريمونتادا",
-  "نجم السوبر ذهبي",
-  "المتضرر الأكبر",
-  "المستفيد الأكبر",
-  "أقوى قفزة",
-  "أكبر تراجع",
-  "هدوء قبل العاصفة",
+  { icon: "📈", title: "الأكثر ثباتًا", goal: "إبراز عضو يحافظ على مستواه." },
+  { icon: "👀", title: "تحت المجهر", goal: "متابعة عضو أو توقع أو مواجهة." },
+  { icon: "🎙️", title: "كلمة الاستوديو", goal: "خاتمة تحريرية قصيرة." },
 ];
 
 function getTodaySaudiDate() {
@@ -248,6 +121,44 @@ function getText(value: unknown) {
 function getNumber(value: unknown) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function formatDurationMs(value: unknown) {
+  const durationMs = getNumber(value);
+
+  if (!durationMs) return "وقت غير محدد";
+
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0) {
+    return `${minutes}:${String(seconds).padStart(2, "0")} دقيقة`;
+  }
+
+  return `${seconds} ثانية`;
+}
+
+function formatSeconds(value: unknown) {
+  const totalSeconds = Math.max(0, Math.floor(getNumber(value)));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0) {
+    return `${minutes}:${String(seconds).padStart(2, "0")} دقيقة`;
+  }
+
+  return `${seconds} ثانية`;
+}
+
+function getRankText(value: unknown) {
+  const rank = getNumber(value);
+  return rank > 0 ? `المركز ${rank}` : "مركزه الحالي";
+}
+
+function getPointsText(value: unknown) {
+  const points = getNumber(value);
+  return points > 0 ? `${points} نقطة` : "رصيده الحالي";
 }
 
 function getEventMembers(event: ChallengeStudioEvent) {
@@ -346,17 +257,6 @@ function buildPrompt(events: ChallengeStudioEvent[], recentMembers: string[]) {
 - لا تستخدم Markdown.
 - لا تكتب أي شرح خارج JSON.
 
-مصطلحات الاستوديو الجديدة، استخدم المناسب منها فقط حسب البيانات ولا تحشرها كلها:
-${JSON.stringify(STUDIO_TERMS, null, 2)}
-
-زوايا الأخبار المسموحة والمطلوبة للتنويع:
-${JSON.stringify(NEWS_ANGLES, null, 2)}
-
-قواعد السوبر ذهبي:
-- اكتب "السوبر ذهبي" ولا تكتب "التوقع الذهبي".
-- عند ذكر نقاط السوبر ذهبي استخدم: بالملي +10، الفائز +4، المتأهل +6، الطريقة +4، والسقف في خروج المغلوب 20 نقطة.
-- إذا كان الحدث مرتبطًا بمباراة سوبر ذهبي، اجعلها فرصة للريمونتادا أو انقلاب الطاولة دون مبالغة أو اختراع.
-
 قاعدة ذكر الأسماء وهي إلزامية جدًا:
 - إذا كان الحدث يحتوي على members أو memberName أو userName أو leaderName أو secondName، يجب ذكر الاسم الحقيقي للعضو في البطاقة نفسها.
 - لا تكتب بطاقة عن عضو موجود في البيانات بدون ذكر اسمه الحقيقي.
@@ -367,11 +267,10 @@ ${JSON.stringify(NEWS_ANGLES, null, 2)}
 - اذكر اسم العضو مرة واحدة فقط في البطاقة، ثم أكمل بالضمائر أو الوصف دون تكرار الاسم.
 
 قواعد صارمة جدًا:
-- اكتب 8 بطاقات بالضبط، لا أقل ولا أكثر.
-- محتوى كل بطاقة يجب أن يكون بين 45 و75 كلمة تقريبًا.
+- اكتب 10 بطاقات بالضبط، لا أقل ولا أكثر.
+- محتوى كل بطاقة يجب أن يكون بين 45 و85 كلمة تقريبًا.
 - لا تجعل البطاقة قصيرة أو جملة واحدة فقط.
 - كل بطاقة يجب أن تحتوي على سياق ثم تحليل مختصر ثم أثر الحدث على المنافسة.
-- لا تكرر نفس المعنى داخل البطاقة.
 - لا تكرر اسم أي عضو داخل النشرة نهائيًا، لا في العنوان ولا في النص ولا في الملخص.
 - إذا ظهر اسم عضو في بطاقة، لا يظهر مرة أخرى في أي بطاقة أخرى.
 - لا يظهر العضو الموجود ضمن قائمة آخر 48 ساعة إلا إذا كان الحدث استثنائيًا وموجودًا ضمن البيانات.
@@ -392,11 +291,11 @@ ${JSON.stringify(NEWS_ANGLES, null, 2)}
 ${JSON.stringify(EDITORIAL_SECTIONS, null, 2)}
 
 الأحداث التي تسمح بتجاوز قاعدة الظهور خلال آخر 48 ساعة:
-- سوبر ذهبي.
-- ضربة بالملي بعد الاحتساب.
-- إنذار للمتصدر.
+- توقع ذهبي.
+- نتيجة صحيحة بالملي بعد الاحتساب.
+- ضغط مباشر على الصدارة.
 - دخول التوب 3.
-- قفزة الترتيب.
+- أكبر صعود.
 - أفضل سلسلة.
 - توقع خطير مؤثر على الترتيب.
 - نجم الجولة إذا كانت نقاطه في الجولة واضحة.
@@ -411,13 +310,15 @@ main, quote, number, badge, funny, watch
 
 هيكلة البطاقات المطلوبة:
 1- بطاقة رئيسية قوية ومبنية على أهم حدث.
-2- بطاقة تصريح أو تعليق استوديو بصياغة صحفية محترمة.
-3- بطاقة رقم اليوم إذا وُجد رقم حقيقي واضح.
-4- بطاقة وسام أو لقب إعلامي مستحق من البيانات.
-5- بطاقة لقطة اليوم أو الحصان الأسود إذا وُجد حدث مناسب.
-6- بطاقة تحت المجهر لعضو أو توقع أو مواجهة.
-7- بطاقة حركة ترتيب: صعود أو تراجع أو ثبات إذا توفرت البيانات.
-8- بطاقة ختامية بعنوان "كلمة الاستوديو" أو تنبيه مهم للجولة.
+2- بطاقة من توقعات المباريات أو الصدارة.
+3- بطاقة من تحدي العشر ثواني إذا توفرت نتيجة اليوم.
+4- بطاقة من تحدي الأعلام إذا توفرت نتيجة اليوم.
+5- بطاقة من خمن كلمة اليوم إذا توفرت نتيجة اليوم.
+6- بطاقة رقم اليوم إذا وُجد رقم حقيقي واضح.
+7- بطاقة وسام أو لقب إعلامي مستحق من البيانات.
+8- بطاقة تحت المجهر لعضو أو توقع أو مواجهة.
+9- بطاقة حركة ترتيب: صعود أو تراجع أو ثبات إذا توفرت البيانات.
+10- بطاقة ختامية بعنوان "كلمة الاستوديو" أو تنبيه مهم للجولة.
 
 صيغة الإخراج المطلوبة:
 {
@@ -643,7 +544,7 @@ function buildLocalCardFromEvent(
       type: "main",
       icon: "🔥",
       title: "الصدارة تحت الضغط",
-      content: `${primaryName} يبقى في الواجهة، لكن ${secondaryName} يقترب من المشهد بفارق ${getNumber(event.data.pointsDiff)} نقطة فقط. هذا التقارب يجعل الجولة القادمة اختبارًا مباشرًا للأعصاب، لأن أي توقع صحيح قد يعيد توزيع الضغط في القمة. المنافسة هنا لم تعد مجرد ترتيب، بل صراع على التفاصيل الصغيرة.`,
+      content: `${primaryName} يبقى في الواجهة، لكن ${secondaryName} يقترب من المشهد بفارق ${getNumber(event.data.pointsDiff)} نقطة فقط. هذه المسافة تجعل الجولة القادمة اختبارًا مباشرًا للأعصاب، وأي توقع صحيح قد يغير شكل القمة.`,
       priority: basePriority,
     };
   }
@@ -652,8 +553,8 @@ function buildLocalCardFromEvent(
     return {
       type: "main",
       icon: "🎯",
-      title: "ضربة بالملي تغيّر المشهد",
-      content: `${primaryName} حضر في العنوان الأبرز بعد احتساب مباراة ${getText(event.data.matchName)}، بعدما أصاب النتيجة ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)} وحصد ${getNumber(event.data.points)} نقاط. مثل هذه الضربة الدقيقة تمنح صاحبها دفعة قوية، وتضع بقية المنافسين تحت ضغط القراءة الصحيحة في المباريات القادمة.`,
+      title: "نتيجة دقيقة تغيّر المشهد",
+      content: `${primaryName} حضر في العنوان الأبرز بعد احتساب مباراة ${getText(event.data.matchName)}، بعدما أصاب النتيجة ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)} وحصد ${getNumber(event.data.points)} نقاط.`,
       priority: basePriority,
     };
   }
@@ -663,7 +564,7 @@ function buildLocalCardFromEvent(
       type: "badge",
       icon: "🔥",
       title: "نجم الجولة",
-      content: `${primaryName} كان الاسم الأبرز في نتائج الجولة الأخيرة، بعدما جمع ${getNumber(event.data.roundPoints)} نقاط من ${getNumber(event.data.calculatedCount)} توقعات محتسبة. هذه الحصيلة لا تعكس الحظ فقط، بل قراءة جيدة لمسار المباريات، وقد تمنحه حضورًا أقوى في حسابات المنافسة خلال المرحلة القادمة.`,
+      content: `${primaryName} كان الاسم الأبرز في نتائج الجولة الأخيرة، بعدما جمع ${getNumber(event.data.roundPoints)} نقاط من ${getNumber(event.data.calculatedCount)} توقعات محتسبة.`,
       priority: basePriority,
     };
   }
@@ -672,8 +573,8 @@ function buildLocalCardFromEvent(
     return {
       type: "number",
       icon: "🚀",
-      title: "قفزة الترتيب",
-      content: `${primaryName} قدّم واحدة من أبرز حركات الترتيب، بعدما صعد ${getNumber(event.data.rankChange)} مراكز ووصل إلى المركز ${getNumber(event.data.currentRank)}. هذا الصعود السريع يمنحه دفعة معنوية مهمة، ويؤكد أن لوحة الصدارة ما زالت قابلة للاشتعال مع كل جولة جديدة.`,
+      title: "أسرع صعود",
+      content: `${primaryName} قدّم واحدة من أبرز حركات الترتيب، بعدما صعد ${getNumber(event.data.rankChange)} مراكز ووصل إلى المركز ${getNumber(event.data.currentRank)}.`,
       priority: basePriority,
     };
   }
@@ -682,8 +583,8 @@ function buildLocalCardFromEvent(
     return {
       type: "funny",
       icon: "📉",
-      title: "سقوط مفاجئ يحتاج ردًا",
-      content: `${primaryName} تراجع ${getNumber(event.data.rankChange)} مراكز في حركة لافتة داخل الجدول. القراءة الهادئة تقول إن الهبوط مؤلم، لكنه لا يعني نهاية المنافسة. الطريق ما زال مفتوحًا للتعويض، بشرط أن تأتي الجولة القادمة بتركيز أعلى وقراءة أدق للمباريات.`,
+      title: "تراجع يحتاج ردًا",
+      content: `${primaryName} تراجع ${getNumber(event.data.rankChange)} مراكز. القراءة الهادئة تقول إن الهبوط مؤلم، لكنه قابل للتعويض إذا جاءت الجولة القادمة بصورة أفضل.`,
       priority: basePriority,
     };
   }
@@ -693,7 +594,7 @@ function buildLocalCardFromEvent(
       type: "badge",
       icon: "🔥",
       title: "سلسلة نارية",
-      content: `${primaryName} يستحق وسام اليوم بعد سلسلة وصلت إلى ${getNumber(event.data.bestStreak)} توقعات صحيحة. الاستمرارية بهذا الشكل تمنح المنافسة بُعدًا مختلفًا، لأنها تكشف عضوًا لا يعتمد على لقطة واحدة فقط، بل يحافظ على إيقاع ثابت في قراءة النتائج.`,
+      content: `${primaryName} يستحق وسام اليوم بعد سلسلة وصلت إلى ${getNumber(event.data.bestStreak)} توقعات صحيحة. الاستمرارية بهذا الشكل تمنح المنافسة بُعدًا مختلفًا.`,
       priority: basePriority,
     };
   }
@@ -703,7 +604,7 @@ function buildLocalCardFromEvent(
       type: "number",
       icon: "📊",
       title: "ملك الدقة",
-      content: `${primaryName} يملك دقة تبلغ ${getNumber(event.data.accuracy)}% من أصل ${getNumber(event.data.total)} توقعات. هذا الرقم لا يظهر من فراغ، بل يعكس قراءة جيدة للمباريات وقدرة على اختيار النتائج بعناية. في سباق طويل، الدقة قد تكون أهم من كثرة المحاولات.`,
+      content: `${primaryName} يملك دقة تبلغ ${getNumber(event.data.accuracy)}% من أصل ${getNumber(event.data.total)} توقعات. رقم يعكس قراءة جيدة للمباريات وليس مجرد حضور في الجدول.`,
       priority: basePriority,
     };
   }
@@ -713,7 +614,7 @@ function buildLocalCardFromEvent(
       type: "badge",
       icon: "🎯",
       title: "قناص النتائج",
-      content: `${primaryName} وصل إلى ${getNumber(event.data.exact)} توقعات دقيقة بالملي. هذا النوع من الأرقام يصنع الفارق في المراحل الحاسمة، لأن النتيجة الدقيقة تمنح أثرًا أكبر من مجرد معرفة الفائز. حضوره هنا يضعه ضمن الأسماء التي تستحق المتابعة.`,
+      content: `${primaryName} وصل إلى ${getNumber(event.data.exact)} توقعات دقيقة بالملي. هذا النوع من الأرقام يصنع الفارق في المراحل الحاسمة.`,
       priority: basePriority,
     };
   }
@@ -723,7 +624,7 @@ function buildLocalCardFromEvent(
       type: "badge",
       icon: "⚡",
       title: "أفضل عودة",
-      content: `${primaryName} عاد إلى الصورة بحركة لافتة، بعدما صعد ${getNumber(event.data.rankChange)} مراكز ووصل إلى المركز ${getNumber(event.data.currentRank)}. هذه العودة لا تعني تحسنًا رقميًا فقط، بل رسالة واضحة بأن التعويض ممكن متى حضرت القراءة الصحيحة والثبات في التوقعات.`,
+      content: `${primaryName} عاد إلى الصورة بحركة لافتة، بعدما صعد ${getNumber(event.data.rankChange)} مراكز ووصل إلى المركز ${getNumber(event.data.currentRank)}.`,
       priority: basePriority,
     };
   }
@@ -732,8 +633,8 @@ function buildLocalCardFromEvent(
     return {
       type: "number",
       icon: "📈",
-      title: "جدار الثبات",
-      content: `${primaryName} يحافظ على حضوره بثبات، مع دقة ${getNumber(event.data.accuracy)}% من ${getNumber(event.data.total)} توقعات. الثبات هنا قيمة لا تقل أهمية عن الصعود السريع، لأنه يمنح صاحبه موقعًا آمنًا نسبيًا ويجعله حاضرًا في حسابات الجولات القادمة.`,
+      title: "الأكثر ثباتًا",
+      content: `${primaryName} يحافظ على حضوره بثبات، مع دقة ${getNumber(event.data.accuracy)}% من ${getNumber(event.data.total)} توقعات. الثبات هنا قيمة لا تقل أهمية عن الصعود السريع.`,
       priority: basePriority,
     };
   }
@@ -743,7 +644,7 @@ function buildLocalCardFromEvent(
       type: "badge",
       icon: "🐎",
       title: "الحصان الأسود",
-      content: `${primaryName} يتحرك بعيدًا عن الضجيج، لكن أرقامه تشير إلى حضور لا يمكن تجاهله. دقة تصل إلى ${getNumber(event.data.accuracy)}% تضعه ضمن الأسماء التي قد تفاجئ المنافسين. مثل هذا الهدوء قد يتحول سريعًا إلى قصة كبيرة في لوحة الصدارة.`,
+      content: `${primaryName} يتحرك بعيدًا عن الضجيج، لكن أرقامه تشير إلى حضور لا يمكن تجاهله. دقة تصل إلى ${getNumber(event.data.accuracy)}% تضعه ضمن الأسماء التي قد تفاجئ المنافسين.`,
       priority: basePriority,
     };
   }
@@ -753,7 +654,7 @@ function buildLocalCardFromEvent(
       type: "funny",
       icon: "😅",
       title: "الأكثر حظًا سيئًا",
-      content: `${primaryName} واجه يومًا صعبًا مع ${getNumber(event.data.wrong)} توقعات غير موفقة من أصل ${getNumber(event.data.total)}. الاستوديو يقرأها بروح رياضية: الحظ يتغير، والمنافسة لا تنتهي من جولة واحدة. المهم أن يعود التركيز قبل المباراة القادمة، فالتعويض وارد دائمًا.`,
+      content: `${primaryName} واجه يومًا صعبًا مع ${getNumber(event.data.wrong)} توقعات غير موفقة من أصل ${getNumber(event.data.total)}. الاستوديو يقرأها بروح رياضية: الحظ يتغير، والمنافسة لا تنتهي من جولة واحدة.`,
       priority: basePriority,
     };
   }
@@ -763,7 +664,7 @@ function buildLocalCardFromEvent(
       type: "funny",
       icon: "😴",
       title: "صح النوم",
-      content: `${primaryName} غاب عن توقع مباراة ${getText(event.data.matchName)}. في بطولة بهذا الإيقاع، تفويت مباراة واحدة قد يترك أثرًا واضحًا على الجدول. الاستوديو يذكّر بأن الحضور قبل صافرة البداية لا يقل أهمية عن دقة التوقع نفسها.`,
+      content: `${primaryName} غاب عن توقع مباراة ${getText(event.data.matchName)}. في بطولة بهذا الإيقاع، تفويت مباراة واحدة قد يترك أثرًا واضحًا على الجدول.`,
       priority: basePriority,
     };
   }
@@ -773,7 +674,121 @@ function buildLocalCardFromEvent(
       type: "watch",
       icon: "🎲",
       title: "توقع تحت المجهر",
-      content: `${primaryName} اختار نتيجة جريئة في مباراة ${getText(event.data.matchName)}: ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)}. إذا تحققت، فقد تتحول إلى واحدة من لقطات الجولة. مثل هذه التوقعات تحمل مخاطرة عالية، لكنها قد تمنح صاحبها قفزة مهمة.`,
+      content: `${primaryName} اختار نتيجة جريئة في مباراة ${getText(event.data.matchName)}: ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)}. إذا تحققت، فقد تتحول إلى واحدة من لقطات الجولة.`,
+      priority: basePriority,
+    };
+  }
+
+
+  if (event.type === "knockout_qualification_hit") {
+    const qualifiedTeamName = getText(event.data.qualifiedTeamName);
+    const qualificationMethod = getText(event.data.qualificationMethod);
+
+    return {
+      type: "main",
+      icon: "🎯",
+      title: "قراءة خروج المغلوب",
+      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} بقراءة ثمينة بعد توقعه ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)} وحصوله على ${getNumber(event.data.points)} نقاط. ${qualifiedTeamName ? `اختياره للمتأهل ${qualifiedTeamName}` : "اختياره في تفاصيل التأهل"}${qualificationMethod ? ` وطريقة الحسم ${qualificationMethod}` : ""} جعل اللقطة أهم من مجرد نتيجة، لأن مباريات خروج المغلوب تكافئ من يقرأ السيناريو كاملًا لا الفائز فقط.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "flag_memory_champion") {
+    return {
+      type: "badge",
+      icon: "🎌",
+      title: "بطل تحدي الأعلام",
+      content: `${primaryName} فرض اسمه في تحدي الأعلام اليوم بعدما أنهى الجولة خلال ${formatSeconds(event.data.timeSeconds)} وسجل ${getNumber(event.data.score)} نقطة مع ${getNumber(event.data.mistakes)} أخطاء فقط. هذه النتيجة تكشف تركيزًا عاليًا وسرعة ملاحظة واضحة، وتضيف له حضورًا مختلفًا خارج حسابات مباريات كأس العالم، خصوصًا وهو يقف عند ${getRankText(event.data.currentRank)} برصيد ${getPointsText(event.data.points)}.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "flag_memory_fastest") {
+    return {
+      type: "number",
+      icon: "⚡",
+      title: "أسرع عين في الأعلام",
+      content: `${primaryName} كان الأسرع في تحدي الأعلام بزمن ${formatSeconds(event.data.timeSeconds)}، مع ${getNumber(event.data.moves)} محاولة و${getNumber(event.data.mistakes)} أخطاء. السرعة هنا ليست مجرد رقم جميل، بل دليل على ذاكرة بصرية حاضرة وقرار سريع تحت الضغط، وهذا النوع من الإنجاز يعطي النشرة زاوية تنافسية جديدة بين الأعضاء.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "flag_memory_fewest_mistakes") {
+    return {
+      type: "watch",
+      icon: "🧠",
+      title: "أقل أخطاء في الأعلام",
+      content: `${primaryName} قدّم واحدة من أنظف جولات تحدي الأعلام اليوم، بعدما أنهى اللعب بـ ${getNumber(event.data.mistakes)} أخطاء وسجل ${getNumber(event.data.score)} نقطة. هذا النوع من النتائج لا يعتمد على السرعة وحدها، بل على الهدوء والتركيز، وقد يجعله حاضرًا في سباق الألعاب اليومية إلى جانب سباق التوقعات.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "word_game_champion") {
+    return {
+      type: "badge",
+      icon: "🧩",
+      title: "بطل خمن كلمة اليوم",
+      content: `${primaryName} تصدر خمن كلمة اليوم بعدما حسمها في ${getNumber(event.data.attemptsUsed)} محاولات وخلال ${formatDurationMs(event.data.durationMs)}. الفوز هنا يضيف جانبًا مختلفًا للمنافسة، لأن سرعة البديهة واختيار الحروف الصحيحة أصبحت جزءًا من أخبار المنصة اليومية، خصوصًا مع وجوده عند ${getRankText(event.data.currentRank)} في لوحة الصدارة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "word_game_fastest") {
+    return {
+      type: "number",
+      icon: "🚀",
+      title: "أسرع فوز في خمن كلمة",
+      content: `${primaryName} خطف لقطة السرعة في خمن كلمة اليوم بعدما أنهى التحدي خلال ${formatDurationMs(event.data.durationMs)} وبعدد ${getNumber(event.data.attemptsUsed)} محاولات. هذا الإنجاز يعكس سرعة قراءة للكلمة وقدرة على تضييق الاحتمالات مبكرًا، وهي تفاصيل تجعل الألعاب اليومية أكثر حماسًا بجانب صراع التوقعات.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "word_game_first_try") {
+    return {
+      type: "funny",
+      icon: "🎯",
+      title: getNumber(event.data.attemptsUsed) === 1 ? "من أول محاولة" : "من ثاني محاولة",
+      content: `${primaryName} دخل خمن كلمة اليوم بتركيز واضح، وحسمها من ${getNumber(event.data.attemptsUsed) === 1 ? "المحاولة الأولى" : "المحاولة الثانية"} خلال ${formatDurationMs(event.data.durationMs)}. مثل هذه البداية السريعة لا تمر مرورًا عاديًا في الاستوديو، لأنها تعطي انطباعًا عن سرعة بديهة عالية وتفتح باب التحدي لبقية الأعضاء في الأيام القادمة.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "word_game_lost") {
+    return {
+      type: "funny",
+      icon: "😅",
+      title: "كلمة استعصت اليوم",
+      content: `${primaryName} لم ينجح في خمن كلمة اليوم رغم استهلاك ${getNumber(event.data.attemptsUsed)} محاولات. الاستوديو يقرأ اللقطة بروح خفيفة: بعض الكلمات تحتاج نفسًا أطول وتركيزًا أكبر، لكن التعويض متاح في تحدي الغد، خصوصًا أن حضوره في ${getRankText(event.data.currentRank)} يجعل كل نشاط يومي مهمًا في المشهد العام.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "ten_seconds_exact") {
+    return {
+      type: "main",
+      icon: "⏱️",
+      title: "العشر ثواني بالملي",
+      content: `${primaryName} خطف لقطة تحدي العشر ثواني بعدما أوقف المؤقت على ${getText(event.data.bestDisplayTime) || "00:10.000"} بالملي، وأضاف لرصيده +${getNumber(event.data.awardedPoints)} نقاط مهمة. هذه النقاط ليست تفصيلًا عابرًا، لأنها قد ترفع الضغط على من حوله في الترتيب وتمنحه دفعة واضحة وهو يقف عند ${getRankText(event.data.currentRank)} برصيد ${getPointsText(event.data.points)}.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "ten_seconds_points_boost") {
+    return {
+      type: "badge",
+      icon: "🔥",
+      title: "خمس نقاط في الوقت القاتل",
+      content: `${primaryName} خرج من تحدي العشر ثواني بفوز ثمين ووقت ${getText(event.data.bestDisplayTime) || "قريب من 10 ثواني"}، ليضيف +${getNumber(event.data.awardedPoints)} نقاط إلى رصيده. مثل هذه الزيادة قد تبدو صغيرة، لكنها في منصة متقاربة قد تصنع فرقًا في المراكز، خصوصًا عندما تأتي من لعبة يومية لا تحتمل التردد.`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "ten_seconds_best_attempt") {
+    return {
+      type: "watch",
+      icon: "⏳",
+      title: "قريب من العشرة",
+      content: `${primaryName} كان قريبًا من خطف تحدي العشر ثواني، بعدما سجل أفضل محاولة عند ${getText(event.data.bestDisplayTime)} بفارق ${getNumber(event.data.bestDiffMs)} ملي ثانية فقط. حتى دون الفوز، هذه اللقطة تستحق المتابعة لأنها تكشف عضوًا يقترب من لحظة مثالية قد تمنحه نقاطًا مهمة في يوم قادم.`,
       priority: basePriority,
     };
   }
@@ -783,19 +798,17 @@ function buildLocalCardFromEvent(
       type: "watch",
       icon: event.type === "top3_spotlight" ? "🥉" : "🔟",
       title: "تحت المجهر",
-      content: `${primaryName} يقف في المركز ${getNumber(event.data.currentRank)} ومعه ${getNumber(event.data.points)} نقطة. هذه المنطقة لا تمنح الهدوء؛ كل توقع صحيح قد يرفع السقف، وكل تعثر قد يفتح الباب للمطاردين. لذلك تبدو الجولات القادمة حاسمة في تثبيت موقعه.`,
+      content: `${primaryName} يقف في المركز ${getNumber(event.data.currentRank)} ومعه ${getNumber(event.data.points)} نقطة. هذه المنطقة لا تمنح الهدوء؛ كل توقع صحيح قد يرفع السقف.`,
       priority: basePriority,
     };
   }
 
   if (event.type === "chasing_pack") {
-    const leaderName = getText(event.data.leaderName);
-
     return {
       type: "watch",
       icon: "🐎",
-      title: "حكاية الريمونتادا",
-      content: `${primaryName} يطارد من المركز ${getNumber(event.data.currentRank)}، ولا يفصله عن ${leaderName || "صاحب الصدارة"} سوى ${getNumber(event.data.pointsBehindLeader)} نقطة. هذا النوع من المطاردة يستحق المتابعة، لأن الاقتراب بهذا الشكل يجعل كل توقع قادم فرصة لتغيير موازين المنافسة.`,
+      title: "قادم من الخلف",
+      content: `${primaryName} يطارد من المركز ${getNumber(event.data.currentRank)}، ولا يفصله عن ${getText(event.data.leaderName) || "صاحب الصدارة"} سوى ${getNumber(event.data.pointsBehindLeader)} نقطة. هذا النوع من المطاردة يستحق المتابعة.`,
       priority: basePriority,
     };
   }
@@ -804,8 +817,8 @@ function buildLocalCardFromEvent(
     return {
       type: "watch",
       icon: "✅",
-      title: "قراءة ذكية للفائز",
-      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} بنقاط مستحقة بعد قراءة الفائز بشكل صحيح. هذا النوع من التوقعات يحافظ على الحضور في الجدول، حتى لو لم تكن النتيجة بالملي. الاستمرارية في جمع النقاط الصغيرة قد تصنع فارقًا كبيرًا لاحقًا.`,
+      title: "الفائز كان في الجيب",
+      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} بنقاط مستحقة بعد قراءة الفائز بشكل صحيح. هذا النوع من التوقعات يحافظ على الحضور في الجدول.`,
       priority: basePriority,
     };
   }
@@ -814,8 +827,8 @@ function buildLocalCardFromEvent(
     return {
       type: "funny",
       icon: "😬",
-      title: "زلة توقع تحتاج ردًا",
-      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} دون نقاط. النتيجة لم تخدمه هذه المرة، لكن الطريق ما زال مفتوحًا للتعويض. مثل هذه اللقطات تذكّر الجميع بأن قراءة المباراة قبل البداية قد تكون أصعب مما تبدو بعد صافرة النهاية.`,
+      title: "فرصة لم تكتمل",
+      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} دون نقاط. النتيجة لم تخدمه هذه المرة، لكن الطريق ما زال مفتوحًا للتعويض.`,
       priority: basePriority,
     };
   }
@@ -825,7 +838,7 @@ function buildLocalCardFromEvent(
       type: "watch",
       icon: "🎙️",
       title: "كلمة الاستوديو",
-      content: `الصورة العامة تقول إن المنافسة لا تزال مفتوحة. عدد الأعضاء أصحاب التوقعات المحتسبة بلغ ${getNumber(event.data.activeMembersCount)}، وهناك ${getNumber(event.data.scheduledMatchesCount)} مباريات قادمة على الرادار. هذه الأرقام تجعل كل جولة فرصة جديدة لتغيير المشهد وإعادة ترتيب المراكز.`,
+      content: `الصورة العامة تقول إن المنافسة لا تزال مفتوحة. عدد الأعضاء أصحاب التوقعات المحتسبة بلغ ${getNumber(event.data.activeMembersCount)}، وهناك ${getNumber(event.data.scheduledMatchesCount)} مباريات قادمة على الرادار.`,
       priority: basePriority,
     };
   }
@@ -836,15 +849,12 @@ function buildLocalCardFromEvent(
   ) {
     return {
       type: event.type === "golden_prediction_alert" ? "main" : "watch",
-      icon: event.type === "golden_prediction_alert" ? "🚀" : "⚽",
+      icon: event.type === "golden_prediction_alert" ? "⭐" : "⚽",
       title:
         event.type === "golden_prediction_alert"
-          ? "السوبر ذهبي يفتح باب الريمونتادا"
+          ? "التوقع الذهبي يفتح باب التحولات"
           : "مباراة قد تعيد ترتيب الأوراق",
-      content:
-        event.type === "golden_prediction_alert"
-          ? `استوديو التحدي يضع مباراة ${getText(event.data.matchName)} في واجهة المتابعة. السوبر ذهبي هنا ليس مجرد توقع عابر؛ بالملي يمنح +10، والفائز +4، وفي خروج المغلوب قد تصل الضربة الكاملة إلى 20 نقطة. لذلك تبدو المواجهة فرصة ريمونتادا حقيقية لمن يقرأ التفاصيل قبل صافرة البداية.`
-          : `استوديو التحدي يضع مباراة ${getText(event.data.matchName)} في واجهة المتابعة. هذا النوع من المواجهات يكشف من يقرأ التفاصيل الصغيرة قبل صافرة البداية، ومن يغامر في التوقيت الصحيح. النتيجة هنا قد لا تكون مجرد توقع عابر، بل نقطة تحول في سباق الترتيب.`,
+      content: `استوديو التحدي يضع مباراة ${getText(event.data.matchName)} في واجهة المتابعة. هذا النوع من المواجهات يكشف من يقرأ التفاصيل الصغيرة قبل صافرة البداية، ومن يغامر في التوقيت الصحيح.`,
       priority: basePriority,
     };
   }
@@ -854,7 +864,7 @@ function buildLocalCardFromEvent(
       type: "watch",
       icon: "👀",
       title: event.title || "تحت المجهر",
-      content: `${primaryName} يدخل نشرة اليوم من زاوية مستحقة. الأرقام المرتبطة بهذا الحدث تمنحه حضورًا واضحًا في المشهد. الاستوديو يضعه تحت المتابعة لأن مثل هذه التفاصيل قد تتحول إلى أثر مباشر في الجولات القادمة.`,
+      content: `${primaryName} يدخل نشرة اليوم من زاوية مستحقة. الأرقام المرتبطة بهذا الحدث تمنحه حضورًا واضحًا في المشهد.`,
       priority: basePriority,
     };
   }
@@ -864,7 +874,7 @@ function buildLocalCardFromEvent(
     icon: "🎙️",
     title: event.title || "كلمة الاستوديو",
     content:
-      "استوديو التحدي يرصد حركة جديدة في المنافسة. الجولات القادمة ستكشف من يملك قراءة ثابتة، ومن ينتظر لحظة الانفجار. لا توجد نقطة صغيرة في سباق طويل، فكل توقع قد يفتح بابًا جديدًا في الترتيب.",
+      "استوديو التحدي يرصد حركة جديدة في المنافسة. الجولات القادمة ستكشف من يملك قراءة ثابتة ومن ينتظر لحظة الانفجار.",
     priority: basePriority,
   };
 }
@@ -876,7 +886,7 @@ function buildFallbackGenericCard(index: number): AiCard {
       icon: "👀",
       title: "زاوية المتابعة",
       content:
-        "استوديو التحدي يواصل قراءة التفاصيل. لا توجد نتيجة صغيرة في سباق النقاط، فكل توقع قد يكون بداية لتحول جديد. الجولات القادمة ستكشف من يحافظ على تركيزه، ومن ينتظر فرصة العودة إلى دائرة المنافسة.",
+        "استوديو التحدي يواصل قراءة التفاصيل. لا توجد نتيجة صغيرة في سباق النقاط، فكل توقع قد يكون بداية لتحول جديد.",
       priority: 40,
     },
     {
@@ -884,7 +894,7 @@ function buildFallbackGenericCard(index: number): AiCard {
       icon: "📊",
       title: "إشارة رقمية",
       content:
-        "لوحة الصدارة لا تتحرك بالأسماء فقط، بل بالأرقام الدقيقة: نقاط، توقعات صحيحة، ونتائج بالملي تصنع الفارق. قراءة هذه الأرقام تمنح الاستوديو صورة أوضح عن شكل المنافسة قبل الجولات القادمة.",
+        "لوحة الصدارة لا تتحرك بالأسماء فقط، بل بالأرقام الدقيقة: نقاط، توقعات صحيحة، ونتائج بالملي تصنع الفارق.",
       priority: 39,
     },
     {
@@ -892,7 +902,7 @@ function buildFallbackGenericCard(index: number): AiCard {
       icon: "🏅",
       title: "رسالة المنافسة",
       content:
-        "الحضور المستمر في التوقعات يمنح صاحبه فرصة دائمة للعودة. الغياب عن مباراة واحدة قد يكون مكلفًا، لكن الثبات في الجولات التالية قادر على تعويض الكثير وإعادة العضو إلى المشهد من جديد.",
+        "الحضور المستمر في التوقعات يمنح صاحبه فرصة دائمة للعودة. الغياب عن مباراة واحدة قد يكون مكلفًا.",
       priority: 38,
     },
   ];
@@ -900,10 +910,11 @@ function buildFallbackGenericCard(index: number): AiCard {
   return fallbackCards[index % fallbackCards.length];
 }
 
+
 function expandCardContent(card: AiCard) {
   const content = cleanContent(card.content);
 
-  if (content.length >= 230) {
+  if (content.length >= 260) {
     return {
       ...card,
       content,
@@ -912,17 +923,17 @@ function expandCardContent(card: AiCard) {
 
   const additions: Record<AiCard["type"], string> = {
     main:
-      "هذه اللقطة تمنح النشرة وزنًا خاصًا، لأنها لا تقف عند الرقم وحده، بل تكشف كيف يمكن لتفصيل واحد أن يغيّر قراءة المنافسة ويزيد الضغط على بقية الأسماء في الجولات القادمة.",
+      "هذه اللقطة تمنح النشرة وزنًا خاصًا، لأنها لا تقف عند الرقم وحده، بل تكشف كيف يمكن لتفصيل واحد أن يغيّر قراءة المنافسة ويزيد الضغط في الجولات القادمة.",
     quote:
-      "قراءة الاستوديو لهذا الحدث تؤكد أن المنافسة لم تعد تعتمد على الحضور فقط، بل على دقة الاختيار وتوقيت التوقع، خصوصًا مع تقارب النقاط واقتراب المراحل الأكثر حساسية.",
+      "قراءة الاستوديو لهذا الحدث تؤكد أن المنافسة لم تعد تعتمد على الحضور فقط، بل على دقة الاختيار وتوقيت التوقع، خصوصًا مع تقارب النقاط.",
     number:
-      "الأرقام هنا ليست مجرد إحصائية عابرة، بل مؤشر واضح على اتجاه المنافسة. كل رقم يحمل خلفه قراءة مختلفة، وقد يكون سببًا في صعود مفاجئ أو ضغط مباشر على المراكز المتقدمة.",
+      "الأرقام هنا ليست مجرد إحصائية عابرة، بل مؤشر واضح على اتجاه المنافسة، وقد تكون سببًا في صعود مفاجئ أو ضغط مباشر على المراكز المتقدمة.",
     badge:
-      "هذا الوسام لا يأتي من فراغ، بل من أثر واضح داخل الجدول. الاستمرارية والدقة في مثل هذه الجولات تمنح العضو حضورًا إعلاميًا مستحقًا وتجعله ضمن الأسماء التي تستحق المتابعة.",
+      "هذا الوسام لا يأتي من فراغ، بل من أثر واضح داخل المنصة، سواء في التوقعات أو الألعاب اليومية التي أصبحت جزءًا من الحماس العام.",
     funny:
-      "الاستوديو يتعامل مع اللقطة بروح خفيفة، لكن الرسالة واضحة: البطولة طويلة، والتعويض ممكن في أي جولة. المهم أن يبقى التركيز حاضرًا قبل كل مباراة قادمة.",
+      "الاستوديو يتعامل مع اللقطة بروح خفيفة، لكن الرسالة واضحة: التعويض ممكن في أي جولة، والمهم أن يبقى التركيز حاضرًا قبل كل تحدٍ قادم.",
     watch:
-      "هذه الزاوية تستحق المتابعة لأنها قد تتحول من مجرد ملاحظة إلى حدث مؤثر. الجولات القادمة ستكشف إن كان هذا التحرك بداية لقصة أكبر داخل لوحة الصدارة.",
+      "هذه الزاوية تستحق المتابعة لأنها قد تتحول من مجرد ملاحظة إلى حدث مؤثر، والجولات القادمة ستكشف إن كان هذا التحرك بداية لقصة أكبر.",
   };
 
   return {
@@ -943,14 +954,26 @@ function finalizeCardsWithLocalRepair(
   const allNames = getAllEventMemberNames(events);
   const usedMembers = new Set<string>();
   const usedEventIds = new Set<string>();
+  const usedTypes = new Map<string, number>();
   const finalCards: AiCard[] = [];
 
   const memberEvents = events.filter((event) => eventHasMembers(event));
   const generalEvents = events.filter((event) => !eventHasMembers(event));
 
+  function canUseEvent(event: ChallengeStudioEvent) {
+    const currentTypeCount = usedTypes.get(event.type) || 0;
+    return currentTypeCount < 2;
+  }
+
+  function markEvent(event: ChallengeStudioEvent) {
+    usedEventIds.add(event.id);
+    usedTypes.set(event.type, (usedTypes.get(event.type) || 0) + 1);
+  }
+
+  // الأولوية للبطاقات المحلية المبنية من الأحداث؛ لأنها تضمن الاسم الحقيقي وتمنع العبارات العامة.
   memberEvents.forEach((event, index) => {
     if (finalCards.length >= REQUIRED_CARDS_COUNT) return;
-    if (usedEventIds.has(event.id)) return;
+    if (usedEventIds.has(event.id) || !canUseEvent(event)) return;
 
     const localCard = buildLocalCardFromEvent(event, usedMembers, index);
     if (!localCard) return;
@@ -964,10 +987,11 @@ function finalizeCardsWithLocalRepair(
     if (!hasAtLeastOneEventMember) return;
     if (hasForbiddenGenericWord(localCard)) return;
 
-    usedEventIds.add(event.id);
+    markEvent(event);
     finalCards.push(expandCardContent(localCard));
   });
 
+  // نستفيد من AI فقط إذا أعطى بطاقة نظيفة وفيها اسم عضو حقيقي وغير مكررة.
   aiCards.forEach((card) => {
     if (finalCards.length >= REQUIRED_CARDS_COUNT) return;
 
@@ -979,7 +1003,7 @@ function finalizeCardsWithLocalRepair(
     if (hasForbiddenGenericWord(card)) return;
 
     const matchedEvent = memberEvents.find((event) => {
-      if (usedEventIds.has(event.id)) return false;
+      if (usedEventIds.has(event.id) || !canUseEvent(event)) return false;
       const eventMembers = getEventMembers(event);
       return eventMembers.some((name) => cardMembers.includes(name));
     });
@@ -996,23 +1020,22 @@ function finalizeCardsWithLocalRepair(
     if (!cleanedCard) return;
     if (hasForbiddenGenericWord(cleanedCard)) return;
 
-    usedEventIds.add(matchedEvent.id);
+    markEvent(matchedEvent);
     finalCards.push(expandCardContent(cleanedCard));
   });
 
   generalEvents.forEach((event, index) => {
     if (finalCards.length >= REQUIRED_CARDS_COUNT) return;
-    if (usedEventIds.has(event.id)) return;
+    if (usedEventIds.has(event.id) || !canUseEvent(event)) return;
 
     const localCard = buildLocalCardFromEvent(event, usedMembers, index);
     if (!localCard) return;
 
-    usedEventIds.add(event.id);
+    markEvent(event);
     finalCards.push(expandCardContent(localCard));
   });
 
   let fallbackIndex = 0;
-
   while (finalCards.length < REQUIRED_CARDS_COUNT) {
     finalCards.push(expandCardContent(buildFallbackGenericCard(fallbackIndex)));
     fallbackIndex += 1;

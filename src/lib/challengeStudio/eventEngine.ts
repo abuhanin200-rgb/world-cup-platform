@@ -1,4 +1,4 @@
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getLeaderboardUsers, type LeaderboardUser } from "@/lib/leaderboard";
 import { getAllMatches, type Match } from "@/lib/matches";
@@ -25,7 +25,18 @@ export type ChallengeStudioEventType =
   | "forgot_prediction"
   | "exact_after_calculation"
   | "winner_after_calculation"
-  | "missed_after_calculation";
+  | "missed_after_calculation"
+  | "knockout_qualification_hit"
+  | "flag_memory_champion"
+  | "flag_memory_fastest"
+  | "flag_memory_fewest_mistakes"
+  | "word_game_champion"
+  | "word_game_fastest"
+  | "word_game_first_try"
+  | "word_game_lost"
+  | "ten_seconds_exact"
+  | "ten_seconds_points_boost"
+  | "ten_seconds_best_attempt";
 
 export type ChallengeStudioEvent = {
   id: string;
@@ -51,6 +62,47 @@ type RawPrediction = {
   isCalculated: boolean;
   createdAt: string;
   calculatedAt: string;
+  qualifiedTeamName: string;
+  qualifiedTeamCode: string;
+  qualificationMethod: string;
+};
+
+type RawFlagMemoryResult = {
+  id: string;
+  userId: string;
+  userName: string;
+  dateKey: string;
+  timeSeconds: number;
+  moves: number;
+  mistakes: number;
+  matchesCount: number;
+  score: number;
+  completed: boolean;
+};
+
+type RawWordGameResult = {
+  id: string;
+  userId: string;
+  userName: string;
+  dateKey: string;
+  won: boolean;
+  attemptsUsed: number;
+  durationMs: number | null;
+  finishedAt: number;
+};
+
+type RawTenSecondsResult = {
+  id: string;
+  userId: string;
+  userName: string;
+  dateKey: string;
+  attemptsCount: number;
+  bestElapsedMs: number | null;
+  bestDiffMs: number | null;
+  bestDisplayTime: string;
+  won: boolean;
+  pointsAwarded: boolean;
+  awardedPoints: number;
 };
 
 function toText(value: unknown) {
@@ -80,6 +132,157 @@ function getAccuracy(user: LeaderboardUser) {
   return Math.round((user.correct / user.total) * 100);
 }
 
+function getMakkahDateKey(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(date);
+}
+
+function getNullableNumber(value: unknown) {
+  if (value === undefined || value === null || value === "") return null;
+
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function getTopUserIdSet(users: LeaderboardUser[], count = 25) {
+  return new Set(users.slice(0, count).map((user) => user.id).filter(Boolean));
+}
+
+function getUserRankData(
+  users: LeaderboardUser[],
+  userId: string,
+  userName: string
+) {
+  return users.find((user) => {
+    return user.id === userId || user.fullName === userName;
+  });
+}
+
+async function getTodayFlagMemoryResultsForEngine(): Promise<RawFlagMemoryResult[]> {
+  const dateKey = getMakkahDateKey();
+  const snapshot = await getDocs(
+    query(collection(db, "flagMemoryResults"), where("dateKey", "==", dateKey))
+  );
+
+  const results = snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => {
+      const data = docSnap.data();
+
+      return {
+        id: toText(data.id) || docSnap.id,
+        userId: toText(data.userId),
+        userName: toText(data.userName),
+        dateKey: toText(data.dateKey),
+        timeSeconds: toNumber(data.timeSeconds),
+        moves: toNumber(data.moves),
+        mistakes: toNumber(data.mistakes),
+        matchesCount: toNumber(data.matchesCount),
+        score: toNumber(data.score),
+        completed: Boolean(data.completed),
+      };
+    })
+    .filter((result) => result.userId && result.userName && result.completed);
+
+  const sorted = results.sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score;
+    if (a.timeSeconds !== b.timeSeconds) return a.timeSeconds - b.timeSeconds;
+    if (a.mistakes !== b.mistakes) return a.mistakes - b.mistakes;
+    if (a.moves !== b.moves) return a.moves - b.moves;
+    return a.userName.localeCompare(b.userName, "ar");
+  });
+
+  const seen = new Set<string>();
+  const unique: RawFlagMemoryResult[] = [];
+
+  sorted.forEach((result) => {
+    const key = result.userId || result.userName;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    unique.push(result);
+  });
+
+  return unique;
+}
+
+async function getTodayWordGameResultsForEngine(): Promise<RawWordGameResult[]> {
+  const dateKey = getMakkahDateKey();
+  const snapshot = await getDocs(
+    query(collection(db, "wordGameDailyResults"), where("dateKey", "==", dateKey))
+  );
+
+  return snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => {
+      const data = docSnap.data();
+      const durationMs = getNullableNumber(data.durationMs);
+
+      return {
+        id: toText(data.id) || docSnap.id,
+        userId: toText(data.userId),
+        userName: toText(data.userName),
+        dateKey: toText(data.dateKey),
+        won: Boolean(data.won),
+        attemptsUsed: toNumber(data.attemptsUsed),
+        durationMs,
+        finishedAt: toNumber(data.finishedAt),
+      };
+    })
+    .filter((result) => result.userId && result.userName)
+    .sort((a, b) => {
+      if (a.won !== b.won) return a.won ? -1 : 1;
+      const aDuration = a.durationMs ?? Number.MAX_SAFE_INTEGER;
+      const bDuration = b.durationMs ?? Number.MAX_SAFE_INTEGER;
+      if (aDuration !== bDuration) return aDuration - bDuration;
+      if (a.attemptsUsed !== b.attemptsUsed) return a.attemptsUsed - b.attemptsUsed;
+      return a.finishedAt - b.finishedAt;
+    });
+}
+
+async function getTodayTenSecondsResultsForEngine(): Promise<RawTenSecondsResult[]> {
+  const dateKey = getMakkahDateKey();
+  const snapshot = await getDocs(
+    query(
+      collection(db, "tenSecondsChallengeDaily"),
+      where("dateKey", "==", dateKey)
+    )
+  );
+
+  return snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => {
+      const data = docSnap.data();
+
+      return {
+        id: toText(data.id) || docSnap.id,
+        userId: toText(data.userId),
+        userName: toText(data.userName),
+        dateKey: toText(data.dateKey),
+        attemptsCount: toNumber(data.attemptsCount),
+        bestElapsedMs: getNullableNumber(data.bestElapsedMs),
+        bestDiffMs: getNullableNumber(data.bestDiffMs),
+        bestDisplayTime: toText(data.bestDisplayTime),
+        won: Boolean(data.won),
+        pointsAwarded: Boolean(data.pointsAwarded),
+        awardedPoints: toNumber(data.awardedPoints),
+      };
+    })
+    .filter((result) => result.userId && result.userName)
+    .sort((a, b) => {
+      if (a.won !== b.won) return a.won ? -1 : 1;
+      const aDiff = a.bestDiffMs ?? Number.POSITIVE_INFINITY;
+      const bDiff = b.bestDiffMs ?? Number.POSITIVE_INFINITY;
+      if (aDiff !== bDiff) return aDiff - bDiff;
+      return a.userName.localeCompare(b.userName, "ar");
+    });
+}
+
 async function getAllPredictionsForEngine(): Promise<RawPrediction[]> {
   const snapshot = await getDocs(collection(db, "predictions"));
 
@@ -103,6 +306,19 @@ async function getAllPredictionsForEngine(): Promise<RawPrediction[]> {
         isCalculated: Boolean(data.isCalculated),
         createdAt: toText(data.createdAt),
         calculatedAt: toText(data.calculatedAt),
+        qualifiedTeamName:
+          toText(data.qualifiedTeamName) ||
+          toText(data.predictedQualifiedTeamName) ||
+          toText(data.selectedQualifiedTeamName) ||
+          toText(data.qualifiedTeam),
+        qualifiedTeamCode:
+          toText(data.qualifiedTeamCode) ||
+          toText(data.predictedQualifiedTeamCode) ||
+          toText(data.selectedQualifiedTeamCode),
+        qualificationMethod:
+          toText(data.qualificationMethod) ||
+          toText(data.predictedQualificationMethod) ||
+          toText(data.selectedQualificationMethod),
       };
     })
     .filter((prediction) => prediction.userId && prediction.matchId);
@@ -862,41 +1078,412 @@ function buildMissedAfterCalculationEvent(predictions: RawPrediction[]) {
   };
 }
 
+
+function buildKnockoutQualificationHitEvent(predictions: RawPrediction[]) {
+  const now = Date.now();
+
+  const prediction = [...predictions]
+    .filter((item) => {
+      const calculatedTime = getTimeValue(item.calculatedAt);
+      const hasQualificationSignal =
+        Boolean(item.qualifiedTeamName || item.qualifiedTeamCode || item.qualificationMethod) ||
+        item.points >= 6;
+
+      return (
+        item.isCalculated &&
+        item.points > 0 &&
+        hasQualificationSignal &&
+        calculatedTime > 0 &&
+        now - calculatedTime <= 24 * 60 * 60 * 1000
+      );
+    })
+    .sort((a, b) => b.points - a.points)[0];
+
+  if (!prediction) return null;
+
+  return {
+    id: `knockout_qualification_hit_${prediction.id}`,
+    type: "knockout_qualification_hit" as const,
+    title: "قراءة خروج المغلوب",
+    priority: prediction.points >= 10 ? 104 : 88,
+    members: [prediction.userName],
+    data: {
+      memberName: prediction.userName,
+      matchName: getPredictionMatchLabel(prediction),
+      homeScore: prediction.homeScore,
+      awayScore: prediction.awayScore,
+      points: prediction.points,
+      qualifiedTeamName: prediction.qualifiedTeamName,
+      qualificationMethod: prediction.qualificationMethod,
+      predictionType: prediction.predictionType,
+    },
+  };
+}
+
+function buildFlagMemoryChampionEvent(
+  results: RawFlagMemoryResult[],
+  users: LeaderboardUser[]
+) {
+  const champion = results[0];
+  if (!champion) return null;
+
+  const rankData = getUserRankData(users, champion.userId, champion.userName);
+
+  return {
+    id: `flag_memory_champion_${champion.id}`,
+    type: "flag_memory_champion" as const,
+    title: "بطل تحدي الأعلام",
+    priority: 90,
+    members: [champion.userName],
+    data: {
+      memberName: champion.userName,
+      score: champion.score,
+      timeSeconds: champion.timeSeconds,
+      moves: champion.moves,
+      mistakes: champion.mistakes,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildFlagMemoryFastestEvent(
+  results: RawFlagMemoryResult[],
+  users: LeaderboardUser[]
+) {
+  const fastest = [...results].sort((a, b) => {
+    if (a.timeSeconds !== b.timeSeconds) return a.timeSeconds - b.timeSeconds;
+    return b.score - a.score;
+  })[0];
+
+  if (!fastest) return null;
+
+  const rankData = getUserRankData(users, fastest.userId, fastest.userName);
+
+  return {
+    id: `flag_memory_fastest_${fastest.id}`,
+    type: "flag_memory_fastest" as const,
+    title: "أسرع عين في الأعلام",
+    priority: 84,
+    members: [fastest.userName],
+    data: {
+      memberName: fastest.userName,
+      score: fastest.score,
+      timeSeconds: fastest.timeSeconds,
+      moves: fastest.moves,
+      mistakes: fastest.mistakes,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildFlagMemoryFewestMistakesEvent(
+  results: RawFlagMemoryResult[],
+  users: LeaderboardUser[]
+) {
+  const cleanPlayer = [...results].sort((a, b) => {
+    if (a.mistakes !== b.mistakes) return a.mistakes - b.mistakes;
+    if (b.score !== a.score) return b.score - a.score;
+    return a.timeSeconds - b.timeSeconds;
+  })[0];
+
+  if (!cleanPlayer) return null;
+
+  const rankData = getUserRankData(users, cleanPlayer.userId, cleanPlayer.userName);
+
+  return {
+    id: `flag_memory_fewest_mistakes_${cleanPlayer.id}`,
+    type: "flag_memory_fewest_mistakes" as const,
+    title: "أقل أخطاء في الأعلام",
+    priority: 78,
+    members: [cleanPlayer.userName],
+    data: {
+      memberName: cleanPlayer.userName,
+      score: cleanPlayer.score,
+      timeSeconds: cleanPlayer.timeSeconds,
+      moves: cleanPlayer.moves,
+      mistakes: cleanPlayer.mistakes,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildWordGameChampionEvent(
+  results: RawWordGameResult[],
+  users: LeaderboardUser[]
+) {
+  const champion = results.find((result) => result.won);
+  if (!champion) return null;
+
+  const rankData = getUserRankData(users, champion.userId, champion.userName);
+
+  return {
+    id: `word_game_champion_${champion.id}`,
+    type: "word_game_champion" as const,
+    title: "بطل خمن كلمة اليوم",
+    priority: 88,
+    members: [champion.userName],
+    data: {
+      memberName: champion.userName,
+      attemptsUsed: champion.attemptsUsed,
+      durationMs: champion.durationMs,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildWordGameFastestEvent(
+  results: RawWordGameResult[],
+  users: LeaderboardUser[]
+) {
+  const fastest = [...results]
+    .filter((result) => result.won)
+    .sort((a, b) => {
+      const aDuration = a.durationMs ?? Number.MAX_SAFE_INTEGER;
+      const bDuration = b.durationMs ?? Number.MAX_SAFE_INTEGER;
+      if (aDuration !== bDuration) return aDuration - bDuration;
+      return a.attemptsUsed - b.attemptsUsed;
+    })[0];
+
+  if (!fastest) return null;
+
+  const rankData = getUserRankData(users, fastest.userId, fastest.userName);
+
+  return {
+    id: `word_game_fastest_${fastest.id}`,
+    type: "word_game_fastest" as const,
+    title: "أسرع فوز في خمن كلمة",
+    priority: 82,
+    members: [fastest.userName],
+    data: {
+      memberName: fastest.userName,
+      attemptsUsed: fastest.attemptsUsed,
+      durationMs: fastest.durationMs,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildWordGameFirstTryEvent(
+  results: RawWordGameResult[],
+  users: LeaderboardUser[]
+) {
+  const sharpPlayer = [...results]
+    .filter((result) => result.won && result.attemptsUsed <= 2)
+    .sort((a, b) => {
+      if (a.attemptsUsed !== b.attemptsUsed) return a.attemptsUsed - b.attemptsUsed;
+      const aDuration = a.durationMs ?? Number.MAX_SAFE_INTEGER;
+      const bDuration = b.durationMs ?? Number.MAX_SAFE_INTEGER;
+      return aDuration - bDuration;
+    })[0];
+
+  if (!sharpPlayer) return null;
+
+  const rankData = getUserRankData(users, sharpPlayer.userId, sharpPlayer.userName);
+
+  return {
+    id: `word_game_first_try_${sharpPlayer.id}`,
+    type: "word_game_first_try" as const,
+    title: sharpPlayer.attemptsUsed === 1 ? "من أول محاولة" : "من ثاني محاولة",
+    priority: sharpPlayer.attemptsUsed === 1 ? 86 : 80,
+    members: [sharpPlayer.userName],
+    data: {
+      memberName: sharpPlayer.userName,
+      attemptsUsed: sharpPlayer.attemptsUsed,
+      durationMs: sharpPlayer.durationMs,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildWordGameLostEvent(
+  results: RawWordGameResult[],
+  users: LeaderboardUser[]
+) {
+  const topUserIds = getTopUserIdSet(users, 25);
+  const lostPlayer = results.find(
+    (result) => !result.won && topUserIds.has(result.userId)
+  );
+
+  if (!lostPlayer) return null;
+
+  const rankData = getUserRankData(users, lostPlayer.userId, lostPlayer.userName);
+
+  return {
+    id: `word_game_lost_${lostPlayer.id}`,
+    type: "word_game_lost" as const,
+    title: "كلمة استعصت اليوم",
+    priority: 58,
+    members: [lostPlayer.userName],
+    data: {
+      memberName: lostPlayer.userName,
+      attemptsUsed: lostPlayer.attemptsUsed,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildTenSecondsExactEvent(
+  results: RawTenSecondsResult[],
+  users: LeaderboardUser[]
+) {
+  const exact = [...results]
+    .filter((result) => result.won && result.bestDiffMs === 0)
+    .sort((a, b) => (b.awardedPoints || 0) - (a.awardedPoints || 0))[0];
+
+  if (!exact) return null;
+
+  const rankData = getUserRankData(users, exact.userId, exact.userName);
+
+  return {
+    id: `ten_seconds_exact_${exact.id}`,
+    type: "ten_seconds_exact" as const,
+    title: "العشر ثواني بالملي",
+    priority: 94,
+    members: [exact.userName],
+    data: {
+      memberName: exact.userName,
+      bestDisplayTime: exact.bestDisplayTime || "00:10.000",
+      bestDiffMs: exact.bestDiffMs,
+      attemptsCount: exact.attemptsCount,
+      awardedPoints: exact.awardedPoints,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildTenSecondsPointsBoostEvent(
+  results: RawTenSecondsResult[],
+  users: LeaderboardUser[]
+) {
+  const winner = [...results]
+    .filter((result) => result.won && result.pointsAwarded && result.awardedPoints > 0)
+    .sort((a, b) => {
+      const aDiff = a.bestDiffMs ?? Number.POSITIVE_INFINITY;
+      const bDiff = b.bestDiffMs ?? Number.POSITIVE_INFINITY;
+      if (aDiff !== bDiff) return aDiff - bDiff;
+      return b.awardedPoints - a.awardedPoints;
+    })[0];
+
+  if (!winner) return null;
+
+  const rankData = getUserRankData(users, winner.userId, winner.userName);
+
+  return {
+    id: `ten_seconds_points_boost_${winner.id}`,
+    type: "ten_seconds_points_boost" as const,
+    title: "خمس نقاط في الوقت القاتل",
+    priority: 89,
+    members: [winner.userName],
+    data: {
+      memberName: winner.userName,
+      bestDisplayTime: winner.bestDisplayTime,
+      bestDiffMs: winner.bestDiffMs,
+      attemptsCount: winner.attemptsCount,
+      awardedPoints: winner.awardedPoints,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
+function buildTenSecondsBestAttemptEvent(
+  results: RawTenSecondsResult[],
+  users: LeaderboardUser[]
+) {
+  const closest = [...results]
+    .filter((result) => !result.won && result.bestDiffMs !== null)
+    .sort((a, b) => {
+      const aDiff = a.bestDiffMs ?? Number.POSITIVE_INFINITY;
+      const bDiff = b.bestDiffMs ?? Number.POSITIVE_INFINITY;
+      return aDiff - bDiff;
+    })[0];
+
+  if (!closest) return null;
+
+  const rankData = getUserRankData(users, closest.userId, closest.userName);
+
+  return {
+    id: `ten_seconds_best_attempt_${closest.id}`,
+    type: "ten_seconds_best_attempt" as const,
+    title: "قريب من العشرة",
+    priority: 62,
+    members: [closest.userName],
+    data: {
+      memberName: closest.userName,
+      bestDisplayTime: closest.bestDisplayTime,
+      bestDiffMs: closest.bestDiffMs,
+      attemptsCount: closest.attemptsCount,
+      currentRank: rankData?.currentRank ?? null,
+      points: rankData?.points ?? null,
+    },
+  };
+}
+
 export async function buildChallengeStudioEvents(): Promise<
   ChallengeStudioEvent[]
 > {
-  const [users, matches, predictions] = await Promise.all([
+  const [
+    users,
+    matches,
+    predictions,
+    flagMemoryResults,
+    wordGameResults,
+    tenSecondsResults,
+  ] = await Promise.all([
     getLeaderboardUsers(),
     getAllMatches(),
     getAllPredictionsForEngine(),
+    getTodayFlagMemoryResultsForEngine(),
+    getTodayWordGameResultsForEngine(),
+    getTodayTenSecondsResultsForEngine(),
   ]);
 
   const activeUsers = users.filter((user) => user.total > 0);
+  const focusUsers = activeUsers.slice(0, 25);
 
   const events = [
     buildGoldenPredictionAlertEvent(matches),
     buildExactAfterCalculationEvent(predictions),
+    buildKnockoutQualificationHitEvent(predictions),
+    buildTenSecondsExactEvent(tenSecondsResults, activeUsers),
     buildRoundStarEvent(predictions),
-    buildLeaderPressureEvent(activeUsers),
+    buildLeaderPressureEvent(focusUsers),
+    buildFlagMemoryChampionEvent(flagMemoryResults, activeUsers),
+    buildWordGameChampionEvent(wordGameResults, activeUsers),
+    buildTenSecondsPointsBoostEvent(tenSecondsResults, activeUsers),
     buildStrongMatchAlertEvent(matches),
     buildDangerousPredictionEvent(predictions),
-    buildTop3SpotlightEvent(activeUsers),
-    buildTop10SpotlightEvent(activeUsers),
-    buildChasingPackEvent(activeUsers),
-    buildBiggestClimbEvent(activeUsers),
-    buildBiggestDropEvent(activeUsers),
-    buildBestStreakEvent(activeUsers),
-    buildHighestAccuracyEvent(activeUsers),
-    buildMostExactEvent(activeUsers),
-    buildBestComebackEvent(activeUsers),
-    buildMostStableEvent(activeUsers),
-    buildBlackHorseEvent(activeUsers),
-    buildWorstLuckEvent(activeUsers),
+    buildTop3SpotlightEvent(focusUsers),
+    buildTop10SpotlightEvent(focusUsers),
+    buildChasingPackEvent(focusUsers),
+    buildBiggestClimbEvent(focusUsers),
+    buildBiggestDropEvent(focusUsers),
+    buildBestStreakEvent(focusUsers),
+    buildHighestAccuracyEvent(focusUsers),
+    buildMostExactEvent(focusUsers),
+    buildBestComebackEvent(focusUsers),
+    buildMostStableEvent(focusUsers),
+    buildBlackHorseEvent(focusUsers),
+    buildFlagMemoryFastestEvent(flagMemoryResults, activeUsers),
+    buildFlagMemoryFewestMistakesEvent(flagMemoryResults, activeUsers),
+    buildWordGameFastestEvent(wordGameResults, activeUsers),
+    buildWordGameFirstTryEvent(wordGameResults, activeUsers),
+    buildTenSecondsBestAttemptEvent(tenSecondsResults, activeUsers),
+    buildWorstLuckEvent(focusUsers),
+    buildWordGameLostEvent(wordGameResults, activeUsers),
     buildWinnerAfterCalculationEvent(predictions),
-    buildForgotPredictionEvent(activeUsers, matches, predictions),
+    buildForgotPredictionEvent(focusUsers, matches, predictions),
     buildMissedAfterCalculationEvent(predictions),
     buildStudioWordEvent(activeUsers, matches),
   ].filter(Boolean) as ChallengeStudioEvent[];
 
-  return events.sort((a, b) => b.priority - a.priority).slice(0, 30);
+  return events.sort((a, b) => b.priority - a.priority).slice(0, 40);
 }

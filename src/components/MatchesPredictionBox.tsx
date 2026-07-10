@@ -818,7 +818,7 @@ export default function MatchesPredictionBox() {
                     <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center text-xs font-black text-amber-100 shadow-md shadow-amber-950/10">
                       <span className="inline-flex items-center justify-center gap-1.5">
                         <Edit3 className="h-4 w-4" />
-                        <span>تعديل التوقع متاح حتى بداية المباراة</span>
+                        <span>تعديل التوقع متاح لمدة 5 دقائق بعد الاعتماد</span>
                       </span>
                     </div>
 
@@ -924,7 +924,7 @@ export default function MatchesPredictionBox() {
                         <div className="text-xs font-black text-amber-100 md:text-sm">
                           <span className="inline-flex items-center justify-center gap-1.5">
                             <Edit3 className="h-4 w-4" />
-                            <span>تعديل التوقع متاح حتى بداية المباراة</span>
+                            <span>تعديل التوقع متاح لمدة 5 دقائق بعد الاعتماد</span>
                           </span>
                         </div>
 

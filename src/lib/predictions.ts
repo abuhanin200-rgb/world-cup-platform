@@ -29,7 +29,7 @@ export type Prediction = {
   awayTeamName: string;
   awayTeamEmoji: string;
   homeTeamCode?: string | null;
-awayTeamCode?: string | null;
+  awayTeamCode?: string | null;
 
   homeScore: number;
   awayScore: number;
@@ -68,7 +68,7 @@ export type SubmitPredictionInput = {
   awayTeamName: string;
   awayTeamEmoji: string;
   homeTeamCode?: string;
-awayTeamCode?: string;
+  awayTeamCode?: string;
 
   homeScore: number;
   awayScore: number;
@@ -117,7 +117,6 @@ export type LatestPrediction = {
   createdAt?: string;
 };
 
-
 type PredictionMatchInfo = {
   predictionType: PredictionType;
   matchStage: MatchStage;
@@ -128,7 +127,7 @@ type PredictionMatchInfo = {
   isActive: boolean;
 };
 
-export const PREDICTION_EDIT_WINDOW_MS = 0;
+export const PREDICTION_EDIT_WINDOW_MS = 5 * 60 * 1000;
 
 function validateScore(score: number) {
   return Number.isInteger(score) && score >= 0 && score <= 30;
@@ -216,7 +215,10 @@ function getTimeValue(createdAt?: string) {
   return Number.isFinite(time) ? time : 0;
 }
 
-function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
+function mapPrediction(
+  id: string,
+  data: Record<string, unknown>
+): Prediction {
   return {
     id,
 
@@ -229,24 +231,29 @@ function mapPrediction(id: string, data: Record<string, unknown>): Prediction {
     homeTeamEmoji: toText(data.homeTeamEmoji),
     awayTeamName: toText(data.awayTeamName),
     awayTeamEmoji: toText(data.awayTeamEmoji),
+
     homeTeamCode:
-  data.homeTeamCode === null || data.homeTeamCode === undefined
-    ? null
-    : toText(data.homeTeamCode),
-awayTeamCode:
-  data.awayTeamCode === null || data.awayTeamCode === undefined
-    ? null
-    : toText(data.awayTeamCode),
+      data.homeTeamCode === null || data.homeTeamCode === undefined
+        ? null
+        : toText(data.homeTeamCode),
+
+    awayTeamCode:
+      data.awayTeamCode === null || data.awayTeamCode === undefined
+        ? null
+        : toText(data.awayTeamCode),
 
     homeScore: toNumber(data.homeScore),
     awayScore: toNumber(data.awayScore),
 
     qualifiedTeamCode:
-      data.qualifiedTeamCode === null || data.qualifiedTeamCode === undefined
+      data.qualifiedTeamCode === null ||
+      data.qualifiedTeamCode === undefined
         ? null
         : toText(data.qualifiedTeamCode),
 
-    qualificationMethod: normalizeQualificationMethod(data.qualificationMethod),
+    qualificationMethod: normalizeQualificationMethod(
+      data.qualificationMethod
+    ),
 
     points: toNumber(data.points),
     resultType: toText(data.resultType),
@@ -256,12 +263,14 @@ awayTeamCode:
     matchStage: normalizeMatchStage(data.matchStage),
 
     actualHomeScore:
-      data.actualHomeScore === null || data.actualHomeScore === undefined
+      data.actualHomeScore === null ||
+      data.actualHomeScore === undefined
         ? null
         : toNumber(data.actualHomeScore),
 
     actualAwayScore:
-      data.actualAwayScore === null || data.actualAwayScore === undefined
+      data.actualAwayScore === null ||
+      data.actualAwayScore === undefined
         ? null
         : toNumber(data.actualAwayScore),
 
@@ -283,10 +292,12 @@ awayTeamCode:
     createdAt: toText(data.createdAt),
     createdAtServer: data.createdAtServer,
     updatedAt: toText(data.updatedAt),
+
     editedAt:
       data.editedAt === null || data.editedAt === undefined
         ? null
         : toText(data.editedAt),
+
     editCount: toNumber(data.editCount),
   };
 }
@@ -295,21 +306,6 @@ function getMatchStartTime(startAt: string) {
   const startTime = new Date(startAt).getTime();
 
   return Number.isFinite(startTime) ? startTime : 0;
-}
-
-function isPredictionEditWindowOpen(
-  prediction: Prediction,
-  matchInfo: Pick<PredictionMatchInfo, "startAt" | "status" | "isActive">,
-  nowTime = Date.now()
-) {
-  if (!prediction || prediction.isCalculated) return false;
-  if (!matchInfo.isActive || matchInfo.status !== "scheduled") return false;
-
-  const startTime = getMatchStartTime(matchInfo.startAt);
-
-  if (!startTime) return false;
-
-  return nowTime < startTime;
 }
 
 export function getPredictionEditWindowRemainingMs(
@@ -323,7 +319,38 @@ export function getPredictionEditWindowRemainingMs(
 
   if (!startTime) return 0;
 
-  return Math.max(0, startTime - nowTime);
+  const createdTime = prediction.createdAt
+    ? new Date(prediction.createdAt).getTime()
+    : 0;
+
+  if (!createdTime || !Number.isFinite(createdTime)) {
+    return 0;
+  }
+
+  const editDeadline = createdTime + PREDICTION_EDIT_WINDOW_MS;
+  const closeTime = Math.min(startTime, editDeadline);
+
+  return Math.max(0, closeTime - nowTime);
+}
+
+function isPredictionEditWindowOpen(
+  prediction: Prediction,
+  matchInfo: Pick<
+    PredictionMatchInfo,
+    "startAt" | "status" | "isActive"
+  >,
+  nowTime = Date.now()
+) {
+  if (!prediction || prediction.isCalculated) return false;
+  if (!matchInfo.isActive || matchInfo.status !== "scheduled") return false;
+
+  const remainingMs = getPredictionEditWindowRemainingMs(
+    prediction,
+    matchInfo.startAt,
+    nowTime
+  );
+
+  return remainingMs > 0;
 }
 
 function validateKnockoutPredictionFields({
@@ -340,7 +367,8 @@ function validateKnockoutPredictionFields({
   qualificationMethod?: QualificationMethod | null;
 }) {
   const isKnockoutDrawPrediction =
-    matchInfo.matchStage === "knockout" && homeScore === awayScore;
+    matchInfo.matchStage === "knockout" &&
+    homeScore === awayScore;
 
   const cleanQualifiedTeamCode = isKnockoutDrawPrediction
     ? toText(qualifiedTeamCode)
@@ -368,12 +396,12 @@ function validateKnockoutPredictionFields({
     qualifiedTeamCode: isKnockoutDrawPrediction
       ? cleanQualifiedTeamCode
       : null,
+
     qualificationMethod: isKnockoutDrawPrediction
       ? cleanQualificationMethod
       : null,
   };
 }
-
 
 export async function getUserPredictionForMatch(
   userId: string,
@@ -390,19 +418,22 @@ export async function getUserPredictionForMatch(
   const fixedPredictionSnap = await getDoc(fixedPredictionRef);
 
   if (fixedPredictionSnap.exists()) {
-    return mapPrediction(fixedPredictionSnap.id, fixedPredictionSnap.data());
+    return mapPrediction(
+      fixedPredictionSnap.id,
+      fixedPredictionSnap.data()
+    );
   }
 
   const predictionsRef = collection(db, "predictions");
 
-  const q = query(
+  const predictionsQuery = query(
     predictionsRef,
     where("userId", "==", userId),
     where("matchId", "==", matchId),
     limit(1)
   );
 
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocs(predictionsQuery);
 
   if (snapshot.empty) return null;
 
@@ -411,7 +442,9 @@ export async function getUserPredictionForMatch(
   return mapPrediction(docSnap.id, docSnap.data());
 }
 
-export async function submitPrediction(input: SubmitPredictionInput) {
+export async function submitPrediction(
+  input: SubmitPredictionInput
+) {
   if (!input.userId) {
     throw new Error("يجب تسجيل الدخول أولًا لاعتماد التوقع");
   }
@@ -420,18 +453,34 @@ export async function submitPrediction(input: SubmitPredictionInput) {
     throw new Error("بيانات المباراة غير مكتملة");
   }
 
-  if (!validateScore(input.homeScore) || !validateScore(input.awayScore)) {
+  if (
+    !validateScore(input.homeScore) ||
+    !validateScore(input.awayScore)
+  ) {
     throw new Error("أدخل نتيجة صحيحة من 0 إلى 30");
   }
 
-  const predictionDocId = getPredictionDocId(input.userId, input.matchId);
-  const predictionRef = doc(db, "predictions", predictionDocId);
+  const predictionDocId = getPredictionDocId(
+    input.userId,
+    input.matchId
+  );
 
- const existingFixedPrediction = await getDoc(predictionRef);
+  const predictionRef = doc(
+    db,
+    "predictions",
+    predictionDocId
+  );
 
-if (existingFixedPrediction.exists() && !input.adminOverride) {
-  throw new Error("تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله");
-}
+  const existingFixedPrediction = await getDoc(predictionRef);
+
+  if (
+    existingFixedPrediction.exists() &&
+    !input.adminOverride
+  ) {
+    throw new Error(
+      "تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله"
+    );
+  }
 
   const existingPrediction = await getUserPredictionForMatch(
     input.userId,
@@ -439,10 +488,13 @@ if (existingFixedPrediction.exists() && !input.adminOverride) {
   );
 
   if (existingPrediction && !input.adminOverride) {
-    throw new Error("تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله");
+    throw new Error(
+      "تم اعتماد توقعك مسبقًا لهذه المباراة ولا يمكن تعديله"
+    );
   }
 
   const matchInfo = await getPredictionMatchInfo(input.matchId);
+
   const { qualifiedTeamCode, qualificationMethod } =
     validateKnockoutPredictionFields({
       matchInfo,
@@ -464,8 +516,12 @@ if (existingFixedPrediction.exists() && !input.adminOverride) {
     homeTeamEmoji: input.homeTeamEmoji,
     awayTeamName: input.awayTeamName,
     awayTeamEmoji: input.awayTeamEmoji,
-    homeTeamCode: toText(input.homeTeamCode) || matchInfo.homeTeamCode,
-awayTeamCode: toText(input.awayTeamCode) || matchInfo.awayTeamCode,
+
+    homeTeamCode:
+      toText(input.homeTeamCode) || matchInfo.homeTeamCode,
+
+    awayTeamCode:
+      toText(input.awayTeamCode) || matchInfo.awayTeamCode,
 
     homeScore: input.homeScore,
     awayScore: input.awayScore,
@@ -516,7 +572,9 @@ awayTeamCode: toText(input.awayTeamCode) || matchInfo.awayTeamCode,
   } as Prediction;
 }
 
-export async function updatePrediction(input: UpdatePredictionInput) {
+export async function updatePrediction(
+  input: UpdatePredictionInput
+) {
   if (!input.userId) {
     throw new Error("يجب تسجيل الدخول أولًا لتعديل التوقع");
   }
@@ -525,12 +583,24 @@ export async function updatePrediction(input: UpdatePredictionInput) {
     throw new Error("بيانات المباراة غير مكتملة");
   }
 
-  if (!validateScore(input.homeScore) || !validateScore(input.awayScore)) {
+  if (
+    !validateScore(input.homeScore) ||
+    !validateScore(input.awayScore)
+  ) {
     throw new Error("أدخل نتيجة صحيحة من 0 إلى 30");
   }
 
-  const predictionDocId = getPredictionDocId(input.userId, input.matchId);
-  const predictionRef = doc(db, "predictions", predictionDocId);
+  const predictionDocId = getPredictionDocId(
+    input.userId,
+    input.matchId
+  );
+
+  const predictionRef = doc(
+    db,
+    "predictions",
+    predictionDocId
+  );
+
   const predictionSnap = await getDoc(predictionRef);
 
   if (!predictionSnap.exists()) {
@@ -585,11 +655,15 @@ export async function updatePrediction(input: UpdatePredictionInput) {
 export async function getLatestPredictions(
   maxItems = 100
 ): Promise<LatestPrediction[]> {
-  const predictionsSnapshot = await getDocs(collection(db, "predictions"));
+  const predictionsSnapshot = await getDocs(
+    collection(db, "predictions")
+  );
 
   return predictionsSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => mapPrediction(docSnap.id, docSnap.data()))
+    .map((docSnap) =>
+      mapPrediction(docSnap.id, docSnap.data())
+    )
     .filter((prediction) => {
       const hasPredictionData =
         prediction.userName &&
@@ -597,9 +671,16 @@ export async function getLatestPredictions(
         prediction.homeTeamName &&
         prediction.awayTeamName;
 
-      return hasPredictionData && prediction.isCalculated === false;
+      return (
+        hasPredictionData &&
+        prediction.isCalculated === false
+      );
     })
-    .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
+    .sort(
+      (a, b) =>
+        getTimeValue(b.createdAt) -
+        getTimeValue(a.createdAt)
+    )
     .slice(0, maxItems)
     .map((prediction) => ({
       id: prediction.id,
@@ -636,12 +717,21 @@ export async function getPredictionsByUserId(
 
   const predictionsRef = collection(db, "predictions");
 
-  const q = query(predictionsRef, where("userId", "==", userId));
+  const predictionsQuery = query(
+    predictionsRef,
+    where("userId", "==", userId)
+  );
 
-  const snapshot = await getDocs(q);
+  const snapshot = await getDocs(predictionsQuery);
 
   return snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => mapPrediction(docSnap.id, docSnap.data()))
-    .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
+    .map((docSnap) =>
+      mapPrediction(docSnap.id, docSnap.data())
+    )
+    .sort(
+      (a, b) =>
+        getTimeValue(b.createdAt) -
+        getTimeValue(a.createdAt)
+    );
 }
