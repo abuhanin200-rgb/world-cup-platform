@@ -20,6 +20,9 @@ const AI_MODEL = "gpt-4.1-mini";
 const REQUIRED_CARDS_COUNT = 10;
 
 const EXCEPTIONAL_EVENT_TYPES = new Set<ChallengeStudioEvent["type"]>([
+  "final_spotlight",
+  "semi_final_spotlight",
+  "third_place_spotlight",
   "golden_prediction_alert",
   "exact_after_calculation",
   "leader_under_pressure",
@@ -266,6 +269,18 @@ function buildPrompt(events: ChallengeStudioEvent[], recentMembers: string[]) {
 - إذا كان الحدث لا يحتوي على أي اسم، عندها فقط يمكن استخدام صياغة عامة.
 - اذكر اسم العضو مرة واحدة فقط في البطاقة، ثم أكمل بالضمائر أو الوصف دون تكرار الاسم.
 
+أولوية الأدوار الحاسمة وهي إلزامية جدًا:
+- إذا وُجد حدث final_spotlight، اجعله البطاقة الأولى في النشرة بنوع main، ولا تضع قبله أي خبر آخر.
+- إذا وُجد حدث semi_final_spotlight، خصص له بطاقة رئيسية مستقلة، واجعله ضمن أول ثلاث بطاقات.
+- إذا وُجد حدثان لنصف النهائي، امنح كل مواجهة بطاقة مستقلة وزاوية تحريرية مختلفة، ولا تدمجهما في خبر واحد.
+- إذا وُجد حدث third_place_spotlight، عامله كمواجهة خاصة على منصة التتويج، لكن بعد النهائي ونصف النهائي في الأولوية.
+- يجب ذكر اسمي المنتخبين الواردين في homeTeamName وawayTeamName داخل النص بوضوح.
+- لا تستخدم للأدوار الحاسمة عبارات عامة فقط مثل: مباراة قوية، قمة مرتقبة، مواجهة نارية؛ بل وضّح معنى العبور للنهائي أو حسم اللقب أو منصة التتويج.
+- اجعل لغة النهائي أعلى هيبة وتأثيرًا من لغة نصف النهائي، ولغة نصف النهائي أكثر توترًا من المباريات العادية.
+- نوّع المدخل الصحفي بين: قيمة المواجهة، ضغط التوقعات، طريق اللقب، اختبار الأعصاب، أثر السوبر ذهبي، وسيناريو التأهل.
+- لا تخترع موعدًا أو نتيجة أو رقمًا غير موجود في الحدث.
+- لا تكرر نفس عنوان أو افتتاحية الدور الحاسم في النشرة نفسها.
+
 قواعد صارمة جدًا:
 - اكتب 10 بطاقات بالضبط، لا أقل ولا أكثر.
 - محتوى كل بطاقة يجب أن يكون بين 45 و85 كلمة تقريبًا.
@@ -309,8 +324,8 @@ ${JSON.stringify(recentMembers, null, 2)}
 main, quote, number, badge, funny, watch
 
 هيكلة البطاقات المطلوبة:
-1- بطاقة رئيسية قوية ومبنية على أهم حدث.
-2- بطاقة من توقعات المباريات أو الصدارة.
+1- النهائي أولًا إذا كان موجودًا، وإلا أقوى حدث متاح.
+2- نصف النهائي إذا كان موجودًا، وإلا بطاقة من توقعات المباريات أو الصدارة.
 3- بطاقة من تحدي العشر ثواني إذا توفرت نتيجة اليوم.
 4- بطاقة من تحدي الأعلام إذا توفرت نتيجة اليوم.
 5- بطاقة من خمن كلمة اليوم إذا توفرت نتيجة اليوم.
@@ -537,6 +552,50 @@ function buildLocalCardFromEvent(
   if (primaryName) usedMembers.add(primaryName);
   if (event.type === "leader_under_pressure" && secondaryName) {
     usedMembers.add(secondaryName);
+  }
+
+  if (event.type === "final_spotlight") {
+    const homeTeamName = getText(event.data.homeTeamName);
+    const awayTeamName = getText(event.data.awayTeamName);
+    const hoursUntilStart = getNumber(event.data.hoursUntilStart);
+    const isGolden = getText(event.data.predictionType) === "golden";
+
+    return {
+      type: "main",
+      icon: "🏆",
+      title: getText(event.title) || "ليلة الحسم الكبرى",
+      content: `${homeTeamName} و${awayTeamName} يقفان أمام المشهد الأخير في البطولة، حيث لا مكان للتعويض بعد صافرة النهائي. ${hoursUntilStart > 0 ? `يتبقى على المواجهة نحو ${hoursUntilStart} ساعة،` : "موعد الحسم بات قريبًا،"} ومعها ترتفع قيمة كل توقع وتتضاعف حساسية التفاصيل. ${isGolden ? "وجود السوبر ذهبي يجعل قراءة النتيجة والمتأهل وطريقة الحسم فرصة قادرة على إعادة ترتيب المنافسة بالكامل." : "النهائي يختبر دقة الأعضاء في أهم مباراة، وقد تصنع نقطة واحدة الفارق في سباق الصدارة."}`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "semi_final_spotlight") {
+    const homeTeamName = getText(event.data.homeTeamName);
+    const awayTeamName = getText(event.data.awayTeamName);
+    const hoursUntilStart = getNumber(event.data.hoursUntilStart);
+    const isGolden = getText(event.data.predictionType) === "golden";
+
+    return {
+      type: "main",
+      icon: "🎯",
+      title: getText(event.title) || "بوابة النهائي تفتح أبوابها",
+      content: `${homeTeamName} يواجه ${awayTeamName} في نصف نهائي لا يمنح سوى بطاقة واحدة إلى المشهد الأخير. ${hoursUntilStart > 0 ? `تبقى قرابة ${hoursUntilStart} ساعة على البداية،` : "صافرة البداية تقترب،"} والضغط هنا لا يقتصر على المنتخبين؛ فالأعضاء أمام اختبار صعب في قراءة النتيجة والمتأهل وسيناريو الحسم. ${isGolden ? "السوبر ذهبي يرفع سقف المخاطرة والمكافأة، وقد يحول هذه المواجهة إلى نقطة انقلاب في الترتيب." : "كل اختيار في هذه المرحلة قد يفتح طريقًا نحو الصدارة أو يوسع الفارق عن المنافسين."}`,
+      priority: basePriority,
+    };
+  }
+
+  if (event.type === "third_place_spotlight") {
+    const homeTeamName = getText(event.data.homeTeamName);
+    const awayTeamName = getText(event.data.awayTeamName);
+    const hoursUntilStart = getNumber(event.data.hoursUntilStart);
+
+    return {
+      type: "watch",
+      icon: "🥉",
+      title: getText(event.title) || "معركة منصة التتويج",
+      content: `${homeTeamName} و${awayTeamName} يعودان إلى الميدان من أجل المركز الثالث وإنهاء البطولة فوق منصة التتويج. ${hoursUntilStart > 0 ? `المواجهة تبدأ بعد نحو ${hoursUntilStart} ساعة،` : "الموعد بات قريبًا،"} وهي مباراة تختلف نفسيًا عن بقية الأدوار؛ لأنها تجمع بين رغبة التعويض وحفظ ختام مشرف. في منصة التوقعات تبقى نقاطها مؤثرة، خصوصًا مع تقارب المراكز في الأمتار الأخيرة.`,
+      priority: basePriority,
+    };
   }
 
   if (event.type === "leader_under_pressure" && primaryName && secondaryName) {
@@ -957,8 +1016,19 @@ function finalizeCardsWithLocalRepair(
   const usedTypes = new Map<string, number>();
   const finalCards: AiCard[] = [];
 
-  const memberEvents = events.filter((event) => eventHasMembers(event));
-  const generalEvents = events.filter((event) => !eventHasMembers(event));
+  const marqueeEventTypes = new Set<ChallengeStudioEvent["type"]>([
+    "final_spotlight",
+    "semi_final_spotlight",
+    "third_place_spotlight",
+  ]);
+
+  const marqueeEvents = events.filter((event) => marqueeEventTypes.has(event.type));
+  const memberEvents = events.filter(
+    (event) => eventHasMembers(event) && !marqueeEventTypes.has(event.type),
+  );
+  const generalEvents = events.filter(
+    (event) => !eventHasMembers(event) && !marqueeEventTypes.has(event.type),
+  );
 
   function canUseEvent(event: ChallengeStudioEvent) {
     const currentTypeCount = usedTypes.get(event.type) || 0;
@@ -970,7 +1040,19 @@ function finalizeCardsWithLocalRepair(
     usedTypes.set(event.type, (usedTypes.get(event.type) || 0) + 1);
   }
 
-  // الأولوية للبطاقات المحلية المبنية من الأحداث؛ لأنها تضمن الاسم الحقيقي وتمنع العبارات العامة.
+  // الأدوار الحاسمة تتصدر النشرة قبل أي خبر آخر، مع بطاقة مستقلة لكل مواجهة.
+  marqueeEvents.forEach((event, index) => {
+    if (finalCards.length >= REQUIRED_CARDS_COUNT) return;
+    if (usedEventIds.has(event.id) || !canUseEvent(event)) return;
+
+    const localCard = buildLocalCardFromEvent(event, usedMembers, index);
+    if (!localCard) return;
+
+    markEvent(event);
+    finalCards.push(expandCardContent(localCard));
+  });
+
+  // الأولوية التالية للبطاقات المحلية المبنية من أحداث الأعضاء؛ لأنها تضمن الاسم الحقيقي وتمنع العبارات العامة.
   memberEvents.forEach((event, index) => {
     if (finalCards.length >= REQUIRED_CARDS_COUNT) return;
     if (usedEventIds.has(event.id) || !canUseEvent(event)) return;

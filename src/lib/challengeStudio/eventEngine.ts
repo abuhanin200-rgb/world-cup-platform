@@ -4,6 +4,9 @@ import { getLeaderboardUsers, type LeaderboardUser } from "@/lib/leaderboard";
 import { getAllMatches, type Match } from "@/lib/matches";
 
 export type ChallengeStudioEventType =
+  | "final_spotlight"
+  | "semi_final_spotlight"
+  | "third_place_spotlight"
   | "golden_prediction_alert"
   | "strong_match_alert"
   | "dangerous_prediction"
@@ -125,6 +128,22 @@ function getMatchLabel(match: Match) {
 
 function getPredictionMatchLabel(prediction: RawPrediction) {
   return `${prediction.homeTeamName} × ${prediction.awayTeamName}`;
+}
+
+function getKnockoutRoundValue(match: Match) {
+  return match.matchStage === "knockout" ? match.knockoutRound || "general" : null;
+}
+
+function getHoursUntilMatch(match: Match, now = Date.now()) {
+  const startTime = getTimeValue(match.startAt);
+  if (!startTime || startTime <= now) return 0;
+  return Math.max(1, Math.ceil((startTime - now) / (60 * 60 * 1000)));
+}
+
+function getEditorialVariant(match: Match, variants: string[]) {
+  const source = `${match.id}-${match.homeTeamCode}-${match.awayTeamCode}`;
+  const score = Array.from(source).reduce((total, char) => total + char.charCodeAt(0), 0);
+  return variants[score % variants.length];
 }
 
 function getAccuracy(user: LeaderboardUser) {
@@ -324,6 +343,141 @@ async function getAllPredictionsForEngine(): Promise<RawPrediction[]> {
     .filter((prediction) => prediction.userId && prediction.matchId);
 }
 
+function buildKnockoutRoundSpotlightEvents(matches: Match[]) {
+  const now = Date.now();
+
+  const upcoming = [...matches]
+    .filter((match) => {
+      const startTime = getTimeValue(match.startAt);
+      const round = getKnockoutRoundValue(match);
+
+      return (
+        match.isActive &&
+        match.status === "scheduled" &&
+        startTime > now &&
+        (round === "semiFinal" || round === "thirdPlace" || round === "final")
+      );
+    })
+    .sort((a, b) => getTimeValue(a.startAt) - getTimeValue(b.startAt));
+
+  const semiFinals = upcoming
+    .filter((match) => getKnockoutRoundValue(match) === "semiFinal")
+    .slice(0, 2);
+
+  const thirdPlace = upcoming.find(
+    (match) => getKnockoutRoundValue(match) === "thirdPlace"
+  );
+
+  const finalMatch = upcoming.find(
+    (match) => getKnockoutRoundValue(match) === "final"
+  );
+
+  const events: ChallengeStudioEvent[] = [];
+
+  if (finalMatch) {
+    events.push({
+      id: `final_spotlight_${finalMatch.id}`,
+      type: "final_spotlight",
+      title: getEditorialVariant(finalMatch, [
+        "ليلة الحسم الكبرى",
+        "المشهد الأخير يقترب",
+        "كل الطرق تقود إلى النهائي",
+        "موعد البطولة وكتابة التاريخ",
+      ]),
+      priority: getHoursUntilMatch(finalMatch, now) <= 24 ? 165 : 158,
+      members: [],
+      data: {
+        matchId: finalMatch.id,
+        matchName: getMatchLabel(finalMatch),
+        homeTeamName: finalMatch.homeTeamName,
+        awayTeamName: finalMatch.awayTeamName,
+        matchDate: finalMatch.matchDate,
+        matchTime: finalMatch.matchTime,
+        hoursUntilStart: getHoursUntilMatch(finalMatch, now),
+        predictionType: finalMatch.predictionType,
+        matchStage: finalMatch.matchStage,
+        knockoutRound: "final",
+        roundLabel: "النهائي",
+        editorialWeight: "maximum",
+        editorialAngle: getEditorialVariant(finalMatch, [
+          "الحسم واللقب وضغط القرار الأخير",
+          "المواجهة التي تختصر مشوار البطولة كاملًا",
+          "اختبار التوقع الأكبر قبل رفع الكأس",
+          "المشهد الختامي وتأثيره المباشر على صدارة الأعضاء",
+        ]),
+      },
+    });
+  }
+
+  semiFinals.forEach((match, index) => {
+    events.push({
+      id: `semi_final_spotlight_${match.id}`,
+      type: "semi_final_spotlight",
+      title: getEditorialVariant(match, [
+        "بوابة النهائي تفتح أبوابها",
+        "ليلة العبور إلى المشهد الأخير",
+        "نصف النهائي يرفع سقف التحدي",
+        "خطوة واحدة تفصل عن النهائي",
+        "صراع التأهل يدخل ساعاته الحاسمة",
+      ]),
+      priority: (getHoursUntilMatch(match, now) <= 24 ? 150 : 144) - index,
+      members: [],
+      data: {
+        matchId: match.id,
+        matchName: getMatchLabel(match),
+        homeTeamName: match.homeTeamName,
+        awayTeamName: match.awayTeamName,
+        matchDate: match.matchDate,
+        matchTime: match.matchTime,
+        hoursUntilStart: getHoursUntilMatch(match, now),
+        predictionType: match.predictionType,
+        matchStage: match.matchStage,
+        knockoutRound: "semiFinal",
+        roundLabel: "نصف النهائي",
+        semiFinalOrder: index + 1,
+        editorialWeight: "very_high",
+        editorialAngle: getEditorialVariant(match, [
+          "سباق الوصول إلى النهائي",
+          "ضغط الفرصة الأخيرة قبل موقعة اللقب",
+          "قراءة المواجهة من زاوية العبور لا من زاوية مباراة عادية",
+          "تأثير نتيجة المواجهة على سباق توقعات الأعضاء",
+        ]),
+      },
+    });
+  });
+
+  if (thirdPlace) {
+    events.push({
+      id: `third_place_spotlight_${thirdPlace.id}`,
+      type: "third_place_spotlight",
+      title: getEditorialVariant(thirdPlace, [
+        "موعد التعويض والميدالية",
+        "المركز الثالث يبحث عن صاحبه",
+        "ختام بطابع تنافسي خاص",
+      ]),
+      priority: getHoursUntilMatch(thirdPlace, now) <= 24 ? 122 : 116,
+      members: [],
+      data: {
+        matchId: thirdPlace.id,
+        matchName: getMatchLabel(thirdPlace),
+        homeTeamName: thirdPlace.homeTeamName,
+        awayTeamName: thirdPlace.awayTeamName,
+        matchDate: thirdPlace.matchDate,
+        matchTime: thirdPlace.matchTime,
+        hoursUntilStart: getHoursUntilMatch(thirdPlace, now),
+        predictionType: thirdPlace.predictionType,
+        matchStage: thirdPlace.matchStage,
+        knockoutRound: "thirdPlace",
+        roundLabel: "المركز الثالث",
+        editorialWeight: "high",
+        editorialAngle: "مواجهة التعويض وإنهاء البطولة بصورة قوية",
+      },
+    });
+  }
+
+  return events;
+}
+
 function buildGoldenPredictionAlertEvent(matches: Match[]) {
   const now = Date.now();
 
@@ -376,11 +530,16 @@ function buildStrongMatchAlertEvent(matches: Match[]) {
   const nextMatch = [...matches]
     .filter((match) => {
       const startTime = getTimeValue(match.startAt);
+      const knockoutRound = getKnockoutRoundValue(match);
+
       return (
         match.isActive &&
         match.status === "scheduled" &&
         startTime > now &&
-        startTime - now <= 48 * 60 * 60 * 1000
+        startTime - now <= 48 * 60 * 60 * 1000 &&
+        knockoutRound !== "semiFinal" &&
+        knockoutRound !== "thirdPlace" &&
+        knockoutRound !== "final"
       );
     })
     .sort((a, b) => getTimeValue(a.startAt) - getTimeValue(b.startAt))[0];
@@ -1449,7 +1608,10 @@ export async function buildChallengeStudioEvents(): Promise<
   const activeUsers = users.filter((user) => user.total > 0);
   const focusUsers = activeUsers.slice(0, 25);
 
+  const knockoutRoundEvents = buildKnockoutRoundSpotlightEvents(matches);
+
   const events = [
+    ...knockoutRoundEvents,
     buildGoldenPredictionAlertEvent(matches),
     buildExactAfterCalculationEvent(predictions),
     buildKnockoutQualificationHitEvent(predictions),
