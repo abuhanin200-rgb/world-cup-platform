@@ -14,6 +14,12 @@ export type PredictionType = "normal" | "golden";
 
 export type MatchStage = "group" | "knockout";
 
+export type KnockoutRound =
+  | "general"
+  | "semiFinal"
+  | "thirdPlace"
+  | "final";
+
 export type QualificationMethod = "extraTime" | "penalties";
 
 export type Match = {
@@ -37,6 +43,7 @@ export type Match = {
 
   predictionType: PredictionType;
   matchStage: MatchStage;
+  knockoutRound?: KnockoutRound;
 
   actualHomeScore?: number | null;
   actualAwayScore?: number | null;
@@ -58,6 +65,7 @@ export type AddMatchInput = {
   matchTime: string;
   predictionType?: PredictionType;
   matchStage?: MatchStage;
+  knockoutRound?: KnockoutRound;
 };
 
 function toText(value: unknown) {
@@ -82,6 +90,21 @@ function normalizePredictionType(value: unknown): PredictionType {
 
 function normalizeMatchStage(value: unknown): MatchStage {
   return value === "knockout" ? "knockout" : "group";
+}
+
+function normalizeKnockoutRound(
+  value: unknown
+): KnockoutRound | undefined {
+  if (
+    value === "general" ||
+    value === "semiFinal" ||
+    value === "thirdPlace" ||
+    value === "final"
+  ) {
+    return value;
+  }
+
+  return undefined;
 }
 
 function normalizeQualificationMethod(
@@ -110,6 +133,8 @@ function getArabicDayName(matchDate: string) {
 }
 
 function mapMatch(id: string, data: Record<string, unknown>): Match {
+  const matchStage = normalizeMatchStage(data.matchStage);
+
   return {
     id,
 
@@ -130,7 +155,11 @@ function mapMatch(id: string, data: Record<string, unknown>): Match {
     isActive: Boolean(data.isActive),
 
     predictionType: normalizePredictionType(data.predictionType),
-    matchStage: normalizeMatchStage(data.matchStage),
+    matchStage,
+    knockoutRound:
+      matchStage === "knockout"
+        ? normalizeKnockoutRound(data.knockoutRound) || "general"
+        : undefined,
 
     actualHomeScore: toNumberOrNull(data.actualHomeScore),
     actualAwayScore: toNumberOrNull(data.actualAwayScore),
@@ -223,6 +252,7 @@ export async function addMatch(input: AddMatchInput) {
     matchTime,
     predictionType,
     matchStage,
+    knockoutRound,
   } = input;
 
   if (!homeTeam || !awayTeam) {
@@ -239,6 +269,11 @@ export async function addMatch(input: AddMatchInput) {
 
   const now = new Date().toISOString();
   const startAt = getMakkahStartAt(matchDate, matchTime);
+  const normalizedMatchStage = normalizeMatchStage(matchStage);
+  const normalizedKnockoutRound =
+    normalizedMatchStage === "knockout"
+      ? normalizeKnockoutRound(knockoutRound) || "general"
+      : undefined;
 
   const matchData = {
     homeTeamCode: homeTeam.code,
@@ -258,7 +293,10 @@ export async function addMatch(input: AddMatchInput) {
     isActive: true,
 
     predictionType: normalizePredictionType(predictionType),
-    matchStage: normalizeMatchStage(matchStage),
+    matchStage: normalizedMatchStage,
+    ...(normalizedKnockoutRound
+      ? { knockoutRound: normalizedKnockoutRound }
+      : {}),
 
     actualHomeScore: null,
     actualAwayScore: null,

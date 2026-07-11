@@ -1,6 +1,7 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -9,7 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { Match, MatchStage } from "./matches";
+import type { KnockoutRound, Match, MatchStage } from "./matches";
 
 export type PredictionType = "normal" | "golden";
 
@@ -20,6 +21,7 @@ export type UpdateAdminMatchInput = {
   isActive: boolean;
   predictionType?: PredictionType;
   matchStage?: MatchStage;
+  knockoutRound?: KnockoutRound;
 };
 
 function getMatchDayArabic(dateText: string) {
@@ -41,6 +43,18 @@ function normalizePredictionType(value?: string): PredictionType {
 
 function normalizeMatchStage(value?: string): MatchStage {
   return value === "knockout" ? "knockout" : "group";
+}
+
+function normalizeKnockoutRound(value?: string): KnockoutRound {
+  if (
+    value === "semiFinal" ||
+    value === "thirdPlace" ||
+    value === "final"
+  ) {
+    return value;
+  }
+
+  return "general";
 }
 
 async function hasPredictionsForMatch(matchId: string) {
@@ -94,12 +108,18 @@ export async function updateAdminMatch(input: UpdateAdminMatchInput) {
     ? normalizeMatchStage(input.matchStage)
     : undefined;
 
+  const nextKnockoutRound = input.knockoutRound
+    ? normalizeKnockoutRound(input.knockoutRound)
+    : undefined;
+
   const shouldChangePredictionType =
     Boolean(nextPredictionType) && nextPredictionType !== currentPredictionType;
 
   const shouldChangeMatchStage =
     Boolean(nextMatchStage) && nextMatchStage !== currentMatchStage;
 
+  // تبقى القيود الحالية على نوع التوقع ومرحلة المباراة كما هي؛
+  // أما knockoutRound فهو حقل عرض مستقل ولا يدخل في الحسبة.
   if (shouldChangePredictionType || shouldChangeMatchStage) {
     const isCalculated =
       Boolean(currentMatchData.resultCalculated) ||
@@ -136,6 +156,14 @@ export async function updateAdminMatch(input: UpdateAdminMatchInput) {
 
   if (nextMatchStage) {
     updateData.matchStage = nextMatchStage;
+
+    if (nextMatchStage === "group") {
+      updateData.knockoutRound = deleteField();
+    } else {
+      updateData.knockoutRound = nextKnockoutRound || "general";
+    }
+  } else if (currentMatchStage === "knockout" && nextKnockoutRound) {
+    updateData.knockoutRound = nextKnockoutRound;
   }
 
   await updateDoc(matchRef, updateData);

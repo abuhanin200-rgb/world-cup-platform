@@ -10,6 +10,7 @@ import {
   ListFilter,
   PauseCircle,
   Rocket,
+  Swords,
   X,
 } from "lucide-react";
 import { getLatestPredictions, LatestPrediction } from "@/lib/predictions";
@@ -46,6 +47,32 @@ function isGoldenPrediction(prediction: LatestPrediction) {
   return prediction.predictionType === "golden";
 }
 
+function getKnockoutRoundLabel(prediction: LatestPrediction) {
+  if (prediction.matchStage !== "knockout") return "";
+
+  if (prediction.knockoutRound === "semiFinal") return "نصف النهائي";
+  if (prediction.knockoutRound === "thirdPlace") return "المركز الثالث";
+  if (prediction.knockoutRound === "final") return "النهائي";
+
+  return "خروج مغلوب";
+}
+
+function getKnockoutRoundBadgeClass(prediction: LatestPrediction) {
+  if (prediction.knockoutRound === "semiFinal") {
+    return "border-violet-300/30 bg-violet-400/10 text-violet-100";
+  }
+
+  if (prediction.knockoutRound === "thirdPlace") {
+    return "border-orange-300/30 bg-orange-400/10 text-orange-100";
+  }
+
+  if (prediction.knockoutRound === "final") {
+    return "border-amber-300/35 bg-amber-400/15 text-amber-100";
+  }
+
+  return "border-blue-300/30 bg-blue-400/10 text-blue-100";
+}
+
 function getPredictionTeamCode(
   prediction: LatestPrediction,
   side: "home" | "away",
@@ -67,6 +94,8 @@ function getPredictionsSignature(predictions: LatestPrediction[]) {
         prediction.qualifiedTeamCode || "",
         prediction.qualificationMethod || "",
         prediction.predictionType,
+        prediction.matchStage,
+        prediction.knockoutRound || "",
       ].join("-");
     })
     .join("|");
@@ -362,6 +391,7 @@ export default function LatestPredictionsTicker() {
 
   function renderPredictionCard(prediction: LatestPrediction, index: number) {
     const golden = isGoldenPrediction(prediction);
+    const knockoutRoundLabel = getKnockoutRoundLabel(prediction);
 
     return (
       <div
@@ -385,6 +415,17 @@ export default function LatestPredictionsTicker() {
           <span className="relative inline-flex items-center gap-1 rounded-full bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md shadow-fuchsia-950/20 ring-1 ring-white/25 md:text-xs">
             <Rocket className="h-3 w-3" />
             <span>سوبر ذهبي</span>
+          </span>
+        )}
+
+        {knockoutRoundLabel && (
+          <span
+            className={`relative inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black shadow-sm md:text-xs ${getKnockoutRoundBadgeClass(
+              prediction,
+            )}`}
+          >
+            <Swords className="h-3 w-3" />
+            <span>{knockoutRoundLabel}</span>
           </span>
         )}
 
@@ -435,6 +476,7 @@ export default function LatestPredictionsTicker() {
 
   function renderPredictionListItem(prediction: LatestPrediction) {
     const golden = isGoldenPrediction(prediction);
+    const knockoutRoundLabel = getKnockoutRoundLabel(prediction);
     const qualifiedTeam = getQualifiedTeamInfo(prediction);
     const qualificationMethodLabel = getQualificationMethodLabel(
       prediction.qualificationMethod,
@@ -473,11 +515,26 @@ export default function LatestPredictionsTicker() {
             </div>
           </div>
 
-          {golden && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 px-2 py-1 text-[10px] font-black text-slate-950 shadow-md shadow-fuchsia-950/20 ring-1 ring-white/20">
-              <Rocket className="h-3 w-3" />
-              <span>توقع سوبر ذهبي</span>
-            </span>
+          {(knockoutRoundLabel || golden) && (
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+              {knockoutRoundLabel && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black shadow-sm ${getKnockoutRoundBadgeClass(
+                    prediction,
+                  )}`}
+                >
+                  <Swords className="h-3 w-3" />
+                  <span>{knockoutRoundLabel}</span>
+                </span>
+              )}
+
+              {golden && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 px-2 py-1 text-[10px] font-black text-slate-950 shadow-md shadow-fuchsia-950/20 ring-1 ring-white/20">
+                  <Rocket className="h-3 w-3" />
+                  <span>توقع سوبر ذهبي</span>
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -612,6 +669,9 @@ export default function LatestPredictionsTicker() {
                           value={prediction.matchId}
                         >
                           {getMatchLabel(prediction)}
+                          {getKnockoutRoundLabel(prediction)
+                            ? ` — ${getKnockoutRoundLabel(prediction)}`
+                            : ""}
                         </option>
                       ))}
                     </select>
@@ -658,9 +718,7 @@ export default function LatestPredictionsTicker() {
   if (loading) {
     return (
       <>
-        <section
-          className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2.25rem]"
-        >
+        <section className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2.25rem]">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
           <div className="relative flex items-center justify-center gap-2 text-center text-[14px] font-bold text-slate-300">
             <span className="h-2.5 w-2.5 rounded-full bg-cyan-300" />
@@ -675,9 +733,7 @@ export default function LatestPredictionsTicker() {
   if (predictions.length === 0) {
     return (
       <>
-        <section
-          className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2rem]"
-        >
+        <section className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2rem]">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
 
           <div className="relative mb-3 flex items-center justify-between gap-3">
@@ -706,12 +762,22 @@ export default function LatestPredictionsTicker() {
 
   return (
     <>
-      <section
-        className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2rem]"
-      >
+      <section className="relative overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-4 shadow-lg shadow-slate-950/25 md:rounded-[2rem]">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(253,186,116,0.18) 0%, rgba(253,186,116,0.085) 38%, rgba(253,186,116,0.024) 62%, transparent 82%)" }} />
-        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(103,232,249,0.18) 0%, rgba(103,232,249,0.085) 38%, rgba(103,232,249,0.024) 62%, transparent 82%)" }} />
+        <div
+          className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(253,186,116,0.18) 0%, rgba(253,186,116,0.085) 38%, rgba(253,186,116,0.024) 62%, transparent 82%)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(103,232,249,0.18) 0%, rgba(103,232,249,0.085) 38%, rgba(103,232,249,0.024) 62%, transparent 82%)",
+          }}
+        />
 
         <div className="relative">
           <div className="relative mb-3 flex items-center justify-between gap-3">

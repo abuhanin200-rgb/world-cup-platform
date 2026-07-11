@@ -10,6 +10,7 @@ import {
   Gauge,
   PauseCircle,
   Rocket,
+  Swords,
   Target,
   Trophy,
   X,
@@ -21,10 +22,13 @@ import {
   HomeHighlightUser,
 } from "@/lib/highlights";
 import { getSiteSettings, TickerSpeed } from "@/lib/siteSettings";
+import type { KnockoutRound, MatchStage } from "@/lib/matches";
 import TeamFlag from "@/components/TeamFlag";
 
 type ExactHitWithPredictionType = ExactHit & {
   predictionType?: "normal" | "golden";
+  matchStage?: MatchStage;
+  knockoutRound?: KnockoutRound;
   points?: number;
   createdAt?: string;
   calculatedAt?: string;
@@ -286,6 +290,45 @@ function getQualifiedTeamInfo(
   };
 }
 
+type KnockoutRoundMeta = {
+  label: string;
+  className: string;
+};
+
+function getKnockoutRoundMeta(
+  hit: ExactHitWithPredictionType,
+): KnockoutRoundMeta | null {
+  if (hit.matchStage !== "knockout" && !hit.knockoutRound) {
+    return null;
+  }
+
+  if (hit.knockoutRound === "semiFinal") {
+    return {
+      label: "نصف النهائي",
+      className: "border-violet-300/30 bg-violet-400/15 text-violet-100",
+    };
+  }
+
+  if (hit.knockoutRound === "thirdPlace") {
+    return {
+      label: "المركز الثالث",
+      className: "border-orange-300/30 bg-orange-400/15 text-orange-100",
+    };
+  }
+
+  if (hit.knockoutRound === "final") {
+    return {
+      label: "النهائي",
+      className: "border-amber-300/35 bg-amber-400/15 text-amber-100",
+    };
+  }
+
+  return {
+    label: "خروج مغلوب",
+    className: "border-blue-300/30 bg-blue-400/15 text-blue-100",
+  };
+}
+
 export default function HomeHighlights() {
   const [predictionKing, setPredictionKing] =
     useState<HomeHighlightUser | null>(null);
@@ -363,8 +406,20 @@ export default function HomeHighlights() {
   return (
     <section className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 md:mt-5 md:rounded-[2rem] md:p-4">
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
-      <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(252,211,77,0.17) 0%, rgba(252,211,77,0.08) 38%, rgba(252,211,77,0.022) 62%, transparent 82%)" }} />
-      <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(103,232,249,0.17) 0%, rgba(103,232,249,0.08) 38%, rgba(103,232,249,0.022) 62%, transparent 82%)" }} />
+      <div
+        className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full"
+        style={{
+          background:
+            "radial-gradient(circle at center, rgba(252,211,77,0.17) 0%, rgba(252,211,77,0.08) 38%, rgba(252,211,77,0.022) 62%, transparent 82%)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full"
+        style={{
+          background:
+            "radial-gradient(circle at center, rgba(103,232,249,0.17) 0%, rgba(103,232,249,0.08) 38%, rgba(103,232,249,0.022) 62%, transparent 82%)",
+        }}
+      />
 
       <div className="relative mb-3 text-center">
         <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/20">
@@ -546,6 +601,7 @@ export function ExactHitsTicker() {
     const exactHit = hit as ExactHitWithPredictionType;
     const golden = isGoldenExactHit(exactHit);
     const qualifiedTeam = getQualifiedTeamInfo(exactHit);
+    const knockoutRound = getKnockoutRoundMeta(exactHit);
 
     return (
       <div
@@ -569,6 +625,15 @@ export function ExactHitsTicker() {
           <span className="relative inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-300 via-fuchsia-300 to-amber-400 px-2 py-0.5 text-[10px] font-black text-slate-950 shadow-md shadow-fuchsia-950/20 md:text-xs">
             <Rocket className="h-3 w-3" />
             <span>سوبر ذهبي بالملي +10</span>
+          </span>
+        )}
+
+        {knockoutRound && (
+          <span
+            className={`relative inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black shadow-md shadow-slate-950/15 md:text-xs ${knockoutRound.className}`}
+          >
+            <Swords className="h-3 w-3" />
+            <span>{knockoutRound.label}</span>
           </span>
         )}
 
@@ -663,6 +728,7 @@ export function ExactHitsTicker() {
     const exactHit = hit as ExactHitWithPredictionType;
     const golden = isGoldenExactHit(exactHit);
     const qualifiedTeam = getQualifiedTeamInfo(exactHit);
+    const knockoutRound = getKnockoutRoundMeta(exactHit);
 
     return (
       <motion.div
@@ -697,9 +763,20 @@ export function ExactHitsTicker() {
             </div>
           </div>
 
-          <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-bold text-slate-200">
-            <Clock3 className="h-3 w-3" />
-            <span>{formatRelativeHitTime(exactHit)}</span>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            {knockoutRound && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black shadow-md shadow-slate-950/15 ${knockoutRound.className}`}
+              >
+                <Swords className="h-3 w-3" />
+                <span>{knockoutRound.label}</span>
+              </span>
+            )}
+
+            <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-bold text-slate-200">
+              <Clock3 className="h-3 w-3" />
+              <span>{formatRelativeHitTime(exactHit)}</span>
+            </div>
           </div>
         </div>
 
@@ -874,8 +951,20 @@ export function ExactHitsTicker() {
     <>
       <section className="relative mt-5 overflow-hidden rounded-[1.65rem] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 shadow-md shadow-slate-950/25 md:mt-6">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-300/10 via-transparent to-cyan-300/5" />
-        <div className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(110,231,183,0.17) 0%, rgba(110,231,183,0.08) 38%, rgba(110,231,183,0.022) 62%, transparent 82%)" }} />
-        <div className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full" style={{ background: "radial-gradient(circle at center, rgba(103,232,249,0.17) 0%, rgba(103,232,249,0.08) 38%, rgba(103,232,249,0.022) 62%, transparent 82%)" }} />
+        <div
+          className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(110,231,183,0.17) 0%, rgba(110,231,183,0.08) 38%, rgba(110,231,183,0.022) 62%, transparent 82%)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(103,232,249,0.17) 0%, rgba(103,232,249,0.08) 38%, rgba(103,232,249,0.022) 62%, transparent 82%)",
+          }}
+        />
 
         <div className="relative">
           <div className="mb-2 flex items-center justify-between gap-3">

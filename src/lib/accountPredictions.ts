@@ -1,6 +1,11 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "./firebase";
-import type { PredictionType, QualificationMethod } from "./matches";
+import type {
+  KnockoutRound,
+  MatchStage,
+  PredictionType,
+  QualificationMethod,
+} from "./matches";
 
 export type AccountPredictionResultType = "exact" | "winner" | "wrong" | "";
 
@@ -26,16 +31,23 @@ export type AccountPrediction = {
   actualAwayScore: number | null;
 
   actualQualifiedTeamCode?: string | null;
-actualQualificationMethod?: QualificationMethod | null;
+  actualQualificationMethod?: QualificationMethod | null;
 
   points: number;
   resultType: AccountPredictionResultType;
   isCalculated: boolean;
 
   predictionType: PredictionType;
+  matchStage: MatchStage;
+  knockoutRound?: KnockoutRound;
 
   createdAt: string;
   calculatedAt: string;
+};
+
+type AccountMatchInfo = {
+  matchStage: MatchStage;
+  knockoutRound?: KnockoutRound;
 };
 
 function toNumber(value: unknown) {
@@ -76,6 +88,22 @@ function normalizePredictionType(value: unknown): PredictionType {
   return value === "golden" ? "golden" : "normal";
 }
 
+function normalizeMatchStage(value: unknown): MatchStage {
+  return value === "knockout" ? "knockout" : "group";
+}
+
+function normalizeKnockoutRound(value: unknown): KnockoutRound {
+  if (
+    value === "semiFinal" ||
+    value === "thirdPlace" ||
+    value === "final"
+  ) {
+    return value;
+  }
+
+  return "general";
+}
+
 function normalizeQualificationMethod(
   value: unknown
 ): QualificationMethod | null {
@@ -86,23 +114,62 @@ function normalizeQualificationMethod(
   return null;
 }
 
+async function getAccountMatchesInfo() {
+  const matchesSnapshot = await getDocs(collection(db, "matches"));
+  const matchesMap = new Map<string, AccountMatchInfo>();
+
+  matchesSnapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .forEach((docSnap) => {
+      const data = docSnap.data();
+      const matchStage = normalizeMatchStage(data.matchStage);
+
+      matchesMap.set(docSnap.id, {
+        matchStage,
+        knockoutRound:
+          matchStage === "knockout"
+            ? normalizeKnockoutRound(data.knockoutRound)
+            : undefined,
+      });
+    });
+
+  return matchesMap;
+}
+
 export async function getAccountPredictions(
   userId: string
 ): Promise<AccountPrediction[]> {
   const predictionsRef = collection(db, "predictions");
+  const predictionsQuery = query(
+    predictionsRef,
+    where("userId", "==", userId)
+  );
 
-  const q = query(predictionsRef, where("userId", "==", userId));
+  const [predictionsSnapshot, matchesMap] = await Promise.all([
+    getDocs(predictionsQuery),
+    getAccountMatchesInfo(),
+  ]);
 
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs
+  return predictionsSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => {
       const data = docSnap.data();
+      const matchId = toText(data.matchId);
+      const currentMatchInfo = matchesMap.get(matchId);
+
+      const matchStage =
+        currentMatchInfo?.matchStage ??
+        normalizeMatchStage(data.matchStage);
+
+      const knockoutRound =
+        matchStage === "knockout"
+          ? currentMatchInfo?.knockoutRound ??
+            normalizeKnockoutRound(data.knockoutRound)
+          : undefined;
 
       return {
         id: docSnap.id,
-        matchId: toText(data.matchId),
+        matchId,
 
         homeTeamName: toText(data.homeTeamName),
         homeTeamEmoji: toText(data.homeTeamEmoji),
@@ -123,16 +190,20 @@ export async function getAccountPredictions(
         actualHomeScore: toNullableNumber(data.actualHomeScore),
         actualAwayScore: toNullableNumber(data.actualAwayScore),
 
-        actualQualifiedTeamCode: toNullableText(data.actualQualifiedTeamCode),
-actualQualificationMethod: normalizeQualificationMethod(
-  data.actualQualificationMethod
-),
+        actualQualifiedTeamCode: toNullableText(
+          data.actualQualifiedTeamCode
+        ),
+        actualQualificationMethod: normalizeQualificationMethod(
+          data.actualQualificationMethod
+        ),
 
         points: toNumber(data.points),
         resultType: normalizeResultType(data.resultType),
         isCalculated: Boolean(data.isCalculated),
 
         predictionType: normalizePredictionType(data.predictionType),
+        matchStage,
+        knockoutRound,
 
         createdAt: toText(data.createdAt),
         calculatedAt: toText(data.calculatedAt),

@@ -135,6 +135,29 @@ function isKnockoutMatch(match: MatchWithKnockout) {
   return match.matchStage === "knockout";
 }
 
+function getKnockoutRoundLabel(round?: Match["knockoutRound"]) {
+  if (round === "semiFinal") return "نصف النهائي";
+  if (round === "thirdPlace") return "المركز الثالث";
+  if (round === "final") return "النهائي";
+  return "خروج المغلوب";
+}
+
+function getKnockoutRoundBadgeClasses(round?: Match["knockoutRound"]) {
+  if (round === "final") {
+    return "border-amber-300/40 bg-amber-300/15 text-amber-100 shadow-amber-950/15";
+  }
+
+  if (round === "thirdPlace") {
+    return "border-orange-300/35 bg-orange-300/10 text-orange-100 shadow-orange-950/15";
+  }
+
+  if (round === "semiFinal") {
+    return "border-cyan-300/35 bg-cyan-300/10 text-cyan-100 shadow-cyan-950/15";
+  }
+
+  return "border-blue-300/30 bg-blue-400/10 text-blue-100 shadow-blue-950/10";
+}
+
 function getQualificationMethodLabel(value?: string | null) {
   if (value === "extraTime") return "أشواط إضافية";
   if (value === "penalties") return "ركلات ترجيح";
@@ -656,6 +679,12 @@ export default function MatchesPredictionBox() {
             const matchTime = formatMatchTimeOnly(match.startAt);
             const golden = isGoldenMatch(match);
             const knockout = isKnockoutMatch(match as MatchWithKnockout);
+            const knockoutRoundLabel = knockout
+              ? getKnockoutRoundLabel(match.knockoutRound)
+              : "";
+            const knockoutRoundBadgeClasses = knockout
+              ? getKnockoutRoundBadgeClasses(match.knockoutRound)
+              : "";
             const knockoutDrawInput = isKnockoutDrawInput(
               match as MatchWithKnockout
             );
@@ -709,9 +738,13 @@ export default function MatchesPredictionBox() {
                 )}
 
                 {knockout && (
-                  <div className="relative mb-4 flex items-center justify-center gap-1.5 rounded-2xl border border-blue-300/30 bg-blue-400/10 px-4 py-2 text-center text-xs font-black text-blue-100">
-                    <Swords className="h-4 w-4" />
-                    <span>خروج المغلوب</span>
+                  <div className="relative mb-3 flex justify-center">
+                    <div
+                      className={`inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-black shadow-md md:text-xs ${knockoutRoundBadgeClasses}`}
+                    >
+                      <Swords className="h-3.5 w-3.5" />
+                      <span>{knockoutRoundLabel}</span>
+                    </div>
                   </div>
                 )}
 

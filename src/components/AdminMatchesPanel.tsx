@@ -1,7 +1,12 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import type { Match, MatchStage, PredictionType } from "@/lib/matches";
+import type {
+  KnockoutRound,
+  Match,
+  MatchStage,
+  PredictionType,
+} from "@/lib/matches";
 import { deleteAdminMatch, updateAdminMatch } from "@/lib/adminMatches";
 import { addAdminLog } from "@/lib/adminLogs";
 import { deleteTestMatch } from "@/lib/deleteTestMatch";
@@ -22,6 +27,30 @@ function normalizePredictionType(value?: PredictionType): PredictionType {
 
 function normalizeMatchStage(value?: MatchStage): MatchStage {
   return value === "knockout" ? "knockout" : "group";
+}
+
+function normalizeKnockoutRound(
+  value?: KnockoutRound | null
+): KnockoutRound {
+  if (
+    value === "semiFinal" ||
+    value === "thirdPlace" ||
+    value === "final"
+  ) {
+    return value;
+  }
+
+  return "general";
+}
+
+function getKnockoutRoundLabel(value?: KnockoutRound | null) {
+  const round = normalizeKnockoutRound(value);
+
+  if (round === "semiFinal") return "نصف النهائي";
+  if (round === "thirdPlace") return "المركز الثالث";
+  if (round === "final") return "النهائي";
+
+  return "خروج مغلوب";
 }
 
 function getPredictionTypeLabel(type?: PredictionType) {
@@ -56,6 +85,24 @@ function getMatchStageBadgeClass(stage?: MatchStage) {
     : "rounded-full bg-white/10 px-3 py-1 text-slate-300";
 }
 
+function getKnockoutRoundBadgeClass(round?: KnockoutRound | null) {
+  const normalizedRound = normalizeKnockoutRound(round);
+
+  if (normalizedRound === "final") {
+    return "rounded-full border border-amber-300/40 bg-amber-300 px-3 py-1 font-black text-slate-950";
+  }
+
+  if (normalizedRound === "thirdPlace") {
+    return "rounded-full border border-orange-300/30 bg-orange-300/15 px-3 py-1 font-black text-orange-100";
+  }
+
+  if (normalizedRound === "semiFinal") {
+    return "rounded-full border border-violet-300/30 bg-violet-300/15 px-3 py-1 font-black text-violet-100";
+  }
+
+  return "rounded-full border border-blue-300/20 bg-blue-300/10 px-3 py-1 font-black text-blue-100";
+}
+
 function isMatchCalculated(match: Match) {
   return Boolean(match.resultCalculated || match.status === "finished");
 }
@@ -76,6 +123,8 @@ export default function AdminMatchesPanel({
   const [editPredictionType, setEditPredictionType] =
     useState<PredictionType>("normal");
   const [editMatchStage, setEditMatchStage] = useState<MatchStage>("group");
+  const [editKnockoutRound, setEditKnockoutRound] =
+    useState<KnockoutRound>("general");
 
   const [savingMatchId, setSavingMatchId] = useState("");
   const [deletingMatchId, setDeletingMatchId] = useState("");
@@ -94,6 +143,11 @@ export default function AdminMatchesPanel({
 
       const matchStageLabel = getMatchStageLabel(match.matchStage).toLowerCase();
 
+      const knockoutRoundLabel =
+        match.matchStage === "knockout"
+          ? getKnockoutRoundLabel(match.knockoutRound).toLowerCase()
+          : "";
+
       const matchesSearch =
         !search ||
         match.homeTeamName.toLowerCase().includes(search) ||
@@ -101,7 +155,8 @@ export default function AdminMatchesPanel({
         match.matchDate.toLowerCase().includes(search) ||
         match.matchTime.toLowerCase().includes(search) ||
         predictionTypeLabel.includes(search) ||
-        matchStageLabel.includes(search);
+        matchStageLabel.includes(search) ||
+        knockoutRoundLabel.includes(search);
 
       const matchesFilter =
         filter === "all" ||
@@ -155,6 +210,11 @@ export default function AdminMatchesPanel({
     setEditIsActive(Boolean(match.isActive));
     setEditPredictionType(normalizePredictionType(match.predictionType));
     setEditMatchStage(normalizeMatchStage(match.matchStage));
+    setEditKnockoutRound(
+      match.matchStage === "knockout"
+        ? normalizeKnockoutRound(match.knockoutRound)
+        : "general"
+    );
   }
 
   function cancelEdit() {
@@ -164,6 +224,7 @@ export default function AdminMatchesPanel({
     setEditIsActive(true);
     setEditPredictionType("normal");
     setEditMatchStage("group");
+    setEditKnockoutRound("general");
   }
 
   async function handleSaveMatch(event: FormEvent, match: Match) {
@@ -176,14 +237,18 @@ export default function AdminMatchesPanel({
     const calculated = isMatchCalculated(match);
 
     try {
-      await updateAdminMatch({
+      const updatePayload = {
         matchId: match.id,
         matchDate: editDate,
         matchTime: editTime,
         isActive: editIsActive,
         predictionType: calculated ? undefined : editPredictionType,
         matchStage: calculated ? undefined : editMatchStage,
-      });
+        knockoutRound:
+          editMatchStage === "knockout" ? editKnockoutRound : undefined,
+      };
+
+      await updateAdminMatch(updatePayload);
 
       const predictionTypeText = calculated
         ? getPredictionTypeLabel(match.predictionType)
@@ -193,6 +258,11 @@ export default function AdminMatchesPanel({
         ? getMatchStageLabel(match.matchStage)
         : getMatchStageLabel(editMatchStage);
 
+      const knockoutRoundText =
+        editMatchStage === "knockout"
+          ? getKnockoutRoundLabel(editKnockoutRound)
+          : "غير مطبق";
+
       await addAdminLog({
         action: "other",
         title: "تعديل مباراة",
@@ -200,7 +270,7 @@ export default function AdminMatchesPanel({
           match.awayTeamName
         }. التاريخ الجديد: ${editDate}، الوقت الجديد: ${editTime}، الحالة: ${
           editIsActive ? "مفعلة" : "مخفية"
-        }، نوع التوقع: ${predictionTypeText}، نوع المرحلة: ${matchStageText}.`,
+        }، نوع التوقع: ${predictionTypeText}، نوع المرحلة: ${matchStageText}، نوع مباراة خروج المغلوب: ${knockoutRoundText}.`,
       });
 
       setMessage("تم تعديل المباراة بنجاح ✅");
@@ -450,6 +520,10 @@ export default function AdminMatchesPanel({
                 match.predictionType
               );
               const matchStage = normalizeMatchStage(match.matchStage);
+              const knockoutRound =
+                matchStage === "knockout"
+                  ? normalizeKnockoutRound(match.knockoutRound)
+                  : undefined;
 
               return (
                 <div
@@ -504,6 +578,14 @@ export default function AdminMatchesPanel({
                     <span className={getMatchStageBadgeClass(matchStage)}>
                       {getMatchStageLabel(matchStage)}
                     </span>
+
+                    {knockoutRound && (
+                      <span
+                        className={getKnockoutRoundBadgeClass(knockoutRound)}
+                      >
+                        {getKnockoutRoundLabel(knockoutRound)}
+                      </span>
+                    )}
 
                     {match.status === "finished" ? (
                       <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-emerald-300">
@@ -607,11 +689,15 @@ export default function AdminMatchesPanel({
                         </label>
                         <select
                           value={editMatchStage}
-                          onChange={(event) =>
-                            setEditMatchStage(
-                              event.target.value as MatchStage
-                            )
-                          }
+                          onChange={(event) => {
+                            const nextStage = event.target.value as MatchStage;
+
+                            setEditMatchStage(nextStage);
+
+                            if (nextStage !== "knockout") {
+                              setEditKnockoutRound("general");
+                            }
+                          }}
                           disabled={isCalculated}
                           className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-slate-950 outline-none focus:border-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
                         >
@@ -622,6 +708,36 @@ export default function AdminMatchesPanel({
                         <div className="mt-2 rounded-xl border border-blue-400/20 bg-blue-400/10 p-3 text-[11px] leading-5 text-blue-100">
                           {getMatchStageHint(editMatchStage)}
                         </div>
+
+                        {editMatchStage === "knockout" && (
+                          <div className="mt-3">
+                            <label className="mb-2 block text-xs font-bold">
+                              نوع مباراة خروج المغلوب
+                            </label>
+
+                            <select
+                              value={editKnockoutRound}
+                              onChange={(event) =>
+                                setEditKnockoutRound(
+                                  event.target.value as KnockoutRound
+                                )
+                              }
+                              className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-slate-950 outline-none focus:border-violet-400"
+                            >
+                              <option value="general">خروج مغلوب</option>
+                              <option value="semiFinal">نصف النهائي</option>
+                              <option value="thirdPlace">
+                                المركز الثالث
+                              </option>
+                              <option value="final">النهائي</option>
+                            </select>
+
+                            <div className="mt-2 rounded-xl border border-violet-300/20 bg-violet-300/10 p-3 text-[11px] leading-5 text-violet-100">
+                              هذا التصنيف للعرض والتنظيم فقط، ولا يؤثر على
+                              الحسبة أو النقاط أو نظام المتأهل.
+                            </div>
+                          </div>
+                        )}
 
                         {isCalculated && (
                           <div className="mt-2 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-[11px] leading-5 text-red-100">

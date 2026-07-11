@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type {
+  KnockoutRound,
   MatchStage,
   PredictionType,
   QualificationMethod,
@@ -43,6 +44,7 @@ export type Prediction = {
 
   predictionType: PredictionType;
   matchStage: MatchStage;
+  knockoutRound?: KnockoutRound;
 
   actualHomeScore?: number | null;
   actualAwayScore?: number | null;
@@ -113,6 +115,7 @@ export type LatestPrediction = {
 
   predictionType: PredictionType;
   matchStage: MatchStage;
+  knockoutRound?: KnockoutRound;
 
   createdAt?: string;
 };
@@ -148,6 +151,21 @@ function normalizePredictionType(value: unknown): PredictionType {
 
 function normalizeMatchStage(value: unknown): MatchStage {
   return value === "knockout" ? "knockout" : "group";
+}
+
+function normalizeKnockoutRound(
+  value: unknown
+): KnockoutRound | undefined {
+  if (
+    value === "general" ||
+    value === "semiFinal" ||
+    value === "thirdPlace" ||
+    value === "final"
+  ) {
+    return value;
+  }
+
+  return undefined;
 }
 
 function normalizeQualificationMethod(
@@ -261,6 +279,10 @@ function mapPrediction(
 
     predictionType: normalizePredictionType(data.predictionType),
     matchStage: normalizeMatchStage(data.matchStage),
+    knockoutRound:
+      normalizeMatchStage(data.matchStage) === "knockout"
+        ? normalizeKnockoutRound(data.knockoutRound)
+        : undefined,
 
     actualHomeScore:
       data.actualHomeScore === null ||
@@ -655,9 +677,26 @@ export async function updatePrediction(
 export async function getLatestPredictions(
   maxItems = 100
 ): Promise<LatestPrediction[]> {
-  const predictionsSnapshot = await getDocs(
-    collection(db, "predictions")
-  );
+  const [predictionsSnapshot, matchesSnapshot] = await Promise.all([
+    getDocs(collection(db, "predictions")),
+    getDocs(collection(db, "matches")),
+  ]);
+
+  const knockoutRoundByMatchId = new Map<string, KnockoutRound>();
+
+  matchesSnapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .forEach((docSnap) => {
+      const matchData = docSnap.data();
+      const matchStage = normalizeMatchStage(matchData.matchStage);
+
+      if (matchStage !== "knockout") return;
+
+      knockoutRoundByMatchId.set(
+        docSnap.id,
+        normalizeKnockoutRound(matchData.knockoutRound) || "general"
+      );
+    });
 
   return predictionsSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
@@ -705,6 +744,9 @@ export async function getLatestPredictions(
 
       predictionType: prediction.predictionType,
       matchStage: prediction.matchStage,
+      knockoutRound: knockoutRoundByMatchId.get(
+        prediction.matchId
+      ),
 
       createdAt: prediction.createdAt,
     }));
@@ -722,13 +764,48 @@ export async function getPredictionsByUserId(
     where("userId", "==", userId)
   );
 
-  const snapshot = await getDocs(predictionsQuery);
+  const [predictionsSnapshot, matchesSnapshot] = await Promise.all([
+    getDocs(predictionsQuery),
+    getDocs(collection(db, "matches")),
+  ]);
 
-  return snapshot.docs
+  const matchInfoById = new Map<
+    string,
+    {
+      matchStage: MatchStage;
+      knockoutRound?: KnockoutRound;
+    }
+  >();
+
+  matchesSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) =>
-      mapPrediction(docSnap.id, docSnap.data())
-    )
+    .forEach((docSnap) => {
+      const matchData = docSnap.data();
+      const matchStage = normalizeMatchStage(matchData.matchStage);
+
+      matchInfoById.set(docSnap.id, {
+        matchStage,
+        knockoutRound:
+          matchStage === "knockout"
+            ? normalizeKnockoutRound(matchData.knockoutRound) || "general"
+            : undefined,
+      });
+    });
+
+  return predictionsSnapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .map((docSnap) => {
+      const prediction = mapPrediction(docSnap.id, docSnap.data());
+      const matchInfo = matchInfoById.get(prediction.matchId);
+
+      if (!matchInfo) return prediction;
+
+      return {
+        ...prediction,
+        matchStage: matchInfo.matchStage,
+        knockoutRound: matchInfo.knockoutRound,
+      };
+    })
     .sort(
       (a, b) =>
         getTimeValue(b.createdAt) -

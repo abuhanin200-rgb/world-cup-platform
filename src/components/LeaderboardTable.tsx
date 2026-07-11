@@ -301,6 +301,44 @@ function isGoldenPrediction(prediction: Prediction) {
   return prediction.predictionType === "golden";
 }
 
+function KnockoutRoundBadge({ prediction }: { prediction: Prediction }) {
+  if (prediction.matchStage !== "knockout") return null;
+
+  if (prediction.knockoutRound === "semiFinal") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-300/30 bg-violet-400/10 px-3 py-1 text-[11px] font-black text-violet-100">
+        <Target className="h-3.5 w-3.5" aria-hidden="true" />
+        <span>نصف النهائي</span>
+      </span>
+    );
+  }
+
+  if (prediction.knockoutRound === "thirdPlace") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-300/30 bg-orange-400/10 px-3 py-1 text-[11px] font-black text-orange-100">
+        <Medal className="h-3.5 w-3.5" aria-hidden="true" />
+        <span>المركز الثالث</span>
+      </span>
+    );
+  }
+
+  if (prediction.knockoutRound === "final") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/35 bg-amber-400/10 px-3 py-1 text-[11px] font-black text-amber-100">
+        <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
+        <span>النهائي</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/30 bg-blue-400/10 px-3 py-1 text-[11px] font-black text-blue-100">
+      <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+      <span>خروج مغلوب</span>
+    </span>
+  );
+}
+
 function getQualificationMethodLabel(value?: string | null) {
   if (value === "extraTime") return "أشواط إضافية";
   if (value === "penalties") return "ركلات ترجيح";
@@ -1548,6 +1586,8 @@ export function PredictionDetailsModal({
                                 <span>توقع سوبر ذهبي</span>
                               </span>
                             )}
+
+                            <KnockoutRoundBadge prediction={prediction} />
                           </div>
 
                           <span

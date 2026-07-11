@@ -2,8 +2,27 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  Bell,
+  Calculator,
+  CalendarDays,
+  Gamepad2,
+  LayoutDashboard,
+  ListChecks,
+  LogIn,
+  LogOut,
+  Mic2,
+  Plus,
+  RefreshCw,
+  ScrollText,
+  Settings,
+  ShieldCheck,
+  UserX,
+  Users,
+} from "lucide-react";
+import {
   addMatch,
   getAllMatches,
+  type KnockoutRound,
   type Match,
   type MatchStage,
   type PredictionType,
@@ -39,6 +58,69 @@ type AdminTab =
 
 type CalculateFilter = "pending" | "calculated" | "all";
 
+const ADMIN_TABS = [
+  {
+    tab: "overview",
+    label: "نظرة عامة",
+    icon: LayoutDashboard,
+  },
+  {
+    tab: "add",
+    label: "إضافة مباراة",
+    icon: Plus,
+  },
+  {
+    tab: "calculate",
+    label: "احتساب النتائج",
+    icon: Calculator,
+  },
+  {
+    tab: "settings",
+    label: "إعدادات الشرائط",
+    icon: Settings,
+  },
+  {
+    tab: "notices",
+    label: "إشعارات الأعضاء",
+    icon: Bell,
+  },
+  {
+    tab: "members",
+    label: "إدارة الأعضاء",
+    icon: Users,
+  },
+  {
+    tab: "predictions",
+    label: "توقعات الأعضاء",
+    icon: ListChecks,
+  },
+  {
+    tab: "missingPredictions",
+    label: "غير المتوقّعين",
+    icon: UserX,
+  },
+  {
+    tab: "matches",
+    label: "المباريات",
+    icon: CalendarDays,
+  },
+  {
+    tab: "games",
+    label: "الألعاب",
+    icon: Gamepad2,
+  },
+  {
+    tab: "challengeStudio",
+    label: "استوديو التحدي",
+    icon: Mic2,
+  },
+  {
+    tab: "logs",
+    label: "السجل",
+    icon: ScrollText,
+  },
+] as const;
+
 function toDateInputValue(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -60,8 +142,9 @@ function formatMatchLabel(match: Match) {
 function formatCalculateMatchLabel(match: Match) {
   const statusText = match.resultCalculated ? "محتسبة" : "غير محتسبة";
 
-  return `${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamEmoji} ${match.awayTeamName} — ${getMatchStageLabel(
-    match.matchStage
+  return `${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamEmoji} ${match.awayTeamName} — ${getMatchDisplayStageLabel(
+    match.matchStage,
+    match.knockoutRound
   )} — ${getPredictionTypeLabel(match.predictionType)} — ${statusText}`;
 }
 
@@ -77,6 +160,23 @@ function getPredictionTypeHint(type?: PredictionType) {
 
 function getMatchStageLabel(stage?: MatchStage) {
   return stage === "knockout" ? "خروج مغلوب" : "دور المجموعات";
+}
+
+function getKnockoutRoundLabel(round?: KnockoutRound) {
+  if (round === "semiFinal") return "نصف النهائي";
+  if (round === "thirdPlace") return "المركز الثالث";
+  if (round === "final") return "النهائي";
+
+  return "خروج مغلوب";
+}
+
+function getMatchDisplayStageLabel(
+  stage?: MatchStage,
+  knockoutRound?: KnockoutRound
+) {
+  return stage === "knockout"
+    ? getKnockoutRoundLabel(knockoutRound)
+    : "دور المجموعات";
 }
 
 function getMatchStageHint(stage?: MatchStage) {
@@ -110,6 +210,8 @@ export default function AdminPage() {
   const [predictionType, setPredictionType] =
     useState<PredictionType>("normal");
   const [matchStage, setMatchStage] = useState<MatchStage>("group");
+  const [knockoutRound, setKnockoutRound] =
+    useState<KnockoutRound>("general");
   const [addingMatch, setAddingMatch] = useState(false);
 
   const [selectedMatchId, setSelectedMatchId] = useState("");
@@ -158,6 +260,10 @@ export default function AdminPage() {
           match.awayTeamCode,
           getPredictionTypeLabel(match.predictionType),
           getMatchStageLabel(match.matchStage),
+          getMatchDisplayStageLabel(
+            match.matchStage,
+            match.knockoutRound
+          ),
           match.resultCalculated ? "محتسبة" : "غير محتسبة",
           match.matchDate,
           match.matchTime,
@@ -324,6 +430,8 @@ export default function AdminPage() {
         matchTime,
         predictionType,
         matchStage,
+        knockoutRound:
+          matchStage === "knockout" ? knockoutRound : undefined,
       });
 
       await addAdminLog({
@@ -336,6 +444,7 @@ export default function AdminPage() {
           matchTime,
           predictionType,
           matchStage,
+          ...(matchStage === "knockout" ? { knockoutRound } : {}),
         },
       });
 
@@ -544,9 +653,10 @@ export default function AdminPage() {
 
             <button
               type="submit"
-              className="w-full rounded-2xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950 hover:bg-amber-300"
             >
-              دخول
+              <LogIn className="h-4 w-4" />
+              <span>دخول</span>
             </button>
           </div>
         </form>
@@ -562,61 +672,57 @@ export default function AdminPage() {
       <div className="mx-auto max-w-7xl">
         <header className="mb-5 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-2xl font-black md:text-3xl">
-                لوحة تحكم الأدمن
-              </h1>
-              <p className="mt-2 text-sm text-slate-300">
-                إدارة المباريات، النتائج، الأعضاء، التوقعات، والإعدادات.
-              </p>
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-200">
+                <ShieldCheck className="h-5 w-5" />
+              </span>
+
+              <div>
+                <h1 className="text-2xl font-black md:text-3xl">
+                  لوحة تحكم الأدمن
+                </h1>
+                <p className="mt-2 text-sm text-slate-300">
+                  إدارة المباريات، النتائج، الأعضاء، التوقعات، والإعدادات.
+                </p>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={loadData}
-                className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10"
               >
-                تحديث البيانات
+                <RefreshCw className="h-4 w-4" />
+                <span>تحديث البيانات</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-xl bg-red-500 px-4 py-2 text-sm font-black text-white hover:bg-red-400"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-black text-white hover:bg-red-400"
               >
-                خروج الأدمن
+                <LogOut className="h-4 w-4" />
+                <span>خروج الأدمن</span>
               </button>
             </div>
           </div>
         </header>
 
         <nav className="mb-5 flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl">
-          {[
-            ["overview", "📊 نظرة عامة"],
-            ["add", "➕ إضافة مباراة"],
-            ["calculate", "🧮 احتساب النتائج"],
-            ["settings", "⚙️ إعدادات الشرائط"],
-            ["notices", "🔔 إشعارات الأعضاء"],
-            ["members", "👥 إدارة الأعضاء"],
-            ["predictions", "🔮 توقعات الأعضاء"],
-            ["missingPredictions", "📩 غير المتوقّعين"],
-            ["matches", "📅 المباريات"],
-            ["games", "🎮 الألعاب"],
-            ["challengeStudio", "🎙️ استوديو التحدي"],
-            ["logs", "📝 السجل"],
-          ].map(([tab, label]) => (
+          {ADMIN_TABS.map(({ tab, label, icon: Icon }) => (
             <button
               key={tab}
               type="button"
-              onClick={() => setActiveTab(tab as AdminTab)}
-              className={`rounded-xl px-3 py-2 text-sm font-bold ${
+              onClick={() => setActiveTab(tab)}
+              className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition ${
                 activeTab === tab
                   ? "bg-amber-400 text-slate-950"
                   : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
               }`}
             >
-              {label}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span>{label}</span>
             </button>
           ))}
         </nav>
@@ -626,8 +732,9 @@ export default function AdminPage() {
         {activeTab === "add" && (
           <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
             <div className="mb-4">
-              <h2 className="text-xl font-black md:text-2xl">
-                ➕ إضافة مباراة
+              <h2 className="flex items-center gap-2 text-xl font-black md:text-2xl">
+                <Plus className="h-5 w-5 text-amber-300 md:h-6 md:w-6" />
+                <span>إضافة مباراة</span>
               </h2>
               <p className="mt-1 text-sm text-slate-300">
                 أضف مباراة جديدة لتظهر في صندوق التوقعات حسب وقتها.
@@ -732,9 +839,14 @@ export default function AdminPage() {
 
                   <select
                     value={matchStage}
-                    onChange={(event) =>
-                      setMatchStage(event.target.value as MatchStage)
-                    }
+                    onChange={(event) => {
+                      const nextMatchStage = event.target.value as MatchStage;
+                      setMatchStage(nextMatchStage);
+
+                      if (nextMatchStage !== "knockout") {
+                        setKnockoutRound("general");
+                      }
+                    }}
                     className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
                   >
                     <option value="group">دور المجموعات</option>
@@ -745,6 +857,34 @@ export default function AdminPage() {
                     {getMatchStageHint(matchStage)}
                   </div>
                 </label>
+
+                {matchStage === "knockout" && (
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold">
+                      نوع مباراة خروج المغلوب
+                    </span>
+
+                    <select
+                      value={knockoutRound}
+                      onChange={(event) =>
+                        setKnockoutRound(
+                          event.target.value as KnockoutRound
+                        )
+                      }
+                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
+                    >
+                      <option value="general">خروج مغلوب</option>
+                      <option value="semiFinal">نصف النهائي</option>
+                      <option value="thirdPlace">المركز الثالث</option>
+                      <option value="final">النهائي</option>
+                    </select>
+
+                    <div className="mt-2 rounded-2xl border border-violet-400/20 bg-violet-400/10 p-3 text-xs leading-6 text-violet-100">
+                      هذا الاختيار للعرض والتنظيم فقط، ولا يؤثر على الحسبة
+                      أو نظام خروج المغلوب.
+                    </div>
+                  </label>
+                )}
 
                 <button
                   type="submit"
@@ -761,8 +901,9 @@ export default function AdminPage() {
         {activeTab === "calculate" && (
           <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
             <div className="mb-4">
-              <h2 className="text-xl font-black md:text-2xl">
-                🧮 احتساب النتائج
+              <h2 className="flex items-center gap-2 text-xl font-black md:text-2xl">
+                <Calculator className="h-5 w-5 text-emerald-300 md:h-6 md:w-6" />
+                <span>احتساب النتائج</span>
               </h2>
               <p className="mt-1 text-sm text-slate-300">
                 اختر مباراة وأدخل النتيجة الفعلية لتحديث نقاط جميع الأعضاء.
@@ -877,7 +1018,10 @@ export default function AdminPage() {
                         <div className="mt-2 text-center text-sm text-blue-200">
                           نوع المرحلة:{" "}
                           <strong>
-                            {getMatchStageLabel(selectedMatch.matchStage)}
+                            {getMatchDisplayStageLabel(
+                              selectedMatch.matchStage,
+                              selectedMatch.knockoutRound
+                            )}
                           </strong>
                         </div>
 

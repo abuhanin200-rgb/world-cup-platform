@@ -1,6 +1,10 @@
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
-import type { PredictionType, QualificationMethod } from "./matches";
+import type {
+  KnockoutRound,
+  PredictionType,
+  QualificationMethod,
+} from "./matches";
 
 export type HomeHighlightUser = {
   id: string;
@@ -47,6 +51,7 @@ export type ExactHit = {
 
   points: number;
   predictionType: PredictionType;
+  knockoutRound?: KnockoutRound;
 
   createdAt: string;
   calculatedAt: string;
@@ -187,6 +192,41 @@ function getTeamCodeFromUserData(data: Record<string, unknown>) {
 
 function normalizePredictionType(value: unknown): PredictionType {
   return value === "golden" ? "golden" : "normal";
+}
+
+
+function normalizeKnockoutRound(value: unknown): KnockoutRound {
+  if (
+    value === "semiFinal" ||
+    value === "thirdPlace" ||
+    value === "final"
+  ) {
+    return value;
+  }
+
+  return "general";
+}
+
+async function getKnockoutRoundsByMatchId(): Promise<
+  Map<string, KnockoutRound>
+> {
+  const snapshot = await getDocs(collection(db, "matches"));
+  const roundsByMatchId = new Map<string, KnockoutRound>();
+
+  snapshot.docs
+    .filter((docSnap) => docSnap.id !== "_init")
+    .forEach((docSnap) => {
+      const data = docSnap.data();
+
+      if (data.matchStage !== "knockout") return;
+
+      roundsByMatchId.set(
+        docSnap.id,
+        normalizeKnockoutRound(data.knockoutRound)
+      );
+    });
+
+  return roundsByMatchId;
 }
 
 function normalizeQualificationMethod(
@@ -466,7 +506,10 @@ function pickFirstArriverUser(
   return users.find((user) => user.id === selectedPrediction.userId) || null;
 }
 
-function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
+function getExactHits(
+  predictions: HighlightPrediction[],
+  knockoutRoundsByMatchId: Map<string, KnockoutRound>
+): ExactHit[] {
   const now = Date.now();
   const twentyFourHours = 24 * 60 * 60 * 1000;
 
@@ -512,6 +555,7 @@ function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
 
         points: prediction.points,
         predictionType: prediction.predictionType,
+        knockoutRound: knockoutRoundsByMatchId.get(prediction.matchId),
 
         createdAt: prediction.createdAt,
         calculatedAt: prediction.calculatedAt,
@@ -520,9 +564,10 @@ function getExactHits(predictions: HighlightPrediction[]): ExactHit[] {
 }
 
 export async function getHomeHighlights() {
-  const [users, predictions] = await Promise.all([
+  const [users, predictions, knockoutRoundsByMatchId] = await Promise.all([
     getUsersForHighlights(),
     getPredictionsForHighlights(),
+    getKnockoutRoundsByMatchId(),
   ]);
 
   const excludedUserIds = new Set<string>();
@@ -551,7 +596,7 @@ export async function getHomeHighlights() {
     excludedUserIds
   );
 
-  const exactHits = getExactHits(predictions);
+  const exactHits = getExactHits(predictions, knockoutRoundsByMatchId);
 
   return {
     predictionKing,

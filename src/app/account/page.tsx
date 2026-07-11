@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
-import { Copyright, ShieldCheck } from "lucide-react";
+import { Copyright, Medal, ShieldCheck, Swords, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -93,6 +93,59 @@ function StatCard({
 
 function isGoldenPrediction(prediction: AccountPrediction) {
   return prediction.predictionType === "golden";
+}
+
+function getMatchRoundBadge(prediction: AccountPrediction) {
+  if (prediction.matchStage !== "knockout") return null;
+
+  if (prediction.knockoutRound === "semiFinal") {
+    return {
+      label: "نصف النهائي",
+      Icon: Swords,
+      className:
+        "border-violet-300/30 bg-violet-400/10 text-violet-100",
+    };
+  }
+
+  if (prediction.knockoutRound === "thirdPlace") {
+    return {
+      label: "المركز الثالث",
+      Icon: Medal,
+      className: "border-amber-300/30 bg-amber-400/10 text-amber-100",
+    };
+  }
+
+  if (prediction.knockoutRound === "final") {
+    return {
+      label: "النهائي",
+      Icon: Trophy,
+      className:
+        "border-fuchsia-300/30 bg-fuchsia-400/10 text-fuchsia-100",
+    };
+  }
+
+  return {
+    label: "خروج مغلوب",
+    Icon: Swords,
+    className: "border-blue-300/30 bg-blue-400/10 text-blue-100",
+  };
+}
+
+function MatchRoundBadge({ prediction }: { prediction: AccountPrediction }) {
+  const badge = getMatchRoundBadge(prediction);
+
+  if (!badge) return null;
+
+  const { Icon } = badge;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-black ${badge.className}`}
+    >
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      <span>{badge.label}</span>
+    </span>
+  );
 }
 
 function getExactPoints(prediction: AccountPrediction) {
@@ -464,6 +517,7 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <ResultBadge prediction={prediction} />
+          <MatchRoundBadge prediction={prediction} />
 
           {isGolden && (
             <span className="rounded-full border border-amber-200/40 bg-gradient-to-r from-amber-300 via-fuchsia-300 to-violet-300 px-3 py-1 text-[11px] font-black text-slate-950 shadow-lg shadow-amber-500/20">
