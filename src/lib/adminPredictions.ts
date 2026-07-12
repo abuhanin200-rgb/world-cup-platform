@@ -3,6 +3,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  increment,
   query,
   where,
   writeBatch,
@@ -36,8 +37,6 @@ export type AdminPrediction = {
   isCalculated: boolean;
 
   createdAt: string;
-  editedAt: string | null;
-  editCount: number;
   calculatedAt: string | null;
 };
 
@@ -238,11 +237,6 @@ export async function getAdminPredictions(): Promise<AdminPrediction[]> {
         isCalculated: Boolean(data.isCalculated),
 
         createdAt: toText(data.createdAt),
-        editedAt:
-          data.editedAt === null || data.editedAt === undefined
-            ? null
-            : toText(data.editedAt),
-        editCount: toNumber(data.editCount),
         calculatedAt:
           data.calculatedAt === null || data.calculatedAt === undefined
             ? null
@@ -297,6 +291,9 @@ export async function deleteAdminPredictionAndFixUserStats(
 
   const predictionData = predictionSnap.data();
   const userId = toText(predictionData.userId);
+  const deletedPredictionPoints = Boolean(predictionData.isCalculated)
+    ? toNumber(predictionData.points)
+    : 0;
 
   if (!userId) {
     throw new Error("معرف العضو غير موجود في التوقع");
@@ -334,7 +331,9 @@ export async function deleteAdminPredictionAndFixUserStats(
   batch.set(
     doc(db, "users", userId),
     {
-      points: stats.points,
+      // لا نعيد بناء users.points من التوقعات فقط، لأن points يشمل نقاط الألعاب
+      // مثل تحدي العشر ثواني. نحذف فقط نقاط التوقع المحذوف.
+      points: increment(-deletedPredictionPoints),
       total: stats.total,
       correct: stats.correct,
       wrong: stats.wrong,
