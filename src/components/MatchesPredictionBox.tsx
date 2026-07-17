@@ -509,6 +509,82 @@ export default function MatchesPredictionBox() {
     });
   }
 
+
+  function updateScoreInput(
+    match: Match,
+    key: "homeScore" | "awayScore",
+    value: string
+  ) {
+    if (value !== "" && !/^\d{0,2}$/.test(value)) return;
+
+    setInputs((current) => {
+      const currentInput = {
+        ...createEmptyPredictionInput(),
+        ...current[match.id],
+      };
+
+      const nextInput = {
+        ...currentInput,
+        [key]: value,
+      };
+
+      if (!isFinalMatch(match)) {
+        return {
+          ...current,
+          [match.id]: nextInput,
+        };
+      }
+
+      const homeScore = toNumber(nextInput.homeScore);
+      const awayScore = toNumber(nextInput.awayScore);
+
+      const spainScore =
+        match.homeTeamCode === "ESP"
+          ? homeScore
+          : match.awayTeamCode === "ESP"
+            ? awayScore
+            : null;
+
+      const argentinaScore =
+        match.homeTeamCode === "ARG"
+          ? homeScore
+          : match.awayTeamCode === "ARG"
+            ? awayScore
+            : null;
+
+      if (spainScore === 0) {
+        nextInput.finalFirstSpainScorer = NO_FINAL_SCORER;
+      } else if (spainScore !== null && nextInput.finalFirstSpainScorer === NO_FINAL_SCORER) {
+        nextInput.finalFirstSpainScorer = "";
+      }
+
+      if (argentinaScore === 0) {
+        nextInput.finalFirstArgentinaScorer = NO_FINAL_SCORER;
+      } else if (
+        argentinaScore !== null &&
+        nextInput.finalFirstArgentinaScorer === NO_FINAL_SCORER
+      ) {
+        nextInput.finalFirstArgentinaScorer = "";
+      }
+
+      if (homeScore === 0 && awayScore === 0) {
+        nextInput.finalFirstScoringTeamCode = "none";
+      } else if (
+        homeScore !== null &&
+        awayScore !== null &&
+        homeScore + awayScore > 0 &&
+        nextInput.finalFirstScoringTeamCode === "none"
+      ) {
+        nextInput.finalFirstScoringTeamCode = "";
+      }
+
+      return {
+        ...current,
+        [match.id]: nextInput,
+      };
+    });
+  }
+
   function getEditRemainingMs(prediction: Prediction, match: Match) {
     if (isPredictionClosed(match.startAt)) return 0;
 
@@ -791,7 +867,7 @@ export default function MatchesPredictionBox() {
           inputMode="numeric"
           value={inputs[match.id]?.homeScore || ""}
           onChange={(event) =>
-            updateInput(match.id, "homeScore", event.target.value)
+            updateScoreInput(match, "homeScore", event.target.value)
           }
           placeholder="0"
           className={`h-14 w-full rounded-2xl border px-3 text-center text-[24px] font-black text-white shadow-inner outline-none transition duration-200 focus:scale-[1.02] focus:ring-2 ${
@@ -809,7 +885,7 @@ export default function MatchesPredictionBox() {
           inputMode="numeric"
           value={inputs[match.id]?.awayScore || ""}
           onChange={(event) =>
-            updateInput(match.id, "awayScore", event.target.value)
+            updateScoreInput(match, "awayScore", event.target.value)
           }
           placeholder="0"
           className={`h-14 w-full rounded-2xl border px-3 text-center text-[24px] font-black text-white shadow-inner outline-none transition duration-200 focus:scale-[1.02] focus:ring-2 ${
@@ -884,6 +960,26 @@ export default function MatchesPredictionBox() {
     const spainPlayers = getFinalSquadByTeamCode("ESP");
     const argentinaPlayers = getFinalSquadByTeamCode("ARG");
 
+    const predictedHomeScore = toNumber(inputs[match.id]?.homeScore || "");
+    const predictedAwayScore = toNumber(inputs[match.id]?.awayScore || "");
+
+    const predictedSpainScore =
+      match.homeTeamCode === "ESP"
+        ? predictedHomeScore
+        : match.awayTeamCode === "ESP"
+          ? predictedAwayScore
+          : null;
+
+    const predictedArgentinaScore =
+      match.homeTeamCode === "ARG"
+        ? predictedHomeScore
+        : match.awayTeamCode === "ARG"
+          ? predictedAwayScore
+          : null;
+
+    const showSpainScorer = predictedSpainScore !== 0;
+    const showArgentinaScorer = predictedArgentinaScore !== 0;
+
     return (
       <div className="mt-4 overflow-hidden rounded-3xl border border-fuchsia-300/30 bg-gradient-to-br from-fuchsia-500/10 via-slate-950/85 to-amber-300/10">
         <div className="border-b border-white/10 px-4 py-3 text-center">
@@ -931,57 +1027,69 @@ export default function MatchesPredictionBox() {
             </div>
           ) : (
             <>
-              <label className="block">
-                <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
-                  <span>أول مسجل من إسبانيا</span>
-                  <span className="rounded-full bg-fuchsia-300 px-2 py-0.5 text-[10px] text-slate-950">
-                    +7
+              {showSpainScorer ? (
+                <label className="block">
+                  <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
+                    <span>أول مسجل من إسبانيا</span>
+                    <span className="rounded-full bg-fuchsia-300 px-2 py-0.5 text-[10px] text-slate-950">
+                      +7
+                    </span>
                   </span>
-                </span>
-                <select
-                  value={inputs[match.id]?.finalFirstSpainScorer || ""}
-                  onChange={(event) =>
-                    updateInput(
-                      match.id,
-                      "finalFirstSpainScorer",
-                      event.target.value
-                    )
-                  }
-                  className="h-12 w-full rounded-2xl border border-fuchsia-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/20"
-                >
-                  <option value="">اختر لاعب إسبانيا</option>
-                  {renderPlayerOptions(spainPlayers)}
-                  <option value={NO_FINAL_SCORER}>
-                    لا يسجل أي لاعب من إسبانيا
-                  </option>
-                </select>
-              </label>
+                  <select
+                    value={inputs[match.id]?.finalFirstSpainScorer || ""}
+                    onChange={(event) =>
+                      updateInput(
+                        match.id,
+                        "finalFirstSpainScorer",
+                        event.target.value
+                      )
+                    }
+                    className="h-12 w-full rounded-2xl border border-fuchsia-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/20"
+                  >
+                    <option value="">اختر لاعب إسبانيا</option>
+                    {renderPlayerOptions(spainPlayers)}
+                    <option value={NO_FINAL_SCORER}>
+                      لا يسجل أي لاعب من إسبانيا
+                    </option>
+                  </select>
+                </label>
+              ) : (
+                <div className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-400/10 px-4 py-3 text-center text-xs font-black text-fuchsia-100">
+                  حسب توقعك، إسبانيا لا تسجل أهدافًا
+                </div>
+              )}
 
-              <label className="block">
-                <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
-                  <span>أول مسجل من الأرجنتين</span>
-                  <span className="rounded-full bg-sky-300 px-2 py-0.5 text-[10px] text-slate-950">
-                    +7
+              {showArgentinaScorer ? (
+                <label className="block">
+                  <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
+                    <span>أول مسجل من الأرجنتين</span>
+                    <span className="rounded-full bg-sky-300 px-2 py-0.5 text-[10px] text-slate-950">
+                      +7
+                    </span>
                   </span>
-                </span>
-                <select
-                  value={inputs[match.id]?.finalFirstArgentinaScorer || ""}
-                  onChange={(event) =>
-                    updateInput(
-                      match.id,
-                      "finalFirstArgentinaScorer",
-                      event.target.value
-                    )
-                  }
-                  className="h-12 w-full rounded-2xl border border-sky-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-300/20"
-                >
-                  <option value="">اختر لاعب الأرجنتين</option>
-                  {renderPlayerOptions(argentinaPlayers)}
-                  <option value={NO_FINAL_SCORER}>
-                    لا يسجل أي لاعب من الأرجنتين
-                  </option>
-                </select>
-              </label>
+                  <select
+                    value={inputs[match.id]?.finalFirstArgentinaScorer || ""}
+                    onChange={(event) =>
+                      updateInput(
+                        match.id,
+                        "finalFirstArgentinaScorer",
+                        event.target.value
+                      )
+                    }
+                    className="h-12 w-full rounded-2xl border border-sky-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-300/20"
+                  >
+                    <option value="">اختر لاعب الأرجنتين</option>
+                    {renderPlayerOptions(argentinaPlayers)}
+                    <option value={NO_FINAL_SCORER}>
+                      لا يسجل أي لاعب من الأرجنتين
+                    </option>
+                  </select>
+                </label>
+              ) : (
+                <div className="rounded-2xl border border-sky-300/20 bg-sky-400/10 px-4 py-3 text-center text-xs font-black text-sky-100">
+                  حسب توقعك، الأرجنتين لا تسجل أهدافًا
+                </div>
+              )}
             </>
           )}
         </div>
