@@ -9,7 +9,14 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { sendMatchCalculationNotifications } from "./matchNotifications";
-import type { MatchStage, PredictionType, QualificationMethod } from "./matches";
+import type {
+  FinalBonusPrediction,
+  FinalBonusResult,
+  KnockoutRound,
+  MatchStage,
+  PredictionType,
+  QualificationMethod,
+} from "./matches";
 
 type ResultType = "exact" | "winner" | "wrong" | "";
 
@@ -32,6 +39,14 @@ awayTeamName?: string;
   qualifiedTeamCode?: string | null;
   qualificationMethod?: QualificationMethod | null;
 
+  finalBonusPrediction?: FinalBonusPrediction | null;
+  finalBonusResult?: FinalBonusResult | null;
+  finalBonusPoints?: number;
+  firstScoringTeamPoints?: number;
+  firstSpainScorerPoints?: number;
+  firstArgentinaScorerPoints?: number;
+  finalTotalPoints?: number;
+
   points?: number;
   isCalculated?: boolean;
   createdAt?: string;
@@ -43,6 +58,7 @@ awayTeamName?: string;
 
   predictionType?: PredictionType;
   matchStage?: MatchStage;
+  knockoutRound?: KnockoutRound;
   resultType?: ResultType;
 };
 
@@ -52,6 +68,8 @@ type MatchDoc = {
   awayTeamCode: string;
   predictionType: PredictionType;
   matchStage: MatchStage;
+  knockoutRound?: KnockoutRound;
+  finalBonusResult?: FinalBonusResult | null;
   resultCalculated?: boolean;
   status?: string;
 };
@@ -80,6 +98,7 @@ export type CalculateMatchInput = {
   actualAwayScore: number;
   actualQualifiedTeamCode?: string;
   actualQualificationMethod?: QualificationMethod;
+  finalBonusResult?: FinalBonusResult | null;
 };
 
 const TEAM_IDENTITY_ALIASES: Record<string, string[]> = {
@@ -147,6 +166,142 @@ function normalizeMatchStage(value: unknown): MatchStage {
   return value === "knockout" ? "knockout" : "group";
 }
 
+function normalizeKnockoutRound(
+  value: unknown
+): KnockoutRound | undefined {
+  if (
+    value === "general" ||
+    value === "semiFinal" ||
+    value === "thirdPlace" ||
+    value === "final"
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeFinalBonusData(
+  value: unknown
+): FinalBonusResult | null {
+  if (!isRecord(value)) return null;
+
+  const firstScoringTeamCode = toText(value.firstScoringTeamCode);
+  const firstSpainScorer = toText(value.firstSpainScorer);
+  const firstArgentinaScorer = toText(value.firstArgentinaScorer);
+
+  if (
+    !firstScoringTeamCode ||
+    !firstSpainScorer ||
+    !firstArgentinaScorer
+  ) {
+    return null;
+  }
+
+  return {
+    firstScoringTeamCode,
+    firstSpainScorer,
+    firstArgentinaScorer,
+  };
+}
+
+function isWorldCupFinal(match: MatchDoc) {
+  return (
+    match.matchStage === "knockout" &&
+    match.knockoutRound === "final"
+  );
+}
+
+function normalizeComparableValue(value?: string | null) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function finalBonusValuesMatch(
+  predictedValue?: string | null,
+  actualValue?: string | null
+) {
+  const predicted = normalizeComparableValue(predictedValue);
+  const actual = normalizeComparableValue(actualValue);
+
+  return predicted !== "" && actual !== "" && predicted === actual;
+}
+
+function validateFinalBonusResult(
+  match: MatchDoc,
+  value?: FinalBonusResult | null
+) {
+  if (!isWorldCupFinal(match)) return null;
+
+  const result = normalizeFinalBonusData(value);
+
+  if (!result) {
+    throw new Error("أكمل النتائج الفعلية لإضافات النهائي");
+  }
+
+  const validFirstScoringTeam =
+    result.firstScoringTeamCode === match.homeTeamCode ||
+    result.firstScoringTeamCode === match.awayTeamCode ||
+    result.firstScoringTeamCode === "none";
+
+  if (!validFirstScoringTeam) {
+    throw new Error("اختر من بدأ التسجيل في النهائي");
+  }
+
+  return result;
+}
+
+function calculateFinalBonusPoints(params: {
+  prediction?: FinalBonusPrediction | null;
+  result?: FinalBonusResult | null;
+}) {
+  const prediction = normalizeFinalBonusData(params.prediction);
+  const result = normalizeFinalBonusData(params.result);
+
+  if (!prediction || !result) {
+    return {
+      firstScoringTeamPoints: 0,
+      firstSpainScorerPoints: 0,
+      firstArgentinaScorerPoints: 0,
+      total: 0,
+    };
+  }
+
+  const firstScoringTeamPoints = finalBonusValuesMatch(
+    prediction.firstScoringTeamCode,
+    result.firstScoringTeamCode
+  )
+    ? 6
+    : 0;
+
+  const firstSpainScorerPoints = finalBonusValuesMatch(
+    prediction.firstSpainScorer,
+    result.firstSpainScorer
+  )
+    ? 7
+    : 0;
+
+  const firstArgentinaScorerPoints = finalBonusValuesMatch(
+    prediction.firstArgentinaScorer,
+    result.firstArgentinaScorer
+  )
+    ? 7
+    : 0;
+
+  return {
+    firstScoringTeamPoints,
+    firstSpainScorerPoints,
+    firstArgentinaScorerPoints,
+    total:
+      firstScoringTeamPoints +
+      firstSpainScorerPoints +
+      firstArgentinaScorerPoints,
+  };
+}
+
 function normalizeQualificationMethod(
   value: unknown
 ): QualificationMethod | null {
@@ -211,6 +366,11 @@ async function getMatchById(matchId: string): Promise<MatchDoc> {
     awayTeamCode: toText(data.awayTeamCode),
     predictionType: normalizePredictionType(data.predictionType),
     matchStage: normalizeMatchStage(data.matchStage),
+    knockoutRound:
+      normalizeMatchStage(data.matchStage) === "knockout"
+        ? normalizeKnockoutRound(data.knockoutRound) || "general"
+        : undefined,
+    finalBonusResult: normalizeFinalBonusData(data.finalBonusResult),
     resultCalculated: Boolean(data.resultCalculated),
     status: String(data.status || "scheduled"),
   };
@@ -733,6 +893,10 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
 
   const match = await getMatchById(input.matchId);
   const actualOutcome = getOutcome(input.actualHomeScore, input.actualAwayScore);
+  const finalBonusResult = validateFinalBonusResult(
+    match,
+    input.finalBonusResult
+  );
 
   const actualQualifiedTeamCode =
     match.matchStage === "knockout" && actualOutcome === "draw"
@@ -791,6 +955,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
               ...prediction,
               predictionType,
               matchStage: match.matchStage,
+              knockoutRound: match.knockoutRound,
             },
             match,
             actualHomeScore: input.actualHomeScore,
@@ -806,13 +971,37 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
             predictionType
           );
 
+    const finalBonusBreakdown = isWorldCupFinal(match)
+      ? calculateFinalBonusPoints({
+          prediction: prediction.finalBonusPrediction,
+          result: finalBonusResult,
+        })
+      : {
+          firstScoringTeamPoints: 0,
+          firstSpainScorerPoints: 0,
+          firstArgentinaScorerPoints: 0,
+          total: 0,
+        };
+
+    const finalTotalPoints = result.points + finalBonusBreakdown.total;
+
     return {
       ...prediction,
-      points: result.points,
+      points: finalTotalPoints,
       resultType: result.resultType,
       isCalculated: true,
       predictionType,
       matchStage: match.matchStage,
+      knockoutRound: match.knockoutRound,
+      finalBonusResult,
+      finalBonusPoints: finalBonusBreakdown.total,
+      firstScoringTeamPoints:
+        finalBonusBreakdown.firstScoringTeamPoints,
+      firstSpainScorerPoints:
+        finalBonusBreakdown.firstSpainScorerPoints,
+      firstArgentinaScorerPoints:
+        finalBonusBreakdown.firstArgentinaScorerPoints,
+      finalTotalPoints,
     };
   });
 
@@ -849,6 +1038,16 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
       actualQualificationMethod,
       predictionType: prediction.predictionType,
       matchStage: match.matchStage,
+      knockoutRound: match.knockoutRound || null,
+      finalBonusResult,
+      finalBonusPoints: prediction.finalBonusPoints || 0,
+      firstScoringTeamPoints:
+        prediction.firstScoringTeamPoints || 0,
+      firstSpainScorerPoints:
+        prediction.firstSpainScorerPoints || 0,
+      firstArgentinaScorerPoints:
+        prediction.firstArgentinaScorerPoints || 0,
+      finalTotalPoints: prediction.finalTotalPoints || prediction.points,
       calculatedAt: now,
       updatedAt: now,
     });
@@ -890,6 +1089,7 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
     actualAwayScore: input.actualAwayScore,
     actualQualifiedTeamCode,
     actualQualificationMethod,
+    finalBonusResult,
     resultCalculated: true,
     calculatedAt: now,
     updatedAt: now,
@@ -921,6 +1121,8 @@ export async function calculateMatchResult(input: CalculateMatchInput) {
     wrongCount,
     predictionType: match.predictionType,
     matchStage: match.matchStage,
+    knockoutRound: match.knockoutRound,
+    finalBonusResult,
   };
 }
 
@@ -972,6 +1174,12 @@ export async function undoMatchCalculation(matchId: string) {
       actualAwayScore: null,
       actualQualifiedTeamCode: null,
       actualQualificationMethod: null,
+      finalBonusResult: null,
+      finalBonusPoints: 0,
+      firstScoringTeamPoints: 0,
+      firstSpainScorerPoints: 0,
+      firstArgentinaScorerPoints: 0,
+      finalTotalPoints: 0,
       calculatedAt: null,
       updatedAt: now,
     });
@@ -1013,6 +1221,7 @@ export async function undoMatchCalculation(matchId: string) {
     actualAwayScore: null,
     actualQualifiedTeamCode: null,
     actualQualificationMethod: null,
+    finalBonusResult: null,
     resultCalculated: false,
     calculatedAt: null,
     updatedAt: now,

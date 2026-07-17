@@ -47,6 +47,13 @@ function isGoldenPrediction(prediction: LatestPrediction) {
   return prediction.predictionType === "golden";
 }
 
+function isHiddenFinalPrediction(prediction: LatestPrediction) {
+  return (
+    prediction.matchStage === "knockout" &&
+    prediction.knockoutRound === "final"
+  );
+}
+
 function getKnockoutRoundLabel(prediction: LatestPrediction) {
   if (prediction.matchStage !== "knockout") return "";
 
@@ -392,6 +399,32 @@ export default function LatestPredictionsTicker() {
   function renderPredictionCard(prediction: LatestPrediction, index: number) {
     const golden = isGoldenPrediction(prediction);
     const knockoutRoundLabel = getKnockoutRoundLabel(prediction);
+    const hiddenFinal = isHiddenFinalPrediction(prediction);
+
+    if (hiddenFinal) {
+      return (
+        <div
+          key={`${prediction.id}-${index}`}
+          dir="rtl"
+          className="group relative inline-flex min-h-[46px] flex-none items-center gap-2 overflow-hidden rounded-2xl border border-amber-300/35 bg-gradient-to-l from-amber-400/18 via-yellow-500/10 to-orange-500/10 px-3 py-2 text-[12px] text-white shadow-md shadow-slate-950/20 md:px-4 md:text-sm"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-l from-amber-300/18 via-transparent to-transparent opacity-80" />
+
+          <span className="relative inline-flex items-center gap-1 rounded-full border border-amber-300/35 bg-amber-400/15 px-2 py-0.5 text-[10px] font-black text-amber-100 shadow-sm md:text-xs">
+            <span>🏆</span>
+            <span>النهائي الكبير</span>
+          </span>
+
+          <span className="relative font-black text-amber-300">
+            {prediction.userName}
+          </span>
+
+          <span className="relative font-bold text-amber-50">
+            اعتمد توقعه للنهائي الكبير 🏆
+          </span>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -481,6 +514,36 @@ export default function LatestPredictionsTicker() {
     const qualificationMethodLabel = getQualificationMethodLabel(
       prediction.qualificationMethod,
     );
+    const hiddenFinal = isHiddenFinalPrediction(prediction);
+
+    if (hiddenFinal) {
+      return (
+        <motion.div
+          key={prediction.id}
+          variants={listItemMotion}
+          className="relative transform-gpu overflow-hidden rounded-3xl border border-amber-300/35 bg-gradient-to-br from-amber-400/12 via-yellow-500/8 to-orange-500/10 p-4 shadow-md shadow-slate-950/20"
+        >
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-300/16 via-transparent to-orange-300/5" />
+
+          <div className="relative flex flex-col items-center text-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/35 bg-amber-400/15 px-3 py-1 text-[11px] font-black text-amber-100">
+              <span>🏆</span>
+              <span>النهائي الكبير</span>
+            </span>
+
+            <div className="mt-3 text-[16px] font-black text-white">
+              <span className="text-amber-300">{prediction.userName}</span>{" "}
+              اعتمد توقعه للنهائي.
+            </div>
+
+            <p className="mt-2 max-w-md text-[12px] font-medium leading-6 text-amber-50/85">
+              تم إخفاء تفاصيل التوقع حتى انتهاء المباراة حفاظًا على عدالة
+              المنافسة.
+            </p>
+          </div>
+        </motion.div>
+      );
+    }
 
     return (
       <motion.div

@@ -43,11 +43,19 @@ export type AccountPrediction = {
 
   createdAt: string;
   calculatedAt: string;
+
+  /**
+   * نحافظ على جميع حقول توقع النهائي كما هي في Firestore.
+   * يشمل ذلك اختيارات الإضافات، النتائج الفعلية، وتفاصيل النقاط
+   * سواء كانت محفوظة كحقول مباشرة أو داخل كائنات متداخلة.
+   */
+  [key: string]: unknown;
 };
 
 type AccountMatchInfo = {
   matchStage: MatchStage;
   knockoutRound?: KnockoutRound;
+  rawData: Record<string, unknown>;
 };
 
 function toNumber(value: unknown) {
@@ -105,7 +113,7 @@ function normalizeKnockoutRound(value: unknown): KnockoutRound {
 }
 
 function normalizeQualificationMethod(
-  value: unknown
+  value: unknown,
 ): QualificationMethod | null {
   if (value === "extraTime" || value === "penalties") {
     return value;
@@ -121,7 +129,7 @@ async function getAccountMatchesInfo() {
   matchesSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .forEach((docSnap) => {
-      const data = docSnap.data();
+      const data = docSnap.data() as Record<string, unknown>;
       const matchStage = normalizeMatchStage(data.matchStage);
 
       matchesMap.set(docSnap.id, {
@@ -130,6 +138,7 @@ async function getAccountMatchesInfo() {
           matchStage === "knockout"
             ? normalizeKnockoutRound(data.knockoutRound)
             : undefined,
+        rawData: data,
       });
     });
 
@@ -137,12 +146,12 @@ async function getAccountMatchesInfo() {
 }
 
 export async function getAccountPredictions(
-  userId: string
+  userId: string,
 ): Promise<AccountPrediction[]> {
   const predictionsRef = collection(db, "predictions");
   const predictionsQuery = query(
     predictionsRef,
-    where("userId", "==", userId)
+    where("userId", "==", userId),
   );
 
   const [predictionsSnapshot, matchesMap] = await Promise.all([
@@ -153,13 +162,12 @@ export async function getAccountPredictions(
   return predictionsSnapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
     .map((docSnap) => {
-      const data = docSnap.data();
+      const data = docSnap.data() as Record<string, unknown>;
       const matchId = toText(data.matchId);
       const currentMatchInfo = matchesMap.get(matchId);
 
       const matchStage =
-        currentMatchInfo?.matchStage ??
-        normalizeMatchStage(data.matchStage);
+        currentMatchInfo?.matchStage ?? normalizeMatchStage(data.matchStage);
 
       const knockoutRound =
         matchStage === "knockout"
@@ -168,6 +176,13 @@ export async function getAccountPredictions(
           : undefined;
 
       return {
+        // بيانات المباراة أولًا كاحتياط للنتائج والإضافات الفعلية.
+        ...(currentMatchInfo?.rawData || {}),
+
+        // بيانات توقع العضو لها الأولوية دائمًا.
+        ...data,
+
+        // الحقول الأساسية أدناه تُعاد بصيغة موحّدة وآمنة للواجهة.
         id: docSnap.id,
         matchId,
 
@@ -184,17 +199,17 @@ export async function getAccountPredictions(
 
         qualifiedTeamCode: toNullableText(data.qualifiedTeamCode),
         qualificationMethod: normalizeQualificationMethod(
-          data.qualificationMethod
+          data.qualificationMethod,
         ),
 
         actualHomeScore: toNullableNumber(data.actualHomeScore),
         actualAwayScore: toNullableNumber(data.actualAwayScore),
 
         actualQualifiedTeamCode: toNullableText(
-          data.actualQualifiedTeamCode
+          data.actualQualifiedTeamCode,
         ),
         actualQualificationMethod: normalizeQualificationMethod(
-          data.actualQualificationMethod
+          data.actualQualificationMethod,
         ),
 
         points: toNumber(data.points),
@@ -207,7 +222,7 @@ export async function getAccountPredictions(
 
         createdAt: toText(data.createdAt),
         calculatedAt: toText(data.calculatedAt),
-      };
+      } satisfies AccountPrediction;
     })
     .sort((a, b) => {
       const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;

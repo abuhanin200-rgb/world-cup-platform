@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  BarChart3,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -12,13 +13,21 @@ import {
   PencilLine,
   Save,
   ShieldCheck,
+  Sparkles,
   Swords,
+  Trophy,
   Timer,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Match, getAllMatches } from "@/lib/matches";
 import {
+  Match,
+  getAllMatches,
+  isWorldCupFinalMatch,
+  type FinalBonusPrediction,
+} from "@/lib/matches";
+import {
+  getLatestPredictions,
   getPredictionEditWindowRemainingMs,
   getUserPredictionForMatch,
   Prediction,
@@ -27,6 +36,11 @@ import {
 } from "@/lib/predictions";
 import { useAuth } from "@/context/AuthContext";
 import TeamFlag from "@/components/TeamFlag";
+import {
+  getFinalSquadByTeamCode,
+  getFinalSquadPlayerName,
+  type FinalSquadPlayer,
+} from "@/data/finalSquads";
 
 type QualificationMethod = "extraTime" | "penalties";
 
@@ -37,6 +51,9 @@ type PredictionInputs = Record<
     awayScore: string;
     qualifiedTeamCode: string;
     qualificationMethod: string;
+    finalFirstScoringTeamCode: string;
+    finalFirstSpainScorer: string;
+    finalFirstArgentinaScorer: string;
   }
 >;
 
@@ -45,6 +62,55 @@ type SavedPredictions = Record<string, Prediction>;
 type MatchWithKnockout = Match & {
   matchStage?: "group" | "knockout";
 };
+
+const NO_FINAL_SCORER = "none";
+
+type FinalPredictionStats = {
+  homeVotes: number;
+  awayVotes: number;
+  totalVotes: number;
+};
+
+type FinalPredictionStatsByMatch = Record<string, FinalPredictionStats>;
+
+function createEmptyPredictionInput() {
+  return {
+    homeScore: "",
+    awayScore: "",
+    qualifiedTeamCode: "",
+    qualificationMethod: "",
+    finalFirstScoringTeamCode: "",
+    finalFirstSpainScorer: "",
+    finalFirstArgentinaScorer: "",
+  };
+}
+
+function isFinalMatch(match: Match) {
+  return isWorldCupFinalMatch(match);
+}
+
+function getPlayerPositionLabel(position: FinalSquadPlayer["position"]) {
+  if (position === "goalkeeper") return "حراس المرمى";
+  if (position === "defender") return "الدفاع";
+  if (position === "midfielder") return "الوسط";
+  return "الهجوم";
+}
+
+function getPlayersByPosition(players: FinalSquadPlayer[]) {
+  const positions: FinalSquadPlayer["position"][] = [
+    "goalkeeper",
+    "defender",
+    "midfielder",
+    "forward",
+  ];
+
+  return positions
+    .map((position) => ({
+      position,
+      players: players.filter((player) => player.position === position),
+    }))
+    .filter((group) => group.players.length > 0);
+}
 
 function formatDate(matchDate: string) {
   try {
@@ -228,6 +294,8 @@ export default function MatchesPredictionBox() {
   const [loading, setLoading] = useState(true);
   const [savingMatchId, setSavingMatchId] = useState("");
   const [editingMatchId, setEditingMatchId] = useState("");
+  const [finalPredictionStats, setFinalPredictionStats] =
+    useState<FinalPredictionStatsByMatch>({});
   const [, setTick] = useState(0);
 
   async function loadMatches() {
@@ -246,11 +314,63 @@ export default function MatchesPredictionBox() {
       });
 
       setMatches(availableMatches);
+      await loadFinalPredictionStats(availableMatches);
     } catch (error) {
       console.error("Load matches error:", error);
       setMatches([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadFinalPredictionStats(currentMatches: Match[]) {
+    const finalMatches = currentMatches.filter(isFinalMatch);
+
+    if (finalMatches.length === 0) {
+      setFinalPredictionStats({});
+      return;
+    }
+
+    try {
+      const latestPredictions = await getLatestPredictions(2000);
+      const nextStats: FinalPredictionStatsByMatch = {};
+
+      finalMatches.forEach((match) => {
+        const matchPredictions = latestPredictions.filter(
+          (prediction) => prediction.matchId === match.id
+        );
+
+        let homeVotes = 0;
+        let awayVotes = 0;
+
+        matchPredictions.forEach((prediction) => {
+          let selectedChampionCode = "";
+
+          if (prediction.homeScore > prediction.awayScore) {
+            selectedChampionCode = match.homeTeamCode;
+          } else if (prediction.awayScore > prediction.homeScore) {
+            selectedChampionCode = match.awayTeamCode;
+          } else {
+            selectedChampionCode = prediction.qualifiedTeamCode || "";
+          }
+
+          if (selectedChampionCode === match.homeTeamCode) {
+            homeVotes += 1;
+          } else if (selectedChampionCode === match.awayTeamCode) {
+            awayVotes += 1;
+          }
+        });
+
+        nextStats[match.id] = {
+          homeVotes,
+          awayVotes,
+          totalVotes: homeVotes + awayVotes,
+        };
+      });
+
+      setFinalPredictionStats(nextStats);
+    } catch (error) {
+      console.error("Load final prediction stats error:", error);
     }
   }
 
@@ -285,6 +405,19 @@ export default function MatchesPredictionBox() {
   useEffect(() => {
     loadMatches();
   }, []);
+
+  useEffect(() => {
+    if (!matches.some(isFinalMatch)) return;
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        loadFinalPredictionStats(matches);
+      }
+    }, 30000);
+
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -324,7 +457,10 @@ export default function MatchesPredictionBox() {
       | "homeScore"
       | "awayScore"
       | "qualifiedTeamCode"
-      | "qualificationMethod",
+      | "qualificationMethod"
+      | "finalFirstScoringTeamCode"
+      | "finalFirstSpainScorer"
+      | "finalFirstArgentinaScorer",
     value: string
   ) {
     if (
@@ -338,10 +474,8 @@ export default function MatchesPredictionBox() {
     setInputs((current) => ({
       ...current,
       [matchId]: {
-        homeScore: current[matchId]?.homeScore || "",
-        awayScore: current[matchId]?.awayScore || "",
-        qualifiedTeamCode: current[matchId]?.qualifiedTeamCode || "",
-        qualificationMethod: current[matchId]?.qualificationMethod || "",
+        ...createEmptyPredictionInput(),
+        ...current[matchId],
         [key]: value,
       },
     }));
@@ -375,16 +509,62 @@ export default function MatchesPredictionBox() {
     if (!isKnockoutDrawInput(match)) return true;
 
     if (!inputs[match.id]?.qualifiedTeamCode) {
-      alert("اختر المنتخب المتأهل");
+      alert(
+        isFinalMatch(match as Match)
+          ? "اختر بطل كأس العالم"
+          : "اختر المنتخب المتأهل"
+      );
       return false;
     }
 
     if (!inputs[match.id]?.qualificationMethod) {
-      alert("اختر طريقة التأهل");
+      alert(
+        isFinalMatch(match as Match)
+          ? "اختر طريقة حسم اللقب"
+          : "اختر طريقة التأهل"
+      );
       return false;
     }
 
     return true;
+  }
+
+  function validateFinalBonusInput(match: Match) {
+    if (!isFinalMatch(match)) return true;
+
+    const matchInput = inputs[match.id];
+
+    if (!matchInput?.finalFirstScoringTeamCode) {
+      alert("اختر من يبدأ التسجيل في النهائي");
+      return false;
+    }
+
+    if (!matchInput.finalFirstSpainScorer) {
+      alert("اختر أول مسجل من إسبانيا");
+      return false;
+    }
+
+    if (!matchInput.finalFirstArgentinaScorer) {
+      alert("اختر أول مسجل من الأرجنتين");
+      return false;
+    }
+
+    return true;
+  }
+
+  function getFinalBonusPredictionInput(
+    match: Match
+  ): FinalBonusPrediction | undefined {
+    if (!isFinalMatch(match)) return undefined;
+
+    const matchInput = inputs[match.id];
+
+    return {
+      firstScoringTeamCode: matchInput?.finalFirstScoringTeamCode || "",
+      firstSpainScorer: matchInput?.finalFirstSpainScorer || "",
+      firstArgentinaScorer:
+        matchInput?.finalFirstArgentinaScorer || "",
+    };
   }
 
   function startEditingPrediction(match: Match, prediction: Prediction) {
@@ -398,6 +578,12 @@ export default function MatchesPredictionBox() {
         awayScore: String(prediction.awayScore),
         qualifiedTeamCode: prediction.qualifiedTeamCode || "",
         qualificationMethod: prediction.qualificationMethod || "",
+        finalFirstScoringTeamCode:
+          prediction.finalBonusPrediction?.firstScoringTeamCode || "",
+        finalFirstSpainScorer:
+          prediction.finalBonusPrediction?.firstSpainScorer || "",
+        finalFirstArgentinaScorer:
+          prediction.finalBonusPrediction?.firstArgentinaScorer || "",
       },
     }));
   }
@@ -406,12 +592,7 @@ export default function MatchesPredictionBox() {
     setEditingMatchId("");
     setInputs((current) => ({
       ...current,
-      [matchId]: {
-        homeScore: "",
-        awayScore: "",
-        qualifiedTeamCode: "",
-        qualificationMethod: "",
-      },
+      [matchId]: createEmptyPredictionInput(),
     }));
   }
 
@@ -443,6 +624,10 @@ export default function MatchesPredictionBox() {
       return;
     }
 
+    if (!validateFinalBonusInput(match)) {
+      return;
+    }
+
     try {
       setSavingMatchId(match.id);
 
@@ -464,6 +649,7 @@ export default function MatchesPredictionBox() {
         qualifiedTeamCode: inputs[match.id]?.qualifiedTeamCode || undefined,
         qualificationMethod: (inputs[match.id]?.qualificationMethod ||
           undefined) as QualificationMethod | undefined,
+        finalBonusPrediction: getFinalBonusPredictionInput(match),
       });
 
       setSavedPredictions((current) => ({
@@ -471,14 +657,11 @@ export default function MatchesPredictionBox() {
         [match.id]: prediction,
       }));
 
+      await loadFinalPredictionStats(matches);
+
       setInputs((current) => ({
         ...current,
-        [match.id]: {
-          homeScore: "",
-          awayScore: "",
-          qualifiedTeamCode: "",
-          qualificationMethod: "",
-        },
+        [match.id]: createEmptyPredictionInput(),
       }));
 
       alert("وصل توقعك واعتمدناه ✅ لا تنسى ترجع وتشوف نتيجتك");
@@ -524,6 +707,10 @@ export default function MatchesPredictionBox() {
       return;
     }
 
+    if (!validateFinalBonusInput(match)) {
+      return;
+    }
+
     try {
       setSavingMatchId(match.id);
 
@@ -535,12 +722,15 @@ export default function MatchesPredictionBox() {
         qualifiedTeamCode: inputs[match.id]?.qualifiedTeamCode || undefined,
         qualificationMethod: (inputs[match.id]?.qualificationMethod ||
           undefined) as QualificationMethod | undefined,
+        finalBonusPrediction: getFinalBonusPredictionInput(match),
       });
 
       setSavedPredictions((current) => ({
         ...current,
         [match.id]: prediction,
       }));
+
+      await loadFinalPredictionStats(matches);
 
       cancelEditingPrediction(match.id);
       alert("تم تعديل توقعك واعتماد التوقع الجديد");
@@ -557,10 +747,18 @@ export default function MatchesPredictionBox() {
   }
 
   function renderScoreInputs(match: Match, golden: boolean) {
+    const finalMatch = isFinalMatch(match);
+
     return (
-      <div
-        className="grid grid-cols-[1fr_28px_1fr] items-center gap-2"
-      >
+      <div>
+        {finalMatch && (
+          <div className="mb-3 flex items-center justify-center gap-2 text-sm font-black text-white md:text-base">
+            <Trophy className="h-4 w-4 text-amber-200" aria-hidden="true" />
+            <span>التوقع الأساسي</span>
+          </div>
+        )}
+
+        <div className="grid grid-cols-[1fr_28px_1fr] items-center gap-2">
         <input
           inputMode="numeric"
           value={inputs[match.id]?.homeScore || ""}
@@ -592,11 +790,14 @@ export default function MatchesPredictionBox() {
               : "border-white/10 bg-slate-950/80 focus:border-amber-400 focus:ring-amber-400/25"
           }`}
         />
+        </div>
       </div>
     );
   }
 
   function renderQualificationFields(match: Match, visible: boolean) {
+    const finalMatch = isFinalMatch(match);
+
     return (
       <>
         {visible && (
@@ -608,7 +809,9 @@ export default function MatchesPredictionBox() {
               }
               className="h-12 rounded-2xl border border-blue-300/30 bg-slate-950/90 px-3 text-[14px] font-bold text-white outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-300/20"
             >
-              <option value="">اختر المنتخب المتأهل</option>
+              <option value="">
+                {finalMatch ? "اختر بطل كأس العالم" : "اختر المنتخب المتأهل"}
+              </option>
               <option value={match.homeTeamCode}>{match.homeTeamName}</option>
               <option value={match.awayTeamCode}>{match.awayTeamName}</option>
             </select>
@@ -620,13 +823,159 @@ export default function MatchesPredictionBox() {
               }
               className="h-12 rounded-2xl border border-blue-300/30 bg-slate-950/90 px-3 text-[14px] font-bold text-white outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-300/20"
             >
-              <option value="">اختر طريقة التأهل</option>
+              <option value="">
+                {finalMatch ? "اختر طريقة حسم اللقب" : "اختر طريقة التأهل"}
+              </option>
               <option value="extraTime">أشواط إضافية</option>
               <option value="penalties">ركلات ترجيح</option>
             </select>
           </div>
         )}
       </>
+    );
+  }
+
+  function renderPlayerOptions(players: FinalSquadPlayer[]) {
+    return getPlayersByPosition(players).map((group) => (
+      <optgroup
+        key={group.position}
+        label={getPlayerPositionLabel(group.position)}
+      >
+        {group.players.map((player) => (
+          <option key={player.id} value={player.id}>
+            {player.nameAr}
+          </option>
+        ))}
+      </optgroup>
+    ));
+  }
+
+  function renderFinalBonusFields(match: Match) {
+    if (!isFinalMatch(match)) return null;
+
+    const spainPlayers = getFinalSquadByTeamCode("ESP");
+    const argentinaPlayers = getFinalSquadByTeamCode("ARG");
+
+    return (
+      <div className="mt-4 overflow-hidden rounded-3xl border border-fuchsia-300/30 bg-gradient-to-br from-fuchsia-500/10 via-slate-950/85 to-amber-300/10">
+        <div className="border-b border-white/10 px-4 py-3 text-center">
+          <div className="inline-flex items-center gap-2 text-sm font-black text-amber-100 md:text-base">
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            <span>إضافات النهائي 20 نقطة</span>
+          </div>
+          <p className="mt-1 text-[11px] font-bold leading-5 text-slate-300 md:text-xs">
+            ثلاث اختيارات حاسمة تضاف إلى نقاط السوبر ذهبي
+          </p>
+        </div>
+
+        <div className="space-y-3 p-3 md:p-4">
+          <label className="block">
+            <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
+              <span>من يبدأ التسجيل؟</span>
+              <span className="rounded-full bg-amber-300 px-2 py-0.5 text-[10px] text-slate-950">
+                +6
+              </span>
+            </span>
+            <select
+              value={inputs[match.id]?.finalFirstScoringTeamCode || ""}
+              onChange={(event) =>
+                updateInput(
+                  match.id,
+                  "finalFirstScoringTeamCode",
+                  event.target.value
+                )
+              }
+              className="h-12 w-full rounded-2xl border border-amber-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-amber-300 focus:ring-2 focus:ring-amber-300/20"
+            >
+              <option value="">اختر من يبدأ التسجيل</option>
+              <option value={match.homeTeamCode}>{match.homeTeamName}</option>
+              <option value={match.awayTeamCode}>{match.awayTeamName}</option>
+              <option value="none">لا يوجد أهداف</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
+              <span>أول مسجل من إسبانيا</span>
+              <span className="rounded-full bg-fuchsia-300 px-2 py-0.5 text-[10px] text-slate-950">
+                +7
+              </span>
+            </span>
+            <select
+              value={inputs[match.id]?.finalFirstSpainScorer || ""}
+              onChange={(event) =>
+                updateInput(
+                  match.id,
+                  "finalFirstSpainScorer",
+                  event.target.value
+                )
+              }
+              className="h-12 w-full rounded-2xl border border-fuchsia-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/20"
+            >
+              <option value="">اختر لاعب إسبانيا</option>
+              {renderPlayerOptions(spainPlayers)}
+              <option value={NO_FINAL_SCORER}>
+                لا يسجل أي لاعب من إسبانيا
+              </option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
+              <span>أول مسجل من الأرجنتين</span>
+              <span className="rounded-full bg-sky-300 px-2 py-0.5 text-[10px] text-slate-950">
+                +7
+              </span>
+            </span>
+            <select
+              value={inputs[match.id]?.finalFirstArgentinaScorer || ""}
+              onChange={(event) =>
+                updateInput(
+                  match.id,
+                  "finalFirstArgentinaScorer",
+                  event.target.value
+                )
+              }
+              className="h-12 w-full rounded-2xl border border-sky-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-300/20"
+            >
+              <option value="">اختر لاعب الأرجنتين</option>
+              {renderPlayerOptions(argentinaPlayers)}
+              <option value={NO_FINAL_SCORER}>
+                لا يسجل أي لاعب من الأرجنتين
+              </option>
+            </select>
+          </label>
+        </div>
+      </div>
+    );
+  }
+
+  function renderSavedFinalBonusPrediction(
+    match: Match,
+    prediction: Prediction
+  ) {
+    if (!isFinalMatch(match) || !prediction.finalBonusPrediction) {
+      return null;
+    }
+
+    const bonus = prediction.finalBonusPrediction;
+    const firstScoringTeamLabel =
+      bonus.firstScoringTeamCode === "none"
+        ? "لا يوجد أهداف"
+        : bonus.firstScoringTeamCode === match.homeTeamCode
+          ? match.homeTeamName
+          : match.awayTeamName;
+
+    return (
+      <div className="rounded-2xl border border-fuchsia-300/25 bg-fuchsia-400/10 p-3 text-xs font-bold leading-6 text-slate-200 shadow-md shadow-fuchsia-950/10 md:text-sm">
+        <div className="mb-2 inline-flex items-center gap-1.5 font-black text-amber-100">
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+          <span>اختيارات إضافات النهائي</span>
+        </div>
+        <div>من يبدأ التسجيل: <span className="font-black text-white">{firstScoringTeamLabel}</span></div>
+        <div>أول مسجل من إسبانيا: <span className="font-black text-white">{bonus.firstSpainScorer === NO_FINAL_SCORER ? "لا يسجل أي لاعب" : getFinalSquadPlayerName("ESP", bonus.firstSpainScorer)}</span></div>
+        <div>أول مسجل من الأرجنتين: <span className="font-black text-white">{bonus.firstArgentinaScorer === NO_FINAL_SCORER ? "لا يسجل أي لاعب" : getFinalSquadPlayerName("ARG", bonus.firstArgentinaScorer)}</span></div>
+      </div>
     );
   }
 
@@ -678,6 +1027,18 @@ export default function MatchesPredictionBox() {
             const countdownText = getCountdownText(match.startAt);
             const matchTime = formatMatchTimeOnly(match.startAt);
             const golden = isGoldenMatch(match);
+            const finalMatch = isFinalMatch(match);
+            const finalStats = finalPredictionStats[match.id] || {
+              homeVotes: 0,
+              awayVotes: 0,
+              totalVotes: 0,
+            };
+            const homeVotePercent = finalStats.totalVotes
+              ? Math.round((finalStats.homeVotes / finalStats.totalVotes) * 100)
+              : 0;
+            const awayVotePercent = finalStats.totalVotes
+              ? 100 - homeVotePercent
+              : 0;
             const knockout = isKnockoutMatch(match as MatchWithKnockout);
             const knockoutRoundLabel = knockout
               ? getKnockoutRoundLabel(match.knockoutRound)
@@ -697,9 +1058,11 @@ export default function MatchesPredictionBox() {
               <article
                 key={match.id}
                 className={`relative overflow-hidden rounded-3xl border p-4 shadow-lg transition duration-200 [backface-visibility:hidden] ${
-                  golden
-                    ? "border-fuchsia-300/40 bg-gradient-to-br from-fuchsia-500/20 via-slate-950/85 to-amber-400/20 shadow-fuchsia-500/10"
-                    : "border-white/10 bg-slate-950/60 shadow-slate-950/20"
+                  finalMatch
+                    ? "border-amber-300/45 bg-gradient-to-br from-amber-300/20 via-fuchsia-950/70 to-blue-950/90 shadow-amber-500/15"
+                    : golden
+                      ? "border-fuchsia-300/40 bg-gradient-to-br from-fuchsia-500/20 via-slate-950/85 to-amber-400/20 shadow-fuchsia-500/10"
+                      : "border-white/10 bg-slate-950/60 shadow-slate-950/20"
                 }`}
               >
                 <div
@@ -712,6 +1075,32 @@ export default function MatchesPredictionBox() {
 
                 <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
 
+                {finalMatch && (
+                  <div className="relative mb-4 overflow-hidden rounded-3xl border border-amber-300/35 bg-slate-950/75 shadow-lg shadow-amber-950/20">
+                    <div className="bg-gradient-to-r from-amber-300 via-fuchsia-300 to-sky-300 px-4 py-3 text-center text-slate-950">
+                      <div className="inline-flex items-center gap-2 text-base font-black md:text-lg">
+                        <Trophy className="h-5 w-5" aria-hidden="true" />
+                        <span>ليلة النهائي الكبير</span>
+                      </div>
+                      <div className="mt-1 text-xs font-black md:text-sm">
+                        {match.homeTeamName} × {match.awayTeamName}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 p-3 text-center text-[10px] font-black md:text-xs">
+                      <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1.5 text-amber-100">🏆 النهائي</span>
+                      <span className="rounded-full border border-fuchsia-300/25 bg-fuchsia-300/10 px-2 py-1.5 text-fuchsia-100">🚀 سوبر ذهبي</span>
+                      <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-1.5 text-emerald-100">🔒 التوقعات مخفية</span>
+                    </div>
+
+                    <div className="mx-3 mb-3 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 text-center text-[10px] font-black leading-5 md:text-xs">
+                      <div className="rounded-xl bg-amber-300/10 px-2 py-2 text-amber-100">الأساسي حتى 20</div>
+                      <div className="rounded-xl bg-fuchsia-300/10 px-2 py-2 text-fuchsia-100">الإضافات حتى 20</div>
+                      <div className="rounded-xl bg-emerald-300/10 px-2 py-2 text-emerald-100">المجموع 40 نقطة</div>
+                    </div>
+                  </div>
+                )}
+
                 {golden && (
                   <div
                     className="relative mb-4 overflow-hidden rounded-2xl border border-fuchsia-300/40 bg-slate-950/75 shadow-md shadow-fuchsia-950/20"
@@ -722,16 +1111,24 @@ export default function MatchesPredictionBox() {
                     </div>
 
                     <div className="space-y-2 px-4 py-3 text-center text-xs font-bold leading-6 text-amber-100 md:text-sm">
-                      <div>فرصة الريمونتادا الكبرى في المراحل الحاسمة</div>
+                      <div>
+                        {finalMatch
+                          ? "السوبر ذهبي — نهائي كأس العالم"
+                          : "فرصة الريمونتادا الكبرى في المراحل الحاسمة"}
+                      </div>
                       <div className="flex flex-wrap items-center justify-center gap-1.5">
                         <span className="rounded-full bg-amber-300 px-2 py-0.5 font-black text-slate-950">الملي +10</span>
                         <span className="rounded-full bg-fuchsia-300 px-2 py-0.5 font-black text-slate-950">الفائز +4</span>
-                        <span className="rounded-full bg-blue-300 px-2 py-0.5 font-black text-slate-950">المتأهل +6</span>
-                        <span className="rounded-full bg-emerald-300 px-2 py-0.5 font-black text-slate-950">الطريقة +4</span>
+                        <span className="rounded-full bg-blue-300 px-2 py-0.5 font-black text-slate-950">
+                          {finalMatch ? "بطل كأس العالم +6" : "المتأهل +6"}
+                        </span>
+                        <span className="rounded-full bg-emerald-300 px-2 py-0.5 font-black text-slate-950">
+                          {finalMatch ? "حسم اللقب +4" : "الطريقة +4"}
+                        </span>
                       </div>
 
                       <div className="mx-auto mt-2 max-w-md rounded-xl border border-white/10 bg-slate-950/45 px-3 py-2 text-[10px] font-bold leading-5 text-amber-100/85 md:text-xs">
-                        حالة خاصة: إذا توقعت تعادلًا واخترت المتأهل الصحيح، والمباراة انتهت فوزًا مباشرًا، تُحسب +4 فقط
+                        حالة خاصة: إذا توقعت تعادلًا واخترت {finalMatch ? "البطل" : "المتأهل"} الصحيح، والمباراة انتهت فوزًا مباشرًا، تُحسب +4 فقط
                       </div>
                     </div>
                   </div>
@@ -744,6 +1141,47 @@ export default function MatchesPredictionBox() {
                     >
                       <Swords className="h-3.5 w-3.5" />
                       <span>{knockoutRoundLabel}</span>
+                    </div>
+                  </div>
+                )}
+
+                {finalMatch && (
+                  <div className="relative mb-4 rounded-3xl border border-sky-300/20 bg-slate-950/55 p-3 shadow-md shadow-sky-950/10">
+                    <div className="mb-3 flex items-center justify-center gap-2 text-sm font-black text-white md:text-base">
+                      <BarChart3 className="h-4 w-4 text-sky-200" aria-hidden="true" />
+                      <span>توقعات الأعضاء</span>
+                    </div>
+
+                    {finalStats.totalVotes === 0 ? (
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center text-xs font-bold text-slate-300">
+                        تظهر النسب بعد اعتماد أول توقع للنهائي.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div>
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-black md:text-sm">
+                            <span>{match.homeTeamName}</span>
+                            <span className="text-amber-200">{homeVotePercent}% — {finalStats.homeVotes} عضو</span>
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
+                            <div className="h-full rounded-full bg-amber-300" style={{ width: `${homeVotePercent}%` }} />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-black md:text-sm">
+                            <span>{match.awayTeamName}</span>
+                            <span className="text-sky-200">{awayVotePercent}% — {finalStats.awayVotes} عضو</span>
+                          </div>
+                          <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
+                            <div className="h-full rounded-full bg-sky-300" style={{ width: `${awayVotePercent}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-3 text-center text-[10px] font-bold leading-5 text-slate-400 md:text-xs">
+                      النسب إجمالية ولا تكشف أسماء الأعضاء أو نتائج توقعاتهم
                     </div>
                   </div>
                 )}
@@ -857,6 +1295,7 @@ export default function MatchesPredictionBox() {
 
                     {renderScoreInputs(match, golden)}
                     {renderQualificationFields(match, knockoutDrawInput)}
+                    {renderFinalBonusFields(match)}
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       <button
@@ -896,7 +1335,11 @@ export default function MatchesPredictionBox() {
                       <div className="rounded-2xl border border-amber-300/40 bg-amber-400 px-3 py-2 text-center text-xs font-black text-slate-950 shadow-md shadow-amber-950/10">
                         <span className="inline-flex items-center justify-center gap-1.5">
                           <Rocket className="h-4 w-4" />
-                          <span>تم اعتماد السوبر ذهبي</span>
+                          <span>
+                            {finalMatch
+                              ? "تم اعتماد توقع النهائي"
+                              : "تم اعتماد السوبر ذهبي"}
+                          </span>
                         </span>
                       </div>
                     )}
@@ -922,7 +1365,7 @@ export default function MatchesPredictionBox() {
 
                         return (
                           <div className="rounded-2xl border border-blue-400/30 bg-blue-400/10 p-3 text-center text-xs font-bold leading-6 text-blue-100 shadow-md shadow-blue-950/10 md:text-sm">
-                            المتأهل:{" "}
+                            {finalMatch ? "بطل كأس العالم" : "المتأهل"}:{" "}
                             <span className="inline-flex items-center justify-center gap-1.5 font-black text-white">
                               {qualifiedTeam && (
                                 <TeamFlag
@@ -940,7 +1383,7 @@ export default function MatchesPredictionBox() {
                             {savedPrediction.qualificationMethod && (
                               <>
                                 {" "}
-                                • طريقة التأهل:{" "}
+                                • {finalMatch ? "طريقة حسم اللقب" : "طريقة التأهل"}:{" "}
                                 <span className="font-black text-white">
                                   {getQualificationMethodLabel(
                                     savedPrediction.qualificationMethod
@@ -951,6 +1394,8 @@ export default function MatchesPredictionBox() {
                           </div>
                         );
                       })()}
+
+                    {renderSavedFinalBonusPrediction(match, savedPrediction)}
 
                     {editable && (
                       <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-center shadow-md shadow-amber-950/10">
@@ -987,6 +1432,7 @@ export default function MatchesPredictionBox() {
                   >
                     {renderScoreInputs(match, golden)}
                     {renderQualificationFields(match, knockoutDrawInput)}
+                    {renderFinalBonusFields(match)}
 
                     <button
                       type="button"
@@ -1006,7 +1452,12 @@ export default function MatchesPredictionBox() {
                           <span>جاري الاعتماد...</span>
                         </>
                       ) : isLoggedIn ? (
-                        golden ? (
+                        finalMatch ? (
+                          <>
+                            <Trophy className="h-4 w-4" />
+                            <span>اعتماد توقع النهائي</span>
+                          </>
+                        ) : golden ? (
                           <>
                             <Rocket className="h-4 w-4" />
                             <span>اعتماد السوبر ذهبي</span>

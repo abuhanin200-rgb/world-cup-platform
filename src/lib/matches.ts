@@ -22,6 +22,25 @@ export type KnockoutRound =
 
 export type QualificationMethod = "extraTime" | "penalties";
 
+/**
+ * اختيارات إضافات النهائي التي يحفظها العضو داخل وثيقة التوقع.
+ * لا تدخل هذه البيانات في تحديد الفائز الأساسي للمباراة.
+ */
+export type FinalBonusPrediction = {
+  firstScoringTeamCode: string;
+  firstSpainScorer: string;
+  firstArgentinaScorer: string;
+};
+
+/**
+ * النتائج الفعلية لإضافات النهائي التي تُحفظ على وثيقة المباراة بعد الحسم.
+ */
+export type FinalBonusResult = {
+  firstScoringTeamCode: string;
+  firstSpainScorer: string;
+  firstArgentinaScorer: string;
+};
+
 export type Match = {
   id: string;
 
@@ -51,6 +70,8 @@ export type Match = {
   actualQualifiedTeamCode?: string | null;
   actualQualificationMethod?: QualificationMethod | null;
 
+  finalBonusResult?: FinalBonusResult | null;
+
   resultCalculated?: boolean;
   calculatedAt?: string | null;
 
@@ -79,6 +100,10 @@ function toNumberOrNull(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function normalizeStatus(value: unknown): MatchStatus {
   if (value === "finished") return "finished";
   return "scheduled";
@@ -93,7 +118,7 @@ function normalizeMatchStage(value: unknown): MatchStage {
 }
 
 function normalizeKnockoutRound(
-  value: unknown
+  value: unknown,
 ): KnockoutRound | undefined {
   if (
     value === "general" ||
@@ -108,13 +133,40 @@ function normalizeKnockoutRound(
 }
 
 function normalizeQualificationMethod(
-  value: unknown
+  value: unknown,
 ): QualificationMethod | null {
   if (value === "extraTime" || value === "penalties") {
     return value;
   }
 
   return null;
+}
+
+function normalizeFinalBonusResult(value: unknown): FinalBonusResult | null {
+  if (!isRecord(value)) return null;
+
+  const firstScoringTeamCode = toText(value.firstScoringTeamCode);
+  const firstSpainScorer = toText(value.firstSpainScorer);
+  const firstArgentinaScorer = toText(value.firstArgentinaScorer);
+
+  const hasAnyFinalBonusResult =
+    firstScoringTeamCode || firstSpainScorer || firstArgentinaScorer;
+
+  if (!hasAnyFinalBonusResult) return null;
+
+  return {
+    firstScoringTeamCode,
+    firstSpainScorer,
+    firstArgentinaScorer,
+  };
+}
+
+export function isWorldCupFinalMatch(
+  match: Pick<Match, "matchStage" | "knockoutRound">,
+) {
+  return (
+    match.matchStage === "knockout" && match.knockoutRound === "final"
+  );
 }
 
 function getMakkahStartAt(matchDate: string, matchTime: string) {
@@ -134,6 +186,12 @@ function getArabicDayName(matchDate: string) {
 
 function mapMatch(id: string, data: Record<string, unknown>): Match {
   const matchStage = normalizeMatchStage(data.matchStage);
+  const knockoutRound =
+    matchStage === "knockout"
+      ? normalizeKnockoutRound(data.knockoutRound) || "general"
+      : undefined;
+
+  const isFinal = matchStage === "knockout" && knockoutRound === "final";
 
   return {
     id,
@@ -156,10 +214,7 @@ function mapMatch(id: string, data: Record<string, unknown>): Match {
 
     predictionType: normalizePredictionType(data.predictionType),
     matchStage,
-    knockoutRound:
-      matchStage === "knockout"
-        ? normalizeKnockoutRound(data.knockoutRound) || "general"
-        : undefined,
+    knockoutRound,
 
     actualHomeScore: toNumberOrNull(data.actualHomeScore),
     actualAwayScore: toNumberOrNull(data.actualAwayScore),
@@ -171,8 +226,12 @@ function mapMatch(id: string, data: Record<string, unknown>): Match {
         : toText(data.actualQualifiedTeamCode),
 
     actualQualificationMethod: normalizeQualificationMethod(
-      data.actualQualificationMethod
+      data.actualQualificationMethod,
     ),
+
+    finalBonusResult: isFinal
+      ? normalizeFinalBonusResult(data.finalBonusResult)
+      : null,
 
     resultCalculated: Boolean(data.resultCalculated),
     calculatedAt:
@@ -275,6 +334,10 @@ export async function addMatch(input: AddMatchInput) {
       ? normalizeKnockoutRound(knockoutRound) || "general"
       : undefined;
 
+  const isFinal =
+    normalizedMatchStage === "knockout" &&
+    normalizedKnockoutRound === "final";
+
   const matchData = {
     homeTeamCode: homeTeam.code,
     homeTeamName: homeTeam.nameAr,
@@ -303,6 +366,8 @@ export async function addMatch(input: AddMatchInput) {
 
     actualQualifiedTeamCode: null,
     actualQualificationMethod: null,
+
+    ...(isFinal ? { finalBonusResult: null } : {}),
 
     resultCalculated: false,
     calculatedAt: null,

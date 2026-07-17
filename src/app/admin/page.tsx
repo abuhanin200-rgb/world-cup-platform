@@ -41,6 +41,7 @@ import AdminMissingPredictionsPanel from "@/components/AdminMissingPredictionsPa
 import AdminHomeBannerPanel from "@/components/AdminHomeBannerPanel";
 import AdminGamesPanel from "@/components/AdminGamesPanel";
 import AdminChallengeStudioPanel from "@/components/AdminChallengeStudioPanel";
+import { getFinalSquadByTeamCode } from "@/data/finalSquads";
 
 type AdminTab =
   | "overview"
@@ -220,6 +221,11 @@ export default function AdminPage() {
   const [actualQualifiedTeamCode, setActualQualifiedTeamCode] = useState("");
   const [actualQualificationMethod, setActualQualificationMethod] =
     useState("");
+  const [actualFirstScoringTeamCode, setActualFirstScoringTeamCode] =
+    useState("");
+  const [actualFirstSpainScorer, setActualFirstSpainScorer] = useState("");
+  const [actualFirstArgentinaScorer, setActualFirstArgentinaScorer] =
+    useState("");
   const [calculateFilter, setCalculateFilter] =
     useState<CalculateFilter>("pending");
   const [calculateSearchTerm, setCalculateSearchTerm] = useState("");
@@ -298,6 +304,26 @@ export default function AdminPage() {
     );
   }, [selectedMatch, actualHomeScore, actualAwayScore]);
 
+  const isSelectedFinal =
+    selectedMatch?.matchStage === "knockout" &&
+    selectedMatch.knockoutRound === "final";
+
+  const spainFinalSquad = useMemo(
+    () => getFinalSquadByTeamCode("ESP"),
+    []
+  );
+
+  const argentinaFinalSquad = useMemo(
+    () => getFinalSquadByTeamCode("ARG"),
+    []
+  );
+
+  function resetFinalResultInputs() {
+    setActualFirstScoringTeamCode("");
+    setActualFirstSpainScorer("");
+    setActualFirstArgentinaScorer("");
+  }
+
   async function loadData() {
     try {
       setLoading(true);
@@ -365,6 +391,7 @@ export default function AdminPage() {
       setActualAwayScore("");
       setActualQualifiedTeamCode("");
       setActualQualificationMethod("");
+      resetFinalResultInputs();
     }
   }, [activeTab, calculateMatches, selectedMatchId]);
 
@@ -492,8 +519,37 @@ export default function AdminPage() {
     }
 
     if (knockoutDraw && !actualQualificationMethod) {
-      alert("اختر طريقة التأهل");
+      alert(isSelectedFinal ? "اختر طريقة حسم اللقب" : "اختر طريقة التأهل");
       return;
+    }
+
+    if (isSelectedFinal) {
+      if (!actualFirstScoringTeamCode) {
+        alert("اختر من بدأ التسجيل في النهائي");
+        return;
+      }
+
+      if (!actualFirstSpainScorer) {
+        alert("اختر أول مسجل من إسبانيا أو اختر لا يسجل");
+        return;
+      }
+
+      if (!actualFirstArgentinaScorer) {
+        alert("اختر أول مسجل من الأرجنتين أو اختر لا يسجل");
+        return;
+      }
+
+      const hasGoals = homeScore + awayScore > 0;
+
+      if (hasGoals && actualFirstScoringTeamCode === "none") {
+        alert("لا يمكن اختيار لا يوجد أهداف والنتيجة تحتوي على أهداف");
+        return;
+      }
+
+      if (!hasGoals && actualFirstScoringTeamCode !== "none") {
+        alert("النتيجة بدون أهداف؛ اختر لا يوجد أهداف");
+        return;
+      }
     }
 
     try {
@@ -509,6 +565,19 @@ export default function AdminPage() {
         actualQualificationMethod: knockoutDraw
           ? (actualQualificationMethod as "extraTime" | "penalties")
           : undefined,
+        finalBonusResult: isSelectedFinal
+          ? {
+              firstScoringTeamCode: actualFirstScoringTeamCode,
+              firstSpainScorer: actualFirstSpainScorer,
+              firstArgentinaScorer: actualFirstArgentinaScorer,
+            }
+          : undefined,
+      } as Parameters<typeof calculateMatchResult>[0] & {
+        finalBonusResult?: {
+          firstScoringTeamCode: string;
+          firstSpainScorer: string;
+          firstArgentinaScorer: string;
+        };
       });
 
       const match = matches.find((item) => item.id === selectedMatchId);
@@ -529,6 +598,13 @@ export default function AdminPage() {
           actualQualificationMethod: knockoutDraw
             ? actualQualificationMethod
             : null,
+          finalBonusResult: isSelectedFinal
+            ? {
+                firstScoringTeamCode: actualFirstScoringTeamCode,
+                firstSpainScorer: actualFirstSpainScorer,
+                firstArgentinaScorer: actualFirstArgentinaScorer,
+              }
+            : null,
         },
       });
 
@@ -538,6 +614,7 @@ export default function AdminPage() {
       setActualAwayScore("");
       setActualQualifiedTeamCode("");
       setActualQualificationMethod("");
+      resetFinalResultInputs();
       setCalculateFilter("pending");
       setCalculateSearchTerm("");
       setActiveTab("matches");
@@ -587,6 +664,7 @@ export default function AdminPage() {
       setActualAwayScore("");
       setActualQualifiedTeamCode("");
       setActualQualificationMethod("");
+      resetFinalResultInputs();
 
       await loadData();
     } catch (error) {
@@ -982,6 +1060,7 @@ export default function AdminPage() {
                           setActualAwayScore("");
                           setActualQualifiedTeamCode("");
                           setActualQualificationMethod("");
+                          resetFinalResultInputs();
                         }}
                         className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-amber-400"
                       >
@@ -1080,14 +1159,15 @@ export default function AdminPage() {
                     {isSelectedKnockoutDraw && selectedMatch && (
                       <div className="rounded-2xl border border-blue-400/20 bg-blue-400/10 p-4">
                         <div className="mb-3 text-sm font-black text-blue-100">
-                          نتيجة تعادل في خروج المغلوب: اختر المتأهل وطريقة
-                          التأهل
+                          {isSelectedFinal
+                            ? "نتيجة تعادل في النهائي: اختر بطل كأس العالم وطريقة حسم اللقب"
+                            : "نتيجة تعادل في خروج المغلوب: اختر المتأهل وطريقة التأهل"}
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                           <label className="block">
                             <span className="mb-2 block text-sm font-bold">
-                              المنتخب المتأهل
+                              {isSelectedFinal ? "بطل كأس العالم" : "المنتخب المتأهل"}
                             </span>
 
                             <select
@@ -1097,7 +1177,11 @@ export default function AdminPage() {
                               }
                               className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm outline-none focus:border-blue-400"
                             >
-                              <option value="">اختر المتأهل</option>
+                              <option value="">
+                                {isSelectedFinal
+                                  ? "اختر بطل كأس العالم"
+                                  : "اختر المتأهل"}
+                              </option>
                               <option value={selectedMatch.homeTeamCode}>
                                 {selectedMatch.homeTeamEmoji}{" "}
                                 {selectedMatch.homeTeamName}
@@ -1111,7 +1195,7 @@ export default function AdminPage() {
 
                           <label className="block">
                             <span className="mb-2 block text-sm font-bold">
-                              طريقة التأهل
+                              {isSelectedFinal ? "طريقة حسم اللقب" : "طريقة التأهل"}
                             </span>
 
                             <select
@@ -1124,6 +1208,94 @@ export default function AdminPage() {
                               <option value="">اختر الطريقة</option>
                               <option value="extraTime">أشواط إضافية</option>
                               <option value="penalties">ركلات ترجيح</option>
+                            </select>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+
+                    {isSelectedFinal && selectedMatch && (
+                      <div className="rounded-3xl border border-amber-300/30 bg-gradient-to-br from-amber-400/15 via-fuchsia-500/10 to-slate-950/70 p-4">
+                        <div className="mb-1 text-center text-lg font-black text-amber-100">
+                          🏆 تفاصيل إضافات النهائي
+                        </div>
+
+                        <p className="mb-4 text-center text-xs leading-6 text-slate-300">
+                          أدخل النتائج الفعلية بدقة ليتم احتساب +6 و+7 و+7 في
+                          الخطوة التالية.
+                        </p>
+
+                        <div className="grid grid-cols-1 gap-3">
+                          <label className="block">
+                            <span className="mb-2 block text-sm font-black text-amber-100">
+                              من بدأ التسجيل؟ +6
+                            </span>
+
+                            <select
+                              value={actualFirstScoringTeamCode}
+                              onChange={(event) =>
+                                setActualFirstScoringTeamCode(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-amber-300/25 bg-slate-950/80 px-4 py-3 text-sm outline-none focus:border-amber-300"
+                            >
+                              <option value="">اختر النتيجة الفعلية</option>
+                              <option value={selectedMatch.homeTeamCode}>
+                                {selectedMatch.homeTeamEmoji}{" "}
+                                {selectedMatch.homeTeamName}
+                              </option>
+                              <option value={selectedMatch.awayTeamCode}>
+                                {selectedMatch.awayTeamEmoji}{" "}
+                                {selectedMatch.awayTeamName}
+                              </option>
+                              <option value="none">لا يوجد أهداف</option>
+                            </select>
+                          </label>
+
+                          <label className="block">
+                            <span className="mb-2 block text-sm font-black text-amber-100">
+                              أول مسجل من إسبانيا +7
+                            </span>
+
+                            <select
+                              value={actualFirstSpainScorer}
+                              onChange={(event) =>
+                                setActualFirstSpainScorer(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-amber-300/25 bg-slate-950/80 px-4 py-3 text-sm outline-none focus:border-amber-300"
+                            >
+                              <option value="">اختر اللاعب</option>
+                              <option value="none">
+                                لا يسجل أي لاعب من إسبانيا
+                              </option>
+                              {spainFinalSquad.map((player) => (
+                                <option key={player.id} value={player.id}>
+                                  {player.nameAr}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="block">
+                            <span className="mb-2 block text-sm font-black text-amber-100">
+                              أول مسجل من الأرجنتين +7
+                            </span>
+
+                            <select
+                              value={actualFirstArgentinaScorer}
+                              onChange={(event) =>
+                                setActualFirstArgentinaScorer(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-amber-300/25 bg-slate-950/80 px-4 py-3 text-sm outline-none focus:border-amber-300"
+                            >
+                              <option value="">اختر اللاعب</option>
+                              <option value="none">
+                                لا يسجل أي لاعب من الأرجنتين
+                              </option>
+                              {argentinaFinalSquad.map((player) => (
+                                <option key={player.id} value={player.id}>
+                                  {player.nameAr}
+                                </option>
+                              ))}
                             </select>
                           </label>
                         </div>

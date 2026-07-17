@@ -28,6 +28,7 @@ import {
 import { getLeaderboardUsers, LeaderboardUser } from "@/lib/leaderboard";
 import { getPredictionsByUserId, Prediction } from "@/lib/predictions";
 import TeamFlag from "@/components/TeamFlag";
+import { getFinalSquadPlayerName } from "@/data/finalSquads";
 
 const USERS_PER_PAGE = 20;
 const MEMBER_PREDICTIONS_PER_PAGE = 6;
@@ -340,6 +341,7 @@ function KnockoutRoundBadge({ prediction }: { prediction: Prediction }) {
 }
 
 function getQualificationMethodLabel(value?: string | null) {
+  if (value === "regularTime") return "الوقت الأصلي";
   if (value === "extraTime") return "أشواط إضافية";
   if (value === "penalties") return "ركلات ترجيح";
   return "";
@@ -697,6 +699,816 @@ function PointsBreakdown({ prediction }: { prediction: Prediction }) {
         />
       </div>
     </div>
+  );
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+type FinalPredictionDisplayData = {
+  predictedChampionCode: string;
+  actualChampionCode: string;
+  predictedDecisionMethod: string;
+  actualDecisionMethod: string;
+  scoreExact: boolean;
+  scoreOutcomeCorrect: boolean;
+  scorePoints: number;
+  championPoints: number;
+  decisionMethodPoints: number;
+  basePoints: number;
+  predictedFirstScoringTeamCode: string;
+  actualFirstScoringTeamCode: string;
+  firstScoringTeamPoints: number;
+  predictedSpainScorer: string;
+  actualSpainScorer: string;
+  firstSpainScorerPoints: number;
+  predictedArgentinaScorer: string;
+  actualArgentinaScorer: string;
+  firstArgentinaScorerPoints: number;
+  bonusPoints: number;
+  totalPoints: number;
+};
+
+function isFinalPrediction(prediction: Prediction) {
+  return (
+    prediction.matchStage === "knockout" &&
+    prediction.knockoutRound === "final"
+  );
+}
+
+function asUnknownRecord(value: unknown): UnknownRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as UnknownRecord;
+}
+
+function getFirstTextValue(sources: UnknownRecord[], keys: string[]) {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source[key];
+
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+  }
+
+  return "";
+}
+
+function getFirstNumberValue(sources: UnknownRecord[], keys: string[]) {
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source[key];
+
+      if (value === undefined || value === null || value === "") continue;
+
+      const numberValue = Number(value);
+
+      if (Number.isFinite(numberValue)) {
+        return numberValue;
+      }
+    }
+  }
+
+  return null;
+}
+
+function normalizeComparableText(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("ar")
+    .replace(/[ًٌٍَُِّْـ]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ");
+}
+
+function isSameText(first?: string | null, second?: string | null) {
+  const normalizedFirst = normalizeComparableText(first);
+  const normalizedSecond = normalizeComparableText(second);
+
+  return (
+    normalizedFirst !== "" &&
+    normalizedSecond !== "" &&
+    normalizedFirst === normalizedSecond
+  );
+}
+
+function getScoreOutcome(homeScore: number, awayScore: number) {
+  if (homeScore > awayScore) return "home";
+  if (homeScore < awayScore) return "away";
+  return "draw";
+}
+
+function getWinnerCodeFromScore(
+  prediction: Prediction,
+  homeScore: number,
+  awayScore: number,
+) {
+  if (homeScore === awayScore) return "";
+
+  return homeScore > awayScore
+    ? getPredictionHomeTeamCode(prediction)
+    : getPredictionAwayTeamCode(prediction);
+}
+
+function normalizeFinalTeamSelection(
+  prediction: Prediction,
+  value?: string | null,
+) {
+  const normalizedValue = normalizeTeamCode(value);
+
+  if (!normalizedValue) return "";
+
+  if (
+    normalizedValue === "HOME" ||
+    normalizedValue === "HOMETEAM" ||
+    normalizedValue === "HOME_TEAM"
+  ) {
+    return getPredictionHomeTeamCode(prediction);
+  }
+
+  if (
+    normalizedValue === "AWAY" ||
+    normalizedValue === "AWAYTEAM" ||
+    normalizedValue === "AWAY_TEAM"
+  ) {
+    return getPredictionAwayTeamCode(prediction);
+  }
+
+  return getQualifiedTeamCode(
+    prediction,
+    getTeamCodeFromName(value) || normalizedValue,
+  );
+}
+
+function getFinalSelectionLabel(value?: string | null) {
+  const cleanValue = String(value || "").trim();
+  const normalizedValue = cleanValue.toLowerCase();
+
+  if (!cleanValue) return "لم يُحدد";
+
+  if (
+    normalizedValue === "none" ||
+    normalizedValue === "no_goal" ||
+    normalizedValue === "nogoal"
+  ) {
+    return "لا يوجد أهداف";
+  }
+
+  return cleanValue;
+}
+
+function getFinalScorerLabel(
+  teamCode: "ESP" | "ARG",
+  value?: string | null,
+) {
+  const cleanValue = String(value || "").trim();
+  const normalizedValue = cleanValue.toLowerCase();
+
+  if (!cleanValue) return "لم يُحدد";
+
+  if (
+    normalizedValue === "none" ||
+    normalizedValue === "no_goal" ||
+    normalizedValue === "nogoal"
+  ) {
+    return "لا يسجل أي لاعب";
+  }
+
+  return getFinalSquadPlayerName(teamCode, cleanValue) || cleanValue;
+}
+
+function getFinalTeamLabel(prediction: Prediction, value?: string | null) {
+  const code = normalizeFinalTeamSelection(prediction, value);
+
+  if (!code) return getFinalSelectionLabel(value);
+
+  return getQualifiedTeamName(prediction, code) || getFinalSelectionLabel(value);
+}
+
+function getFinalPredictionDisplayData(
+  prediction: Prediction,
+): FinalPredictionDisplayData {
+  const root = prediction as unknown as UnknownRecord;
+  const bonusPrediction = asUnknownRecord(
+    root.finalBonusPrediction ||
+      root.finalPredictionExtras ||
+      root.finalExtrasPrediction,
+  );
+  const bonusResult = asUnknownRecord(
+    root.finalBonusResult || root.finalResultExtras || root.finalExtrasResult,
+  );
+  const bonusPointsRecord = asUnknownRecord(
+    root.finalBonusPoints || root.finalExtrasPoints || root.finalPointsBreakdown,
+  );
+  const basePointsRecord = asUnknownRecord(
+    root.finalBasePoints || root.basePointsBreakdown || root.finalBasicPoints,
+  );
+
+  const predictedHomeScore = normalizeNumberValue(prediction.homeScore) ?? 0;
+  const predictedAwayScore = normalizeNumberValue(prediction.awayScore) ?? 0;
+  const actualHomeScore = normalizeNumberValue(prediction.actualHomeScore) ?? 0;
+  const actualAwayScore = normalizeNumberValue(prediction.actualAwayScore) ?? 0;
+
+  const scoreExact =
+    predictedHomeScore === actualHomeScore &&
+    predictedAwayScore === actualAwayScore;
+
+  const scoreOutcomeCorrect =
+    getScoreOutcome(predictedHomeScore, predictedAwayScore) ===
+    getScoreOutcome(actualHomeScore, actualAwayScore);
+
+  const predictedChampionRaw = getFirstTextValue(
+    [root, bonusPrediction],
+    [
+      "qualifiedTeamCode",
+      "championTeamCode",
+      "predictedChampionTeamCode",
+      "selectedChampionTeamCode",
+    ],
+  );
+
+  const actualChampionRaw = getFirstTextValue(
+    [root, bonusResult],
+    [
+      "actualQualifiedTeamCode",
+      "championTeamCode",
+      "actualChampionTeamCode",
+      "winnerTeamCode",
+    ],
+  );
+
+  const predictedChampionCode =
+    normalizeFinalTeamSelection(prediction, predictedChampionRaw) ||
+    getWinnerCodeFromScore(
+      prediction,
+      predictedHomeScore,
+      predictedAwayScore,
+    );
+
+  const actualChampionCode =
+    normalizeFinalTeamSelection(prediction, actualChampionRaw) ||
+    getWinnerCodeFromScore(prediction, actualHomeScore, actualAwayScore);
+
+  const predictedDecisionMethod =
+    getFirstTextValue(
+      [root, bonusPrediction],
+      [
+        "finalDecisionMethod",
+        "qualificationMethod",
+        "decisionMethod",
+        "championshipDecisionMethod",
+      ],
+    ) ||
+    (predictedHomeScore !== predictedAwayScore ? "regularTime" : "");
+
+  const actualDecisionMethod =
+    getFirstTextValue(
+      [root, bonusResult],
+      [
+        "actualFinalDecisionMethod",
+        "actualQualificationMethod",
+        "finalDecisionMethod",
+        "decisionMethod",
+        "championshipDecisionMethod",
+      ],
+    ) || (actualHomeScore !== actualAwayScore ? "regularTime" : "");
+
+  const scorePoints =
+    getFirstNumberValue([basePointsRecord, root], [
+      "scorePoints",
+      "resultPoints",
+      "baseScorePoints",
+      "finalScorePoints",
+    ]) ??
+    (scoreExact ? 10 : scoreOutcomeCorrect ? 4 : 0);
+
+  const championCorrect =
+    predictedChampionCode !== "" &&
+    actualChampionCode !== "" &&
+    predictedChampionCode === actualChampionCode;
+
+  const championPoints =
+    getFirstNumberValue([basePointsRecord, root], [
+      "championPoints",
+      "qualifiedTeamPoints",
+      "winnerTeamPoints",
+      "finalChampionPoints",
+    ]) ?? (championCorrect ? 6 : 0);
+
+  const decisionMethodCorrect =
+    predictedDecisionMethod !== "" &&
+    actualDecisionMethod !== "" &&
+    predictedDecisionMethod === actualDecisionMethod;
+
+  const decisionMethodPoints =
+    getFirstNumberValue([basePointsRecord, root], [
+      "decisionMethodPoints",
+      "qualificationMethodPoints",
+      "finalDecisionMethodPoints",
+      "methodPoints",
+    ]) ?? (decisionMethodCorrect ? 4 : 0);
+
+  const predictedFirstScoringTeamRaw = getFirstTextValue(
+    [bonusPrediction, root],
+    [
+      "firstScoringTeamCode",
+      "predictedFirstScoringTeamCode",
+      "selectedFirstScoringTeamCode",
+      "startsScoringTeamCode",
+    ],
+  );
+
+  const actualFirstScoringTeamRaw = getFirstTextValue(
+    [bonusResult, root],
+    [
+      "firstScoringTeamCode",
+      "actualFirstScoringTeamCode",
+      "startsScoringTeamCode",
+      "actualStartsScoringTeamCode",
+    ],
+  );
+
+  const predictedFirstScoringTeamCode = normalizeFinalTeamSelection(
+    prediction,
+    predictedFirstScoringTeamRaw,
+  );
+  const actualFirstScoringTeamCode = normalizeFinalTeamSelection(
+    prediction,
+    actualFirstScoringTeamRaw,
+  );
+
+  const firstScoringTeamCorrect =
+    predictedFirstScoringTeamCode !== "" &&
+    actualFirstScoringTeamCode !== "" &&
+    predictedFirstScoringTeamCode === actualFirstScoringTeamCode;
+
+  const firstScoringTeamPoints =
+    getFirstNumberValue([bonusPointsRecord, root], [
+      "firstScoringTeamPoints",
+      "firstScoringTeam",
+      "startsScoringPoints",
+      "startsScoringTeamPoints",
+    ]) ?? (firstScoringTeamCorrect ? 6 : 0);
+
+  const predictedSpainScorer = getFirstTextValue(
+    [bonusPrediction, root],
+    [
+      "firstSpainScorer",
+      "predictedFirstSpainScorer",
+      "selectedFirstSpainScorer",
+      "spainFirstScorer",
+    ],
+  );
+  const actualSpainScorer = getFirstTextValue(
+    [bonusResult, root],
+    [
+      "firstSpainScorer",
+      "actualFirstSpainScorer",
+      "spainFirstScorer",
+      "actualSpainFirstScorer",
+    ],
+  );
+
+  const firstSpainScorerPoints =
+    getFirstNumberValue([bonusPointsRecord, root], [
+      "firstSpainScorerPoints",
+      "firstSpainScorer",
+      "spainFirstScorerPoints",
+      "spainScorerPoints",
+    ]) ?? (isSameText(predictedSpainScorer, actualSpainScorer) ? 7 : 0);
+
+  const predictedArgentinaScorer = getFirstTextValue(
+    [bonusPrediction, root],
+    [
+      "firstArgentinaScorer",
+      "predictedFirstArgentinaScorer",
+      "selectedFirstArgentinaScorer",
+      "argentinaFirstScorer",
+    ],
+  );
+  const actualArgentinaScorer = getFirstTextValue(
+    [bonusResult, root],
+    [
+      "firstArgentinaScorer",
+      "actualFirstArgentinaScorer",
+      "argentinaFirstScorer",
+      "actualArgentinaFirstScorer",
+    ],
+  );
+
+  const firstArgentinaScorerPoints =
+    getFirstNumberValue([bonusPointsRecord, root], [
+      "firstArgentinaScorerPoints",
+      "firstArgentinaScorer",
+      "argentinaFirstScorerPoints",
+      "argentinaScorerPoints",
+    ]) ??
+    (isSameText(predictedArgentinaScorer, actualArgentinaScorer) ? 7 : 0);
+
+  const calculatedBonusPoints =
+    firstScoringTeamPoints +
+    firstSpainScorerPoints +
+    firstArgentinaScorerPoints;
+
+  const bonusPoints =
+    getFirstNumberValue([bonusPointsRecord, root], [
+      "total",
+      "totalPoints",
+      "bonusTotal",
+      "finalBonusTotal",
+      "finalExtrasTotal",
+    ]) ?? calculatedBonusPoints;
+
+  const explicitTotalPoints = getFirstNumberValue([root], [
+    "finalTotalPoints",
+    "totalFinalPoints",
+    "grandTotalPoints",
+    "fullFinalPoints",
+  ]);
+
+  const predictionPoints = normalizeNumberValue(prediction.points) ?? 0;
+  const totalPoints =
+    explicitTotalPoints ??
+    (predictionPoints > 0
+      ? predictionPoints
+      : scorePoints + championPoints + decisionMethodPoints + bonusPoints);
+
+  const calculatedBasePoints =
+    scorePoints + championPoints + decisionMethodPoints;
+
+  const basePoints =
+    getFirstNumberValue([basePointsRecord, root], [
+      "total",
+      "totalPoints",
+      "baseTotal",
+      "finalBaseTotal",
+      "basicPoints",
+      "basePoints",
+    ]) ??
+    (totalPoints >= bonusPoints ? totalPoints - bonusPoints : calculatedBasePoints);
+
+  return {
+    predictedChampionCode,
+    actualChampionCode,
+    predictedDecisionMethod,
+    actualDecisionMethod,
+    scoreExact,
+    scoreOutcomeCorrect,
+    scorePoints,
+    championPoints,
+    decisionMethodPoints,
+    basePoints,
+    predictedFirstScoringTeamCode,
+    actualFirstScoringTeamCode,
+    firstScoringTeamPoints,
+    predictedSpainScorer,
+    actualSpainScorer,
+    firstSpainScorerPoints,
+    predictedArgentinaScorer,
+    actualArgentinaScorer,
+    firstArgentinaScorerPoints,
+    bonusPoints,
+    totalPoints,
+  };
+}
+
+function FinalBonusResultRow({
+  label,
+  predictedValue,
+  actualValue,
+  points,
+}: {
+  label: string;
+  predictedValue: string;
+  actualValue: string;
+  points: number;
+}) {
+  const correct = points > 0;
+
+  return (
+    <div
+      className={`rounded-2xl border p-3 ${
+        correct
+          ? "border-emerald-400/25 bg-emerald-400/10"
+          : "border-red-400/20 bg-red-400/[0.07]"
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs font-black text-white md:text-sm">{label}</div>
+
+        <span
+          className={`rounded-full px-2.5 py-1 text-[10px] font-black md:text-xs ${
+            correct
+              ? "bg-emerald-400 text-slate-950"
+              : "bg-red-400/15 text-red-200"
+          }`}
+        >
+          {correct ? `صحيح +${points}` : "خاطئ +0"}
+        </span>
+      </div>
+
+      <div className="mt-2 grid grid-cols-1 gap-1.5 text-[11px] leading-5 md:grid-cols-2 md:text-xs">
+        <div className="rounded-xl bg-slate-950/45 px-2.5 py-2 text-slate-300">
+          اختيار العضو: <span className="font-black text-white">{predictedValue}</span>
+        </div>
+
+        <div className="rounded-xl bg-slate-950/45 px-2.5 py-2 text-slate-300">
+          النتيجة الفعلية: <span className="font-black text-white">{actualValue}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LockedFinalPredictionCard({ prediction }: { prediction: Prediction }) {
+  return (
+    <motion.div
+      variants={modalItemMotion}
+      className="relative overflow-hidden rounded-3xl border border-amber-300/25 bg-gradient-to-br from-amber-400/10 via-slate-950/90 to-fuchsia-500/10 p-4 shadow-lg shadow-amber-950/15"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.14),transparent_42%)]" />
+
+      <div className="relative text-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-400/10 text-amber-200">
+          <Lock className="h-6 w-6" aria-hidden="true" />
+        </div>
+
+        <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-300/25 bg-amber-400/10 px-3 py-1 text-[11px] font-black text-amber-100">
+          <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>النهائي الكبير</span>
+        </div>
+
+        <h4 className="mt-3 text-base font-black text-white md:text-lg">
+          اعتمد توقعه للنهائي الكبير 🏆
+        </h4>
+
+        <p className="mx-auto mt-2 max-w-md text-xs font-bold leading-6 text-slate-300">
+          تفاصيل النتيجة والبطل وإضافات النهائي مخفية حتى يتم احتساب النهائي.
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
+function CalculatedFinalPredictionCard({
+  prediction,
+}: {
+  prediction: Prediction;
+}) {
+  const finalData = getFinalPredictionDisplayData(prediction);
+  const predictedChampionName = getFinalTeamLabel(
+    prediction,
+    finalData.predictedChampionCode,
+  );
+  const actualChampionName = getFinalTeamLabel(
+    prediction,
+    finalData.actualChampionCode,
+  );
+  const predictedMethodLabel =
+    getQualificationMethodLabel(finalData.predictedDecisionMethod) ||
+    getFinalSelectionLabel(finalData.predictedDecisionMethod);
+  const actualMethodLabel =
+    getQualificationMethodLabel(finalData.actualDecisionMethod) ||
+    getFinalSelectionLabel(finalData.actualDecisionMethod);
+  const scoreLabel = finalData.scoreExact
+    ? "الملي"
+    : finalData.scoreOutcomeCorrect
+      ? "الفائز صحيح"
+      : "النتيجة";
+  const hasDecisionMethod =
+    finalData.predictedDecisionMethod !== "" ||
+    finalData.actualDecisionMethod !== "";
+
+  return (
+    <motion.div
+      variants={modalItemMotion}
+      whileTap={{ scale: 0.995 }}
+      className="relative overflow-hidden rounded-3xl border border-amber-300/30 bg-gradient-to-br from-amber-400/12 via-slate-950/95 to-fuchsia-500/12 p-4 shadow-xl shadow-amber-950/20"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.17),transparent_38%),radial-gradient(circle_at_100%_100%,rgba(217,70,239,0.10),transparent_34%)]" />
+
+      <div className="relative">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/30 bg-amber-400/10 px-3 py-1 text-[11px] font-black text-amber-100">
+              <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>توقع النهائي الكبير</span>
+            </span>
+
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-fuchsia-500 via-amber-300 to-yellow-300 px-3 py-1 text-[11px] font-black text-slate-950 shadow-lg shadow-fuchsia-500/20 ring-1 ring-amber-100/50">
+              <Rocket className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>السوبر ذهبي</span>
+            </span>
+          </div>
+
+          <span className="rounded-full bg-gradient-to-r from-amber-300 to-yellow-400 px-3 py-1 text-[11px] font-black text-slate-950 shadow-md shadow-amber-500/20">
+            {finalData.totalPoints} نقطة
+          </span>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/55 p-3">
+          <div className="mb-3 text-center text-sm font-black text-amber-100">
+            التوقع الأساسي
+          </div>
+
+          <div className="grid grid-cols-[1fr_58px_1fr] items-center gap-2 text-center">
+            <div className="min-w-0">
+              <div className="flex justify-center">
+                <TeamFlag
+                  code={getPredictionHomeTeamCode(prediction)}
+                  emoji={prediction.homeTeamEmoji}
+                  name={prediction.homeTeamName}
+                  size="md"
+                />
+              </div>
+              <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
+                {prediction.homeTeamName}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-amber-300/25 bg-slate-950/90 px-2 py-2 text-sm font-black text-amber-100">
+              {prediction.homeScore} - {prediction.awayScore}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex justify-center">
+                <TeamFlag
+                  code={getPredictionAwayTeamCode(prediction)}
+                  emoji={prediction.awayTeamEmoji}
+                  name={prediction.awayTeamName}
+                  size="md"
+                />
+              </div>
+              <div className="mt-1 text-xs font-bold leading-5 text-slate-200">
+                {prediction.awayTeamName}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-2 text-xs font-bold leading-6">
+            <div className="rounded-xl border border-blue-400/20 bg-blue-400/10 px-3 py-2 text-blue-100">
+              🏆 بطل كأس العالم: <span className="font-black text-white">{predictedChampionName}</span>
+            </div>
+
+            {hasDecisionMethod && (
+              <div className="rounded-xl border border-violet-400/20 bg-violet-400/10 px-3 py-2 text-violet-100">
+                طريقة حسم اللقب: <span className="font-black text-white">{predictedMethodLabel}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.08] p-3">
+          <div className="mb-2 text-center text-sm font-black text-emerald-100">
+            النتيجة الفعلية
+          </div>
+
+          <div className="text-center text-xs font-bold leading-6 text-slate-300">
+            <div>
+              {prediction.homeTeamName} {prediction.actualHomeScore} - {prediction.actualAwayScore} {prediction.awayTeamName}
+            </div>
+            <div className="mt-1 font-black text-white">
+              {actualChampionName} بطل كأس العالم
+              {hasDecisionMethod ? ` — ${actualMethodLabel}` : ""}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-amber-400/20 bg-slate-950/55 p-3">
+          <div className="mb-2 text-center text-sm font-black text-amber-100">
+            نقاط السوبر ذهبي
+          </div>
+
+          <div className={`grid gap-2 ${hasDecisionMethod ? "grid-cols-3" : "grid-cols-2"}`}>
+            <PointsBreakdownItem label={scoreLabel} points={finalData.scorePoints} />
+            <PointsBreakdownItem label="بطل كأس العالم" points={finalData.championPoints} />
+            {hasDecisionMethod && (
+              <PointsBreakdownItem label="طريقة الحسم" points={finalData.decisionMethodPoints} />
+            )}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-amber-300/20 bg-amber-400/10 px-3 py-2 text-center">
+              <div className="text-[10px] font-bold text-amber-100/80">
+                المجموع الأساسي
+              </div>
+              <div className="mt-1 text-sm font-black text-amber-100">
+                {finalData.basePoints} / 20
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center">
+              <div className="text-[10px] font-bold text-slate-400">
+                الحد الأعلى
+              </div>
+              <div className="mt-1 text-sm font-black text-white">
+                20 نقطة
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.06] p-3">
+          <div className="mb-3 text-center text-sm font-black text-cyan-100">
+            إضافات النهائي
+          </div>
+
+          <div className="space-y-2">
+            <FinalBonusResultRow
+              label="من يبدأ التسجيل؟"
+              predictedValue={getFinalTeamLabel(
+                prediction,
+                finalData.predictedFirstScoringTeamCode,
+              )}
+              actualValue={getFinalTeamLabel(
+                prediction,
+                finalData.actualFirstScoringTeamCode,
+              )}
+              points={finalData.firstScoringTeamPoints}
+            />
+
+            <FinalBonusResultRow
+              label="أول مسجل من إسبانيا"
+              predictedValue={getFinalScorerLabel(
+                "ESP",
+                finalData.predictedSpainScorer,
+              )}
+              actualValue={getFinalScorerLabel(
+                "ESP",
+                finalData.actualSpainScorer,
+              )}
+              points={finalData.firstSpainScorerPoints}
+            />
+
+            <FinalBonusResultRow
+              label="أول مسجل من الأرجنتين"
+              predictedValue={getFinalScorerLabel(
+                "ARG",
+                finalData.predictedArgentinaScorer,
+              )}
+              actualValue={getFinalScorerLabel(
+                "ARG",
+                finalData.actualArgentinaScorer,
+              )}
+              points={finalData.firstArgentinaScorerPoints}
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-3 py-2 text-center">
+              <div className="text-[10px] font-bold text-cyan-100/80">
+                مجموع إضافات النهائي
+              </div>
+              <div className="mt-1 text-sm font-black text-cyan-100">
+                {finalData.bonusPoints} / 20
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center">
+              <div className="text-[10px] font-bold text-slate-400">
+                الحد الأعلى
+              </div>
+              <div className="mt-1 text-sm font-black text-white">
+                20 نقطة
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 overflow-hidden rounded-2xl border border-amber-300/35 bg-gradient-to-r from-amber-400/15 via-fuchsia-400/10 to-amber-400/15 shadow-lg shadow-amber-950/10">
+          <div className="grid grid-cols-3 divide-x divide-x-reverse divide-white/10">
+            <div className="px-2 py-3 text-center">
+              <div className="text-[10px] font-bold text-amber-100/75">
+                الأساسي
+              </div>
+              <div className="mt-1 text-lg font-black text-amber-100">
+                {finalData.basePoints}
+              </div>
+            </div>
+
+            <div className="px-2 py-3 text-center">
+              <div className="text-[10px] font-bold text-cyan-100/75">
+                الإضافات
+              </div>
+              <div className="mt-1 text-lg font-black text-cyan-100">
+                {finalData.bonusPoints}
+              </div>
+            </div>
+
+            <div className="px-2 py-3 text-center">
+              <div className="text-[10px] font-bold text-white/75">
+                الإجمالي
+              </div>
+              <div className="mt-1 text-lg font-black text-white">
+                {finalData.totalPoints} / 40
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1554,6 +2366,24 @@ export function PredictionDetailsModal({
               <>
                 <motion.div variants={modalListMotion} initial="hidden" animate="show" className="space-y-3">
                   {visiblePredictions.map((prediction) => {
+                    if (isFinalPrediction(prediction)) {
+                      if (!prediction.isCalculated) {
+                        return (
+                          <LockedFinalPredictionCard
+                            key={prediction.id}
+                            prediction={prediction}
+                          />
+                        );
+                      }
+
+                      return (
+                        <CalculatedFinalPredictionCard
+                          key={prediction.id}
+                          prediction={prediction}
+                        />
+                      );
+                    }
+
                     const status = getPredictionStatus(prediction);
                     const golden = isGoldenPrediction(prediction);
                     const knockoutPrediction = prediction as Prediction & {
