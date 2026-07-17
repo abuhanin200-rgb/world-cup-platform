@@ -471,14 +471,42 @@ export default function MatchesPredictionBox() {
       return;
     }
 
-    setInputs((current) => ({
-      ...current,
-      [matchId]: {
+    setInputs((current) => {
+      const currentInput = {
         ...createEmptyPredictionInput(),
         ...current[matchId],
-        [key]: value,
-      },
-    }));
+      };
+
+      if (key === "finalFirstScoringTeamCode") {
+        const noGoalsSelected = value === "none";
+
+        return {
+          ...current,
+          [matchId]: {
+            ...currentInput,
+            finalFirstScoringTeamCode: value,
+            finalFirstSpainScorer: noGoalsSelected
+              ? NO_FINAL_SCORER
+              : currentInput.finalFirstSpainScorer === NO_FINAL_SCORER
+                ? ""
+                : currentInput.finalFirstSpainScorer,
+            finalFirstArgentinaScorer: noGoalsSelected
+              ? NO_FINAL_SCORER
+              : currentInput.finalFirstArgentinaScorer === NO_FINAL_SCORER
+                ? ""
+                : currentInput.finalFirstArgentinaScorer,
+          },
+        };
+      }
+
+      return {
+        ...current,
+        [matchId]: {
+          ...currentInput,
+          [key]: value,
+        },
+      };
+    });
   }
 
   function getEditRemainingMs(prediction: Prediction, match: Match) {
@@ -894,57 +922,68 @@ export default function MatchesPredictionBox() {
             </select>
           </label>
 
-          <label className="block">
-            <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
-              <span>أول مسجل من إسبانيا</span>
-              <span className="rounded-full bg-fuchsia-300 px-2 py-0.5 text-[10px] text-slate-950">
-                +7
+          {inputs[match.id]?.finalFirstScoringTeamCode === "none" ? (
+            <div className="rounded-2xl border border-emerald-300/25 bg-emerald-400/10 px-4 py-3 text-center text-xs font-black leading-6 text-emerald-100 md:text-sm">
+              <span className="inline-flex items-center justify-center gap-2">
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                <span>لا توجد أهداف — لا يسجل أي لاعب من المنتخبين</span>
               </span>
-            </span>
-            <select
-              value={inputs[match.id]?.finalFirstSpainScorer || ""}
-              onChange={(event) =>
-                updateInput(
-                  match.id,
-                  "finalFirstSpainScorer",
-                  event.target.value
-                )
-              }
-              className="h-12 w-full rounded-2xl border border-fuchsia-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/20"
-            >
-              <option value="">اختر لاعب إسبانيا</option>
-              {renderPlayerOptions(spainPlayers)}
-              <option value={NO_FINAL_SCORER}>
-                لا يسجل أي لاعب من إسبانيا
-              </option>
-            </select>
-          </label>
+            </div>
+          ) : (
+            <>
+              <label className="block">
+                <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
+                  <span>أول مسجل من إسبانيا</span>
+                  <span className="rounded-full bg-fuchsia-300 px-2 py-0.5 text-[10px] text-slate-950">
+                    +7
+                  </span>
+                </span>
+                <select
+                  value={inputs[match.id]?.finalFirstSpainScorer || ""}
+                  onChange={(event) =>
+                    updateInput(
+                      match.id,
+                      "finalFirstSpainScorer",
+                      event.target.value
+                    )
+                  }
+                  className="h-12 w-full rounded-2xl border border-fuchsia-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300 focus:ring-2 focus:ring-fuchsia-300/20"
+                >
+                  <option value="">اختر لاعب إسبانيا</option>
+                  {renderPlayerOptions(spainPlayers)}
+                  <option value={NO_FINAL_SCORER}>
+                    لا يسجل أي لاعب من إسبانيا
+                  </option>
+                </select>
+              </label>
 
-          <label className="block">
-            <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
-              <span>أول مسجل من الأرجنتين</span>
-              <span className="rounded-full bg-sky-300 px-2 py-0.5 text-[10px] text-slate-950">
-                +7
-              </span>
-            </span>
-            <select
-              value={inputs[match.id]?.finalFirstArgentinaScorer || ""}
-              onChange={(event) =>
-                updateInput(
-                  match.id,
-                  "finalFirstArgentinaScorer",
-                  event.target.value
-                )
-              }
-              className="h-12 w-full rounded-2xl border border-sky-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-300/20"
-            >
-              <option value="">اختر لاعب الأرجنتين</option>
-              {renderPlayerOptions(argentinaPlayers)}
-              <option value={NO_FINAL_SCORER}>
-                لا يسجل أي لاعب من الأرجنتين
-              </option>
-            </select>
-          </label>
+              <label className="block">
+                <span className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-white md:text-sm">
+                  <span>أول مسجل من الأرجنتين</span>
+                  <span className="rounded-full bg-sky-300 px-2 py-0.5 text-[10px] text-slate-950">
+                    +7
+                  </span>
+                </span>
+                <select
+                  value={inputs[match.id]?.finalFirstArgentinaScorer || ""}
+                  onChange={(event) =>
+                    updateInput(
+                      match.id,
+                      "finalFirstArgentinaScorer",
+                      event.target.value
+                    )
+                  }
+                  className="h-12 w-full rounded-2xl border border-sky-300/30 bg-slate-950/90 px-3 text-sm font-bold text-white outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-300/20"
+                >
+                  <option value="">اختر لاعب الأرجنتين</option>
+                  {renderPlayerOptions(argentinaPlayers)}
+                  <option value={NO_FINAL_SCORER}>
+                    لا يسجل أي لاعب من الأرجنتين
+                  </option>
+                </select>
+              </label>
+            </>
+          )}
         </div>
       </div>
     );
@@ -1088,9 +1127,18 @@ export default function MatchesPredictionBox() {
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 p-3 text-center text-[10px] font-black md:text-xs">
-                      <span className="rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1.5 text-amber-100">🏆 النهائي</span>
-                      <span className="rounded-full border border-fuchsia-300/25 bg-fuchsia-300/10 px-2 py-1.5 text-fuchsia-100">🚀 سوبر ذهبي</span>
-                      <span className="rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-1.5 text-emerald-100">🔒 التوقعات مخفية</span>
+                      <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-amber-300/25 bg-amber-300/10 px-2 py-1.5 text-amber-100">
+                        <Trophy className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>النهائي</span>
+                      </span>
+                      <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-fuchsia-300/25 bg-fuchsia-300/10 px-2 py-1.5 text-fuchsia-100">
+                        <Rocket className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>سوبر ذهبي</span>
+                      </span>
+                      <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-emerald-300/25 bg-emerald-300/10 px-2 py-1.5 text-emerald-100">
+                        <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>التوقعات مخفية</span>
+                      </span>
                     </div>
 
                     <div className="mx-3 mb-3 grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 text-center text-[10px] font-black leading-5 md:text-xs">
@@ -1180,9 +1228,6 @@ export default function MatchesPredictionBox() {
                       </div>
                     )}
 
-                    <div className="mt-3 text-center text-[10px] font-bold leading-5 text-slate-400 md:text-xs">
-                      النسب إجمالية ولا تكشف أسماء الأعضاء أو نتائج توقعاتهم
-                    </div>
                   </div>
                 )}
 
