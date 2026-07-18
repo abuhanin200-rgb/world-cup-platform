@@ -13,6 +13,8 @@ type Props = {
   matches: Match[];
 };
 
+const PLATFORM_URL = "https://world-cup-platform.vercel.app";
+
 function formatMatchLabel(match: Match) {
   return `${match.homeTeamEmoji} ${match.homeTeamName} × ${match.awayTeamName} ${match.awayTeamEmoji}`;
 }
@@ -25,6 +27,55 @@ function getPredictionTypeMessageHint(predictionType?: Match["predictionType"]) 
   return predictionType === "golden"
     ? "توقع سوبر ذهبي — الرسالة: فرصة الريمونتادا"
     : "توقع عادي — الرسالة: زِد نقاطك";
+}
+
+function isFinalMatch(match: Match) {
+  return (
+    match.matchStage === "knockout" &&
+    match.knockoutRound === "final"
+  );
+}
+
+function isThirdPlaceMatch(match: Match) {
+  return (
+    match.matchStage === "knockout" &&
+    match.knockoutRound === "thirdPlace"
+  );
+}
+
+function buildReminderMessage(match: Match) {
+  const matchLabel = formatMatchLabel(match);
+
+  if (isFinalMatch(match)) {
+    return [
+      "🏆 النهائي الكبير وصل!",
+      "",
+      matchLabel,
+      "",
+      "🔥 لا تفوّت أهم توقع في البطولة.",
+      "قد يكون هذا التوقع هو الفارق في تتويج بطل منصة توقعات كأس العالم 2026.",
+      "",
+      "⏳ اعتمد توقعك قبل إغلاق باب التوقعات.",
+      "",
+      `🌐 ${PLATFORM_URL}`,
+    ].join("\n");
+  }
+
+  if (isThirdPlaceMatch(match)) {
+    return [
+      "🥉 مواجهة المركز الثالث!",
+      "",
+      matchLabel,
+      "",
+      "🔥 فرصة أخيرة لحصد نقاط مهمة قبل ختام البطولة.",
+      "",
+      "⏳ اعتمد توقعك قبل إغلاق باب التوقعات.",
+      "",
+      `🌐 ${PLATFORM_URL}`,
+    ].join("\n");
+  }
+
+  return buildMissingPredictionMessage(match);
 }
 
 export default function AdminMissingPredictionsPanel({ matches }: Props) {
@@ -46,9 +97,7 @@ export default function AdminMissingPredictionsPanel({ matches }: Props) {
   const selectedMatch =
     availableMatches.find((match) => match.id === selectedMatchId) || null;
 
-  const message = selectedMatch
-    ? buildMissingPredictionMessage(selectedMatch)
-    : "";
+  const message = selectedMatch ? buildReminderMessage(selectedMatch) : "";
 
   async function handleLoadMissingMembers() {
     if (!selectedMatchId) {
@@ -92,7 +141,8 @@ export default function AdminMissingPredictionsPanel({ matches }: Props) {
           >
             {availableMatches.map((match) => (
               <option key={match.id} value={match.id}>
-                {formatMatchLabel(match)} — {getPredictionTypeLabel(match.predictionType)}
+                {formatMatchLabel(match)} —{" "}
+                {getPredictionTypeLabel(match.predictionType)}
               </option>
             ))}
           </select>
@@ -110,7 +160,14 @@ export default function AdminMissingPredictionsPanel({ matches }: Props) {
 
       {selectedMatch && (
         <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
-          نوع المباراة: <strong>{getPredictionTypeMessageHint(selectedMatch.predictionType)}</strong>
+          نوع المباراة:{" "}
+          <strong>
+            {isFinalMatch(selectedMatch)
+              ? "النهائي الكبير — رسالة خاصة"
+              : isThirdPlaceMatch(selectedMatch)
+                ? "مباراة المركز الثالث — رسالة خاصة"
+                : getPredictionTypeMessageHint(selectedMatch.predictionType)}
+          </strong>
         </div>
       )}
 
