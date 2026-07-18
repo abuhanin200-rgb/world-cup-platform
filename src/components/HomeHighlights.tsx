@@ -362,7 +362,7 @@ function getPodiumMeta(place: PodiumPlace) {
       label: "المركز الأول",
       medal: "🥇",
       cardClass:
-        "border-amber-200/65 bg-gradient-to-b from-amber-300/25 via-amber-400/10 to-slate-950/92 shadow-[0_0_36px_rgba(251,191,36,0.22)]",
+        "border-amber-100/75 bg-gradient-to-b from-amber-300/30 via-amber-400/12 to-slate-950/92 shadow-[0_0_48px_rgba(251,191,36,0.34)]",
       glowClass: "bg-amber-300/30",
       iconClass: "border-amber-200/60 bg-amber-300/18 text-amber-100",
       pointsClass: "border-amber-300/35 bg-amber-300/13 text-amber-100",
@@ -374,8 +374,8 @@ function getPodiumMeta(place: PodiumPlace) {
       label: "المركز الثاني",
       medal: "🥈",
       cardClass:
-        "border-slate-200/35 bg-gradient-to-b from-slate-100/17 via-slate-300/7 to-slate-950/92 shadow-[0_0_26px_rgba(226,232,240,0.10)]",
-      glowClass: "bg-slate-200/18",
+        "border-slate-200/28 bg-gradient-to-b from-slate-100/13 via-slate-300/5 to-slate-950/94 shadow-[0_0_18px_rgba(226,232,240,0.07)]",
+      glowClass: "bg-slate-200/12",
       iconClass: "border-slate-100/35 bg-slate-100/10 text-slate-100",
       pointsClass: "border-slate-200/25 bg-slate-200/9 text-slate-100",
     };
@@ -457,7 +457,9 @@ function PodiumChampionCard({
         delay: place === 1 ? 0.12 : place === 2 ? 0.26 : 0.36,
         ease: "easeOut",
       }}
-      className={`group relative flex min-w-0 flex-col overflow-hidden rounded-[1.45rem] border px-2 py-3 text-center md:rounded-[1.8rem] md:px-4 md:py-4 ${meta.cardClass}`}
+      className={`group relative flex min-w-0 flex-col overflow-hidden rounded-[1.45rem] border px-2 text-center md:rounded-[1.8rem] md:px-4 ${
+        place === 1 ? "py-4 md:py-5" : "py-2.5 md:py-3"
+      } ${meta.cardClass}`}
     >
       <div
         className={`pointer-events-none absolute -top-14 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full blur-3xl ${meta.glowClass}`}
@@ -486,7 +488,7 @@ function PodiumChampionCard({
           } ${meta.iconClass}`}
         >
           {place === 1 && (
-            <Crown className="absolute -top-7 h-11 w-11 rotate-[-5deg] text-amber-200 drop-shadow-[0_0_12px_rgba(253,230,138,0.7)] md:-top-9 md:h-14 md:w-14" />
+            <Crown className="champion-crown-shine absolute -top-8 h-[3.25rem] w-[3.25rem] rotate-[-5deg] text-amber-200 drop-shadow-[0_0_16px_rgba(253,230,138,0.82)] md:-top-11 md:h-16 md:w-16" />
           )}
           <TeamFlag
             code={teamCode}
@@ -508,6 +510,9 @@ function PodiumChampionCard({
       {place === 1 && (
         <div className="relative mt-2">
           <ChampionBadge />
+          <p className="mx-auto mt-2 max-w-[12rem] text-[8px] font-bold leading-4 text-amber-100/75 md:text-[10px]">
+            سيبقى اسمه محفورًا في سجل أبطال المنصة
+          </p>
         </div>
       )}
 
@@ -599,7 +604,7 @@ function HiddenPodiumCard({ place }: { place: PodiumPlace }) {
 
       <div className="relative mt-4 flex min-h-[58px] items-center justify-center rounded-xl border border-white/10 bg-slate-950/42 px-2 py-2 text-[9px] font-black leading-5 text-slate-200 md:text-xs">
         <LockKeyhole className="ml-1 h-4 w-4 shrink-0 text-amber-200" />
-        <span>سيتم الكشف بعد احتساب النهائي</span>
+        <span>سيتم الكشف عن البطل بعد احتساب النهائي</span>
       </div>
     </article>
   );
@@ -617,13 +622,13 @@ function ConnectedPodium({
   ];
 
   return (
-    <div className="relative mt-[-1px] grid grid-cols-3 items-end px-1 md:px-3">
+    <div className="relative mt-[-1px] grid grid-cols-3 items-end px-1 drop-shadow-[0_18px_24px_rgba(2,6,23,0.5)] md:px-3">
       {labels.map((item) => (
         <div
           key={item.place}
           className={`relative flex items-center justify-center border border-white/10 bg-gradient-to-b ${item.className} to-slate-950/85 ${
             item.place === 1
-              ? "h-16 rounded-t-[1.4rem] border-amber-300/40 md:h-24"
+              ? "h-20 rounded-t-[1.4rem] border-amber-300/45 shadow-[0_18px_32px_rgba(2,6,23,0.45)] md:h-28"
               : item.place === 2
                 ? "h-12 rounded-tr-[1.2rem] md:h-16"
                 : "h-10 rounded-tl-[1.2rem] md:h-14"
@@ -755,7 +760,7 @@ export default function HomeHighlights() {
 
       <div className="champion-rays pointer-events-none absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full opacity-55 md:top-14 md:h-[28rem] md:w-[28rem]" />
 
-      {Array.from({ length: 14 }).map((_, index) => (
+      {Array.from({ length: 9 }).map((_, index) => (
         <Sparkles
           key={`champion-sparkle-${index}`}
           className="champion-sparkle pointer-events-none absolute h-3 w-3 text-amber-200/55"
@@ -809,7 +814,7 @@ export default function HomeHighlights() {
                 place={3}
                 pointsGap={Math.max(0, secondPlace.points - thirdPlace.points)}
               />
-              <div className="relative z-10 md:-translate-y-7 md:scale-[1.12]">
+              <div className="relative z-10 md:-translate-y-10 md:scale-[1.18]">
                 <PodiumChampionCard
                   champion={firstPlace}
                   place={1}
@@ -865,6 +870,12 @@ export default function HomeHighlights() {
         .champion-trophy-glow {
           animation: championTrophyGlow 1.8s ease-in-out infinite;
         }
+
+        .champion-crown-shine {
+          animation: championCrownShine 3.8s ease-in-out infinite;
+          transform-origin: center;
+        }
+
 
         .champion-confetti {
           position: absolute;
@@ -929,6 +940,25 @@ export default function HomeHighlights() {
           }
         }
 
+        @keyframes championCrownShine {
+          0%,
+          72%,
+          100% {
+            filter: brightness(1) drop-shadow(0 0 10px rgba(253, 230, 138, 0.45));
+            transform: rotate(-5deg) scale(1);
+          }
+
+          82% {
+            filter: brightness(1.65) drop-shadow(0 0 20px rgba(253, 230, 138, 0.95));
+            transform: rotate(-2deg) scale(1.12);
+          }
+
+          90% {
+            filter: brightness(1.15) drop-shadow(0 0 14px rgba(253, 230, 138, 0.7));
+            transform: rotate(-7deg) scale(1.04);
+          }
+        }
+
         @keyframes championConfettiFall {
           0% {
             opacity: 0;
@@ -949,7 +979,8 @@ export default function HomeHighlights() {
           .champion-rays,
           .champion-sparkle,
           .champion-trophy-glow,
-          .champion-confetti {
+          .champion-confetti,
+          .champion-crown-shine {
             animation: none !important;
           }
         }
