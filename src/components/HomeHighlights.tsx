@@ -403,7 +403,7 @@ function ChampionBadge() {
       <div className="group/badge relative inline-flex max-w-full items-center justify-center">
         <div className="absolute inset-0 rounded-full bg-amber-300/28 blur-md" />
 
-        <div className="relative inline-flex max-w-[82%] items-center justify-center gap-1.5 overflow-hidden rounded-[999px] border border-amber-100/65 bg-gradient-to-l from-amber-300 via-yellow-100 to-amber-400 px-2.5 py-1 text-[9px] font-black text-slate-950 shadow-lg shadow-amber-950/35 sm:max-w-[78%] sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[10px] md:max-w-none md:px-4 md:text-xs">
+        <div className="relative -mt-1 inline-flex max-w-[76%] items-center justify-center gap-1.5 overflow-hidden rounded-[999px] border border-amber-100/55 bg-gradient-to-l from-amber-400/90 via-amber-200/95 to-yellow-300/90 px-2 py-1 text-[8px] font-black text-slate-950 shadow-md shadow-amber-950/25 sm:max-w-[72%] sm:gap-2 sm:px-2.5 sm:text-[9px] md:max-w-none md:px-3.5 md:text-[11px]">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/50 via-transparent to-transparent" />
 
           <Crown className="relative h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
@@ -492,7 +492,10 @@ function PodiumChampionCard({
           } ${meta.iconClass}`}
         >
           {place === 1 && (
-            <Crown className="champion-crown-shine absolute -top-8 h-[3.25rem] w-[3.25rem] rotate-[-5deg] text-amber-200 drop-shadow-[0_0_16px_rgba(253,230,138,0.82)] md:-top-11 md:h-16 md:w-16" />
+            <>
+              <div className="champion-crown-halo pointer-events-none absolute -top-9 h-16 w-16 rounded-full bg-amber-300/20 blur-xl md:-top-12 md:h-20 md:w-20" />
+              <Crown className="champion-crown-shine absolute -top-8 h-[3.25rem] w-[3.25rem] rotate-[-5deg] text-amber-200 drop-shadow-[0_0_16px_rgba(253,230,138,0.82)] md:-top-11 md:h-16 md:w-16" />
+            </>
           )}
           <TeamFlag
             code={teamCode}
@@ -627,7 +630,7 @@ function ConnectedPodium({
 
   return (
     <div className="relative mt-[-1px] px-1 drop-shadow-[0_18px_24px_rgba(2,6,23,0.5)] md:px-3">
-      <div className="pointer-events-none absolute inset-x-4 top-0 z-10 h-px bg-gradient-to-r from-transparent via-amber-200/80 to-transparent md:inset-x-8" />
+      <div className="pointer-events-none absolute inset-x-3 top-0 z-10 h-[2px] rounded-full bg-gradient-to-r from-transparent via-amber-200/90 to-transparent shadow-[0_0_10px_rgba(253,230,138,0.45)] md:inset-x-7" />
 
       <div className="grid grid-cols-3 items-end">
       {labels.map((item) => (
@@ -886,8 +889,12 @@ export default function HomeHighlights() {
         }
 
         .champion-crown-shine {
-          animation: championCrownShine 3.8s ease-in-out infinite;
+          animation: championCrownShine 5.6s ease-in-out infinite;
           transform-origin: center;
+        }
+
+        .champion-crown-halo {
+          animation: championCrownHalo 5.6s ease-in-out infinite;
         }
 
 
@@ -956,20 +963,39 @@ export default function HomeHighlights() {
 
         @keyframes championCrownShine {
           0%,
-          72%,
+          74%,
           100% {
             filter: brightness(1) drop-shadow(0 0 10px rgba(253, 230, 138, 0.45));
             transform: rotate(-5deg) scale(1);
           }
 
           82% {
-            filter: brightness(1.65) drop-shadow(0 0 20px rgba(253, 230, 138, 0.95));
-            transform: rotate(-2deg) scale(1.12);
+            filter: brightness(1.5) drop-shadow(0 0 20px rgba(253, 230, 138, 0.9));
+            transform: rotate(-3deg) scale(1.09);
           }
 
           90% {
-            filter: brightness(1.15) drop-shadow(0 0 14px rgba(253, 230, 138, 0.7));
-            transform: rotate(-7deg) scale(1.04);
+            filter: brightness(1.12) drop-shadow(0 0 14px rgba(253, 230, 138, 0.65));
+            transform: rotate(-6deg) scale(1.03);
+          }
+        }
+
+        @keyframes championCrownHalo {
+          0%,
+          74%,
+          100% {
+            opacity: 0.3;
+            transform: scale(0.92);
+          }
+
+          82% {
+            opacity: 0.75;
+            transform: scale(1.12);
+          }
+
+          90% {
+            opacity: 0.45;
+            transform: scale(1.02);
           }
         }
 
@@ -994,7 +1020,8 @@ export default function HomeHighlights() {
           .champion-sparkle,
           .champion-trophy-glow,
           .champion-confetti,
-          .champion-crown-shine {
+          .champion-crown-shine,
+          .champion-crown-halo {
             animation: none !important;
           }
         }
