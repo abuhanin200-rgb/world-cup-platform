@@ -362,7 +362,7 @@ function getPodiumMeta(place: PodiumPlace) {
       label: "المركز الأول",
       medal: "🥇",
       cardClass:
-        "border-amber-100/75 bg-gradient-to-b from-amber-300/30 via-amber-400/12 to-slate-950/92 shadow-[0_0_48px_rgba(251,191,36,0.34)]",
+        "border-amber-100/80 bg-gradient-to-b from-amber-300/32 via-amber-400/13 to-slate-950/92 shadow-[0_0_54px_rgba(251,191,36,0.38)]",
       glowClass: "bg-amber-300/30",
       iconClass: "border-amber-200/60 bg-amber-300/18 text-amber-100",
       pointsClass: "border-amber-300/35 bg-amber-300/13 text-amber-100",
@@ -403,7 +403,7 @@ function ChampionBadge() {
       <div className="group/badge relative inline-flex max-w-full items-center justify-center">
         <div className="absolute inset-0 rounded-full bg-amber-300/28 blur-md" />
 
-        <div className="relative inline-flex max-w-full items-center justify-center gap-1.5 overflow-hidden rounded-full border border-amber-100/65 bg-gradient-to-l from-amber-300 via-yellow-100 to-amber-400 px-2.5 py-1.5 text-[9px] font-black text-slate-950 shadow-lg shadow-amber-950/35 sm:gap-2 sm:px-3 sm:text-[10px] md:px-4 md:text-xs">
+        <div className="relative inline-flex max-w-[82%] items-center justify-center gap-1.5 overflow-hidden rounded-[999px] border border-amber-100/65 bg-gradient-to-l from-amber-300 via-yellow-100 to-amber-400 px-2.5 py-1 text-[9px] font-black text-slate-950 shadow-lg shadow-amber-950/35 sm:max-w-[78%] sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[10px] md:max-w-none md:px-4 md:text-xs">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/50 via-transparent to-transparent" />
 
           <Crown className="relative h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
@@ -462,7 +462,7 @@ function PodiumChampionCard({
         ease: "easeOut",
       }}
       className={`group relative flex min-w-0 flex-col overflow-hidden rounded-[1.45rem] border px-2 text-center md:rounded-[1.8rem] md:px-4 ${
-        place === 1 ? "py-4 md:py-5" : "py-2.5 md:py-3"
+        place === 1 ? "py-[1.15rem] md:py-6" : "py-2.5 md:py-3"
       } ${meta.cardClass}`}
     >
       <div
@@ -608,7 +608,7 @@ function HiddenPodiumCard({ place }: { place: PodiumPlace }) {
 
       <div className="relative mt-4 flex min-h-[58px] items-center justify-center rounded-xl border border-white/10 bg-slate-950/42 px-2 py-2 text-[9px] font-black leading-5 text-slate-200 md:text-xs">
         <LockKeyhole className="ml-1 h-4 w-4 shrink-0 text-amber-200" />
-        <span>سيتم الكشف عن البطل بعد احتساب النهائي</span>
+        <span>تُكشف هوية البطل بعد اعتماد النتائج النهائية</span>
       </div>
     </article>
   );
@@ -626,7 +626,10 @@ function ConnectedPodium({
   ];
 
   return (
-    <div className="relative mt-[-1px] grid grid-cols-3 items-end px-1 drop-shadow-[0_18px_24px_rgba(2,6,23,0.5)] md:px-3">
+    <div className="relative mt-[-1px] px-1 drop-shadow-[0_18px_24px_rgba(2,6,23,0.5)] md:px-3">
+      <div className="pointer-events-none absolute inset-x-4 top-0 z-10 h-px bg-gradient-to-r from-transparent via-amber-200/80 to-transparent md:inset-x-8" />
+
+      <div className="grid grid-cols-3 items-end">
       {labels.map((item) => (
         <div
           key={item.place}
@@ -655,6 +658,7 @@ function ConnectedPodium({
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 }
@@ -764,14 +768,20 @@ export default function HomeHighlights() {
 
       <div className="champion-rays pointer-events-none absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full opacity-55 md:top-14 md:h-[28rem] md:w-[28rem]" />
 
-      {Array.from({ length: 5 }).map((_, index) => (
+      {[
+        { left: "8%", top: "8%", delay: "0s" },
+        { left: "78%", top: "10%", delay: "0.45s" },
+        { left: "12%", top: "56%", delay: "0.9s" },
+        { left: "84%", top: "58%", delay: "1.35s" },
+        { left: "52%", top: "42%", delay: "1.8s" },
+      ].map((sparkle, index) => (
         <Sparkles
           key={`champion-sparkle-${index}`}
-          className="champion-sparkle pointer-events-none absolute h-2.5 w-2.5 text-amber-200/40"
+          className="champion-sparkle pointer-events-none absolute h-2.5 w-2.5 text-amber-200/35"
           style={{
-            left: `${8 + ((index * 21) % 84)}%`,
-            top: `${8 + ((index * 31) % 42)}%`,
-            animationDelay: `${(index % 5) * 0.45}s`,
+            left: sparkle.left,
+            top: sparkle.top,
+            animationDelay: sparkle.delay,
           }}
         />
       ))}
