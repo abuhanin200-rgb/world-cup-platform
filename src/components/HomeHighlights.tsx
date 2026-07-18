@@ -458,19 +458,31 @@ function PodiumChampionCard({
         </div>
       </div>
 
-      <div className="relative mt-2 inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-black text-slate-200 md:text-xs">
-        {place === 1 ? (
-          <>
-            <Trophy className="h-3.5 w-3.5 text-amber-200" />
-            <span>{meta.badge}</span>
-          </>
-        ) : (
-          <>
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>{meta.badge}</span>
-          </>
-        )}
-      </div>
+      {place === 1 ? (
+        <div className="relative mt-3 flex justify-center">
+          <div className="group/badge relative inline-flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full bg-amber-300/30 blur-lg transition duration-300 group-hover/badge:bg-amber-300/40" />
+
+            <div className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-amber-200/55 bg-gradient-to-l from-amber-300 via-yellow-200 to-amber-400 px-3 py-1.5 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-950/30 md:px-4 md:py-2 md:text-xs">
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/45 via-transparent to-transparent" />
+              <div className="pointer-events-none absolute inset-y-0 -left-10 w-8 rotate-12 bg-white/50 blur-md transition duration-700 group-hover/badge:left-[110%]" />
+
+              <span className="relative flex h-5 w-5 items-center justify-center rounded-full border border-slate-950/10 bg-slate-950/10 md:h-6 md:w-6">
+                <Crown className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              </span>
+
+              <span className="relative tracking-tight">بطل نسخة 2026</span>
+
+              <Sparkles className="relative h-3.5 w-3.5 md:h-4 md:w-4" />
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="relative mt-2 inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-black text-slate-200 md:text-xs">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          <span>{meta.badge}</span>
+        </div>
+      )}
 
       {typeof pointsGap === "number" && pointsGap > 0 && (
         <div className="relative mt-2 text-[9px] font-bold text-slate-400 md:text-[10px]">
