@@ -207,11 +207,15 @@ function normalizeKnockoutRound(value: unknown): KnockoutRound {
   return "general";
 }
 
-async function getKnockoutRoundsByMatchId(): Promise<
-  Map<string, KnockoutRound>
-> {
+type MatchesHighlightMeta = {
+  knockoutRoundsByMatchId: Map<string, KnockoutRound>;
+  isFinalCalculated: boolean;
+};
+
+async function getMatchesHighlightMeta(): Promise<MatchesHighlightMeta> {
   const snapshot = await getDocs(collection(db, "matches"));
-  const roundsByMatchId = new Map<string, KnockoutRound>();
+  const knockoutRoundsByMatchId = new Map<string, KnockoutRound>();
+  let isFinalCalculated = false;
 
   snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
@@ -220,13 +224,22 @@ async function getKnockoutRoundsByMatchId(): Promise<
 
       if (data.matchStage !== "knockout") return;
 
-      roundsByMatchId.set(
-        docSnap.id,
-        normalizeKnockoutRound(data.knockoutRound)
-      );
+      const knockoutRound = normalizeKnockoutRound(data.knockoutRound);
+
+      knockoutRoundsByMatchId.set(docSnap.id, knockoutRound);
+
+      if (
+        knockoutRound === "final" &&
+        Boolean(data.resultCalculated)
+      ) {
+        isFinalCalculated = true;
+      }
     });
 
-  return roundsByMatchId;
+  return {
+    knockoutRoundsByMatchId,
+    isFinalCalculated,
+  };
 }
 
 function normalizeQualificationMethod(
@@ -564,10 +577,10 @@ function getExactHits(
 }
 
 export async function getHomeHighlights() {
-  const [users, predictions, knockoutRoundsByMatchId] = await Promise.all([
+  const [users, predictions, matchesMeta] = await Promise.all([
     getUsersForHighlights(),
     getPredictionsForHighlights(),
-    getKnockoutRoundsByMatchId(),
+    getMatchesHighlightMeta(),
   ]);
 
   const excludedUserIds = new Set<string>();
@@ -596,7 +609,14 @@ export async function getHomeHighlights() {
     excludedUserIds
   );
 
-  const exactHits = getExactHits(predictions, knockoutRoundsByMatchId);
+  const exactHits = getExactHits(
+    predictions,
+    matchesMeta.knockoutRoundsByMatchId
+  );
+
+  const platformChampions = matchesMeta.isFinalCalculated
+    ? users.filter((user) => user.total > 0).slice(0, 3)
+    : [];
 
   return {
     predictionKing,
@@ -604,5 +624,8 @@ export async function getHomeHighlights() {
     fastestRiserUser,
     firstArriverUser,
     exactHits,
+
+    isFinalCalculated: matchesMeta.isFinalCalculated,
+    platformChampions,
   };
 }

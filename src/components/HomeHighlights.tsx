@@ -6,15 +6,17 @@ import { AnimatePresence, motion, type Variants } from "framer-motion";
 import {
   BadgeCheck,
   Clock3,
-  Flame,
+  Crown,
   Gauge,
+  Medal,
   PauseCircle,
   Rocket,
+  ShieldCheck,
+  Sparkles,
   Swords,
   Target,
   Trophy,
   X,
-  Zap,
 } from "lucide-react";
 import {
   ExactHit,
@@ -329,16 +331,231 @@ function getKnockoutRoundMeta(
   };
 }
 
+type PlatformChampion = HomeHighlightUserWithTeamCode;
+
+type PodiumPlace = 1 | 2 | 3;
+
+function getPodiumMeta(place: PodiumPlace) {
+  if (place === 1) {
+    return {
+      label: "المركز الأول",
+      badge: "بطل نسخة 2026",
+      medal: "🥇",
+      heightClass: "md:min-h-[330px]",
+      cardClass:
+        "border-amber-300/45 bg-gradient-to-b from-amber-300/22 via-amber-400/10 to-slate-950/80 shadow-amber-950/35",
+      glowClass: "bg-amber-300/25",
+      iconClass: "border-amber-200/40 bg-amber-300/20 text-amber-100",
+      podiumClass:
+        "border-amber-300/35 bg-gradient-to-b from-amber-300/25 to-amber-500/10 text-amber-100",
+      pointsClass:
+        "border-amber-300/35 bg-amber-300/15 text-amber-100",
+    };
+  }
+
+  if (place === 2) {
+    return {
+      label: "المركز الثاني",
+      badge: "وصيف المنصة",
+      medal: "🥈",
+      heightClass: "md:min-h-[290px]",
+      cardClass:
+        "border-slate-200/30 bg-gradient-to-b from-slate-200/16 via-slate-300/7 to-slate-950/80 shadow-slate-950/30",
+      glowClass: "bg-slate-200/18",
+      iconClass: "border-slate-200/30 bg-slate-200/12 text-slate-100",
+      podiumClass:
+        "border-slate-200/25 bg-gradient-to-b from-slate-200/18 to-slate-400/8 text-slate-100",
+      pointsClass:
+        "border-slate-200/25 bg-slate-200/10 text-slate-100",
+    };
+  }
+
+  return {
+    label: "المركز الثالث",
+    badge: "ثالث الأبطال",
+    medal: "🥉",
+    heightClass: "md:min-h-[270px]",
+    cardClass:
+      "border-orange-300/35 bg-gradient-to-b from-orange-300/17 via-orange-400/8 to-slate-950/80 shadow-orange-950/25",
+    glowClass: "bg-orange-300/18",
+    iconClass: "border-orange-200/30 bg-orange-300/12 text-orange-100",
+    podiumClass:
+      "border-orange-300/25 bg-gradient-to-b from-orange-300/18 to-orange-500/8 text-orange-100",
+    pointsClass:
+      "border-orange-300/25 bg-orange-300/10 text-orange-100",
+  };
+}
+
+function PodiumChampionCard({
+  champion,
+  place,
+  pointsGap,
+}: {
+  champion: PlatformChampion;
+  place: PodiumPlace;
+  pointsGap?: number;
+}) {
+  const meta = getPodiumMeta(place);
+  const teamCode = champion.favoriteTeamCode || champion.teamCode;
+
+  return (
+    <motion.article
+      variants={cardMotion}
+      className={`group relative flex flex-col overflow-hidden rounded-[1.8rem] border p-3 text-center shadow-2xl transition duration-300 hover:-translate-y-1 md:p-4 ${meta.heightClass} ${meta.cardClass}`}
+    >
+      <div
+        className={`pointer-events-none absolute -top-16 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full blur-3xl ${meta.glowClass}`}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent" />
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+
+      <div className="relative flex items-start justify-between gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[10px] font-black text-white md:text-xs">
+          <Medal className="h-3.5 w-3.5" />
+          {meta.label}
+        </span>
+
+        <span className="text-2xl leading-none drop-shadow-lg md:text-3xl">
+          {meta.medal}
+        </span>
+      </div>
+
+      <div className="relative mx-auto mt-3">
+        <div
+          className={`absolute inset-0 scale-125 rounded-full blur-xl ${meta.glowClass}`}
+        />
+        <div
+          className={`relative flex h-[74px] w-[74px] items-center justify-center rounded-full border shadow-xl md:h-[86px] md:w-[86px] ${meta.iconClass}`}
+        >
+          {place === 1 && (
+            <Crown className="absolute -top-5 h-8 w-8 rotate-[-5deg] text-amber-200 drop-shadow-lg md:h-9 md:w-9" />
+          )}
+
+          <TeamFlag
+            code={teamCode}
+            emoji={champion.teamEmoji}
+            name={champion.favoriteTeam}
+            size="lg"
+          />
+        </div>
+      </div>
+
+      <div className="relative mt-3 min-h-[44px] break-words text-sm font-black leading-6 text-white md:text-base">
+        {champion.fullName}
+      </div>
+
+      <div className="relative mt-1 truncate text-[10px] font-bold text-slate-300 md:text-xs">
+        {champion.favoriteTeam || "بدون منتخب مفضل"}
+      </div>
+
+      <div
+        className={`relative mt-3 rounded-2xl border px-3 py-2 ${meta.pointsClass}`}
+      >
+        <div className="text-[10px] font-bold opacity-75">المجموع النهائي</div>
+        <div className="mt-0.5 text-xl font-black md:text-2xl">
+          {champion.points}
+          <span className="mr-1 text-xs md:text-sm">نقطة</span>
+        </div>
+      </div>
+
+      <div className="relative mt-2 inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-black text-slate-200 md:text-xs">
+        {place === 1 ? (
+          <>
+            <Trophy className="h-3.5 w-3.5 text-amber-200" />
+            <span>{meta.badge}</span>
+          </>
+        ) : (
+          <>
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>{meta.badge}</span>
+          </>
+        )}
+      </div>
+
+      {typeof pointsGap === "number" && pointsGap > 0 && (
+        <div className="relative mt-2 text-[9px] font-bold text-slate-400 md:text-[10px]">
+          فارق {pointsGap} نقطة عن المركز السابق
+        </div>
+      )}
+
+      <div
+        className={`relative mt-auto pt-4 ${place === 1 ? "md:pt-5" : "md:pt-4"}`}
+      >
+        <div
+          className={`flex h-12 items-center justify-center rounded-t-2xl border border-b-0 text-2xl font-black shadow-inner md:h-16 md:text-3xl ${meta.podiumClass}`}
+        >
+          {place}
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
+function HiddenPodiumCard({ place }: { place: PodiumPlace }) {
+  const meta = getPodiumMeta(place);
+
+  return (
+    <motion.article
+      variants={cardMotion}
+      className={`relative flex flex-col overflow-hidden rounded-[1.8rem] border p-3 text-center shadow-xl md:p-4 ${meta.heightClass} ${meta.cardClass}`}
+    >
+      <div
+        className={`pointer-events-none absolute -top-14 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full blur-3xl ${meta.glowClass}`}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
+
+      <div className="relative flex items-start justify-between gap-2">
+        <span className="rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[10px] font-black text-white md:text-xs">
+          {meta.label}
+        </span>
+        <span className="text-2xl leading-none opacity-80 md:text-3xl">
+          {meta.medal}
+        </span>
+      </div>
+
+      <div className="relative mx-auto mt-5">
+        <div
+          className={`absolute inset-0 scale-150 rounded-full blur-2xl ${meta.glowClass}`}
+        />
+        <div
+          className={`relative flex h-[74px] w-[74px] items-center justify-center rounded-full border backdrop-blur-md md:h-[86px] md:w-[86px] ${meta.iconClass}`}
+        >
+          {place === 1 ? (
+            <Crown className="h-8 w-8 animate-pulse" />
+          ) : (
+            <Medal className="h-8 w-8 animate-pulse" />
+          )}
+        </div>
+      </div>
+
+      <div className="relative mt-4 text-base font-black text-white md:text-lg">
+        قريبًا
+      </div>
+
+      <div className="relative mx-auto mt-2 h-2 w-24 overflow-hidden rounded-full bg-white/10">
+        <div className="h-full w-1/2 animate-pulse rounded-full bg-white/35" />
+      </div>
+
+      <p className="relative mt-3 text-[10px] font-medium leading-5 text-slate-300 md:text-xs">
+        تُكشف هوية صاحب المركز بعد احتساب النهائي
+      </p>
+
+      <div className="relative mt-auto pt-4">
+        <div
+          className={`flex h-12 items-center justify-center rounded-t-2xl border border-b-0 text-2xl font-black shadow-inner md:h-16 md:text-3xl ${meta.podiumClass}`}
+        >
+          {place}
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
 export default function HomeHighlights() {
-  const [predictionKing, setPredictionKing] =
-    useState<HomeHighlightUser | null>(null);
-
-  const [bestStreakUser, setBestStreakUser] =
-    useState<HomeHighlightUser | null>(null);
-
-  const [firstArriverUser, setFirstArriverUser] =
-    useState<HomeHighlightUser | null>(null);
-
+  const [platformChampions, setPlatformChampions] = useState<
+    PlatformChampion[]
+  >([]);
+  const [isFinalCalculated, setIsFinalCalculated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -346,11 +563,14 @@ export default function HomeHighlights() {
       try {
         const data = await getHomeHighlights();
 
-        setPredictionKing(data.predictionKing);
-        setBestStreakUser(data.bestStreakUser);
-        setFirstArriverUser(data.firstArriverUser);
+        setPlatformChampions(
+          Array.isArray(data.platformChampions)
+            ? (data.platformChampions as PlatformChampion[])
+            : [],
+        );
+        setIsFinalCalculated(Boolean(data.isFinalCalculated));
       } catch (error) {
-        console.error("فشل تحميل مميزات الصفحة الرئيسية:", error);
+        console.error("فشل تحميل أبطال المنصة:", error);
       } finally {
         setLoading(false);
       }
@@ -378,92 +598,118 @@ export default function HomeHighlights() {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <section className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 md:mt-5 md:rounded-[2rem] md:p-4">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+  const firstPlace = platformChampions[0] || null;
+  const secondPlace = platformChampions[1] || null;
+  const thirdPlace = platformChampions[2] || null;
 
-        <div className="relative mb-3 text-center">
-          <h2 className="inline-flex items-center justify-center gap-2 text-base font-black md:text-xl">
-            <Trophy className="h-5 w-5 text-fuchsia-100" />
-            <span>أبطال التحدي الآن</span>
-          </h2>
-
-          <p className="mt-1 text-[10px] font-medium text-slate-300 md:text-xs">
-            أسماء تتغير تلقائيًا حسب التوقعات والنتائج
-          </p>
-        </div>
-
-        <div className="relative grid grid-cols-3 gap-2 md:gap-4">
-          <EmptyCard title="ملك التوقعات" text="جاري التحميل..." />
-          <EmptyCard title="أفضل سلسلة" text="جاري التحميل..." />
-          <EmptyCard title="أول الواصلين" text="جاري التحميل..." />
-        </div>
-      </section>
-    );
-  }
+  const championsAreReady =
+    isFinalCalculated && Boolean(firstPlace && secondPlace && thirdPlace);
 
   return (
-    <section className="relative mt-4 overflow-hidden rounded-[1.65rem] border border-white/10 bg-white/[0.08] p-3 shadow-md shadow-slate-950/25 md:mt-5 md:rounded-[2rem] md:p-4">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
+    <motion.section
+      variants={sectionMotion}
+      initial="hidden"
+      animate="show"
+      className="relative mt-4 overflow-hidden rounded-[2rem] border border-amber-300/20 bg-slate-950/75 p-3 shadow-2xl shadow-slate-950/40 md:mt-5 md:rounded-[2.4rem] md:p-5"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-300/10 via-violet-400/5 to-cyan-300/8" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/70 to-transparent" />
+
       <div
-        className="pointer-events-none absolute -right-20 top-0 h-40 w-40 rounded-full"
+        className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full blur-3xl"
         style={{
           background:
-            "radial-gradient(circle at center, rgba(252,211,77,0.17) 0%, rgba(252,211,77,0.08) 38%, rgba(252,211,77,0.022) 62%, transparent 82%)",
+            "radial-gradient(circle, rgba(251,191,36,0.20) 0%, rgba(251,191,36,0.07) 45%, transparent 72%)",
         }}
       />
       <div
-        className="pointer-events-none absolute -left-20 bottom-0 h-40 w-40 rounded-full"
+        className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full blur-3xl"
         style={{
           background:
-            "radial-gradient(circle at center, rgba(103,232,249,0.17) 0%, rgba(103,232,249,0.08) 38%, rgba(103,232,249,0.022) 62%, transparent 82%)",
+            "radial-gradient(circle, rgba(34,211,238,0.16) 0%, rgba(34,211,238,0.05) 45%, transparent 72%)",
         }}
       />
 
-      <div className="relative mb-3 text-center">
-        <div className="mx-auto mb-2 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/20">
-          <Trophy className="h-5 w-5" />
+      <div className="relative text-center">
+        <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-[10px] font-black text-amber-100 shadow-lg shadow-amber-950/20 md:text-xs">
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>
+            {championsAreReady ? "التتويج الرسمي" : "لحظة التتويج تقترب"}
+          </span>
         </div>
 
-        <h2 className="text-base font-black tracking-tight md:text-xl">
-          أبطال التحدي الآن
+        <div className="relative mx-auto mt-3 flex h-16 w-16 items-center justify-center rounded-[1.4rem] border border-amber-300/35 bg-gradient-to-br from-amber-300/25 to-amber-500/8 text-amber-100 shadow-xl shadow-amber-950/30 md:h-20 md:w-20">
+          <div className="absolute inset-0 animate-pulse rounded-[1.4rem] bg-amber-300/10 blur-xl" />
+          <Trophy className="relative h-8 w-8 md:h-10 md:w-10" />
+          <Crown className="absolute -top-3 h-7 w-7 rotate-[-8deg] text-amber-200 md:h-8 md:w-8" />
+        </div>
+
+        <h2 className="mt-3 bg-gradient-to-l from-amber-200 via-white to-cyan-100 bg-clip-text text-lg font-black tracking-tight text-transparent md:text-3xl">
+          أبطال منصة توقعات كأس العالم 2026
         </h2>
 
-        <p className="mt-1 text-[10px] font-medium text-slate-300 md:text-xs">
-          أسماء تتغير تلقائيًا حسب التوقعات والنتائج
+        <p className="mx-auto mt-2 max-w-2xl text-[10px] font-medium leading-5 text-slate-300 md:text-sm md:leading-7">
+          {championsAreReady
+            ? "مبروك لأصحاب المراكز الثلاثة الأولى بعد رحلة مليئة بالحماس والتحدي ودقة التوقعات."
+            : "المنافسة في لحظاتها الأخيرة… تُكشف هوية الأبطال تلقائيًا بعد احتساب النهائي الكبير."}
         </p>
       </div>
 
-      <div className="relative grid grid-cols-3 gap-2 md:gap-4">
-        <HighlightCard
-          title="ملك التوقعات"
-          icon={<Trophy className="h-3.5 w-3.5 md:h-4 md:w-4" />}
-          user={predictionKing}
-          valueText={`${predictionKing?.points || 0} نقاط`}
-          accentClass="bg-amber-400 text-slate-950 shadow-amber-950/20"
-          emptyText="يظهر بعد تسجيل أول نقاط"
-        />
+      <div className="relative mt-5 rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-2.5 md:mt-7 md:p-4">
+        <div className="pointer-events-none absolute inset-0 rounded-[1.7rem] bg-gradient-to-b from-white/5 to-transparent" />
 
-        <HighlightCard
-          title="أفضل سلسلة"
-          icon={<Flame className="h-3.5 w-3.5 md:h-4 md:w-4" />}
-          user={bestStreakUser}
-          valueText={`السلسلة: ${bestStreakUser?.bestStreak || 0}`}
-          accentClass="bg-emerald-400 text-slate-950 shadow-emerald-950/20"
-          emptyText="تظهر بعد وجود سلسلة صحيحة"
-        />
+        {loading ? (
+          <div className="relative grid grid-cols-3 gap-2 md:items-end md:gap-4">
+            <HiddenPodiumCard place={2} />
+            <HiddenPodiumCard place={1} />
+            <HiddenPodiumCard place={3} />
+          </div>
+        ) : championsAreReady ? (
+          <div className="relative grid grid-cols-3 gap-2 md:items-end md:gap-4">
+            <PodiumChampionCard
+              champion={secondPlace}
+              place={2}
+              pointsGap={Math.max(0, firstPlace.points - secondPlace.points)}
+            />
 
-        <HighlightCard
-          title="أول الواصلين"
-          icon={<Zap className="h-3.5 w-3.5 md:h-4 md:w-4" />}
-          user={firstArriverUser}
-          valueText="توقع قبل الجميع"
-          accentClass="bg-violet-400 text-slate-950 shadow-violet-950/20"
-          emptyText="تظهر بعد أول توقع"
-        />
+            <div className="md:-translate-y-5">
+              <PodiumChampionCard champion={firstPlace} place={1} />
+            </div>
+
+            <PodiumChampionCard
+              champion={thirdPlace}
+              place={3}
+              pointsGap={Math.max(0, secondPlace.points - thirdPlace.points)}
+            />
+          </div>
+        ) : (
+          <div className="relative grid grid-cols-3 gap-2 md:items-end md:gap-4">
+            <HiddenPodiumCard place={2} />
+
+            <div className="md:-translate-y-5">
+              <HiddenPodiumCard place={1} />
+            </div>
+
+            <HiddenPodiumCard place={3} />
+          </div>
+        )}
       </div>
-    </section>
+
+      <div className="relative mt-4 flex flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-slate-950/50 px-3 py-3 text-center md:flex-row md:gap-3">
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-black text-amber-100 md:text-xs">
+          <ShieldCheck className="h-4 w-4" />
+          <span>الترتيب النهائي يعتمد نظام لوحة الصدارة المعتمد</span>
+        </div>
+
+        <span className="hidden h-4 w-px bg-white/15 md:block" />
+
+        <div className="text-[9px] font-bold text-slate-400 md:text-[11px]">
+          {championsAreReady
+            ? "تم اعتماد المراكز بعد احتساب النهائي"
+            : "الأسماء مخفية حتى لحظة الحسم"}
+        </div>
+      </div>
+    </motion.section>
   );
 }
 

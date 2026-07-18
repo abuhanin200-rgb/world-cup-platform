@@ -21,22 +21,50 @@ export type AdminPrediction = {
   matchId: string;
   predictionType: PredictionType;
 
+  matchStage?: "group" | "knockout";
+  knockoutRound?: "general" | "semiFinal" | "thirdPlace" | "final";
+
   homeTeamName: string;
   homeTeamEmoji: string;
+  homeTeamCode: string | null;
+
   awayTeamName: string;
   awayTeamEmoji: string;
+  awayTeamCode: string | null;
 
   homeScore: number;
   awayScore: number;
 
+  qualifiedTeamCode: string | null;
+  qualificationMethod: "extraTime" | "penalties" | string | null;
+
   actualHomeScore: number | null;
   actualAwayScore: number | null;
+  actualQualifiedTeamCode: string | null;
+  actualQualificationMethod: "extraTime" | "penalties" | string | null;
+
+  finalBonusPrediction: {
+    firstScoringTeamCode?: string | null;
+    firstSpainScorer?: string | null;
+    firstArgentinaScorer?: string | null;
+  } | null;
+
+  finalBonusResult: {
+    firstScoringTeamCode?: string | null;
+    firstSpainScorer?: string | null;
+    firstArgentinaScorer?: string | null;
+  } | null;
+
+  finalBonusPoints: number | null;
+  basePoints: number | null;
 
   points: number;
   resultType: string;
   isCalculated: boolean;
 
   createdAt: string;
+  editedAt: string | null;
+  editCount: number;
   calculatedAt: string | null;
 };
 
@@ -143,15 +171,58 @@ export function getPredictionResultClass(prediction: AdminPrediction) {
   return "border-red-400/20 bg-red-500/10 text-red-100";
 }
 
-async function getMatchPredictionTypeMap() {
+type MatchAdminMetadata = {
+  predictionType: PredictionType;
+  matchStage?: "group" | "knockout";
+  knockoutRound?: "general" | "semiFinal" | "thirdPlace" | "final";
+  homeTeamCode: string | null;
+  awayTeamCode: string | null;
+};
+
+function normalizeMatchStage(value: unknown): "group" | "knockout" | undefined {
+  return value === "group" || value === "knockout" ? value : undefined;
+}
+
+function normalizeKnockoutRound(
+  value: unknown,
+): "general" | "semiFinal" | "thirdPlace" | "final" | undefined {
+  return value === "general" ||
+    value === "semiFinal" ||
+    value === "thirdPlace" ||
+    value === "final"
+    ? value
+    : undefined;
+}
+
+function toNullableText(value: unknown) {
+  const text = toText(value);
+  return text || null;
+}
+
+function toOptionalObject(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+async function getMatchAdminMetadataMap() {
   const snapshot = await getDocs(collection(db, "matches"));
-  const map = new Map<string, PredictionType>();
+  const map = new Map<string, MatchAdminMetadata>();
 
   snapshot.docs.forEach((docSnap) => {
     if (docSnap.id === "_init") return;
 
     const data = docSnap.data();
-    map.set(docSnap.id, normalizePredictionType(data.predictionType));
+
+    map.set(docSnap.id, {
+      predictionType: normalizePredictionType(data.predictionType),
+      matchStage: normalizeMatchStage(data.matchStage),
+      knockoutRound: normalizeKnockoutRound(data.knockoutRound),
+      homeTeamCode: toNullableText(data.homeTeamCode),
+      awayTeamCode: toNullableText(data.awayTeamCode),
+    });
   });
 
   return map;
@@ -159,7 +230,7 @@ async function getMatchPredictionTypeMap() {
 
 function buildSingleUserStats(predictions: RebuildPrediction[]) {
   const sorted = [...predictions].sort(
-    (a, b) => getTimeValue(a.createdAt) - getTimeValue(b.createdAt)
+    (a, b) => getTimeValue(a.createdAt) - getTimeValue(b.createdAt),
   );
 
   let points = 0;
@@ -198,9 +269,9 @@ function buildSingleUserStats(predictions: RebuildPrediction[]) {
 }
 
 export async function getAdminPredictions(): Promise<AdminPrediction[]> {
-  const [predictionsSnapshot, matchPredictionTypeMap] = await Promise.all([
+  const [predictionsSnapshot, matchMetadataMap] = await Promise.all([
     getDocs(collection(db, "predictions")),
-    getMatchPredictionTypeMap(),
+    getMatchAdminMetadataMap(),
   ]);
 
   return predictionsSnapshot.docs
@@ -208,6 +279,16 @@ export async function getAdminPredictions(): Promise<AdminPrediction[]> {
     .map((docSnap) => {
       const data = docSnap.data();
       const matchId = toText(data.matchId);
+      const matchMetadata = matchMetadataMap.get(matchId);
+
+      const finalBonusPrediction = toOptionalObject(data.finalBonusPrediction);
+      const finalBonusResult = toOptionalObject(data.finalBonusResult);
+
+      const storedPredictionType = toText(data.predictionType);
+      const predictionType =
+        storedPredictionType === "golden" || storedPredictionType === "normal"
+          ? normalizePredictionType(storedPredictionType)
+          : matchMetadata?.predictionType || "normal";
 
       return {
         id: docSnap.id,
@@ -216,38 +297,87 @@ export async function getAdminPredictions(): Promise<AdminPrediction[]> {
         userName: toText(data.userName) || "عضو",
 
         matchId,
-        predictionType:
-          normalizePredictionType(data.predictionType) ||
-          matchPredictionTypeMap.get(matchId) ||
-          "normal",
+        predictionType,
+
+        matchStage:
+          normalizeMatchStage(data.matchStage) || matchMetadata?.matchStage,
+        knockoutRound:
+          normalizeKnockoutRound(data.knockoutRound) ||
+          matchMetadata?.knockoutRound,
 
         homeTeamName: toText(data.homeTeamName),
         homeTeamEmoji: toText(data.homeTeamEmoji),
+        homeTeamCode:
+          toNullableText(data.homeTeamCode) ||
+          matchMetadata?.homeTeamCode ||
+          null,
+
         awayTeamName: toText(data.awayTeamName),
         awayTeamEmoji: toText(data.awayTeamEmoji),
+        awayTeamCode:
+          toNullableText(data.awayTeamCode) ||
+          matchMetadata?.awayTeamCode ||
+          null,
 
         homeScore: toNumber(data.homeScore),
         awayScore: toNumber(data.awayScore),
 
+        qualifiedTeamCode: toNullableText(data.qualifiedTeamCode),
+        qualificationMethod: toNullableText(data.qualificationMethod),
+
         actualHomeScore: toNullableNumber(data.actualHomeScore),
         actualAwayScore: toNullableNumber(data.actualAwayScore),
+        actualQualifiedTeamCode: toNullableText(data.actualQualifiedTeamCode),
+        actualQualificationMethod: toNullableText(
+          data.actualQualificationMethod,
+        ),
+
+        finalBonusPrediction: finalBonusPrediction
+          ? {
+              firstScoringTeamCode: toNullableText(
+                finalBonusPrediction.firstScoringTeamCode,
+              ),
+              firstSpainScorer: toNullableText(
+                finalBonusPrediction.firstSpainScorer,
+              ),
+              firstArgentinaScorer: toNullableText(
+                finalBonusPrediction.firstArgentinaScorer,
+              ),
+            }
+          : null,
+
+        finalBonusResult: finalBonusResult
+          ? {
+              firstScoringTeamCode: toNullableText(
+                finalBonusResult.firstScoringTeamCode,
+              ),
+              firstSpainScorer: toNullableText(
+                finalBonusResult.firstSpainScorer,
+              ),
+              firstArgentinaScorer: toNullableText(
+                finalBonusResult.firstArgentinaScorer,
+              ),
+            }
+          : null,
+
+        finalBonusPoints: toNullableNumber(data.finalBonusPoints),
+        basePoints: toNullableNumber(data.basePoints),
 
         points: toNumber(data.points),
         resultType: toText(data.resultType),
         isCalculated: Boolean(data.isCalculated),
 
         createdAt: toText(data.createdAt),
-        calculatedAt:
-          data.calculatedAt === null || data.calculatedAt === undefined
-            ? null
-            : toText(data.calculatedAt),
+        editedAt: toNullableText(data.editedAt),
+        editCount: toNumber(data.editCount),
+        calculatedAt: toNullableText(data.calculatedAt),
       };
     })
     .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
 }
 
 export function getPredictionMatchOptions(
-  predictions: AdminPrediction[]
+  predictions: AdminPrediction[],
 ): PredictionMatchOption[] {
   const map = new Map<string, PredictionMatchOption>();
 
@@ -276,7 +406,7 @@ export function getPredictionMatchOptions(
 }
 
 export async function deleteAdminPredictionAndFixUserStats(
-  predictionId: string
+  predictionId: string,
 ) {
   if (!predictionId) {
     throw new Error("معرف التوقع غير موجود");
@@ -301,7 +431,7 @@ export async function deleteAdminPredictionAndFixUserStats(
 
   const userPredictionsQuery = query(
     collection(db, "predictions"),
-    where("userId", "==", userId)
+    where("userId", "==", userId),
   );
 
   const userPredictionsSnapshot = await getDocs(userPredictionsQuery);
@@ -341,7 +471,7 @@ export async function deleteAdminPredictionAndFixUserStats(
       bestStreak: stats.bestStreak,
       lastUpdated: now,
     },
-    { merge: true }
+    { merge: true },
   );
 
   await batch.commit();
@@ -406,7 +536,7 @@ export async function auditUserStats(): Promise<UserStatsAuditItem[]> {
       const userId = docSnap.id;
 
       const realStats = buildSingleUserStats(
-        calculatedPredictionsByUser.get(userId) || []
+        calculatedPredictionsByUser.get(userId) || [],
       );
 
       const savedPoints = toNumber(data.points);
