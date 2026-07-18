@@ -403,12 +403,12 @@ function ChampionBadge() {
       <div className="group/badge relative inline-flex max-w-full items-center justify-center">
         <div className="absolute inset-0 rounded-full bg-amber-300/28 blur-md" />
 
-        <div className="relative -mt-1 inline-flex max-w-[76%] items-center justify-center gap-1.5 overflow-hidden rounded-[999px] border border-amber-100/55 bg-gradient-to-l from-amber-400/90 via-amber-200/95 to-yellow-300/90 px-2 py-1 text-[8px] font-black text-slate-950 shadow-md shadow-amber-950/25 sm:max-w-[72%] sm:gap-2 sm:px-2.5 sm:text-[9px] md:max-w-none md:px-3.5 md:text-[11px]">
+        <div className="relative -mt-0.5 inline-flex max-w-[86%] items-center justify-center gap-1.5 overflow-hidden rounded-full border border-amber-100/75 bg-gradient-to-l from-amber-300 via-yellow-100 to-amber-400 px-2.5 py-1.5 text-[9px] font-black leading-none text-slate-950 shadow-lg shadow-amber-950/30 sm:max-w-[80%] sm:gap-2 sm:px-3 sm:text-[10px] md:max-w-none md:px-4 md:text-xs">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/50 via-transparent to-transparent" />
 
           <Crown className="relative h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
 
-          <span className="relative whitespace-nowrap">بطل نسخة 2026</span>
+          <span className="relative whitespace-nowrap tracking-tight">بطل نسخة 2026</span>
 
           <Sparkles className="relative hidden h-3.5 w-3.5 shrink-0 sm:block" />
         </div>
@@ -629,7 +629,7 @@ function ConnectedPodium({
   ];
 
   return (
-    <div className="relative mt-[-1px] px-1 drop-shadow-[0_18px_24px_rgba(2,6,23,0.5)] md:px-3">
+    <div className="relative mt-2 px-1 drop-shadow-[0_18px_24px_rgba(2,6,23,0.5)] md:mt-3 md:px-3">
       <div className="pointer-events-none absolute inset-x-3 top-0 z-10 h-[2px] rounded-full bg-gradient-to-r from-transparent via-amber-200/90 to-transparent shadow-[0_0_10px_rgba(253,230,138,0.45)] md:inset-x-7" />
 
       <div className="grid grid-cols-3 items-end">
