@@ -8,11 +8,13 @@ import {
   Clock3,
   Crown,
   Gauge,
+  LockKeyhole,
   Medal,
   PauseCircle,
   Rocket,
   ShieldCheck,
   Sparkles,
+  Star,
   Swords,
   Target,
   Trophy,
@@ -331,59 +333,106 @@ function getKnockoutRoundMeta(
   };
 }
 
-type PlatformChampion = HomeHighlightUserWithTeamCode;
+type PlatformChampion = HomeHighlightUserWithTeamCode & {
+  exactHits?: number;
+};
 
 type PodiumPlace = 1 | 2 | 3;
+
+const CONFETTI_PARTICLES = [
+  { left: "4%", delay: "0s", duration: "4.4s", rotate: "18deg" },
+  { left: "9%", delay: "0.35s", duration: "4.8s", rotate: "65deg" },
+  { left: "15%", delay: "0.8s", duration: "4.2s", rotate: "115deg" },
+  { left: "22%", delay: "0.15s", duration: "5s", rotate: "155deg" },
+  { left: "29%", delay: "1.05s", duration: "4.5s", rotate: "210deg" },
+  { left: "36%", delay: "0.55s", duration: "4.9s", rotate: "260deg" },
+  { left: "44%", delay: "0.05s", duration: "4.3s", rotate: "305deg" },
+  { left: "52%", delay: "0.95s", duration: "5.1s", rotate: "350deg" },
+  { left: "60%", delay: "0.25s", duration: "4.6s", rotate: "35deg" },
+  { left: "68%", delay: "0.7s", duration: "4.1s", rotate: "90deg" },
+  { left: "76%", delay: "0.4s", duration: "4.7s", rotate: "145deg" },
+  { left: "83%", delay: "1.15s", duration: "5s", rotate: "205deg" },
+  { left: "90%", delay: "0.1s", duration: "4.4s", rotate: "275deg" },
+  { left: "96%", delay: "0.65s", duration: "4.8s", rotate: "330deg" },
+];
 
 function getPodiumMeta(place: PodiumPlace) {
   if (place === 1) {
     return {
       label: "المركز الأول",
-      badge: "بطل نسخة 2026",
       medal: "🥇",
-      heightClass: "md:min-h-[330px]",
       cardClass:
-        "border-amber-300/45 bg-gradient-to-b from-amber-300/22 via-amber-400/10 to-slate-950/80 shadow-amber-950/35",
-      glowClass: "bg-amber-300/25",
-      iconClass: "border-amber-200/40 bg-amber-300/20 text-amber-100",
-      podiumClass:
-        "border-amber-300/35 bg-gradient-to-b from-amber-300/25 to-amber-500/10 text-amber-100",
-      pointsClass:
-        "border-amber-300/35 bg-amber-300/15 text-amber-100",
+        "border-amber-200/65 bg-gradient-to-b from-amber-300/25 via-amber-400/10 to-slate-950/92 shadow-[0_0_36px_rgba(251,191,36,0.22)]",
+      glowClass: "bg-amber-300/30",
+      iconClass: "border-amber-200/60 bg-amber-300/18 text-amber-100",
+      pointsClass: "border-amber-300/35 bg-amber-300/13 text-amber-100",
     };
   }
 
   if (place === 2) {
     return {
       label: "المركز الثاني",
-      badge: "وصيف المنصة",
       medal: "🥈",
-      heightClass: "md:min-h-[290px]",
       cardClass:
-        "border-slate-200/30 bg-gradient-to-b from-slate-200/16 via-slate-300/7 to-slate-950/80 shadow-slate-950/30",
+        "border-slate-200/35 bg-gradient-to-b from-slate-100/17 via-slate-300/7 to-slate-950/92 shadow-[0_0_26px_rgba(226,232,240,0.10)]",
       glowClass: "bg-slate-200/18",
-      iconClass: "border-slate-200/30 bg-slate-200/12 text-slate-100",
-      podiumClass:
-        "border-slate-200/25 bg-gradient-to-b from-slate-200/18 to-slate-400/8 text-slate-100",
-      pointsClass:
-        "border-slate-200/25 bg-slate-200/10 text-slate-100",
+      iconClass: "border-slate-100/35 bg-slate-100/10 text-slate-100",
+      pointsClass: "border-slate-200/25 bg-slate-200/9 text-slate-100",
     };
   }
 
   return {
     label: "المركز الثالث",
-    badge: "ثالث الأبطال",
     medal: "🥉",
-    heightClass: "md:min-h-[270px]",
     cardClass:
-      "border-orange-300/35 bg-gradient-to-b from-orange-300/17 via-orange-400/8 to-slate-950/80 shadow-orange-950/25",
+      "border-orange-300/40 bg-gradient-to-b from-orange-300/18 via-orange-400/8 to-slate-950/92 shadow-[0_0_26px_rgba(251,146,60,0.10)]",
     glowClass: "bg-orange-300/18",
-    iconClass: "border-orange-200/30 bg-orange-300/12 text-orange-100",
-    podiumClass:
-      "border-orange-300/25 bg-gradient-to-b from-orange-300/18 to-orange-500/8 text-orange-100",
-    pointsClass:
-      "border-orange-300/25 bg-orange-300/10 text-orange-100",
+    iconClass: "border-orange-200/35 bg-orange-300/10 text-orange-100",
+    pointsClass: "border-orange-300/25 bg-orange-300/9 text-orange-100",
   };
+}
+
+function getSuccessRate(champion: PlatformChampion) {
+  if (!champion.total) return 0;
+  return Math.round((champion.correct / champion.total) * 100);
+}
+
+function ChampionBadge() {
+  return (
+    <div className="relative flex justify-center">
+      <div className="group/badge relative inline-flex items-center justify-center">
+        <div className="absolute inset-0 rounded-full bg-amber-300/35 blur-lg" />
+        <div className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-amber-100/65 bg-gradient-to-l from-amber-300 via-yellow-100 to-amber-400 px-3 py-1.5 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-950/35 md:px-4 md:text-xs">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/55 via-transparent to-transparent" />
+          <Crown className="relative h-4 w-4" />
+          <span className="relative whitespace-nowrap">بطل نسخة 2026</span>
+          <Sparkles className="relative h-3.5 w-3.5" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChampionStat({
+  icon,
+  value,
+  label,
+}: {
+  icon: ReactNode;
+  value: string | number;
+  label: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-slate-950/45 px-1.5 py-2 text-center shadow-inner">
+      <div className="flex items-center justify-center gap-1 text-sm font-black text-white md:text-base">
+        {icon}
+        <span>{value}</span>
+      </div>
+      <div className="mt-0.5 text-[8px] font-bold leading-3 text-slate-400 md:text-[10px]">
+        {label}
+      </div>
+    </div>
+  );
 }
 
 function PodiumChampionCard({
@@ -397,40 +446,48 @@ function PodiumChampionCard({
 }) {
   const meta = getPodiumMeta(place);
   const teamCode = champion.favoriteTeamCode || champion.teamCode;
+  const successRate = getSuccessRate(champion);
 
   return (
     <motion.article
-      variants={cardMotion}
-      className={`group relative flex flex-col overflow-hidden rounded-[1.8rem] border p-3 text-center shadow-2xl transition duration-300 hover:-translate-y-1 md:p-4 ${meta.heightClass} ${meta.cardClass}`}
+      initial={{ opacity: 0, y: 34, scale: place === 1 ? 0.92 : 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        duration: 0.65,
+        delay: place === 1 ? 0.12 : place === 2 ? 0.26 : 0.36,
+        ease: "easeOut",
+      }}
+      className={`group relative flex min-w-0 flex-col overflow-hidden rounded-[1.45rem] border px-2 py-3 text-center md:rounded-[1.8rem] md:px-4 md:py-4 ${meta.cardClass}`}
     >
       <div
-        className={`pointer-events-none absolute -top-16 left-1/2 h-36 w-36 -translate-x-1/2 rounded-full blur-3xl ${meta.glowClass}`}
+        className={`pointer-events-none absolute -top-14 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full blur-3xl ${meta.glowClass}`}
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent" />
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-white/65 to-transparent" />
 
-      <div className="relative flex items-start justify-between gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[10px] font-black text-white md:text-xs">
-          <Medal className="h-3.5 w-3.5" />
+      <div className="relative flex items-center justify-between gap-1">
+        <span className="rounded-full border border-white/10 bg-slate-950/55 px-2 py-1 text-[9px] font-black leading-4 text-white md:px-3 md:text-xs">
           {meta.label}
         </span>
-
-        <span className="text-2xl leading-none drop-shadow-lg md:text-3xl">
+        <span className="text-xl leading-none drop-shadow-lg md:text-3xl">
           {meta.medal}
         </span>
       </div>
 
-      <div className="relative mx-auto mt-3">
+      <div className={`relative mx-auto ${place === 1 ? "mt-4" : "mt-3"}`}>
         <div
-          className={`absolute inset-0 scale-125 rounded-full blur-xl ${meta.glowClass}`}
+          className={`absolute inset-0 scale-150 rounded-full blur-2xl ${meta.glowClass}`}
         />
         <div
-          className={`relative flex h-[74px] w-[74px] items-center justify-center rounded-full border shadow-xl md:h-[86px] md:w-[86px] ${meta.iconClass}`}
+          className={`relative flex items-center justify-center rounded-full border shadow-xl ${
+            place === 1
+              ? "h-[78px] w-[78px] md:h-[104px] md:w-[104px]"
+              : "h-[66px] w-[66px] md:h-[86px] md:w-[86px]"
+          } ${meta.iconClass}`}
         >
           {place === 1 && (
-            <Crown className="absolute -top-5 h-8 w-8 rotate-[-5deg] text-amber-200 drop-shadow-lg md:h-9 md:w-9" />
+            <Crown className="absolute -top-7 h-11 w-11 rotate-[-5deg] text-amber-200 drop-shadow-[0_0_12px_rgba(253,230,138,0.7)] md:-top-9 md:h-14 md:w-14" />
           )}
-
           <TeamFlag
             code={teamCode}
             emoji={champion.teamEmoji}
@@ -440,65 +497,56 @@ function PodiumChampionCard({
         </div>
       </div>
 
-      <div className="relative mt-3 min-h-[44px] break-words text-sm font-black leading-6 text-white md:text-base">
+      <div
+        className={`relative mt-3 min-h-[40px] break-words font-black leading-5 text-white ${
+          place === 1 ? "text-sm md:text-lg" : "text-xs md:text-base"
+        }`}
+      >
         {champion.fullName}
       </div>
 
-      <div className="relative mt-1 truncate text-[10px] font-bold text-slate-300 md:text-xs">
+      {place === 1 && (
+        <div className="relative mt-2">
+          <ChampionBadge />
+        </div>
+      )}
+
+      <div className="relative mt-2 truncate text-[9px] font-bold text-slate-400 md:text-xs">
         {champion.favoriteTeam || "بدون منتخب مفضل"}
       </div>
 
       <div
-        className={`relative mt-3 rounded-2xl border px-3 py-2 ${meta.pointsClass}`}
+        className={`relative mt-2 rounded-xl border px-2 py-2 ${meta.pointsClass}`}
       >
-        <div className="text-[10px] font-bold opacity-75">المجموع النهائي</div>
-        <div className="mt-0.5 text-xl font-black md:text-2xl">
-          {champion.points}
-          <span className="mr-1 text-xs md:text-sm">نقطة</span>
+        <div className="flex items-center justify-center gap-1 text-lg font-black md:text-2xl">
+          <Star className="h-4 w-4 fill-current md:h-5 md:w-5" />
+          <span>{champion.points}</span>
+        </div>
+        <div className="text-[8px] font-bold opacity-70 md:text-[10px]">
+          إجمالي النقاط
         </div>
       </div>
 
-      {place === 1 ? (
-        <div className="relative mt-3 flex justify-center">
-          <div className="group/badge relative inline-flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-amber-300/30 blur-lg transition duration-300 group-hover/badge:bg-amber-300/40" />
-
-            <div className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-amber-200/55 bg-gradient-to-l from-amber-300 via-yellow-200 to-amber-400 px-3 py-1.5 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-950/30 md:px-4 md:py-2 md:text-xs">
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/45 via-transparent to-transparent" />
-              <div className="pointer-events-none absolute inset-y-0 -left-10 w-8 rotate-12 bg-white/50 blur-md transition duration-700 group-hover/badge:left-[110%]" />
-
-              <span className="relative flex h-5 w-5 items-center justify-center rounded-full border border-slate-950/10 bg-slate-950/10 md:h-6 md:w-6">
-                <Crown className="h-3.5 w-3.5 md:h-4 md:w-4" />
-              </span>
-
-              <span className="relative tracking-tight">بطل نسخة 2026</span>
-
-              <Sparkles className="relative h-3.5 w-3.5 md:h-4 md:w-4" />
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="relative mt-2 inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-black text-slate-200 md:text-xs">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          <span>{meta.badge}</span>
-        </div>
-      )}
-
-      {typeof pointsGap === "number" && pointsGap > 0 && (
-        <div className="relative mt-2 text-[9px] font-bold text-slate-400 md:text-[10px]">
-          فارق {pointsGap} نقطة عن المركز السابق
-        </div>
-      )}
-
-      <div
-        className={`relative mt-auto pt-4 ${place === 1 ? "md:pt-5" : "md:pt-4"}`}
-      >
-        <div
-          className={`flex h-12 items-center justify-center rounded-t-2xl border border-b-0 text-2xl font-black shadow-inner md:h-16 md:text-3xl ${meta.podiumClass}`}
-        >
-          {place}
-        </div>
+      <div className="relative mt-2 grid grid-cols-2 gap-1.5">
+        <ChampionStat
+          icon={<Target className="h-3.5 w-3.5 text-cyan-200" />}
+          value={champion.exactHits || 0}
+          label="نتائج بالملي"
+        />
+        <ChampionStat
+          icon={<Gauge className="h-3.5 w-3.5 text-emerald-200" />}
+          value={`${successRate}%`}
+          label="نسبة النجاح"
+        />
       </div>
+
+      {typeof pointsGap === "number" && (
+        <div className="relative mt-2 rounded-lg border border-white/8 bg-white/[0.04] px-1.5 py-1.5 text-[8px] font-bold leading-4 text-slate-400 md:text-[10px]">
+          {place === 1
+            ? `يتقدم على الوصيف بفارق ${pointsGap} نقطة`
+            : `فارق ${pointsGap} نقطة عن المركز السابق`}
+        </div>
+      )}
     </motion.article>
   );
 }
@@ -507,59 +555,119 @@ function HiddenPodiumCard({ place }: { place: PodiumPlace }) {
   const meta = getPodiumMeta(place);
 
   return (
-    <motion.article
-      variants={cardMotion}
-      className={`relative flex flex-col overflow-hidden rounded-[1.8rem] border p-3 text-center shadow-xl md:p-4 ${meta.heightClass} ${meta.cardClass}`}
+    <article
+      className={`relative flex min-w-0 flex-col items-center overflow-hidden rounded-[1.4rem] border px-2 py-3 text-center md:rounded-[1.8rem] md:px-4 md:py-4 ${meta.cardClass}`}
     >
       <div
-        className={`pointer-events-none absolute -top-14 left-1/2 h-32 w-32 -translate-x-1/2 rounded-full blur-3xl ${meta.glowClass}`}
+        className={`pointer-events-none absolute -top-12 left-1/2 h-28 w-28 -translate-x-1/2 rounded-full blur-3xl ${meta.glowClass}`}
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
 
-      <div className="relative flex items-start justify-between gap-2">
-        <span className="rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[10px] font-black text-white md:text-xs">
+      <div className="relative flex w-full items-center justify-between gap-1">
+        <span className="rounded-full border border-white/10 bg-slate-950/55 px-2 py-1 text-[9px] font-black leading-4 text-white md:px-3 md:text-xs">
           {meta.label}
         </span>
-        <span className="text-2xl leading-none opacity-80 md:text-3xl">
+        <span className="text-xl leading-none opacity-85 md:text-3xl">
           {meta.medal}
         </span>
       </div>
 
-      <div className="relative mx-auto mt-5">
+      <div className="relative mx-auto mt-4">
         <div
           className={`absolute inset-0 scale-150 rounded-full blur-2xl ${meta.glowClass}`}
         />
         <div
-          className={`relative flex h-[74px] w-[74px] items-center justify-center rounded-full border backdrop-blur-md md:h-[86px] md:w-[86px] ${meta.iconClass}`}
+          className={`relative flex items-center justify-center rounded-full border ${
+            place === 1
+              ? "h-[76px] w-[76px] md:h-[100px] md:w-[100px]"
+              : "h-[64px] w-[64px] md:h-[82px] md:w-[82px]"
+          } ${meta.iconClass}`}
         >
           {place === 1 ? (
-            <Crown className="h-8 w-8 animate-pulse" />
+            <Crown className="h-10 w-10 animate-pulse md:h-12 md:w-12" />
           ) : (
-            <Medal className="h-8 w-8 animate-pulse" />
+            <Medal className="h-8 w-8 animate-pulse md:h-10 md:w-10" />
           )}
         </div>
       </div>
 
-      <div className="relative mt-4 text-base font-black text-white md:text-lg">
-        قريبًا
-      </div>
-
-      <div className="relative mx-auto mt-2 h-2 w-24 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full w-1/2 animate-pulse rounded-full bg-white/35" />
-      </div>
-
-      <p className="relative mt-3 text-[10px] font-medium leading-5 text-slate-300 md:text-xs">
-        تُكشف هوية صاحب المركز بعد احتساب النهائي
-      </p>
-
-      <div className="relative mt-auto pt-4">
-        <div
-          className={`flex h-12 items-center justify-center rounded-t-2xl border border-b-0 text-2xl font-black shadow-inner md:h-16 md:text-3xl ${meta.podiumClass}`}
-        >
-          {place}
+      {place === 1 && (
+        <div className="relative mt-3 opacity-70">
+          <ChampionBadge />
         </div>
+      )}
+
+      <div className="relative mt-4 flex min-h-[58px] items-center justify-center rounded-xl border border-white/10 bg-slate-950/42 px-2 py-2 text-[9px] font-black leading-5 text-slate-200 md:text-xs">
+        <LockKeyhole className="ml-1 h-4 w-4 shrink-0 text-amber-200" />
+        <span>سيتم الكشف بعد احتساب النهائي</span>
       </div>
-    </motion.article>
+    </article>
+  );
+}
+
+function ConnectedPodium({
+  championsReady,
+}: {
+  championsReady: boolean;
+}) {
+  const labels = [
+    { place: 3, label: "المركز الثالث", className: "from-orange-400/22" },
+    { place: 1, label: "المركز الأول", className: "from-amber-300/30" },
+    { place: 2, label: "المركز الثاني", className: "from-slate-200/20" },
+  ];
+
+  return (
+    <div className="relative mt-[-1px] grid grid-cols-3 items-end px-1 md:px-3">
+      {labels.map((item) => (
+        <div
+          key={item.place}
+          className={`relative flex items-center justify-center border border-white/10 bg-gradient-to-b ${item.className} to-slate-950/85 ${
+            item.place === 1
+              ? "h-16 rounded-t-[1.4rem] border-amber-300/40 md:h-24"
+              : item.place === 2
+                ? "h-12 rounded-tr-[1.2rem] md:h-16"
+                : "h-10 rounded-tl-[1.2rem] md:h-14"
+          }`}
+        >
+          <span
+            className={`font-black ${
+              item.place === 1
+                ? "text-3xl text-amber-100 md:text-5xl"
+                : "text-2xl text-white md:text-4xl"
+            }`}
+          >
+            {item.place}
+          </span>
+          {item.place === 1 && championsReady && (
+            <div className="absolute -top-3 flex items-center gap-1 rounded-full border border-amber-300/35 bg-amber-300/15 px-2 py-0.5 text-[8px] font-black text-amber-100 md:text-[10px]">
+              <Crown className="h-3 w-3" />
+              البطل
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CelebrationEffects({ active }: { active: boolean }) {
+  if (!active) return null;
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden rounded-[2rem]">
+      {CONFETTI_PARTICLES.map((particle, index) => (
+        <span
+          key={`${particle.left}-${index}`}
+          className={`champion-confetti champion-confetti-${index % 4}`}
+          style={{
+            left: particle.left,
+            animationDelay: particle.delay,
+            animationDuration: particle.duration,
+            transform: `rotate(${particle.rotate})`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -569,18 +677,34 @@ export default function HomeHighlights() {
   >([]);
   const [isFinalCalculated, setIsFinalCalculated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   useEffect(() => {
     async function loadHighlights() {
       try {
         const data = await getHomeHighlights();
+        const finalCalculated = Boolean(data.isFinalCalculated);
 
         setPlatformChampions(
           Array.isArray(data.platformChampions)
             ? (data.platformChampions as PlatformChampion[])
             : [],
         );
-        setIsFinalCalculated(Boolean(data.isFinalCalculated));
+        setIsFinalCalculated(finalCalculated);
+
+        if (finalCalculated) {
+          const celebrationKey = "world-cup-2026-champions-celebration-seen";
+          const hasSeenCelebration = window.localStorage.getItem(celebrationKey);
+
+          if (!hasSeenCelebration) {
+            setShowCelebration(true);
+            window.localStorage.setItem(celebrationKey, "1");
+
+            window.setTimeout(() => {
+              setShowCelebration(false);
+            }, 5200);
+          }
+        }
       } catch (error) {
         console.error("فشل تحميل أبطال المنصة:", error);
       } finally {
@@ -614,7 +738,7 @@ export default function HomeHighlights() {
   const secondPlace = platformChampions[1] || null;
   const thirdPlace = platformChampions[2] || null;
 
-  const championsAreReady =
+  const championsReady =
     isFinalCalculated && Boolean(firstPlace && secondPlace && thirdPlace);
 
   return (
@@ -622,92 +746,89 @@ export default function HomeHighlights() {
       variants={sectionMotion}
       initial="hidden"
       animate="show"
-      className="relative mt-4 overflow-hidden rounded-[2rem] border border-amber-300/20 bg-slate-950/75 p-3 shadow-2xl shadow-slate-950/40 md:mt-5 md:rounded-[2.4rem] md:p-5"
+      className="relative mt-4 overflow-hidden rounded-[2rem] border border-amber-300/25 bg-slate-950/80 p-3 shadow-[0_22px_60px_rgba(2,6,23,0.5)] md:mt-5 md:rounded-[2.5rem] md:p-5"
     >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-300/10 via-violet-400/5 to-cyan-300/8" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/70 to-transparent" />
+      <CelebrationEffects active={showCelebration} />
 
-      <div
-        className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full blur-3xl"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(251,191,36,0.20) 0%, rgba(251,191,36,0.07) 45%, transparent 72%)",
-        }}
-      />
-      <div
-        className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full blur-3xl"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(34,211,238,0.16) 0%, rgba(34,211,238,0.05) 45%, transparent 72%)",
-        }}
-      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-300/9 via-violet-400/4 to-cyan-300/8" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-100/80 to-transparent" />
+
+      <div className="champion-rays pointer-events-none absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full opacity-55 md:top-14 md:h-[28rem] md:w-[28rem]" />
+
+      {Array.from({ length: 14 }).map((_, index) => (
+        <Sparkles
+          key={`champion-sparkle-${index}`}
+          className="champion-sparkle pointer-events-none absolute h-3 w-3 text-amber-200/55"
+          style={{
+            left: `${6 + ((index * 17) % 88)}%`,
+            top: `${5 + ((index * 23) % 58)}%`,
+            animationDelay: `${(index % 6) * 0.35}s`,
+          }}
+        />
+      ))}
 
       <div className="relative text-center">
-        <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1.5 text-[10px] font-black text-amber-100 shadow-lg shadow-amber-950/20 md:text-xs">
+        <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-amber-300/35 bg-amber-300/10 px-3 py-1.5 text-[10px] font-black text-amber-100 shadow-lg shadow-amber-950/20 md:text-xs">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>
-            {championsAreReady ? "التتويج الرسمي" : "لحظة التتويج تقترب"}
-          </span>
+          <span>{championsReady ? "التتويج الرسمي" : "لحظة التتويج تقترب"}</span>
         </div>
 
-        <div className="relative mx-auto mt-3 flex h-16 w-16 items-center justify-center rounded-[1.4rem] border border-amber-300/35 bg-gradient-to-br from-amber-300/25 to-amber-500/8 text-amber-100 shadow-xl shadow-amber-950/30 md:h-20 md:w-20">
-          <div className="absolute inset-0 animate-pulse rounded-[1.4rem] bg-amber-300/10 blur-xl" />
-          <Trophy className="relative h-8 w-8 md:h-10 md:w-10" />
-          <Crown className="absolute -top-3 h-7 w-7 rotate-[-8deg] text-amber-200 md:h-8 md:w-8" />
+        <div className="relative mx-auto mt-3 flex h-20 w-20 items-center justify-center rounded-[1.55rem] border border-amber-300/40 bg-gradient-to-br from-amber-300/28 to-amber-500/8 text-amber-100 shadow-[0_0_36px_rgba(251,191,36,0.22)] md:h-24 md:w-24">
+          <div className="champion-trophy-glow absolute inset-0 rounded-[1.55rem] bg-amber-300/14 blur-xl" />
+          <Trophy className="relative h-10 w-10 md:h-12 md:w-12" />
+          <Crown className="absolute -top-5 h-10 w-10 rotate-[-8deg] text-amber-200 drop-shadow-[0_0_12px_rgba(253,230,138,0.75)] md:h-12 md:w-12" />
         </div>
 
-        <h2 className="mt-3 bg-gradient-to-l from-amber-200 via-white to-cyan-100 bg-clip-text text-lg font-black tracking-tight text-transparent md:text-3xl">
+        <h2 className="mt-4 bg-gradient-to-l from-amber-200 via-white to-cyan-100 bg-clip-text text-lg font-black tracking-tight text-transparent md:text-3xl">
           أبطال منصة توقعات كأس العالم 2026
         </h2>
 
         <p className="mx-auto mt-2 max-w-2xl text-[10px] font-medium leading-5 text-slate-300 md:text-sm md:leading-7">
-          {championsAreReady
-            ? "مبروك لأصحاب المراكز الثلاثة الأولى بعد رحلة مليئة بالحماس والتحدي ودقة التوقعات."
+          {championsReady
+            ? "انتهت رحلة كأس العالم 2026… وهؤلاء هم أبطال المنصة."
             : "المنافسة في لحظاتها الأخيرة… تُكشف هوية الأبطال تلقائيًا بعد احتساب النهائي الكبير."}
         </p>
       </div>
 
-      <div className="relative mt-5 rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-2.5 md:mt-7 md:p-4">
+      <div className="relative mt-5 rounded-[1.7rem] border border-white/10 bg-white/[0.035] p-2 md:mt-7 md:p-4">
         <div className="pointer-events-none absolute inset-0 rounded-[1.7rem] bg-gradient-to-b from-white/5 to-transparent" />
 
-        {loading ? (
-          <div className="relative grid grid-cols-3 gap-2 md:items-end md:gap-4">
-            <HiddenPodiumCard place={2} />
-            <HiddenPodiumCard place={1} />
-            <HiddenPodiumCard place={3} />
-          </div>
-        ) : championsAreReady ? (
-          <div className="relative grid grid-cols-3 gap-2 md:items-end md:gap-4">
-            <PodiumChampionCard
-              champion={secondPlace}
-              place={2}
-              pointsGap={Math.max(0, firstPlace.points - secondPlace.points)}
-            />
+        <div className="relative grid grid-cols-3 items-end gap-1.5 md:gap-4">
+          {loading || !championsReady ? (
+            <>
+              <HiddenPodiumCard place={3} />
+              <div className="md:-translate-y-5 md:scale-[1.08]">
+                <HiddenPodiumCard place={1} />
+              </div>
+              <HiddenPodiumCard place={2} />
+            </>
+          ) : (
+            <>
+              <PodiumChampionCard
+                champion={thirdPlace}
+                place={3}
+                pointsGap={Math.max(0, secondPlace.points - thirdPlace.points)}
+              />
+              <div className="relative z-10 md:-translate-y-7 md:scale-[1.12]">
+                <PodiumChampionCard
+                  champion={firstPlace}
+                  place={1}
+                  pointsGap={Math.max(0, firstPlace.points - secondPlace.points)}
+                />
+              </div>
+              <PodiumChampionCard
+                champion={secondPlace}
+                place={2}
+                pointsGap={Math.max(0, firstPlace.points - secondPlace.points)}
+              />
+            </>
+          )}
+        </div>
 
-            <div className="md:-translate-y-5">
-              <PodiumChampionCard champion={firstPlace} place={1} />
-            </div>
-
-            <PodiumChampionCard
-              champion={thirdPlace}
-              place={3}
-              pointsGap={Math.max(0, secondPlace.points - thirdPlace.points)}
-            />
-          </div>
-        ) : (
-          <div className="relative grid grid-cols-3 gap-2 md:items-end md:gap-4">
-            <HiddenPodiumCard place={2} />
-
-            <div className="md:-translate-y-5">
-              <HiddenPodiumCard place={1} />
-            </div>
-
-            <HiddenPodiumCard place={3} />
-          </div>
-        )}
+        <ConnectedPodium championsReady={championsReady} />
       </div>
 
-      <div className="relative mt-4 flex flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-slate-950/50 px-3 py-3 text-center md:flex-row md:gap-3">
+      <div className="relative mt-4 flex flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-slate-950/55 px-3 py-3 text-center md:flex-row md:gap-3">
         <div className="inline-flex items-center gap-1.5 text-[10px] font-black text-amber-100 md:text-xs">
           <ShieldCheck className="h-4 w-4" />
           <span>الترتيب النهائي يعتمد نظام لوحة الصدارة المعتمد</span>
@@ -716,11 +837,123 @@ export default function HomeHighlights() {
         <span className="hidden h-4 w-px bg-white/15 md:block" />
 
         <div className="text-[9px] font-bold text-slate-400 md:text-[11px]">
-          {championsAreReady
-            ? "تم اعتماد المراكز بعد احتساب النهائي"
-            : "الأسماء مخفية حتى لحظة الحسم"}
+          {championsReady
+            ? "سيتم تخليد أسماء الأبطال في سجل نسخة 2026"
+            : "الأسماء محفوظة حتى لحظة الحسم"}
         </div>
       </div>
+
+      <style jsx>{`
+        .champion-rays {
+          background:
+            repeating-conic-gradient(
+              from 0deg,
+              rgba(251, 191, 36, 0.18) 0deg,
+              rgba(251, 191, 36, 0.03) 8deg,
+              transparent 16deg,
+              transparent 28deg
+            );
+          mask-image: radial-gradient(circle, black 0%, transparent 70%);
+          -webkit-mask-image: radial-gradient(circle, black 0%, transparent 70%);
+          animation: championRaysSpin 24s linear infinite;
+        }
+
+        .champion-sparkle {
+          animation: championSparkle 2.4s ease-in-out infinite;
+        }
+
+        .champion-trophy-glow {
+          animation: championTrophyGlow 1.8s ease-in-out infinite;
+        }
+
+        .champion-confetti {
+          position: absolute;
+          top: -24px;
+          width: 7px;
+          height: 14px;
+          border-radius: 2px;
+          animation-name: championConfettiFall;
+          animation-timing-function: ease-in;
+          animation-fill-mode: forwards;
+        }
+
+        .champion-confetti-0 {
+          background: #fbbf24;
+        }
+
+        .champion-confetti-1 {
+          background: #67e8f9;
+        }
+
+        .champion-confetti-2 {
+          background: #f472b6;
+        }
+
+        .champion-confetti-3 {
+          background: #a7f3d0;
+        }
+
+        @keyframes championRaysSpin {
+          from {
+            transform: translateX(-50%) rotate(0deg);
+          }
+
+          to {
+            transform: translateX(-50%) rotate(360deg);
+          }
+        }
+
+        @keyframes championSparkle {
+          0%,
+          100% {
+            opacity: 0.22;
+            transform: scale(0.72) rotate(0deg);
+          }
+
+          50% {
+            opacity: 0.9;
+            transform: scale(1.2) rotate(18deg);
+          }
+        }
+
+        @keyframes championTrophyGlow {
+          0%,
+          100% {
+            opacity: 0.45;
+            transform: scale(0.94);
+          }
+
+          50% {
+            opacity: 1;
+            transform: scale(1.12);
+          }
+        }
+
+        @keyframes championConfettiFall {
+          0% {
+            opacity: 0;
+            transform: translate3d(0, -25px, 0) rotate(0deg);
+          }
+
+          8% {
+            opacity: 1;
+          }
+
+          100% {
+            opacity: 0;
+            transform: translate3d(24px, 720px, 0) rotate(760deg);
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .champion-rays,
+          .champion-sparkle,
+          .champion-trophy-glow,
+          .champion-confetti {
+            animation: none !important;
+          }
+        }
+      `}</style>
     </motion.section>
   );
 }

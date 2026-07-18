@@ -25,6 +25,7 @@ export type HomeHighlightUser = {
 
   currentStreak: number;
   bestStreak: number;
+  exactHits: number;
 
   lastPredictionAt?: string;
 };
@@ -330,6 +331,7 @@ async function getUsersForHighlights(): Promise<HomeHighlightUser[]> {
 
         currentStreak: toNumber(data.currentStreak),
         bestStreak: toNumber(data.bestStreak),
+        exactHits: 0,
 
         lastPredictionAt: toText(data.lastPredictionAt),
       } as HomeHighlightUser;
@@ -614,8 +616,32 @@ export async function getHomeHighlights() {
     matchesMeta.knockoutRoundsByMatchId
   );
 
+  const exactHitsByUserId = predictions.reduce<Map<string, number>>(
+    (counts, prediction) => {
+      if (
+        prediction.isCalculated &&
+        prediction.resultType === "exact" &&
+        prediction.userId
+      ) {
+        counts.set(
+          prediction.userId,
+          (counts.get(prediction.userId) || 0) + 1
+        );
+      }
+
+      return counts;
+    },
+    new Map<string, number>()
+  );
+
   const platformChampions = matchesMeta.isFinalCalculated
-    ? users.filter((user) => user.total > 0).slice(0, 3)
+    ? users
+        .filter((user) => user.total > 0)
+        .slice(0, 3)
+        .map((user) => ({
+          ...user,
+          exactHits: exactHitsByUserId.get(user.id) || 0,
+        }))
     : [];
 
   return {
