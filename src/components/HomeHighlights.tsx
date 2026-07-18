@@ -400,13 +400,17 @@ function getSuccessRate(champion: PlatformChampion) {
 function ChampionBadge() {
   return (
     <div className="relative flex justify-center">
-      <div className="group/badge relative inline-flex items-center justify-center">
-        <div className="absolute inset-0 rounded-full bg-amber-300/35 blur-lg" />
-        <div className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-amber-100/65 bg-gradient-to-l from-amber-300 via-yellow-100 to-amber-400 px-3 py-1.5 text-[10px] font-black text-slate-950 shadow-lg shadow-amber-950/35 md:px-4 md:text-xs">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/55 via-transparent to-transparent" />
-          <Crown className="relative h-4 w-4" />
+      <div className="group/badge relative inline-flex max-w-full items-center justify-center">
+        <div className="absolute inset-0 rounded-full bg-amber-300/28 blur-md" />
+
+        <div className="relative inline-flex max-w-full items-center justify-center gap-1.5 overflow-hidden rounded-full border border-amber-100/65 bg-gradient-to-l from-amber-300 via-yellow-100 to-amber-400 px-2.5 py-1.5 text-[9px] font-black text-slate-950 shadow-lg shadow-amber-950/35 sm:gap-2 sm:px-3 sm:text-[10px] md:px-4 md:text-xs">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/50 via-transparent to-transparent" />
+
+          <Crown className="relative h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+
           <span className="relative whitespace-nowrap">بطل نسخة 2026</span>
-          <Sparkles className="relative h-3.5 w-3.5" />
+
+          <Sparkles className="relative hidden h-3.5 w-3.5 shrink-0 sm:block" />
         </div>
       </div>
     </div>
@@ -760,14 +764,14 @@ export default function HomeHighlights() {
 
       <div className="champion-rays pointer-events-none absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full opacity-55 md:top-14 md:h-[28rem] md:w-[28rem]" />
 
-      {Array.from({ length: 9 }).map((_, index) => (
+      {Array.from({ length: 5 }).map((_, index) => (
         <Sparkles
           key={`champion-sparkle-${index}`}
-          className="champion-sparkle pointer-events-none absolute h-3 w-3 text-amber-200/55"
+          className="champion-sparkle pointer-events-none absolute h-2.5 w-2.5 text-amber-200/40"
           style={{
-            left: `${6 + ((index * 17) % 88)}%`,
-            top: `${5 + ((index * 23) % 58)}%`,
-            animationDelay: `${(index % 6) * 0.35}s`,
+            left: `${8 + ((index * 21) % 84)}%`,
+            top: `${8 + ((index * 31) % 42)}%`,
+            animationDelay: `${(index % 5) * 0.45}s`,
           }}
         />
       ))}
@@ -917,13 +921,13 @@ export default function HomeHighlights() {
         @keyframes championSparkle {
           0%,
           100% {
-            opacity: 0.22;
-            transform: scale(0.72) rotate(0deg);
+            opacity: 0.12;
+            transform: scale(0.68) rotate(0deg);
           }
 
           50% {
-            opacity: 0.9;
-            transform: scale(1.2) rotate(18deg);
+            opacity: 0.55;
+            transform: scale(1.05) rotate(18deg);
           }
         }
 
