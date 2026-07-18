@@ -629,9 +629,7 @@ function ConnectedPodium({
   ];
 
   return (
-    <div className="relative mt-2 px-1 drop-shadow-[0_18px_24px_rgba(2,6,23,0.5)] md:mt-3 md:px-3">
-      <div className="pointer-events-none absolute inset-x-3 top-0 z-10 h-[2px] rounded-full bg-gradient-to-r from-transparent via-amber-200/90 to-transparent shadow-[0_0_10px_rgba(253,230,138,0.45)] md:inset-x-7" />
-
+    <div className="relative mt-1.5 px-1 drop-shadow-[0_18px_24px_rgba(2,6,23,0.5)] md:mt-2 md:px-3">
       <div className="grid grid-cols-3 items-end">
       {labels.map((item) => (
         <div
