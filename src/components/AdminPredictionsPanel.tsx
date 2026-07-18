@@ -14,6 +14,7 @@ import {
   getAdminAddPredictionUsers,
 } from "@/lib/adminAddPrediction";
 import { submitPrediction } from "@/lib/predictions";
+import { getFinalSquadPlayerName } from "@/data/finalSquads";
 
 type PredictionType = "normal" | "golden";
 
@@ -21,6 +22,26 @@ type AdminPredictionWithType = AdminPrediction & {
   predictionType?: PredictionType;
   editedAt?: string | null;
   editCount?: number;
+  matchStage?: "group" | "knockout";
+  knockoutRound?: "general" | "semiFinal" | "thirdPlace" | "final";
+  homeTeamCode?: string | null;
+  awayTeamCode?: string | null;
+  qualifiedTeamCode?: string | null;
+  qualificationMethod?: "extraTime" | "penalties" | string | null;
+  actualQualifiedTeamCode?: string | null;
+  actualQualificationMethod?: "extraTime" | "penalties" | string | null;
+  finalBonusPrediction?: {
+    firstScoringTeamCode?: string | null;
+    firstSpainScorer?: string | null;
+    firstArgentinaScorer?: string | null;
+  } | null;
+  finalBonusResult?: {
+    firstScoringTeamCode?: string | null;
+    firstSpainScorer?: string | null;
+    firstArgentinaScorer?: string | null;
+  } | null;
+  finalBonusPoints?: number | null;
+  basePoints?: number | null;
 };
 
 type PredictionStatus =
@@ -131,9 +152,61 @@ function getPredictionResultClass(prediction: AdminPredictionWithType) {
   return "border-red-400/30 bg-red-400/10 text-red-100";
 }
 
+function isFinalPrediction(prediction: AdminPredictionWithType) {
+  return (
+    prediction.matchStage === "knockout" && prediction.knockoutRound === "final"
+  );
+}
+
+function getTeamLabel(
+  prediction: AdminPredictionWithType,
+  code?: string | null,
+) {
+  if (!code) return "—";
+  if (code === "none") return "لا يوجد أهداف";
+
+  if (code === prediction.homeTeamCode) {
+    return `${prediction.homeTeamEmoji} ${prediction.homeTeamName}`;
+  }
+
+  if (code === prediction.awayTeamCode) {
+    return `${prediction.awayTeamEmoji} ${prediction.awayTeamName}`;
+  }
+
+  if (code === "ESP") return "🇪🇸 إسبانيا";
+  if (code === "ARG") return "🇦🇷 الأرجنتين";
+
+  return code;
+}
+
+function getMethodLabel(method?: string | null) {
+  if (!method) return "—";
+  if (method === "extraTime") return "أشواط إضافية";
+  if (method === "penalties") return "ركلات ترجيح";
+  return method;
+}
+
+function getScorerLabel(teamCode: "ESP" | "ARG", value?: string | null) {
+  if (!value) return "—";
+  if (value === "none") return "لا يسجل أي لاعب";
+
+  return getFinalSquadPlayerName(teamCode, value) || value;
+}
+
+function getFinalBasePoints(prediction: AdminPredictionWithType) {
+  const total = Number(prediction.points || 0);
+  const bonus = Number(prediction.finalBonusPoints || 0);
+
+  if (typeof prediction.basePoints === "number") {
+    return prediction.basePoints;
+  }
+
+  return Math.max(0, total - bonus);
+}
+
 function matchesStatusFilter(
   prediction: AdminPredictionWithType,
-  status: PredictionStatus
+  status: PredictionStatus,
 ) {
   const golden = isGoldenPrediction(prediction);
 
@@ -165,21 +238,21 @@ export default function AdminPredictionsPanel() {
   const [page, setPage] = useState(1);
   const [showAddPrediction, setShowAddPrediction] = useState(false);
 
-const [users, setUsers] = useState<any[]>([]);
-const [matches, setMatches] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [matches, setMatches] = useState<any[]>([]);
 
-const [selectedUserId, setSelectedUserId] = useState("");
-const [selectedMatchId, setSelectedMatchId] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedMatchId, setSelectedMatchId] = useState("");
 
-const [homeScore, setHomeScore] = useState(0);
-const [awayScore, setAwayScore] = useState(0);
+  const [homeScore, setHomeScore] = useState(0);
+  const [awayScore, setAwayScore] = useState(0);
 
-const [savingPrediction, setSavingPrediction] = useState(false);
+  const [savingPrediction, setSavingPrediction] = useState(false);
 
-const [qualifiedTeamCode, setQualifiedTeamCode] = useState("");
-const [qualificationMethod, setQualificationMethod] = useState<
-  "extraTime" | "penalties" | ""
->("");
+  const [qualifiedTeamCode, setQualifiedTeamCode] = useState("");
+  const [qualificationMethod, setQualificationMethod] = useState<
+    "extraTime" | "penalties" | ""
+  >("");
 
   const pageSize = 20;
 
@@ -237,25 +310,25 @@ const [qualificationMethod, setQualificationMethod] = useState<
     }
   }
 
- useEffect(() => {
-  loadPredictions();
+  useEffect(() => {
+    loadPredictions();
 
-  async function loadAddPredictionData() {
-    try {
-      const [usersData, matchesData] = await Promise.all([
-        getAdminAddPredictionUsers(),
-        getAdminAddPredictionMatches(),
-      ]);
+    async function loadAddPredictionData() {
+      try {
+        const [usersData, matchesData] = await Promise.all([
+          getAdminAddPredictionUsers(),
+          getAdminAddPredictionMatches(),
+        ]);
 
-      setUsers(usersData);
-      setMatches(matchesData);
-    } catch (error) {
-      console.error("Load add prediction data:", error);
+        setUsers(usersData);
+        setMatches(matchesData);
+      } catch (error) {
+        console.error("Load add prediction data:", error);
+      }
     }
-  }
 
-  loadAddPredictionData();
-}, []);
+    loadAddPredictionData();
+  }, []);
 
   const matchOptions = useMemo(() => {
     return getPredictionMatchOptions(predictions);
@@ -311,40 +384,40 @@ const [qualificationMethod, setQualificationMethod] = useState<
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredPredictions.length / pageSize)
+    Math.ceil(filteredPredictions.length / pageSize),
   );
 
   const visiblePredictions = filteredPredictions.slice(
     (page - 1) * pageSize,
-    page * pageSize
+    page * pageSize,
   );
 
   const totalPending = predictions.filter(
-    (prediction) => !prediction.isCalculated
+    (prediction) => !prediction.isCalculated,
   ).length;
 
   const totalExact = predictions.filter((prediction) =>
-    isExactPrediction(prediction)
+    isExactPrediction(prediction),
   ).length;
 
   const totalWinner = predictions.filter((prediction) =>
-    isWinnerPrediction(prediction)
+    isWinnerPrediction(prediction),
   ).length;
 
   const totalWrong = predictions.filter((prediction) =>
-    isWrongPrediction(prediction)
+    isWrongPrediction(prediction),
   ).length;
 
   const totalGolden = predictions.filter((prediction) =>
-    isGoldenPrediction(prediction)
+    isGoldenPrediction(prediction),
   ).length;
 
   const totalDuplicates = predictions.filter((prediction) =>
-    isDuplicatePrediction(prediction)
+    isDuplicatePrediction(prediction),
   ).length;
 
   const totalEdited = predictions.filter((prediction) =>
-    isEditedPrediction(prediction)
+    isEditedPrediction(prediction),
   ).length;
 
   const totalGoldenExact = predictions.filter((prediction) => {
@@ -356,181 +429,182 @@ const [qualificationMethod, setQualificationMethod] = useState<
   }).length;
 
   const selectedMatchForAdminAdd =
-  matches.find((match) => match.id === selectedMatchId) || null;
+    matches.find((match) => match.id === selectedMatchId) || null;
 
-const isAdminAddKnockoutDraw =
-  selectedMatchForAdminAdd?.matchStage === "knockout" &&
-  Number(homeScore) === Number(awayScore);
+  const isAdminAddKnockoutDraw =
+    selectedMatchForAdminAdd?.matchStage === "knockout" &&
+    Number(homeScore) === Number(awayScore);
 
   async function handleSaveAdminPrediction() {
-  try {
-    setSavingPrediction(true);
+    try {
+      setSavingPrediction(true);
 
-   if (!selectedMatchForAdminAdd) {
-  alert("اختر المباراة");
-  return;
-}
+      if (!selectedMatchForAdminAdd) {
+        alert("اختر المباراة");
+        return;
+      }
 
-await submitPrediction({
-  userId: selectedUserId,
-  userName: users.find((user) => user.id === selectedUserId)?.fullName || "عضو",
+      await submitPrediction({
+        userId: selectedUserId,
+        userName:
+          users.find((user) => user.id === selectedUserId)?.fullName || "عضو",
 
-  matchId: selectedMatchId,
+        matchId: selectedMatchId,
 
-  homeTeamName: selectedMatchForAdminAdd.homeTeamName,
-  homeTeamEmoji: selectedMatchForAdminAdd.homeTeamEmoji,
-  awayTeamName: selectedMatchForAdminAdd.awayTeamName,
-  awayTeamEmoji: selectedMatchForAdminAdd.awayTeamEmoji,
-  homeTeamCode: selectedMatchForAdminAdd.homeTeamCode,
-  awayTeamCode: selectedMatchForAdminAdd.awayTeamCode,
+        homeTeamName: selectedMatchForAdminAdd.homeTeamName,
+        homeTeamEmoji: selectedMatchForAdminAdd.homeTeamEmoji,
+        awayTeamName: selectedMatchForAdminAdd.awayTeamName,
+        awayTeamEmoji: selectedMatchForAdminAdd.awayTeamEmoji,
+        homeTeamCode: selectedMatchForAdminAdd.homeTeamCode,
+        awayTeamCode: selectedMatchForAdminAdd.awayTeamCode,
 
-  homeScore: Number(homeScore),
-  awayScore: Number(awayScore),
+        homeScore: Number(homeScore),
+        awayScore: Number(awayScore),
 
-  qualifiedTeamCode: qualifiedTeamCode || undefined,
-  qualificationMethod: qualificationMethod || undefined,
+        qualifiedTeamCode: qualifiedTeamCode || undefined,
+        qualificationMethod: qualificationMethod || undefined,
 
-  adminOverride: true,
-});
+        adminOverride: true,
+      });
 
-    alert("تمت إضافة التوقع بنجاح");
+      alert("تمت إضافة التوقع بنجاح");
 
-    setShowAddPrediction(false);
-    setSelectedUserId("");
-    setSelectedMatchId("");
-    setHomeScore(0);
-    setAwayScore(0);
-    setQualifiedTeamCode("");
-    setQualificationMethod("");
+      setShowAddPrediction(false);
+      setSelectedUserId("");
+      setSelectedMatchId("");
+      setHomeScore(0);
+      setAwayScore(0);
+      setQualifiedTeamCode("");
+      setQualificationMethod("");
 
-    await loadPredictions();
-  } catch (error) {
-    alert(error instanceof Error ? error.message : "تعذر إضافة التوقع");
-  } finally {
-    setSavingPrediction(false);
+      await loadPredictions();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "تعذر إضافة التوقع");
+    } finally {
+      setSavingPrediction(false);
+    }
   }
-}
 
   return (
     <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
       {showAddPrediction && (
-  <div className="mb-5 rounded-3xl border border-emerald-400/30 bg-emerald-500/10 p-4">
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <h3 className="text-lg font-black text-emerald-100">
-        ➕ إضافة توقع لعضو
-      </h3>
+        <div className="mb-5 rounded-3xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h3 className="text-lg font-black text-emerald-100">
+              ➕ إضافة توقع لعضو
+            </h3>
 
-      <button
-        type="button"
-        onClick={() => setShowAddPrediction(false)}
-        className="rounded-lg border border-white/10 px-3 py-1 text-xs font-bold text-slate-200 hover:bg-white/10"
-      >
-        إغلاق
-      </button>
-    </div>
+            <button
+              type="button"
+              onClick={() => setShowAddPrediction(false)}
+              className="rounded-lg border border-white/10 px-3 py-1 text-xs font-bold text-slate-200 hover:bg-white/10"
+            >
+              إغلاق
+            </button>
+          </div>
 
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      <select
-        value={selectedUserId}
-        onChange={(event) => setSelectedUserId(event.target.value)}
-        className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
-      >
-        <option value="">اختر العضو</option>
-        {users.map((user) => (
-          <option key={user.id} value={user.id}>
-            {user.fullName}
-          </option>
-        ))}
-      </select>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <select
+              value={selectedUserId}
+              onChange={(event) => setSelectedUserId(event.target.value)}
+              className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
+            >
+              <option value="">اختر العضو</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.fullName}
+                </option>
+              ))}
+            </select>
 
-      <select
-        value={selectedMatchId}
-        onChange={(event) => {
-          setSelectedMatchId(event.target.value);
-          setQualifiedTeamCode("");
-          setQualificationMethod("");
-        }}
-        className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
-      >
-        <option value="">اختر المباراة</option>
-        {matches.map((match) => (
-          <option key={match.id} value={match.id}>
-            {match.homeTeamEmoji} {match.homeTeamName} × {match.awayTeamName}{" "}
-            {match.awayTeamEmoji}
-          </option>
-        ))}
-      </select>
+            <select
+              value={selectedMatchId}
+              onChange={(event) => {
+                setSelectedMatchId(event.target.value);
+                setQualifiedTeamCode("");
+                setQualificationMethod("");
+              }}
+              className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
+            >
+              <option value="">اختر المباراة</option>
+              {matches.map((match) => (
+                <option key={match.id} value={match.id}>
+                  {match.homeTeamEmoji} {match.homeTeamName} ×{" "}
+                  {match.awayTeamName} {match.awayTeamEmoji}
+                </option>
+              ))}
+            </select>
 
-      <input
-        type="number"
-        min={0}
-        max={30}
-        value={homeScore}
-        onChange={(event) => setHomeScore(Number(event.target.value))}
-        placeholder="نتيجة المنتخب الأول"
-        className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black"
-      />
+            <input
+              type="number"
+              min={0}
+              max={30}
+              value={homeScore}
+              onChange={(event) => setHomeScore(Number(event.target.value))}
+              placeholder="نتيجة المنتخب الأول"
+              className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black"
+            />
 
-      <input
-        type="number"
-        min={0}
-        max={30}
-        value={awayScore}
-        onChange={(event) => setAwayScore(Number(event.target.value))}
-        placeholder="نتيجة المنتخب الثاني"
-        className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black"
-      />
-    </div>
+            <input
+              type="number"
+              min={0}
+              max={30}
+              value={awayScore}
+              onChange={(event) => setAwayScore(Number(event.target.value))}
+              placeholder="نتيجة المنتخب الثاني"
+              className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-center text-lg font-black"
+            />
+          </div>
 
-    {isAdminAddKnockoutDraw && selectedMatchForAdminAdd && (
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-        <select
-          value={qualifiedTeamCode}
-          onChange={(event) => setQualifiedTeamCode(event.target.value)}
-          className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
-        >
-          <option value="">اختر المتأهل</option>
-          <option value={selectedMatchForAdminAdd.homeTeamCode}>
-            {selectedMatchForAdminAdd.homeTeamEmoji}{" "}
-            {selectedMatchForAdminAdd.homeTeamName}
-          </option>
-          <option value={selectedMatchForAdminAdd.awayTeamCode}>
-            {selectedMatchForAdminAdd.awayTeamEmoji}{" "}
-            {selectedMatchForAdminAdd.awayTeamName}
-          </option>
-        </select>
+          {isAdminAddKnockoutDraw && selectedMatchForAdminAdd && (
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <select
+                value={qualifiedTeamCode}
+                onChange={(event) => setQualifiedTeamCode(event.target.value)}
+                className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
+              >
+                <option value="">اختر المتأهل</option>
+                <option value={selectedMatchForAdminAdd.homeTeamCode}>
+                  {selectedMatchForAdminAdd.homeTeamEmoji}{" "}
+                  {selectedMatchForAdminAdd.homeTeamName}
+                </option>
+                <option value={selectedMatchForAdminAdd.awayTeamCode}>
+                  {selectedMatchForAdminAdd.awayTeamEmoji}{" "}
+                  {selectedMatchForAdminAdd.awayTeamName}
+                </option>
+              </select>
 
-        <select
-          value={qualificationMethod}
-          onChange={(event) =>
-            setQualificationMethod(
-              event.target.value as "extraTime" | "penalties" | ""
-            )
-          }
-          className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
-        >
-          <option value="">اختر طريقة التأهل</option>
-          <option value="extraTime">أشواط إضافية</option>
-          <option value="penalties">ركلات ترجيح</option>
-        </select>
-      </div>
-    )}
+              <select
+                value={qualificationMethod}
+                onChange={(event) =>
+                  setQualificationMethod(
+                    event.target.value as "extraTime" | "penalties" | "",
+                  )
+                }
+                className="rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm"
+              >
+                <option value="">اختر طريقة التأهل</option>
+                <option value="extraTime">أشواط إضافية</option>
+                <option value="penalties">ركلات ترجيح</option>
+              </select>
+            </div>
+          )}
 
-    <button
-      type="button"
-      disabled={savingPrediction}
-      onClick={handleSaveAdminPrediction}
-      className="mt-4 w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white hover:bg-emerald-400 disabled:opacity-50"
-    >
-      {savingPrediction ? "جاري الحفظ..." : "حفظ التوقع"}
-    </button>
+          <button
+            type="button"
+            disabled={savingPrediction}
+            onClick={handleSaveAdminPrediction}
+            className="mt-4 w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-black text-white hover:bg-emerald-400 disabled:opacity-50"
+          >
+            {savingPrediction ? "جاري الحفظ..." : "حفظ التوقع"}
+          </button>
 
-    <p className="mt-3 text-xs leading-6 text-emerald-100">
-      التوقع سيُحفظ بنفس طريقة توقع العضو، ولن يؤثر على النقاط إلا عند احتساب
-      المباراة.
-    </p>
-  </div>
-)}
+          <p className="mt-3 text-xs leading-6 text-emerald-100">
+            التوقع سيُحفظ بنفس طريقة توقع العضو، ولن يؤثر على النقاط إلا عند
+            احتساب المباراة.
+          </p>
+        </div>
+      )}
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-black md:text-2xl">🔮 توقعات الأعضاء</h2>
@@ -558,12 +632,12 @@ await submitPrediction({
           </button>
 
           <button
-  type="button"
-  onClick={() => setShowAddPrediction(true)}
-  className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white hover:bg-emerald-400"
->
-  ➕ إضافة توقع لعضو
-</button>
+            type="button"
+            onClick={() => setShowAddPrediction(true)}
+            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white hover:bg-emerald-400"
+          >
+            ➕ إضافة توقع لعضو
+          </button>
         </div>
       </div>
 
@@ -726,30 +800,24 @@ await submitPrediction({
                       {item.savedPoints}
                     </td>
 
-                    <td className="px-3 py-2 text-center">
-                      {item.realPoints}
-                    </td>
+                    <td className="px-3 py-2 text-center">{item.realPoints}</td>
 
                     <td
                       className={`px-3 py-2 text-center font-black ${
                         item.pointsDiff > 0
                           ? "text-red-300"
                           : item.pointsDiff < 0
-                          ? "text-emerald-300"
-                          : "text-slate-300"
+                            ? "text-emerald-300"
+                            : "text-slate-300"
                       }`}
                     >
                       {item.pointsDiff > 0 ? "+" : ""}
                       {item.pointsDiff}
                     </td>
 
-                    <td className="px-3 py-2 text-center">
-                      {item.savedTotal}
-                    </td>
+                    <td className="px-3 py-2 text-center">{item.savedTotal}</td>
 
-                    <td className="px-3 py-2 text-center">
-                      {item.realTotal}
-                    </td>
+                    <td className="px-3 py-2 text-center">{item.realTotal}</td>
 
                     <td className="px-3 py-2 text-center">
                       {item.savedCorrect}
@@ -759,13 +827,9 @@ await submitPrediction({
                       {item.realCorrect}
                     </td>
 
-                    <td className="px-3 py-2 text-center">
-                      {item.savedWrong}
-                    </td>
+                    <td className="px-3 py-2 text-center">{item.savedWrong}</td>
 
-                    <td className="px-3 py-2 text-center">
-                      {item.realWrong}
-                    </td>
+                    <td className="px-3 py-2 text-center">{item.realWrong}</td>
                   </tr>
                 ))}
               </tbody>
@@ -789,13 +853,16 @@ await submitPrediction({
       ) : (
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1240px] border-collapse text-sm">
+            <table className="w-full min-w-[1780px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-white/10 bg-slate-950/80 text-[12px] text-slate-300">
                   <th className="px-3 py-3 text-right font-black">#</th>
                   <th className="px-3 py-3 text-right font-black">العضو</th>
                   <th className="px-3 py-3 text-right font-black">المباراة</th>
                   <th className="px-3 py-3 text-center font-black">التوقع</th>
+                  <th className="px-3 py-3 text-center font-black">
+                    تفاصيل النهائي
+                  </th>
                   <th className="px-3 py-3 text-center font-black">النوع</th>
                   <th className="px-3 py-3 text-center font-black">
                     النتيجة الفعلية
@@ -851,15 +918,13 @@ await submitPrediction({
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-bold">
-                            {prediction.homeTeamEmoji}{" "}
-                            {prediction.homeTeamName}
+                            {prediction.homeTeamEmoji} {prediction.homeTeamName}
                           </span>
 
                           <span className="text-slate-500">×</span>
 
                           <span className="font-bold">
-                            {prediction.awayTeamName}{" "}
-                            {prediction.awayTeamEmoji}
+                            {prediction.awayTeamName} {prediction.awayTeamEmoji}
                           </span>
                         </div>
                       </td>
@@ -874,6 +939,151 @@ await submitPrediction({
                         >
                           {prediction.homeScore} - {prediction.awayScore}
                         </span>
+                      </td>
+
+                      <td className="px-3 py-3 align-top">
+                        {isFinalPrediction(prediction) ? (
+                          <div className="min-w-[410px] rounded-2xl border border-violet-300/25 bg-gradient-to-br from-violet-500/10 via-slate-950/70 to-amber-400/10 p-3 text-right">
+                            <div className="mb-3 flex items-center justify-between gap-2">
+                              <span className="rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-[10px] font-black text-amber-100">
+                                النهائي الكبير
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400">
+                                التفاصيل ظاهرة للأدمن
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-[11px]">
+                              <div className="rounded-xl bg-white/5 p-2">
+                                <div className="text-slate-400">
+                                  البطل المتوقع
+                                </div>
+                                <div className="mt-1 font-black text-white">
+                                  {prediction.homeScore === prediction.awayScore
+                                    ? getTeamLabel(
+                                        prediction,
+                                        prediction.qualifiedTeamCode,
+                                      )
+                                    : prediction.homeScore >
+                                        prediction.awayScore
+                                      ? getTeamLabel(
+                                          prediction,
+                                          prediction.homeTeamCode,
+                                        )
+                                      : getTeamLabel(
+                                          prediction,
+                                          prediction.awayTeamCode,
+                                        )}
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl bg-white/5 p-2">
+                                <div className="text-slate-400">
+                                  طريقة الحسم
+                                </div>
+                                <div className="mt-1 font-black text-white">
+                                  {prediction.homeScore === prediction.awayScore
+                                    ? getMethodLabel(
+                                        prediction.qualificationMethod,
+                                      )
+                                    : "وقت أصلي"}
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl bg-white/5 p-2">
+                                <div className="text-slate-400">
+                                  من يبدأ التسجيل؟
+                                </div>
+                                <div className="mt-1 font-black text-cyan-100">
+                                  {getTeamLabel(
+                                    prediction,
+                                    prediction.finalBonusPrediction
+                                      ?.firstScoringTeamCode,
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl bg-white/5 p-2">
+                                <div className="text-slate-400">
+                                  أول مسجل من إسبانيا
+                                </div>
+                                <div className="mt-1 font-black text-cyan-100">
+                                  {getScorerLabel(
+                                    "ESP",
+                                    prediction.finalBonusPrediction
+                                      ?.firstSpainScorer,
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="col-span-2 rounded-xl bg-white/5 p-2">
+                                <div className="text-slate-400">
+                                  أول مسجل من الأرجنتين
+                                </div>
+                                <div className="mt-1 font-black text-cyan-100">
+                                  {getScorerLabel(
+                                    "ARG",
+                                    prediction.finalBonusPrediction
+                                      ?.firstArgentinaScorer,
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {prediction.isCalculated && (
+                              <div className="mt-3 border-t border-white/10 pt-3">
+                                <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                                  <div className="rounded-xl border border-amber-300/20 bg-amber-400/10 p-2">
+                                    <div className="text-amber-100/75">
+                                      الأساسي
+                                    </div>
+                                    <div className="mt-1 text-base font-black text-amber-100">
+                                      {getFinalBasePoints(prediction)}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/10 p-2">
+                                    <div className="text-cyan-100/75">
+                                      الإضافات
+                                    </div>
+                                    <div className="mt-1 text-base font-black text-cyan-100">
+                                      {Number(prediction.finalBonusPoints || 0)}
+                                    </div>
+                                  </div>
+                                  <div className="rounded-xl border border-emerald-300/20 bg-emerald-400/10 p-2">
+                                    <div className="text-emerald-100/75">
+                                      الإجمالي
+                                    </div>
+                                    <div className="mt-1 text-base font-black text-emerald-100">
+                                      {Number(prediction.points || 0)}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+                                  <div className="rounded-lg bg-slate-900/70 px-2 py-1.5 text-slate-300">
+                                    البطل الفعلي:{" "}
+                                    <span className="font-black text-white">
+                                      {getTeamLabel(
+                                        prediction,
+                                        prediction.actualQualifiedTeamCode,
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="rounded-lg bg-slate-900/70 px-2 py-1.5 text-slate-300">
+                                    الحسم الفعلي:{" "}
+                                    <span className="font-black text-white">
+                                      {getMethodLabel(
+                                        prediction.actualQualificationMethod,
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-500">—</span>
+                        )}
                       </td>
 
                       <td className="px-3 py-3 text-center">
@@ -895,7 +1105,7 @@ await submitPrediction({
                       <td className="px-3 py-3 text-center">
                         <span
                           className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${getPredictionResultClass(
-                            prediction
+                            prediction,
                           )}`}
                         >
                           {getPredictionResultLabel(prediction)}
@@ -967,14 +1177,15 @@ await submitPrediction({
         </button>
 
         <div className="text-center text-sm text-slate-300">
-          صفحة {page} من {totalPages} — عدد النتائج{" "}
-          {filteredPredictions.length}
+          صفحة {page} من {totalPages} — عدد النتائج {filteredPredictions.length}
         </div>
 
         <button
           type="button"
           disabled={page >= totalPages}
-          onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+          onClick={() =>
+            setPage((current) => Math.min(totalPages, current + 1))
+          }
           className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
         >
           التالي
