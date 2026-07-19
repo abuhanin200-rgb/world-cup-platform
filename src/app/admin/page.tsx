@@ -539,17 +539,20 @@ export default function AdminPage() {
         return;
       }
 
-      const hasGoals = homeScore + awayScore > 0;
+      const hasGoalsInOriginalTime = homeScore + awayScore > 0;
 
-      if (hasGoals && actualFirstScoringTeamCode === "none") {
+      if (
+        hasGoalsInOriginalTime &&
+        actualFirstScoringTeamCode === "none"
+      ) {
         alert("لا يمكن اختيار لا يوجد أهداف والنتيجة تحتوي على أهداف");
         return;
       }
 
-      if (!hasGoals && actualFirstScoringTeamCode !== "none") {
-        alert("النتيجة بدون أهداف؛ اختر لا يوجد أهداف");
-        return;
-      }
+      // قد تنتهي الأشواط الأصلية 0-0 ثم يأتي أول هدف في الأشواط الإضافية.
+      // لذلك نسمح باختيار المنتخب الذي بدأ التسجيل حتى مع إدخال نتيجة 0-0،
+      // مع إبقاء نتيجة الأشواط الأصلية كما هي في العرض والاحتساب الأساسي.
+
     }
 
     try {
