@@ -167,7 +167,7 @@ export default function RegisterPage() {
       variants={pageMotion}
       initial="hidden"
       animate="show"
-      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+      className="relative flex min-h-[100dvh] items-center justify-center overflow-x-hidden overflow-y-auto bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-white"
     >
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.14),transparent_34%),radial-gradient(circle_at_12%_35%,rgba(56,189,248,0.10),transparent_32%),radial-gradient(circle_at_90%_70%,rgba(52,211,153,0.08),transparent_30%)]" />
       <div className="pointer-events-none absolute -right-24 top-20 h-60 w-60 rounded-full bg-amber-300/10 blur-3xl" />
@@ -219,35 +219,47 @@ export default function RegisterPage() {
             className="space-y-4"
           >
             <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold">
+              <label
+                htmlFor="register-full-name"
+                className="mb-2 flex items-center gap-2 text-sm font-bold"
+              >
                 <User className="h-4 w-4 text-amber-300" />
                 <span>الاسم</span>
                 <span className="text-slate-400">(20 حرف كحد أقصى)</span>
               </label>
 
               <input
+                id="register-full-name"
                 type="text"
                 value={fullName}
                 maxLength={20}
                 onChange={(event) => setFullName(event.target.value)}
+                aria-describedby="register-full-name-help"
                 className="w-full rounded-xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-amber-400 focus:bg-slate-950/80"
                 placeholder="اكتب اسمك"
                 required
               />
 
-              <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
-                <span>{fullName.length}/20</span>
+              <div
+                id="register-full-name-help"
+                className="mt-1 flex items-center justify-between text-xs text-slate-400"
+              >
+                <span dir="ltr">{fullName.length}/20</span>
                 <span>الاسم يظهر في لوحة الصدارة</span>
               </div>
             </div>
 
             <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold">
+              <label
+                htmlFor="register-password"
+                className="mb-2 flex items-center gap-2 text-sm font-bold"
+              >
                 <KeyRound className="h-4 w-4 text-amber-300" />
                 <span>الرقم السري</span>
               </label>
 
               <input
+                id="register-password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -258,12 +270,16 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold">
+              <label
+                htmlFor="register-phone"
+                className="mb-2 flex items-center gap-2 text-sm font-bold"
+              >
                 <Smartphone className="h-4 w-4 text-amber-300" />
                 <span>رقم الجوال</span>
               </label>
 
               <input
+                id="register-phone"
                 type="tel"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
@@ -274,12 +290,16 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold">
+              <label
+                htmlFor="register-favorite-team"
+                className="mb-2 flex items-center gap-2 text-sm font-bold"
+              >
                 <Flag className="h-4 w-4 text-amber-300" />
                 <span>المنتخب المرشح للقب</span>
               </label>
 
               <select
+                id="register-favorite-team"
                 value={favoriteTeam}
                 onChange={(event) => handleTeamChange(event.target.value)}
                 disabled={teamsLoading}
@@ -302,6 +322,9 @@ export default function RegisterPage() {
               {favoriteTeam && (
                 <motion.div
                   key={favoriteTeam}
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
                   initial={{ opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.97 }}
@@ -320,6 +343,9 @@ export default function RegisterPage() {
               {message && (
                 <motion.div
                   key={message}
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
                   initial={{ opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.97 }}
@@ -333,6 +359,9 @@ export default function RegisterPage() {
               {error && (
                 <motion.div
                   key={error}
+                  role="alert"
+                  aria-live="assertive"
+                  aria-atomic="true"
                   initial={{ opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.97 }}

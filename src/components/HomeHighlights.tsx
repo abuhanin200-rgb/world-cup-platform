@@ -1222,7 +1222,10 @@ export function ExactHitsTicker() {
           {hit.homeTeamName}
         </span>
 
-        <span className="relative rounded-xl bg-amber-400 px-2 py-1 font-black text-slate-950 shadow-inner">
+        <span
+          dir="ltr"
+          className="relative rounded-xl bg-amber-400 px-2 py-1 font-black text-slate-950 shadow-inner"
+        >
           {hit.homeScore} - {hit.awayScore}
         </span>
 
@@ -1352,7 +1355,10 @@ export function ExactHitsTicker() {
             {hit.homeTeamName}
           </span>
 
-          <span className="rounded-xl bg-amber-400 px-2.5 py-1 text-slate-950">
+          <span
+            dir="ltr"
+            className="rounded-xl bg-amber-400 px-2.5 py-1 text-slate-950"
+          >
             {hit.homeScore} - {hit.awayScore}
           </span>
 

@@ -1328,7 +1328,10 @@ function CalculatedFinalPredictionCard({
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-300/25 bg-slate-950/90 px-2 py-2 text-sm font-black text-amber-100">
+            <div
+              dir="ltr"
+              className="rounded-xl border border-amber-300/25 bg-slate-950/90 px-2 py-2 text-sm font-black text-amber-100"
+            >
               {prediction.homeScore} - {prediction.awayScore}
             </div>
 
@@ -2448,6 +2451,7 @@ export function PredictionDetailsModal({
                           </div>
 
                           <div
+                            dir="ltr"
                             className={`rounded-xl border px-2 py-2 text-sm font-black ${
                               golden
                                 ? "border-fuchsia-300/30 bg-slate-950/85 text-amber-100 shadow-inner shadow-fuchsia-950/20"
@@ -2736,7 +2740,7 @@ export default function LeaderboardTable() {
             </span>
           </button>
 
-          <div className="mx-auto mt-3 max-w-md rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-[11px] font-bold leading-6 text-slate-300 md:text-xs">
+          <div className="mx-auto mt-3 hidden max-w-md rounded-2xl border border-white/10 bg-slate-950/40 px-3 py-2 text-[11px] font-bold leading-6 text-slate-300 md:block md:text-xs">
             <span className="text-emerald-300">ص</span> = النتيجة بالملي،{" "}
             <span className="text-amber-200">ف</span> = الفائز الصحيح،{" "}
             <span className="text-red-300">خ</span> = الخطأ
@@ -2744,7 +2748,11 @@ export default function LeaderboardTable() {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-[14px] text-slate-300">
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-[14px] text-slate-300"
+          >
             جاري تحميل لوحة الصدارة...
           </div>
         ) : users.length === 0 ? (
@@ -2761,39 +2769,131 @@ export default function LeaderboardTable() {
           </div>
         ) : (
           <>
-            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 shadow-inner">
+            <div className="space-y-2 md:hidden">
+              {visibleUsers.map((user) => {
+                const style = getTopRankStyle(user.currentRank);
+
+                return (
+                  <motion.article
+                    key={user.id}
+                    variants={leaderboardRowMotion}
+                    initial="hidden"
+                    whileInView="show"
+                    viewport={{ once: true, amount: 0.35 }}
+                    className={`relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 p-3 shadow-inner ${style.rowClass}`}
+                  >
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-200/40 to-transparent"
+                    />
+
+                    <div className="relative flex items-center gap-2.5">
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <RankBadge rank={user.currentRank} />
+                        <RankMovement user={user} />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => openUserPredictions(user)}
+                        className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-right text-sm font-black leading-6 underline-offset-4 hover:underline ${style.nameClass}`}
+                        title="اضغط لعرض توقعات العضو"
+                        aria-label={`عرض ملف وتوقعات ${user.fullName}`}
+                      >
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          {style.icon && (
+                            <span className="shrink-0" aria-hidden="true">
+                              {style.icon}
+                            </span>
+                          )}
+                          <span className="min-w-0 break-words">{user.fullName}</span>
+                        </span>
+                      </button>
+
+                      <div
+                        className={`flex min-w-[64px] shrink-0 flex-col items-center justify-center rounded-xl px-2 py-1.5 ${
+                          user.currentRank <= 3
+                            ? style.badgeClass
+                            : "bg-amber-400 text-slate-950"
+                        }`}
+                      >
+                        <span className="text-[10px] font-black opacity-75">النقاط</span>
+                        <span dir="ltr" className="text-sm font-black tabular-nums">
+                          {user.points}
+                        </span>
+                      </div>
+                    </div>
+
+                    <dl className="relative mt-2 grid grid-cols-4 gap-1.5 text-center">
+                      <div className="rounded-xl border border-white/10 bg-white/5 px-1.5 py-2">
+                        <dt className="text-[10px] font-bold text-slate-400">التوقعات</dt>
+                        <dd dir="ltr" className="mt-1 text-sm font-black tabular-nums text-slate-100">
+                          {user.total}
+                        </dd>
+                      </div>
+
+                      <div className="rounded-xl border border-emerald-400/15 bg-emerald-400/10 px-1.5 py-2">
+                        <dt className="text-[10px] font-bold text-emerald-200">صحيحة</dt>
+                        <dd dir="ltr" className="mt-1 text-sm font-black tabular-nums text-emerald-300">
+                          {user.exact}
+                        </dd>
+                      </div>
+
+                      <div className="rounded-xl border border-amber-300/15 bg-amber-300/10 px-1.5 py-2">
+                        <dt className="text-[10px] font-bold text-amber-100">فائز</dt>
+                        <dd dir="ltr" className="mt-1 text-sm font-black tabular-nums text-amber-200">
+                          {user.winner}
+                        </dd>
+                      </div>
+
+                      <div className="rounded-xl border border-red-400/15 bg-red-400/10 px-1.5 py-2">
+                        <dt className="text-[10px] font-bold text-red-200">خطأ</dt>
+                        <dd dir="ltr" className="mt-1 text-sm font-black tabular-nums text-red-300">
+                          {user.wrong}
+                        </dd>
+                      </div>
+                    </dl>
+                  </motion.article>
+                );
+              })}
+            </div>
+
+            <div className="relative hidden overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 shadow-inner md:block">
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-amber-200/45 to-transparent"
               />
               <table className="w-full table-fixed text-center">
+                <caption className="sr-only">
+                  ترتيب الأعضاء حسب النقاط والتوقعات الصحيحة
+                </caption>
                 <thead className="bg-slate-950">
                   <tr className="text-[10px] md:text-sm">
-                    <th className="w-[18%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th scope="col" className="w-[18%] px-1 py-3 font-black md:px-4 md:py-4">
                       المركز
                     </th>
 
-                    <th className="w-[27%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th scope="col" className="w-[27%] px-1 py-3 font-black md:px-4 md:py-4">
                       الاسم
                     </th>
 
-                    <th className="w-[13%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th scope="col" className="w-[13%] px-1 py-3 font-black md:px-4 md:py-4">
                       التوقعات
                     </th>
 
-                    <th className="w-[8%] px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
+                    <th scope="col" className="w-[8%] px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
                       ص
                     </th>
 
-                    <th className="w-[8%] px-1 py-3 font-black text-amber-200 md:px-4 md:py-4">
+                    <th scope="col" className="w-[8%] px-1 py-3 font-black text-amber-200 md:px-4 md:py-4">
                       ف
                     </th>
 
-                    <th className="w-[8%] px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
+                    <th scope="col" className="w-[8%] px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
                       خ
                     </th>
 
-                    <th className="w-[18%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th scope="col" className="w-[18%] px-1 py-3 font-black md:px-4 md:py-4">
                       النقاط
                     </th>
                   </tr>
@@ -2839,24 +2939,25 @@ export default function LeaderboardTable() {
                           </button>
                         </td>
 
-                        <td className="px-1 py-3 font-black text-slate-200 md:px-4 md:py-4">
+                        <td dir="ltr" className="px-1 py-3 font-black text-slate-200 md:px-4 md:py-4">
                           {user.total}
                         </td>
 
-                        <td className="px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
+                        <td dir="ltr" className="px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
                           {user.exact}
                         </td>
 
-                        <td className="px-1 py-3 font-black text-amber-200 md:px-4 md:py-4">
+                        <td dir="ltr" className="px-1 py-3 font-black text-amber-200 md:px-4 md:py-4">
                           {user.winner}
                         </td>
 
-                        <td className="px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
+                        <td dir="ltr" className="px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
                           {user.wrong}
                         </td>
 
                         <td className="px-1 py-3 md:px-4 md:py-4">
                           <span
+                            dir="ltr"
                             className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[11px] font-black md:h-8 md:min-w-8 md:px-3 md:text-sm ${
                               user.currentRank <= 3
                                 ? style.badgeClass
@@ -2884,7 +2985,8 @@ export default function LeaderboardTable() {
               </button>
 
               <div className="rounded-xl border border-white/10 bg-slate-950/50 px-4 py-2 text-xs font-bold text-slate-200 md:text-sm">
-                صفحة {currentPage} من {totalPages}
+                صفحة <bdi dir="ltr">{currentPage}</bdi> من{" "}
+                <bdi dir="ltr">{totalPages}</bdi>
               </div>
 
               <button

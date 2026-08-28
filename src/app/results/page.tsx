@@ -27,7 +27,7 @@ export default function ResultsPage() {
               <span>{m.teamA}</span>
               <span className="text-3xl">{m.flagA}</span>
             </div>
-            <div className="mx-6 px-5 py-2 bg-slate-100 dark:bg-slate-950 rounded-2xl font-mono text-xl font-black flex items-center gap-3 text-brand-purple dark:text-brand-gold border border-slate-200 dark:border-slate-800">
+            <div dir="ltr" className="mx-6 px-5 py-2 bg-slate-100 dark:bg-slate-950 rounded-2xl font-mono text-xl font-black flex items-center gap-3 text-brand-purple dark:text-brand-gold border border-slate-200 dark:border-slate-800">
               <span>{m.scoreA}</span>
               <span className="text-brand-pink animate-pulse">:</span>
               <span>{m.scoreB}</span>

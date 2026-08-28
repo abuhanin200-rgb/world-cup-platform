@@ -485,6 +485,7 @@ export default function LatestPredictionsTicker() {
         </span>
 
         <span
+          dir="ltr"
           className={`relative rounded-xl px-2 py-1 font-black shadow-inner ${
             golden
               ? "bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 text-slate-950"
@@ -613,6 +614,7 @@ export default function LatestPredictionsTicker() {
           </span>
 
           <span
+            dir="ltr"
             className={`rounded-xl px-2.5 py-1 ${
               golden
                 ? "bg-gradient-to-l from-amber-300 via-orange-300 to-fuchsia-300 text-slate-950"

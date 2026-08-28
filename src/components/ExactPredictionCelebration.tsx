@@ -342,6 +342,7 @@ export default function ExactPredictionCelebration() {
                   </div>
 
                   <motion.div
+                    dir="ltr"
                     initial={{ scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{

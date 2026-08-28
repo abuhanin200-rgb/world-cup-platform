@@ -1106,7 +1106,10 @@ function FinalPredictionCard({
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-300/25 bg-slate-950/90 px-2 py-2 text-sm font-black text-amber-100">
+            <div
+              dir="ltr"
+              className="rounded-xl border border-amber-300/25 bg-slate-950/90 px-2 py-2 text-sm font-black text-amber-100"
+            >
               {prediction.homeScore} - {prediction.awayScore}
             </div>
 
@@ -1450,7 +1453,7 @@ function PredictionCard({ prediction }: { prediction: AccountPrediction }) {
             توقعك
           </div>
 
-          <div className="mt-2 text-lg font-black text-white">
+          <div dir="ltr" className="mt-2 text-lg font-black text-white">
             {prediction.homeScore} - {prediction.awayScore}
           </div>
         </div>

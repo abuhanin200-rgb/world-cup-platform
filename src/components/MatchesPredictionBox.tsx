@@ -864,7 +864,10 @@ export default function MatchesPredictionBox() {
 
         <div className="grid grid-cols-[1fr_28px_1fr] items-center gap-2">
         <input
+          id={`prediction-${match.id}-home-score`}
           inputMode="numeric"
+          aria-label={`توقع أهداف ${match.homeTeamName}`}
+          dir="ltr"
           value={inputs[match.id]?.homeScore || ""}
           onChange={(event) =>
             updateScoreInput(match, "homeScore", event.target.value)
@@ -882,7 +885,10 @@ export default function MatchesPredictionBox() {
         </div>
 
         <input
+          id={`prediction-${match.id}-away-score`}
           inputMode="numeric"
+          aria-label={`توقع أهداف ${match.awayTeamName}`}
+          dir="ltr"
           value={inputs[match.id]?.awayScore || ""}
           onChange={(event) =>
             updateScoreInput(match, "awayScore", event.target.value)
@@ -907,6 +913,9 @@ export default function MatchesPredictionBox() {
         {visible && (
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             <select
+              aria-label={
+                finalMatch ? "اختيار بطل كأس العالم" : "اختيار المنتخب المتأهل"
+              }
               value={inputs[match.id]?.qualifiedTeamCode || ""}
               onChange={(event) =>
                 updateInput(match.id, "qualifiedTeamCode", event.target.value)
@@ -921,6 +930,9 @@ export default function MatchesPredictionBox() {
             </select>
 
             <select
+              aria-label={
+                finalMatch ? "اختيار طريقة حسم اللقب" : "اختيار طريقة التأهل"
+              }
               value={inputs[match.id]?.qualificationMethod || ""}
               onChange={(event) =>
                 updateInput(match.id, "qualificationMethod", event.target.value)
@@ -1001,6 +1013,7 @@ export default function MatchesPredictionBox() {
               </span>
             </span>
             <select
+              aria-label="اختيار المنتخب الذي يبدأ التسجيل"
               value={inputs[match.id]?.finalFirstScoringTeamCode || ""}
               onChange={(event) =>
                 updateInput(
@@ -1036,6 +1049,7 @@ export default function MatchesPredictionBox() {
                     </span>
                   </span>
                   <select
+                    aria-label="اختيار أول مسجل من إسبانيا"
                     value={inputs[match.id]?.finalFirstSpainScorer || ""}
                     onChange={(event) =>
                       updateInput(
@@ -1068,6 +1082,7 @@ export default function MatchesPredictionBox() {
                     </span>
                   </span>
                   <select
+                    aria-label="اختيار أول مسجل من الأرجنتين"
                     value={inputs[match.id]?.finalFirstArgentinaScorer || ""}
                     onChange={(event) =>
                       updateInput(
@@ -1150,6 +1165,8 @@ export default function MatchesPredictionBox() {
 
       {loading ? (
         <div
+          role="status"
+          aria-live="polite"
           className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-center text-slate-300 shadow-inner"
         >
           <div className="inline-flex items-center gap-2 text-[14px] font-bold">
@@ -1317,7 +1334,10 @@ export default function MatchesPredictionBox() {
                         <div>
                           <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-black md:text-sm">
                             <span>{match.homeTeamName}</span>
-                            <span className="text-amber-200">{homeVotePercent}% — {finalStats.homeVotes} عضو</span>
+                            <span className="text-amber-200">
+                              <bdi dir="ltr">{homeVotePercent}%</bdi> —{" "}
+                              <bdi dir="ltr">{finalStats.homeVotes}</bdi> عضو
+                            </span>
                           </div>
                           <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
                             <div className="h-full rounded-full bg-amber-300" style={{ width: `${homeVotePercent}%` }} />
@@ -1327,7 +1347,10 @@ export default function MatchesPredictionBox() {
                         <div>
                           <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-black md:text-sm">
                             <span>{match.awayTeamName}</span>
-                            <span className="text-sky-200">{awayVotePercent}% — {finalStats.awayVotes} عضو</span>
+                            <span className="text-sky-200">
+                              <bdi dir="ltr">{awayVotePercent}%</bdi> —{" "}
+                              <bdi dir="ltr">{finalStats.awayVotes}</bdi> عضو
+                            </span>
                           </div>
                           <div className="h-2.5 overflow-hidden rounded-full bg-slate-800">
                             <div className="h-full rounded-full bg-sky-300" style={{ width: `${awayVotePercent}%` }} />
@@ -1356,7 +1379,7 @@ export default function MatchesPredictionBox() {
                       }`}
                     >
                       <Clock3 className="h-4 w-4 opacity-80" />
-                      <span>{matchTime}</span>
+                      <bdi dir="ltr">{matchTime}</bdi>
                     </div>
                   </div>
 
@@ -1377,9 +1400,13 @@ export default function MatchesPredictionBox() {
                       )}
 
                       <span>
-                        {closed
-                          ? "انتهى وقت التوقع"
-                          : `ينتهي التوقع خلال: ${countdownText}`}
+                        {closed ? (
+                          "انتهى وقت التوقع"
+                        ) : (
+                          <>
+                            ينتهي التوقع خلال: <bdi>{countdownText}</bdi>
+                          </>
+                        )}
                       </span>
                     </span>
                   </div>
@@ -1412,7 +1439,8 @@ export default function MatchesPredictionBox() {
                         : "border-white/10 bg-white/10 text-amber-300 shadow-slate-950/15"
                     }`}
                   >
-                    VS
+                    <span dir="ltr" aria-hidden="true">VS</span>
+                    <span className="sr-only">ضد</span>
                   </div>
 
                   <div className="min-w-0 text-center">
@@ -1497,7 +1525,12 @@ export default function MatchesPredictionBox() {
                       </div>
                     )}
 
-                    <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-[14px] font-black text-emerald-100 shadow-md shadow-emerald-950/10">
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      aria-atomic="true"
+                      className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-[14px] font-black text-emerald-100 shadow-md shadow-emerald-950/10"
+                    >
                       <span className="inline-flex items-center justify-center gap-1.5">
                         <CheckCircle2 className="h-4 w-4" />
                         <span>وصل توقعك واعتمدناه</span>
@@ -1505,8 +1538,10 @@ export default function MatchesPredictionBox() {
                     </div>
 
                     <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-center text-[16px] font-black text-emerald-100 shadow-md shadow-emerald-950/10">
-                      توقعك المعتمد: {savedPrediction.homeScore} -{" "}
-                      {savedPrediction.awayScore}
+                      توقعك المعتمد:{" "}
+                      <bdi dir="ltr" className="inline-block tabular-nums">
+                        {savedPrediction.homeScore} - {savedPrediction.awayScore}
+                      </bdi>
                     </div>
 
                     {savedPrediction.qualifiedTeamCode &&

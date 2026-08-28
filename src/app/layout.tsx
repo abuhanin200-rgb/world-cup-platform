@@ -4,6 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import PresenceTracker from "@/components/PresenceTracker";
 import SuperGoldenNotice from "@/components/SuperGoldenNotice";
+import MotionAccessibilityProvider from "@/components/MotionAccessibilityProvider";
 
 const siteUrl = "https://world-cup-platform.vercel.app";
 
@@ -54,7 +55,6 @@ export const viewport: Viewport = {
   themeColor: "#020617",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -65,11 +65,13 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body>
-        <AuthProvider>
-          <PresenceTracker />
-          <MaintenanceGate>{children}</MaintenanceGate>
-          <SuperGoldenNotice />
-        </AuthProvider>
+        <MotionAccessibilityProvider>
+          <AuthProvider>
+            <PresenceTracker />
+            <MaintenanceGate>{children}</MaintenanceGate>
+            <SuperGoldenNotice />
+          </AuthProvider>
+        </MotionAccessibilityProvider>
       </body>
     </html>
   );

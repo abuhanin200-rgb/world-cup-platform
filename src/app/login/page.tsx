@@ -182,12 +182,16 @@ export default function LoginPage() {
             className="space-y-4"
           >
             <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold">
+              <label
+                htmlFor="login-full-name"
+                className="mb-2 flex items-center gap-2 text-sm font-bold"
+              >
                 <User className="h-4 w-4 text-amber-300" />
                 <span>الاسم</span>
               </label>
 
               <input
+                id="login-full-name"
                 type="text"
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
@@ -198,12 +202,16 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold">
+              <label
+                htmlFor="login-password"
+                className="mb-2 flex items-center gap-2 text-sm font-bold"
+              >
                 <KeyRound className="h-4 w-4 text-amber-300" />
                 <span>الرقم السري</span>
               </label>
 
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
@@ -217,6 +225,9 @@ export default function LoginPage() {
               {message && (
                 <motion.div
                   key={message}
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
                   initial={{ opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.97 }}
@@ -230,6 +241,9 @@ export default function LoginPage() {
               {error && (
                 <motion.div
                   key={error}
+                  role="alert"
+                  aria-live="assertive"
+                  aria-atomic="true"
                   initial={{ opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.97 }}

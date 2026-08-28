@@ -118,3 +118,46 @@ body {
   -webkit-backface-visibility: hidden;
   will-change: transform;
 }
+
+/* أهداف لمس موحدة للعناصر التفاعلية الأساسية */
+:where(
+  button,
+  [role="button"],
+  a[href],
+  select,
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"]
+) {
+  min-block-size: 44px;
+}
+
+:where(button[aria-label], [role="button"][aria-label], a[aria-label]) {
+  min-inline-size: 44px;
+}
+
+/* تركيز لوحة المفاتيح دون تغيير الحالة البصرية الافتراضية */
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  [role="button"],
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 2px solid #fbbf24 !important;
+  outline-offset: 3px;
+}
+
+/* تقليل الحركات فقط عندما يطلب المستخدم ذلك من نظامه */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
