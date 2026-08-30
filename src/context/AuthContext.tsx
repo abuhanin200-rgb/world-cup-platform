@@ -8,6 +8,8 @@ import {
   useState,
   ReactNode,
 } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import {
   AppUser,
   getUserById,
@@ -25,6 +27,7 @@ type AuthContextType = {
   register: (input: RegisterUserInput) => Promise<AppUser>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  secureSession: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,6 +37,7 @@ const STORAGE_KEY = "worldcup_2026_user_id";
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [firebaseUid, setFirebaseUid] = useState<string | null>(null);
 
   async function refreshUser() {
     const storedUserId = localStorage.getItem(STORAGE_KEY);
@@ -53,6 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(freshUser);
   }
+
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (firebaseUser) => {
+      setFirebaseUid(firebaseUser?.uid || null);
+    });
+  }, []);
 
   useEffect(() => {
     async function loadStoredUser() {
@@ -91,6 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function logout() {
     localStorage.removeItem(STORAGE_KEY);
     setUser(null);
+    setFirebaseUid(null);
+    void signOut(auth);
   }
 
   const value = useMemo(
@@ -102,8 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refreshUser,
+      secureSession: Boolean(user && firebaseUid === user.id),
     }),
-    [user, loading]
+    [user, loading, firebaseUid]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -249,7 +249,7 @@ function findGenericMemberWords(cards: AiCard[], summary = "") {
 
 function buildPrompt(events: ChallengeStudioEvent[], recentMembers: string[]) {
   return `
-أنت رئيس تحرير رياضي محترف داخل منصة توقعات كأس العالم 2026.
+أنت رئيس تحرير رياضي محترف داخل منصة التحدي.
 مهمتك كتابة نشرة يومية باسم "استوديو التحدي" بأسلوب صحفي رياضي احترافي.
 
 نبرة الكتابة:

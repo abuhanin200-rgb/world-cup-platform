@@ -1,10 +1,10 @@
 import {
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
-  increment,
   query,
   runTransaction,
   serverTimestamp,
@@ -12,6 +12,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { syncPlatformGameXp } from "@/lib/platformGameXpClient";
 
 export const TEN_SECONDS_TARGET_MS = 10000;
 
@@ -30,7 +31,7 @@ export const DEFAULT_TEN_SECONDS_SETTINGS: TenSecondsSettings = {
   toleranceMs: 20,
   awardedPoints: 5,
   memberNotice:
-    "أوقف المؤقت عند 00:10.000 بالضبط. لديك 3 محاولات يوميًا، والفوز يمنحك +5 نقاط رسمية.",
+    "أوقف المؤقت عند 00:10.000 بالضبط. لديك 3 محاولات يوميًا، والفوز يمنحك XP مستقلًا عن نقاط البطولات.",
 };
 
 export type TenSecondsAttempt = {
@@ -348,7 +349,6 @@ export async function saveTenSecondsAttempt(
   const resultId = `${userId}_${dateKey}`;
 
   const resultRef = doc(db, tenSecondsDailyCollection, resultId);
-  const userRef = doc(db, "users", userId);
 
   await runTransaction(db, async (transaction) => {
     const resultSnap = await transaction.get(resultRef);
@@ -381,20 +381,13 @@ export async function saveTenSecondsAttempt(
         bestDisplayTime: displayTime,
 
         won,
-        pointsAwarded: won,
-        awardedPoints: won ? settings.awardedPoints : 0,
+        // حقول Legacy محفوظة للتوافق فقط. من الآن XP الألعاب مستقل عن users.points.
+        pointsAwarded: false,
+        awardedPoints: 0,
 
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-
-      if (won && settings.awardedPoints > 0) {
-        transaction.update(userRef, {
-          points: increment(settings.awardedPoints),
-          updatedAt: nowIso,
-          lastUpdated: nowIso,
-        });
-      }
 
       return;
     }
@@ -442,19 +435,12 @@ export async function saveTenSecondsAttempt(
       bestDisplayTime: shouldUpdateBest ? displayTime : current.bestDisplayTime,
 
       won,
-      pointsAwarded: won ? true : current.pointsAwarded,
-      awardedPoints: won ? settings.awardedPoints : current.awardedPoints || 0,
+      pointsAwarded: current.pointsAwarded,
+      awardedPoints: current.awardedPoints || 0,
 
       updatedAt: serverTimestamp(),
     });
 
-    if (won && !current.pointsAwarded && settings.awardedPoints > 0) {
-      transaction.update(userRef, {
-        points: increment(settings.awardedPoints),
-        updatedAt: nowIso,
-        lastUpdated: nowIso,
-      });
-    }
   });
 
   const updatedSnap = await getDoc(resultRef);
@@ -463,7 +449,18 @@ export async function saveTenSecondsAttempt(
     throw new Error("تعذر تحميل نتيجة تحدي العشر ثواني بعد الحفظ.");
   }
 
-  return mapDailyResult(updatedSnap.id, updatedSnap.data());
+  const updatedResult = mapDailyResult(updatedSnap.id, updatedSnap.data());
+
+  try {
+    await syncPlatformGameXp({
+      gameId: "ten-seconds",
+      sourceResultId: resultId,
+    });
+  } catch (error) {
+    console.warn("Ten seconds XP sync skipped:", error);
+  }
+
+  return updatedResult;
 }
 
 export async function adminDeleteTenSecondsResult(resultId: string) {
@@ -471,30 +468,7 @@ export async function adminDeleteTenSecondsResult(resultId: string) {
     throw new Error("معرّف النتيجة غير موجود");
   }
 
-  const resultRef = doc(db, tenSecondsDailyCollection, resultId);
-
-  await runTransaction(db, async (transaction) => {
-    const resultSnap = await transaction.get(resultRef);
-
-    if (!resultSnap.exists()) {
-      throw new Error("النتيجة غير موجودة أو محذوفة مسبقًا");
-    }
-
-    const result = mapDailyResult(resultSnap.id, resultSnap.data());
-
-    if (result.pointsAwarded && result.awardedPoints > 0 && result.userId) {
-      const userRef = doc(db, "users", result.userId);
-      const nowIso = new Date().toISOString();
-
-      transaction.update(userRef, {
-        points: increment(-result.awardedPoints),
-        updatedAt: nowIso,
-        lastUpdated: nowIso,
-      });
-    }
-
-    transaction.delete(resultRef);
-  });
+  await deleteDoc(doc(db, tenSecondsDailyCollection, resultId));
 }
 
 export async function adminDeleteTodayTenSecondsResults() {

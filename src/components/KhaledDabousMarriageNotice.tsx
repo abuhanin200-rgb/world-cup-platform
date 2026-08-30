@@ -124,7 +124,7 @@ export default function KhaledDabousMarriageNotice() {
           </motion.div>
 
           <p className="text-[14px] font-bold leading-7 text-slate-100">
-            🎉 بكل الفرح والمحبة، يبارك أعضاء منصة توقعات كأس العالم 2026
+            🎉 بكل الفرح والمحبة، يبارك أعضاء منصة التحدي
             لأخينا
           </p>
 

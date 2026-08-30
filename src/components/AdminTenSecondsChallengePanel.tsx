@@ -108,7 +108,7 @@ export default function AdminTenSecondsChallengePanel() {
   async function handleDeleteResult(result: TenSecondsDailyResult) {
     const confirmed = confirm(
       result.pointsAwarded
-        ? `حذف نتيجة ${result.userName}؟ سيتم خصم ${result.awardedPoints} نقاط من رصيده.`
+        ? `حذف نتيجة ${result.userName}؟ بعد الحذف أعد بناء XP الألعاب لتحديث الترتيب.`
         : `حذف نتيجة ${result.userName}؟`
     );
 
@@ -133,7 +133,7 @@ export default function AdminTenSecondsChallengePanel() {
     if (results.length === 0) return;
 
     const confirmed = confirm(
-      "هل تريد حذف كل نتائج اليوم؟ سيتم خصم نقاط الفائزين الذين أخذوا نقاطًا."
+      "هل تريد حذف كل نتائج اليوم؟ بعد الحذف أعد بناء XP الألعاب لتحديث الترتيب."
     );
 
     if (!confirmed) return;
@@ -177,7 +177,7 @@ export default function AdminTenSecondsChallengePanel() {
           </h2>
 
           <p className="mt-1 text-sm leading-6 text-slate-300">
-            تحكم بتشغيل التحدي والمحاولات والسماحية والنقاط. التعديل هنا لا يمس
+            تحكم بتشغيل التحدي والمحاولات والسماحية وXP. التعديل هنا لا يمس
             نظام التوقعات ولا إحصائياتها.
           </p>
         </div>
@@ -255,7 +255,7 @@ export default function AdminTenSecondsChallengePanel() {
 
             <label className="block rounded-2xl border border-white/10 bg-slate-950/50 p-4">
               <span className="mb-2 block text-sm font-black">
-                نقاط الفوز الرسمية
+                XP عند الفوز
               </span>
 
               <input
@@ -300,7 +300,7 @@ export default function AdminTenSecondsChallengePanel() {
           </label>
 
           <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-7 text-amber-100">
-            <strong>تنبيه مهم:</strong> نقاط هذا التحدي مستقلة عن التوقعات. لا
+            <strong>تنبيه مهم:</strong> XP هذا التحدي مستقل عن نقاط البطولات. لا
             تزيد عدد التوقعات، ولا الفائز الصحيح، ولا بالملي، ولا الخطأ.
           </div>
 
@@ -329,7 +329,7 @@ export default function AdminTenSecondsChallengePanel() {
             </h3>
 
             <p className="mt-1 text-sm leading-6 text-slate-300">
-              حذف النتيجة من هنا يخصم نقاط الفوز تلقائيًا إذا كانت النتيجة فائزة.
+              حذف النتيجة لا يغيّر نقاط البطولات. استخدم إعادة بناء XP من تبويب الألعاب لتحديث ترتيب الألعاب بعد الحذف.
             </p>
           </div>
 
@@ -458,8 +458,8 @@ export default function AdminTenSecondsChallengePanel() {
                     />
 
                     <AdminResultStat
-                      label="النقاط"
-                      value={result.pointsAwarded ? `+${result.awardedPoints}` : "+0"}
+                      label="XP سابق"
+                      value={result.pointsAwarded ? `+${result.awardedPoints}` : "XP"}
                       className="border-emerald-400/15 bg-emerald-400/10 text-emerald-200"
                     />
                   </div>

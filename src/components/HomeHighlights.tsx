@@ -800,7 +800,7 @@ export default function HomeHighlights() {
         </div>
 
         <h2 className="mt-4 bg-gradient-to-l from-amber-200 via-white to-cyan-100 bg-clip-text text-lg font-black tracking-tight text-transparent md:text-3xl">
-          أبطال منصة توقعات كأس العالم 2026
+          أبطال كأس العالم 2026 في التحدي
         </h2>
 
         <p className="mx-auto mt-2 max-w-2xl text-[10px] font-medium leading-5 text-slate-300 md:text-sm md:leading-7">

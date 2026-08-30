@@ -10,7 +10,7 @@ body {
   min-height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #020617;
+  background-color: #04133a;
   color: #ffffff;
   overflow-x: hidden;
   overscroll-behavior-x: none;
@@ -30,7 +30,7 @@ body {
 }
 
 html {
-  background: #020617;
+  background: #04133a;
   scroll-behavior: auto;
 }
 
@@ -39,7 +39,7 @@ body {
   min-height: 100vh;
   min-height: 100svh;
   min-height: 100dvh;
-  background: #020617;
+  background: #04133a;
 }
 
 /* دعم المشاريع التي تستخدم حاوية Next.js التقليدية */
@@ -47,7 +47,7 @@ body {
   min-height: 100vh;
   min-height: 100svh;
   min-height: 100dvh;
-  background: #020617;
+  background: #04133a;
   isolation: isolate;
 }
 
@@ -55,40 +55,40 @@ body {
 @supports (-webkit-touch-callout: none) {
   html {
     min-height: 100%;
-    background: #020617;
+    background: #04133a;
   }
 
   body {
     min-height: 100svh;
-    background: #020617;
+    background: #04133a;
     overscroll-behavior-y: none;
     -webkit-overflow-scrolling: touch;
   }
 
   #__next {
     min-height: 100svh;
-    background: #020617;
+    background: #04133a;
   }
 }
 
 /* تحسين شكل قوائم التمرير */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #061a4d;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #35558f;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #ffc210;
 }
 
 /* إخفاء شريط التمرير لبعض المناطق مثل الشات والقوائم */
@@ -160,4 +160,19 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+:root {
+  --brand-navy: #08245f;
+  --brand-navy-900: #061a4d;
+  --brand-navy-950: #04133a;
+  --brand-yellow: #ffc210;
+  --brand-yellow-soft: #ffd866;
+  --brand-white: #ffffff;
+}
+
+::selection { background: rgba(255,194,16,.28); color: #fff; }
+
+@media (max-width: 767px) {
+  .mobile-compact-card { border-radius: 18px !important; padding: 12px !important; }
 }

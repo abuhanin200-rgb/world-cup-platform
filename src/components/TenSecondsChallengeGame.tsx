@@ -169,7 +169,7 @@ function getFriendlyErrorMessage(error: unknown) {
     message.includes("permission") ||
     message.includes("Missing or insufficient")
   ) {
-    return "تعذر حفظ المحاولة بسبب صلاحيات قاعدة البيانات. راجع قواعد Firestore.";
+    return "تعذر حفظ المحاولة الآن. حاول مرة أخرى بعد قليل.";
   }
 
   if (message.includes("index")) {
@@ -511,7 +511,7 @@ export default function TenSecondsChallengeGame() {
 
         if (latestAttempt.won) {
           setMessage(
-            `00:10.000 ✅ جابها بالملي — +${result.awardedPoints} نقاط`
+            `00:10.000 ✅ جابها بالملي — XP تم احتسابه في ترتيب الألعاب`
           );
           await refreshUser();
         } else {
@@ -599,7 +599,7 @@ export default function TenSecondsChallengeGame() {
 
               <span>
                 {hasWonToday
-                  ? `فزت اليوم وتم اعتماد +${todayResult?.awardedPoints || settings.awardedPoints} نقاط`
+                  ? `فزت اليوم وتم اعتماد نقاط خبرتك في ترتيب الألعاب`
                   : !settings.enabled
                     ? "تحدي العشر ثواني متوقف مؤقتًا"
                     : attemptsLeft > 0
@@ -660,7 +660,7 @@ export default function TenSecondsChallengeGame() {
 
             <StatCard
               label="الجائزة"
-              value={`+${settings.awardedPoints}`}
+              value={`+${settings.awardedPoints} XP`}
               icon={<Trophy className="h-4 w-4 text-emerald-300" />}
               valueClassName="text-emerald-200"
             />
@@ -724,7 +724,7 @@ export default function TenSecondsChallengeGame() {
 
                     <span>
                       {lastAttempt.won
-                        ? `00:10.000 ✅ ${lastAttempt.message} +${todayResult?.awardedPoints || settings.awardedPoints} نقاط`
+                        ? `00:10.000 ✅ ${lastAttempt.message} — XP تم احتسابه`
                         : `${lastAttempt.displayTime} ❌ ${lastAttempt.message}`}
                     </span>
                   </span>

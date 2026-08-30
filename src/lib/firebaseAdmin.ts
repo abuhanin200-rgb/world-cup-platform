@@ -1,5 +1,6 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 
 function getFirebaseAdminPrivateKey() {
   const privateKey = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
@@ -36,4 +37,7 @@ function getFirebaseAdminApp() {
   });
 }
 
-export const adminDb = getFirestore(getFirebaseAdminApp());
+const adminApp = getFirebaseAdminApp();
+
+export const adminDb = getFirestore(adminApp);
+export const adminAuth = getAuth(adminApp);

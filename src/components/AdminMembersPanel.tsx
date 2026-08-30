@@ -5,6 +5,7 @@ import {
   AdminMember,
   getAdminMembers,
   resetAdminMemberStats,
+  resetAdminMemberPassword,
   updateAdminMember,
 } from "@/lib/adminMembers";
 import { addAdminLog } from "@/lib/adminLogs";
@@ -32,7 +33,7 @@ function buildFormState(member: AdminMember, teams: Team[]): MemberFormState {
   return {
     fullName: member.fullName || "",
     phone: member.phone || "",
-    password: member.password || "",
+    password: "",
     teamCode: selectedTeam?.code || "",
 
     points: String(member.points || 0),
@@ -174,7 +175,6 @@ export default function AdminMembersPanel() {
         userId: selectedMember.id,
         fullName: formState.fullName,
         phone: formState.phone,
-        password: formState.password,
         favoriteTeam: selectedTeam.nameAr,
         teamEmoji: selectedTeam.emoji,
 
@@ -185,6 +185,10 @@ export default function AdminMembersPanel() {
         currentStreak: toNumber(formState.currentStreak),
         bestStreak: toNumber(formState.bestStreak),
       });
+
+      if (formState.password.trim()) {
+        await resetAdminMemberPassword(selectedMember.id, formState.password);
+      }
 
       await addAdminLog({
         action: "update_member",
@@ -398,16 +402,17 @@ export default function AdminMembersPanel() {
 
                 <div>
                   <label className="mb-2 block text-sm font-bold">
-                    الرقم السري
+                    كلمة مرور جديدة <span className="text-xs font-normal text-slate-400">(اختياري)</span>
                   </label>
                   <input
-                    type="text"
+                    type="password"
                     value={formState.password}
+                    autoComplete="new-password"
+                    placeholder="اتركها فارغة بدون تغيير"
                     onChange={(event) =>
                       updateField("password", event.target.value)
                     }
                     className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-                    required
                   />
                 </div>
 

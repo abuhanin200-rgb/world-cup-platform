@@ -32,6 +32,7 @@ import { calculateMatchResult, undoMatchCalculation } from "@/lib/scoring";
 import { listenAdminAccess, lockAdmin, unlockAdmin } from "@/lib/adminAuth";
 import { addAdminLog } from "@/lib/adminLogs";
 import AdminOverviewPanel from "@/components/AdminOverviewPanel";
+import AdminTournamentV2Panel from "@/components/AdminTournamentV2Panel";
 import AdminMembersPanel from "@/components/AdminMembersPanel";
 import AdminSettingsPanel from "@/components/AdminSettingsPanel";
 import AdminMatchesPanel from "@/components/AdminMatchesPanel";
@@ -45,6 +46,7 @@ import { getFinalSquadByTeamCode } from "@/data/finalSquads";
 
 type AdminTab =
   | "overview"
+  | "tournamentsV2"
   | "add"
   | "calculate"
   | "settings"
@@ -64,6 +66,11 @@ const ADMIN_TABS = [
     tab: "overview",
     label: "نظرة عامة",
     icon: LayoutDashboard,
+  },
+  {
+    tab: "tournamentsV2",
+    label: "البطولات",
+    icon: ShieldCheck,
   },
   {
     tab: "add",
@@ -704,15 +711,15 @@ export default function AdminPage() {
           <div className="mb-5 text-center">
             <div className="mx-auto mb-3 h-16 w-16 overflow-hidden rounded-3xl border border-white/20 bg-white/10">
               <img
-                src="/wc2026-logo.png"
-                alt="شعار منصة توقعات كأس العالم 2026"
+                src="/brand/altahaddi-symbol-white.png"
+                alt="شعار منصة التحدي"
                 className="h-full w-full object-contain p-2"
               />
             </div>
 
             <h1 className="text-2xl font-black">دخول الأدمن</h1>
             <p className="mt-2 text-sm text-slate-300">
-              لوحة تحكم منصة توقعات كأس العالم 2026
+              لوحة تحكم منصة التحدي
             </p>
           </div>
 
@@ -809,6 +816,7 @@ export default function AdminPage() {
         </nav>
 
         {activeTab === "overview" && <AdminOverviewPanel />}
+        {activeTab === "tournamentsV2" && <AdminTournamentV2Panel />}
 
         {activeTab === "add" && (
           <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">

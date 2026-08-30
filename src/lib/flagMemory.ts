@@ -10,6 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { syncPlatformGameXp } from "@/lib/platformGameXpClient";
 
 export type FlagMemoryResult = {
   id: string;
@@ -324,6 +325,15 @@ export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
     completed: true,
     createdAt: serverTimestamp(),
   });
+
+  try {
+    await syncPlatformGameXp({
+      gameId: "flag-memory",
+      sourceResultId: resultId,
+    });
+  } catch (error) {
+    console.warn("Flag memory XP sync skipped:", error);
+  }
 
   return {
     id: resultId,

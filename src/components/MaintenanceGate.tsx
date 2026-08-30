@@ -107,6 +107,77 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const styleId = "altahaddi-scrollbar-ux-fix";
+    let style = document.getElementById(styleId) as HTMLStyleElement | null;
+
+    if (!style) {
+      style = document.createElement("style");
+      style.id = styleId;
+      style.textContent = `
+        html {
+          overflow-y: auto !important;
+          scrollbar-gutter: stable;
+        }
+
+        body {
+          overflow-y: visible !important;
+        }
+
+        html, body {
+          overscroll-behavior-y: auto !important;
+        }
+
+        * {
+          scrollbar-width: auto;
+          scrollbar-color: #48659f #061a4d;
+        }
+
+        ::-webkit-scrollbar {
+          width: 12px !important;
+          height: 12px !important;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: #061a4d;
+          border-radius: 999px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          min-height: 48px;
+          border: 3px solid #061a4d;
+          border-radius: 999px;
+          background: #48659f;
+          background-clip: padding-box;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: #ffc210;
+          background-clip: padding-box;
+        }
+
+        ::-webkit-scrollbar-thumb:active {
+          background: #ffffff;
+          background-clip: padding-box;
+        }
+
+        .hidden-scrollbar {
+          -ms-overflow-style: none !important;
+          scrollbar-width: none !important;
+        }
+
+        .hidden-scrollbar::-webkit-scrollbar {
+          display: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    return () => {
+      document.getElementById(styleId)?.remove();
+    };
+  }, []);
+
   if (isAdminPage) {
     return <>{children}</>;
   }
@@ -118,10 +189,10 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
         variants={pageMotion}
         initial="hidden"
         animate="show"
-        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#04133a] via-[#061a4d] to-[#08245f] p-4 text-white"
       >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.16),transparent_34%),radial-gradient(circle_at_10%_30%,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_90%_70%,rgba(52,211,153,0.10),transparent_30%)]" />
-        <div className="pointer-events-none absolute -right-24 top-24 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute -left-24 bottom-24 h-80 w-80 rounded-full bg-amber-400/10 blur-3xl" />
 
         <motion.section
@@ -149,7 +220,7 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
 
             <motion.div
               aria-hidden="true"
-              className="absolute inset-[-13px] rounded-[2.2rem] border border-cyan-300/15 border-t-cyan-200/60"
+              className="absolute inset-[-13px] rounded-[2.2rem] border border-white/15 border-t-white/60"
               animate={{ rotate: -360 }}
               transition={{
                 duration: 3.5,
@@ -159,8 +230,8 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
             />
 
             <motion.img
-              src="/wc2026-logo.png"
-              alt="شعار منصة توقعات كأس العالم 2026"
+              src="/brand/altahaddi-symbol-white.png"
+              alt="شعار منصة التحدي"
               className="relative h-14 w-14 object-contain p-1"
               animate={{
                 y: [0, -4, 0],
@@ -216,7 +287,7 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
             variants={itemMotion}
             className="relative mt-4 text-[11px] font-bold text-slate-500"
           >
-            World Cup 2026 Predictions Platform
+            منصة التحدي
           </motion.div>
         </motion.section>
       </motion.main>
@@ -230,7 +301,7 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
         variants={pageMotion}
         initial="hidden"
         animate="show"
-        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-4 text-white"
+        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#04133a] via-[#061a4d] to-[#08245f] p-4 text-white"
       >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(239,68,68,0.14),transparent_34%),radial-gradient(circle_at_10%_30%,rgba(251,191,36,0.12),transparent_32%),radial-gradient(circle_at_90%_70%,rgba(34,211,238,0.10),transparent_30%)]" />
         <div className="pointer-events-none absolute -right-24 top-24 h-72 w-72 rounded-full bg-red-400/10 blur-3xl" />
@@ -260,8 +331,8 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
             />
 
             <img
-              src="/wc2026-logo.png"
-              alt="شعار منصة توقعات كأس العالم 2026"
+              src="/brand/altahaddi-symbol-white.png"
+              alt="شعار منصة التحدي"
               className="relative h-16 w-16 object-contain p-1"
             />
           </motion.div>

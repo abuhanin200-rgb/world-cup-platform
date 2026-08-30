@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import { syncPlatformGameXp } from "@/lib/platformGameXpClient";
 import type {
   WordGameDailyGame,
   WordGameDailyResult,
@@ -246,6 +247,20 @@ export async function saveWordGameProgress(params: {
 
     transaction.set(statsRef, updatedStats, { merge: true });
   });
+
+  if (
+    params.updatedGame.status === "won" ||
+    params.updatedGame.status === "lost"
+  ) {
+    try {
+      await syncPlatformGameXp({
+        gameId: "word-game",
+        sourceResultId: params.updatedGame.id,
+      });
+    } catch (error) {
+      console.warn("Word game XP sync skipped:", error);
+    }
+  }
 }
 
 export async function submitWordGameGuess(params: {

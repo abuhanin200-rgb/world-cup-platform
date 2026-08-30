@@ -4,12 +4,13 @@ import { useState } from "react";
 import AdminWordGamePanel from "@/components/AdminWordGamePanel";
 import AdminFlagMemoryPanel from "@/components/AdminFlagMemoryPanel";
 import AdminTenSecondsChallengePanel from "./AdminTenSecondsChallengePanel";
+import AdminPlatformGamesXpPanel from "@/components/AdminPlatformGamesXpPanel";
 
-type GamesAdminTab = "wordGame" | "flagMemory" | "tenSeconds";
+type GamesAdminTab = "platformXp" | "wordGame" | "flagMemory" | "tenSeconds";
 
 export default function AdminGamesPanel() {
   const [activeGameTab, setActiveGameTab] =
-    useState<GamesAdminTab>("wordGame");
+    useState<GamesAdminTab>("platformXp");
 
   return (
     <section className="space-y-5" dir="rtl">
@@ -23,6 +24,18 @@ export default function AdminGamesPanel() {
         </div>
 
         <div className="flex flex-wrap gap-2 rounded-2xl border border-white/10 bg-slate-950/50 p-2">
+          <button
+            type="button"
+            onClick={() => setActiveGameTab("platformXp")}
+            className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+              activeGameTab === "platformXp"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            ⚡ XP والترتيب
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveGameTab("wordGame")}
@@ -60,6 +73,8 @@ export default function AdminGamesPanel() {
           </button>
         </div>
       </div>
+
+      {activeGameTab === "platformXp" && <AdminPlatformGamesXpPanel />}
 
       {activeGameTab === "wordGame" && <AdminWordGamePanel />}
 

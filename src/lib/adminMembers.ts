@@ -6,14 +6,12 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 
 export type AdminMember = {
   id: string;
   fullName: string;
   phone: string;
-  password: string;
-
   favoriteTeam: string;
   teamEmoji: string;
 
@@ -38,7 +36,7 @@ export type UpdateAdminMemberInput = {
   userId: string;
   fullName: string;
   phone: string;
-  password: string;
+  password?: string;
   favoriteTeam: string;
   teamEmoji: string;
 
@@ -72,8 +70,6 @@ function mapMember(id: string, data: Record<string, unknown>): AdminMember {
     id,
     fullName: toText(data.fullName) || "عضو بدون اسم",
     phone: toText(data.phone),
-    password: toText(data.password),
-
     favoriteTeam: toText(data.favoriteTeam),
     teamEmoji: toText(data.teamEmoji),
 
@@ -177,7 +173,6 @@ export async function updateAdminMember(input: UpdateAdminMemberInput) {
   const userId = toText(input.userId);
   const fullName = toText(input.fullName);
   const phone = toText(input.phone);
-  const password = toText(input.password);
   const favoriteTeam = toText(input.favoriteTeam);
   const teamEmoji = toText(input.teamEmoji);
 
@@ -197,10 +192,6 @@ export async function updateAdminMember(input: UpdateAdminMemberInput) {
     throw new Error("رقم الجوال مطلوب");
   }
 
-  if (!password || password.length < 4) {
-    throw new Error("الرقم السري يجب ألا يقل عن 4 أحرف أو أرقام");
-  }
-
   if (!favoriteTeam) {
     throw new Error("المنتخب المرشح مطلوب");
   }
@@ -210,7 +201,6 @@ export async function updateAdminMember(input: UpdateAdminMemberInput) {
   await updateDoc(doc(db, "users", userId), {
     fullName,
     phone,
-    password,
 
     favoriteTeam,
     teamEmoji,
@@ -230,6 +220,39 @@ export async function updateAdminMember(input: UpdateAdminMemberInput) {
   await refreshLeaderboardRanks();
 
   return getAdminMemberById(userId);
+}
+
+export async function resetAdminMemberPassword(
+  userId: string,
+  newPassword: string,
+) {
+  const cleanUserId = toText(userId);
+  const cleanPassword = toText(newPassword);
+
+  if (!cleanUserId) throw new Error("اختر العضو أولًا");
+  if (!cleanPassword || cleanPassword.length < 4) {
+    throw new Error("كلمة المرور الجديدة يجب ألا تقل عن 4 أحرف أو أرقام");
+  }
+  if (!auth.currentUser) {
+    throw new Error("جلسة الأدمن غير موجودة");
+  }
+
+  const token = await auth.currentUser.getIdToken();
+  const response = await fetch("/api/admin/member-password", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ userId: cleanUserId, newPassword: cleanPassword }),
+  });
+  const data = (await response.json()) as { error?: string };
+
+  if (!response.ok) {
+    throw new Error(data.error || "تعذر تغيير كلمة مرور العضو");
+  }
+
+  return true;
 }
 
 export async function resetAdminMemberStats(userId: string) {

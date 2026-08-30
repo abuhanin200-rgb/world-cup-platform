@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
@@ -9,7 +8,8 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { signInWithCustomToken } from "firebase/auth";
+import { auth, db } from "./firebase";
 
 export type AppUser = {
   id: string;
@@ -178,74 +178,37 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
   const favoriteTeam = cleanText(input.favoriteTeam);
   const teamEmoji = cleanText(input.teamEmoji);
 
-  if (!fullName) {
-    throw new Error("الاسم مطلوب");
-  }
-
-  if (fullName.length > 20) {
-    throw new Error("الاسم يجب ألا يتجاوز 20 حرفًا");
-  }
-
-  if (!phone) {
-    throw new Error("رقم الجوال مطلوب");
-  }
-
+  if (!fullName) throw new Error("الاسم مطلوب");
+  if (fullName.length > 20) throw new Error("الاسم يجب ألا يتجاوز 20 حرفًا");
+  if (!phone) throw new Error("رقم الجوال مطلوب");
   if (!password || password.length < 4) {
     throw new Error("كلمة المرور يجب ألا تقل عن 4 أرقام أو أحرف");
   }
+  if (!favoriteTeam) throw new Error("اختر المنتخب المرشح");
 
-  if (!favoriteTeam) {
-    throw new Error("اختر المنتخب المرشح");
-  }
-
-  const existingName = await getUserByFullName(fullName);
-
-  if (existingName) {
-    throw new Error("هذا الاسم مستخدم مسبقًا");
-  }
-
-  const existingPhone = await getUserByPhone(phone);
-
-  if (existingPhone) {
-    throw new Error("رقم الجوال مستخدم مسبقًا");
-  }
-
-  const now = new Date().toISOString();
-
-  const userData = {
-    fullName,
-    phone,
-    password,
-
-    favoriteTeam,
-    teamEmoji,
-
-    points: 0,
-    total: 0,
-    correct: 0,
-    wrong: 0,
-
-    currentRank: 0,
-    previousRank: 0,
-    rankChange: 0,
-    rankDirection: "-",
-
-    currentStreak: 0,
-    bestStreak: 0,
-
-    seenNotices: {},
-
-    createdAt: now,
-    updatedAt: now,
+  const response = await fetch("/api/member-auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fullName,
+      phone,
+      password,
+      favoriteTeam,
+      teamEmoji,
+    }),
+  });
+  const data = (await response.json()) as {
+    customToken?: string;
+    user?: AppUser;
+    error?: string;
   };
 
-  const userRef = await addDoc(collection(db, "users"), userData);
+  if (!response.ok || !data.customToken || !data.user) {
+    throw new Error(data.error || "تعذر إنشاء الحساب");
+  }
 
-  return {
-    id: userRef.id,
-    ...userData,
-    rankDirection: "-",
-  };
+  await signInWithCustomToken(auth, data.customToken);
+  return data.user;
 }
 
 export async function loginUser(input: LoginUserInput): Promise<AppUser> {
@@ -256,17 +219,23 @@ export async function loginUser(input: LoginUserInput): Promise<AppUser> {
     throw new Error("أدخل الاسم وكلمة المرور");
   }
 
-  const user = await getUserByFullName(fullName);
+  const response = await fetch("/api/member-auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fullName, password }),
+  });
+  const data = (await response.json()) as {
+    customToken?: string;
+    user?: AppUser;
+    error?: string;
+  };
 
-  if (!user) {
-    throw new Error("بيانات الدخول غير صحيحة");
+  if (!response.ok || !data.customToken || !data.user) {
+    throw new Error(data.error || "بيانات الدخول غير صحيحة");
   }
 
-  if (String(user.password || "") !== password) {
-    throw new Error("بيانات الدخول غير صحيحة");
-  }
-
-  return user;
+  await signInWithCustomToken(auth, data.customToken);
+  return data.user;
 }
 
 export async function updateUserProfile(
@@ -338,32 +307,34 @@ export async function updateUserPassword(
   const newPassword = cleanText(input.newPassword);
   const confirmPassword = cleanText(input.confirmPassword);
 
-  if (!userId) {
-    throw new Error("معرّف العضو غير موجود");
-  }
-
+  if (!userId) throw new Error("معرّف العضو غير موجود");
   if (!newPassword || newPassword.length < 4) {
     throw new Error("كلمة المرور الجديدة يجب ألا تقل عن 4 أرقام أو أحرف");
   }
-
   if (newPassword !== confirmPassword) {
     throw new Error("كلمة المرور وتأكيدها غير متطابقين");
   }
-
-  const userRef = doc(db, "users", userId);
-  const now = new Date().toISOString();
-
-  await updateDoc(userRef, {
-    password: newPassword,
-    updatedAt: now,
-  });
-
-  const updatedUser = await getUserById(userId);
-
-  if (!updatedUser) {
-    throw new Error("تعذر تحميل بيانات العضو بعد تغيير كلمة المرور");
+  if (!auth.currentUser || auth.currentUser.uid !== userId) {
+    throw new Error("أعد تسجيل الدخول مرة واحدة قبل تغيير كلمة المرور");
   }
 
+  const token = await auth.currentUser.getIdToken();
+  const response = await fetch("/api/member-auth/password", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ newPassword }),
+  });
+  const data = (await response.json()) as { error?: string };
+
+  if (!response.ok) {
+    throw new Error(data.error || "تعذر تغيير كلمة المرور");
+  }
+
+  const updatedUser = await getUserById(userId);
+  if (!updatedUser) throw new Error("تعذر تحميل بيانات العضو بعد تغيير كلمة المرور");
   return updatedUser;
 }
 
