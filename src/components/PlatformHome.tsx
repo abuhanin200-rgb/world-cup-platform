@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Flag, Gamepad2, Medal, Sparkles, Target, TimerReset, Trophy } from "lucide-react";
+import { ArrowLeft, CalendarDays, Flag, Gamepad2, MapPin, Medal, Sparkles, Target, TimerReset, Trophy } from "lucide-react";
 import PlatformStatsOverview from "@/components/PlatformStatsOverview";
+import TournamentStatusBadge from "@/components/tournaments/TournamentStatusBadge";
 import MemberNoticeRenderer from "@/components/MemberNoticeRenderer";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -11,7 +12,6 @@ import {
   WORLD_CUP_2026_TOURNAMENT,
   formatTournamentDateRange,
   getTournamentHref,
-  getTournamentStatusLabel,
   type Tournament,
 } from "@/domain/tournaments";
 
@@ -31,7 +31,7 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
       <div className="absolute inset-0 bg-gradient-to-t from-[#031039] via-[#04184a]/75 to-[#071d54]/35" />
       <div className="relative flex h-full flex-col justify-between">
         <div className="flex items-start justify-between gap-3">
-          <span className="rounded-full border border-white/15 bg-black/25 px-2.5 py-1 text-[10px] font-black text-white/85 backdrop-blur-md md:text-xs">{getTournamentStatusLabel(tournament.status)}</span>
+          <TournamentStatusBadge status={tournament.status} />
           {tournament.branding.logoUrl ? (
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/90 p-1.5 shadow-lg md:h-16 md:w-16">
               <img src={tournament.branding.logoUrl} alt={`شعار ${tournament.name}`} className="h-full w-full object-contain" />
@@ -40,7 +40,10 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
         </div>
         <div>
           <h3 className="text-xl font-black text-white md:text-2xl">{tournament.shortName}</h3>
-          <p className="mt-1 text-[11px] font-bold text-white/65 md:text-xs">{tournament.hostCountry || ""}{date ? ` · ${date}` : ""}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-bold text-white/70 md:text-xs">
+            {tournament.hostCountry ? <span className="inline-flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[var(--brand-yellow)]" aria-hidden="true" />{tournament.hostCountry}</span> : null}
+            {date ? <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[var(--brand-yellow)]" aria-hidden="true" /><span>{date}</span></span> : null}
+          </div>
           <div className="mt-4 flex min-h-[42px] items-center justify-between rounded-xl border border-white/12 bg-black/20 px-3 text-xs font-black text-white backdrop-blur-md">
             <span>دخول البطولة</span><ArrowLeft className="h-4 w-4 transition group-hover:-translate-x-1" aria-hidden="true" />
           </div>

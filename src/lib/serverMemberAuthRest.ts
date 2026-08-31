@@ -192,6 +192,7 @@ export async function loginMember(fullName: string, password: string) {
 export async function registerMember(input: {
   fullName: string;
   phone: string;
+  email: string;
   password: string;
   favoriteTeam: string;
   teamEmoji: string;
@@ -229,11 +230,21 @@ export async function registerMember(input: {
     updatedAt: now,
   };
   const credential = await hashMemberPassword(input.password);
-
-  await commitWrites([
+  const writes = [
     createDocumentWrite("users", userId, userData),
     createDocumentWrite("memberCredentials", userId, credential),
-  ]);
+  ];
+  if (input.email) {
+    writes.push(
+      createDocumentWrite("memberPrivateProfiles", userId, {
+        email: input.email.trim().toLowerCase(),
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+  }
+
+  await commitWrites(writes);
 
   return {
     customToken: createFirebaseCustomToken(userId, {

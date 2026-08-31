@@ -163,6 +163,7 @@ async function readApiJson<T>(response: Response, serviceLabel: string): Promise
 export type RegisterUserInput = {
   fullName: string;
   phone: string;
+  email: string;
   password: string;
   favoriteTeam: string;
   teamEmoji: string;
@@ -290,6 +291,7 @@ export async function getUserById(userId: string): Promise<AppUser | null> {
 export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
   const fullName = cleanText(input.fullName);
   const phone = cleanText(input.phone);
+  const email = cleanText(input.email).toLowerCase();
   const password = cleanText(input.password);
   const favoriteTeam = cleanText(input.favoriteTeam);
   const teamEmoji = cleanText(input.teamEmoji);
@@ -297,6 +299,7 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
   if (!fullName) throw new Error("الاسم مطلوب");
   if (fullName.length > 20) throw new Error("الاسم يجب ألا يتجاوز 20 حرفًا");
   if (!phone) throw new Error("رقم الجوال مطلوب");
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("أدخل بريدًا إلكترونيًا صحيحًا");
   if (!password || password.length < 4) {
     throw new Error("كلمة المرور يجب ألا تقل عن 4 أرقام أو أحرف");
   }
@@ -310,6 +313,7 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
       body: JSON.stringify({
         fullName,
         phone,
+        email,
         password,
         favoriteTeam,
         teamEmoji,

@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const fullName = clean(body.fullName);
     const phone = clean(body.phone);
+    const email = clean(body.email).toLowerCase();
     const password = clean(body.password);
     const favoriteTeam = clean(body.favoriteTeam);
     const teamEmoji = clean(body.teamEmoji);
@@ -23,6 +24,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "الاسم يجب ألا يتجاوز 20 حرفًا" }, { status: 400 });
     }
     if (!phone) return NextResponse.json({ error: "رقم الجوال مطلوب" }, { status: 400 });
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "أدخل بريدًا إلكترونيًا صحيحًا" }, { status: 400 });
+    }
     if (!password || password.length < 4) {
       return NextResponse.json(
         { error: "كلمة المرور يجب ألا تقل عن 4 أرقام أو أحرف" },
@@ -36,6 +40,7 @@ export async function POST(request: Request) {
     const result = await registerMember({
       fullName,
       phone,
+      email,
       password,
       favoriteTeam,
       teamEmoji,
