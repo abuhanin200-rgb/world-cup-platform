@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
-import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
-import { hashMemberPassword } from "@/lib/serverPassword";
+import { replaceMemberPassword } from "@/lib/serverMemberAuthRest";
+import { verifyFirebaseIdTokenViaRest } from "@/lib/serverFirebaseRest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +15,6 @@ function bearerToken(request: Request) {
 export async function POST(request: Request) {
   try {
     const token = bearerToken(request);
-
     if (!token) {
       return NextResponse.json(
         { error: "أعد تسجيل الدخول لتغيير كلمة المرور" },
@@ -24,7 +22,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const decoded = await adminAuth.verifyIdToken(token);
+    const userId = await verifyFirebaseIdTokenViaRest(token);
     const body = (await request.json()) as { newPassword?: string };
     const newPassword = String(body.newPassword || "").trim();
 
@@ -35,42 +33,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const userRef = adminDb.collection("users").doc(decoded.uid);
-    const userSnap = await userRef.get();
-
-    if (!userSnap.exists) {
-      return NextResponse.json({ error: "الحساب غير موجود" }, { status: 404 });
-    }
-
-    const credentialRef = adminDb
-      .collection("memberCredentials")
-      .doc(decoded.uid);
-    const oldCredential = await credentialRef.get();
-    const oldCreatedAt = oldCredential.data()?.createdAt;
-    const credential = await hashMemberPassword(
-      newPassword,
-      typeof oldCreatedAt === "string" ? oldCreatedAt : undefined,
-    );
-    const now = new Date().toISOString();
-    const batch = adminDb.batch();
-
-    batch.set(credentialRef, credential, { merge: true });
-    batch.set(
-      userRef,
-      {
-        password: FieldValue.delete(),
-        authUid: decoded.uid,
-        memberAuthVersion: 2,
-        memberAuthMigratedAt: now,
-        updatedAt: now,
-      },
-      { merge: true },
-    );
-    await batch.commit();
-
+    await replaceMemberPassword(userId, newPassword);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Member password update error:", error);
+    console.error("Member REST password update error:", error);
     return NextResponse.json(
       { error: "تعذر تغيير كلمة المرور" },
       { status: 401 },

@@ -176,3 +176,31 @@ body {
 @media (max-width: 767px) {
   .mobile-compact-card { border-radius: 18px !important; padding: 12px !important; }
 }
+
+/* تغذية بصرية موحدة عند الضغط على العناصر التفاعلية */
+:where(button:not(:disabled), [role="button"]:not([aria-disabled="true"])) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition-property: transform, filter, background-color, border-color, box-shadow, opacity;
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
+}
+
+:where(button:not(:disabled), [role="button"]:not([aria-disabled="true"])):active {
+  transform: scale(0.975);
+  filter: brightness(0.96);
+}
+
+:where(a[href]) {
+  -webkit-tap-highlight-color: rgba(255, 194, 16, 0.12);
+}
+
+:where(a[href]):active {
+  opacity: 0.82;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button:not(:disabled), [role="button"]:not([aria-disabled="true"])):active {
+    transform: none;
+  }
+}

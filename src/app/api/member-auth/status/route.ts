@@ -1,49 +1,40 @@
 import { NextResponse } from "next/server";
-import {
-  getFirebaseAdminDiagnostics,
-  getFirebaseAdminServices,
-} from "@/lib/firebaseAdmin";
+import { restAdminStatus } from "@/lib/serverFirebaseRest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET() {
-  const env = getFirebaseAdminDiagnostics();
-
   try {
-    const { db, auth } = getFirebaseAdminServices();
-
-    // Firestore read verifies project + credentials. Creating a token verifies the
-    // private signing key without exposing any member data or secret values.
-    await db.collection("users").limit(1).get();
-    await auth.createCustomToken("member-auth-health-check", { healthCheck: true });
-
+    const checks = await restAdminStatus();
     return NextResponse.json(
       {
         ok: true,
         service: "member-auth",
-        firebaseAdmin: "ready",
-        environment: env,
+        transport: "google-rest",
+        firebaseAdminSdk: "not_used",
+        checks,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "");
-    console.error("Member auth status failed:", error);
+    console.error("Member REST auth status failed:", error);
 
     let reason = "server_error";
-    if (/PROJECT_ID|project/i.test(message)) reason = "project_id";
-    else if (/CLIENT_EMAIL|client.?email/i.test(message)) reason = "client_email";
-    else if (/PRIVATE_KEY|private key|PEM|credential/i.test(message)) reason = "private_key";
+    if (/PROJECT_ID/i.test(message)) reason = "project_id";
+    else if (/CLIENT_EMAIL/i.test(message)) reason = "client_email";
+    else if (/PRIVATE_KEY/i.test(message)) reason = "private_key";
+    else if (/GOOGLE_OAUTH/i.test(message)) reason = "google_oauth";
+    else if (/FIRESTORE/i.test(message)) reason = "firestore";
 
     return NextResponse.json(
       {
         ok: false,
         service: "member-auth",
-        firebaseAdmin: "not_ready",
+        transport: "google-rest",
         reason,
-        environment: env,
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );

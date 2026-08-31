@@ -1,30 +1,25 @@
 import { NextResponse } from "next/server";
-import {
-  createMemberCustomToken,
-  findMemberByFullName,
-  mapSafeMemberUser,
-  verifyAndMigrateMemberPassword,
-} from "@/lib/serverMemberAuth";
+import { loginMember } from "@/lib/serverMemberAuthRest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function serverErrorMessage(error: unknown) {
+function classifyServerError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "");
 
-  if (/FIREBASE_ADMIN_|private key|credential|PEM/i.test(message)) {
+  if (/FIREBASE_|GOOGLE_OAUTH_|FIRESTORE_/i.test(message)) {
     return {
       status: 503,
-      code: "MEMBER_AUTH_SERVER_CONFIG",
-      error: "خدمة دخول الأعضاء غير مكتملة الإعداد في السيرفر. راجع إعدادات Firebase Admin في Vercel.",
+      code: "MEMBER_AUTH_INFRASTRUCTURE",
+      error: "تعذر تشغيل خدمة دخول الأعضاء على السيرفر. راجع صفحة حالة الدخول ثم حاول مرة أخرى.",
     };
   }
 
   return {
     status: 500,
     code: "MEMBER_AUTH_SERVER_ERROR",
-    error: "تعذر تسجيل الدخول الآن، حاول مرة أخرى",
+    error: "تعذر تسجيل الدخول الآن، حاول مرة أخرى.",
   };
 }
 
@@ -34,59 +29,28 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as {
-      fullName?: string;
-      password?: string;
-    };
+    const body = (await request.json()) as { fullName?: string; password?: string };
     const fullName = String(body.fullName || "").trim();
     const password = String(body.password || "").trim();
 
     if (!fullName || !password) {
-      return NextResponse.json(
-        { error: "أدخل الاسم وكلمة المرور" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "أدخل الاسم وكلمة المرور" }, { status: 400 });
     }
 
-    const memberDoc = await findMemberByFullName(fullName);
-
-    if (!memberDoc) {
-      return NextResponse.json(
-        { error: "بيانات الدخول غير صحيحة" },
-        { status: 401 },
-      );
+    const result = await loginMember(fullName, password);
+    if (!result) {
+      return NextResponse.json({ error: "بيانات الدخول غير صحيحة" }, { status: 401 });
     }
 
-    const userData = memberDoc.data() as Record<string, unknown>;
-    const valid = await verifyAndMigrateMemberPassword(
-      memberDoc.id,
-      userData,
-      password,
-    );
-
-    if (!valid) {
-      return NextResponse.json(
-        { error: "بيانات الدخول غير صحيحة" },
-        { status: 401 },
-      );
-    }
-
-    const refreshed = await memberDoc.ref.get();
-    const customToken = await createMemberCustomToken(memberDoc.id);
-
-    return NextResponse.json({
-      customToken,
-      user: mapSafeMemberUser(
-        refreshed.id,
-        refreshed.data() as Record<string, unknown>,
-      ),
+    return NextResponse.json(result, {
+      headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    console.error("Member secure login error:", error);
-    const details = serverErrorMessage(error);
+    console.error("Member REST login error:", error);
+    const details = classifyServerError(error);
     return NextResponse.json(
       { error: details.error, code: details.code },
-      { status: details.status },
+      { status: details.status, headers: { "Cache-Control": "no-store" } },
     );
   }
 }
