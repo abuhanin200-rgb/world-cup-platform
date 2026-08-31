@@ -115,7 +115,12 @@ async function signInMemberWithCustomToken(customToken: string) {
       throw new Error("تعذر الاتصال بخدمة تسجيل الدخول. تحقق من الإنترنت وحاول مرة أخرى.");
     }
 
-    throw error;
+    const fallbackMessage = /string did not match the expected pattern/i.test(message)
+      ? "تعذر بدء جلسة الدخول. حدّث الصفحة ثم حاول مرة أخرى."
+      : "تعذر تسجيل الدخول الآن. حاول مرة أخرى.";
+
+    console.error("Firebase member auth failed:", error);
+    throw new Error(fallbackMessage);
   }
 }
 
@@ -261,17 +266,24 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
   }
   if (!favoriteTeam) throw new Error("اختر المنتخب المرشح");
 
-  const response = await fetch("/api/member-auth/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fullName,
-      phone,
-      password,
-      favoriteTeam,
-      teamEmoji,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/member-auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fullName,
+        phone,
+        password,
+        favoriteTeam,
+        teamEmoji,
+      }),
+    });
+  } catch (error) {
+    console.error("Member register request failed:", error);
+    throw new Error("تعذر الاتصال بخدمة إنشاء الحساب. حدّث الصفحة وحاول مرة أخرى.");
+  }
+
   const data = (await response.json()) as {
     customToken?: string;
     user?: AppUser;
@@ -294,11 +306,18 @@ export async function loginUser(input: LoginUserInput): Promise<AppUser> {
     throw new Error("أدخل الاسم وكلمة المرور");
   }
 
-  const response = await fetch("/api/member-auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fullName, password }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/member-auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fullName, password }),
+    });
+  } catch (error) {
+    console.error("Member login request failed:", error);
+    throw new Error("تعذر الاتصال بخدمة تسجيل الدخول. حدّث الصفحة وحاول مرة أخرى.");
+  }
+
   const data = (await response.json()) as {
     customToken?: string;
     user?: AppUser;
