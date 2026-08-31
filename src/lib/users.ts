@@ -8,7 +8,12 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { signInWithCustomToken } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  browserSessionPersistence,
+  setPersistence,
+  signInWithCustomToken,
+} from "firebase/auth";
 import { auth, db } from "./firebase";
 
 export type AppUser = {
@@ -43,6 +48,76 @@ export type AppUser = {
   updatedAt?: string;
   lastUpdated?: string;
 };
+
+
+async function signInMemberWithCustomToken(customToken: string) {
+  const token = String(customToken || "").trim();
+
+  if (!token || token.split(".").length !== 3) {
+    throw new Error("تعذر إنشاء جلسة دخول آمنة. أعد المحاولة.");
+  }
+
+  const apiKey = String(auth.app.options.apiKey || "").trim();
+  if (!apiKey) {
+    throw new Error("إعدادات تسجيل الدخول غير مكتملة في النسخة المنشورة.");
+  }
+
+  // Safari/WebKit may have trouble with Firebase's IndexedDB-backed default
+  // persistence. Prefer localStorage explicitly, then fall back to sessionStorage.
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (localPersistenceError) {
+    console.warn(
+      "Firebase local persistence unavailable; falling back to session persistence.",
+      localPersistenceError,
+    );
+    try {
+      await setPersistence(auth, browserSessionPersistence);
+    } catch (sessionPersistenceError) {
+      console.warn(
+        "Firebase session persistence unavailable; continuing with current persistence.",
+        sessionPersistenceError,
+      );
+    }
+  }
+
+  try {
+    await signInWithCustomToken(auth, token);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: unknown }).code || "")
+        : "";
+
+    const safariPatternError = /string did not match the expected pattern/i.test(message);
+
+    // One extra attempt with sessionStorage helps iOS Safari when persistence
+    // initialization gets into a bad IndexedDB state.
+    if (safariPatternError) {
+      try {
+        await setPersistence(auth, browserSessionPersistence);
+        await signInWithCustomToken(auth, token);
+        return;
+      } catch (retryError) {
+        console.error("Firebase Safari auth retry failed:", retryError);
+        throw new Error(
+          "تعذر بدء جلسة الدخول على Safari. أغلق الصفحة وافتحها من جديد ثم حاول مرة أخرى.",
+        );
+      }
+    }
+
+    if (code === "auth/invalid-custom-token" || code === "auth/custom-token-mismatch") {
+      throw new Error("تعذر التحقق من جلسة الحساب. أعد المحاولة.");
+    }
+
+    if (code === "auth/network-request-failed") {
+      throw new Error("تعذر الاتصال بخدمة تسجيل الدخول. تحقق من الإنترنت وحاول مرة أخرى.");
+    }
+
+    throw error;
+  }
+}
 
 export type RegisterUserInput = {
   fullName: string;
@@ -207,7 +282,7 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
     throw new Error(data.error || "تعذر إنشاء الحساب");
   }
 
-  await signInWithCustomToken(auth, data.customToken);
+  await signInMemberWithCustomToken(data.customToken);
   return data.user;
 }
 
@@ -234,7 +309,7 @@ export async function loginUser(input: LoginUserInput): Promise<AppUser> {
     throw new Error(data.error || "بيانات الدخول غير صحيحة");
   }
 
-  await signInWithCustomToken(auth, data.customToken);
+  await signInMemberWithCustomToken(data.customToken);
   return data.user;
 }
 
