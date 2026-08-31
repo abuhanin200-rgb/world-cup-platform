@@ -7,6 +7,8 @@ import {
 } from "@/lib/serverMemberAuth";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function clean(value: unknown) {
   return String(value || "").trim();

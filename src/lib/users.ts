@@ -124,6 +124,42 @@ async function signInMemberWithCustomToken(customToken: string) {
   }
 }
 
+
+async function readApiJson<T>(response: Response, serviceLabel: string): Promise<T> {
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+  const text = await response.text();
+
+  if (!text) {
+    throw new Error(`${serviceLabel} لم تُرجع استجابة. أعد المحاولة بعد تحديث الصفحة.`);
+  }
+
+  const looksLikeJson = contentType.includes("application/json") || /^[\s]*[\[{]/.test(text);
+
+  if (!looksLikeJson) {
+    const preview = text.slice(0, 120).replace(/\s+/g, " ");
+    console.error(`${serviceLabel} returned non-JSON response`, {
+      status: response.status,
+      contentType,
+      preview,
+    });
+
+    if (response.status === 404) {
+      throw new Error("خدمة تسجيل الدخول غير موجودة في النسخة المنشورة. أعد نشر آخر نسخة من المشروع.");
+    }
+
+    throw new Error(
+      `خدمة تسجيل الدخول في السيرفر لم تبدأ بشكل صحيح (HTTP ${response.status}). راجع حالة Member Auth في /api/member-auth/status.`,
+    );
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch (error) {
+    console.error(`${serviceLabel} returned invalid JSON`, error);
+    throw new Error("تعذر قراءة استجابة خدمة تسجيل الدخول. أعد المحاولة.");
+  }
+}
+
 export type RegisterUserInput = {
   fullName: string;
   phone: string;
@@ -284,11 +320,11 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
     throw new Error("تعذر الاتصال بخدمة إنشاء الحساب. حدّث الصفحة وحاول مرة أخرى.");
   }
 
-  const data = (await response.json()) as {
+  const data = await readApiJson<{
     customToken?: string;
     user?: AppUser;
     error?: string;
-  };
+  }>(response, "خدمة إنشاء الحساب");
 
   if (!response.ok || !data.customToken || !data.user) {
     throw new Error(data.error || "تعذر إنشاء الحساب");
@@ -318,11 +354,11 @@ export async function loginUser(input: LoginUserInput): Promise<AppUser> {
     throw new Error("تعذر الاتصال بخدمة تسجيل الدخول. حدّث الصفحة وحاول مرة أخرى.");
   }
 
-  const data = (await response.json()) as {
+  const data = await readApiJson<{
     customToken?: string;
     user?: AppUser;
     error?: string;
-  };
+  }>(response, "خدمة تسجيل الدخول");
 
   if (!response.ok || !data.customToken || !data.user) {
     throw new Error(data.error || "بيانات الدخول غير صحيحة");
@@ -421,7 +457,7 @@ export async function updateUserPassword(
     },
     body: JSON.stringify({ newPassword }),
   });
-  const data = (await response.json()) as { error?: string };
+  const data = await readApiJson<{ error?: string }>(response, "خدمة تغيير كلمة المرور");
 
   if (!response.ok) {
     throw new Error(data.error || "تعذر تغيير كلمة المرور");

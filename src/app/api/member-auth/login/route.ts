@@ -7,6 +7,30 @@ import {
 } from "@/lib/serverMemberAuth";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function serverErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+
+  if (/FIREBASE_ADMIN_|private key|credential|PEM/i.test(message)) {
+    return {
+      status: 503,
+      code: "MEMBER_AUTH_SERVER_CONFIG",
+      error: "خدمة دخول الأعضاء غير مكتملة الإعداد في السيرفر. راجع إعدادات Firebase Admin في Vercel.",
+    };
+  }
+
+  return {
+    status: 500,
+    code: "MEMBER_AUTH_SERVER_ERROR",
+    error: "تعذر تسجيل الدخول الآن، حاول مرة أخرى",
+  };
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true, service: "member-auth-login", method: "POST" });
+}
 
 export async function POST(request: Request) {
   try {
@@ -59,9 +83,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Member secure login error:", error);
+    const details = serverErrorMessage(error);
     return NextResponse.json(
-      { error: "تعذر تسجيل الدخول الآن، حاول مرة أخرى" },
-      { status: 500 },
+      { error: details.error, code: details.code },
+      { status: details.status },
     );
   }
 }

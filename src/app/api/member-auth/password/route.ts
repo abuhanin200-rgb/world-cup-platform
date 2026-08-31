@@ -4,6 +4,8 @@ import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
 import { hashMemberPassword } from "@/lib/serverPassword";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function bearerToken(request: Request) {
   const authorization = request.headers.get("authorization") || "";
