@@ -204,3 +204,313 @@ body {
     transform: none;
   }
 }
+
+/* =========================================================
+   Altahaddi Motion System V2
+   Lightweight compositor-first surfaces and interactions.
+   ========================================================= */
+.altahaddi-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.75), transparent 92%);
+}
+
+.altahaddi-primary-button,
+.altahaddi-secondary-button {
+  position: relative;
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  gap: .55rem;
+  overflow: hidden;
+  border-radius: 16px;
+  padding-inline: 1rem;
+  font-size: .875rem;
+  font-weight: 900;
+  transition: transform 160ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+.altahaddi-primary-button {
+  border: 1px solid rgba(255,194,16,.72);
+  background: #ffc210;
+  color: #04133a;
+  box-shadow: 0 12px 30px rgba(255,194,16,.13);
+}
+.altahaddi-primary-button:hover { transform: translateY(-2px); box-shadow: 0 17px 38px rgba(255,194,16,.20); }
+.altahaddi-primary-button:active { transform: translateY(0) scale(.98); }
+
+.altahaddi-secondary-button {
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.055);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+.altahaddi-secondary-button:hover { transform: translateY(-2px); background: rgba(255,255,255,.085); border-color: rgba(255,255,255,.18); }
+.altahaddi-secondary-button:active { transform: translateY(0) scale(.98); }
+
+.altahaddi-icon-button {
+  display: inline-grid;
+  min-width: 42px;
+  min-height: 42px;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 13px;
+  background: rgba(255,255,255,.045);
+  color: rgba(255,255,255,.65);
+  transition: transform 150ms ease, background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.altahaddi-icon-button:hover { color: #ffc210; border-color: rgba(255,194,16,.18); background: rgba(255,194,16,.06); }
+.altahaddi-icon-button:active { transform: scale(.94); }
+
+.altahaddi-input {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 16px;
+  background: rgba(0,0,0,.18);
+  padding-block: .75rem;
+  color: #fff;
+  font-size: .875rem;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+.altahaddi-input::placeholder { color: rgba(255,255,255,.28); }
+.altahaddi-input:focus { border-color: rgba(255,194,16,.68); background: rgba(0,0,0,.24); box-shadow: 0 0 0 4px rgba(255,194,16,.07); }
+
+.altahaddi-carousel-button {
+  display: inline-grid;
+  min-width: 42px;
+  min-height: 42px;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 999px;
+  background: rgba(255,255,255,.05);
+  color: rgba(255,255,255,.72);
+  transition: transform 150ms ease, color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+.altahaddi-carousel-button:hover { transform: translateY(-1px); color: #ffc210; border-color: rgba(255,194,16,.22); background: rgba(255,194,16,.07); }
+
+@media (max-width: 767px) {
+  .altahaddi-primary-button,
+  .altahaddi-secondary-button { min-height: 46px; border-radius: 15px; font-size: .8rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .altahaddi-primary-button:hover,
+  .altahaddi-secondary-button:hover,
+  .altahaddi-carousel-button:hover { transform: none; }
+}
+
+
+/* =========================================================
+   Altahaddi Visual System V3 — home refinement
+   ========================================================= */
+.altahaddi-hero-v3 {
+  background:
+    linear-gradient(135deg, rgba(5,23,70,.98), rgba(8,39,104,.95) 52%, rgba(5,22,65,.98)),
+    #06194a;
+}
+
+.altahaddi-showcase-lines {
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to left, rgba(0,0,0,.85), transparent 86%);
+}
+
+@media (max-width: 640px) {
+  .altahaddi-showcase-lines { background-size: 34px 34px; }
+}
+
+/* =========================================================
+   Web V2 final mobile QA
+   Safe-area aware floating dock + bottom sheet containment.
+   ========================================================= */
+.altahaddi-mobile-dock {
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+}
+
+.altahaddi-notification-sheet {
+  left: max(0px, env(safe-area-inset-left));
+  right: max(0px, env(safe-area-inset-right));
+}
+
+@media (max-width: 767px) {
+  html {
+    scroll-padding-bottom: calc(116px + env(safe-area-inset-bottom));
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+}
+
+@media (min-width: 768px) {
+  .altahaddi-notification-sheet {
+    right: auto;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  :where(a[href], button:not(:disabled), [role="button"]:not([aria-disabled="true"])) {
+    -webkit-tap-highlight-color: rgba(255, 194, 16, 0.08);
+  }
+}
+
+/* =========================================================
+   Altahaddi Glass System V4
+   Consistent high-contrast glassmorphism without excessive blur.
+   ========================================================= */
+.altahaddi-glass {
+  border: 1px solid rgba(255,255,255,.13);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.035) 42%, rgba(3,15,47,.30)),
+    rgba(5,24,70,.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 22px 55px rgba(0,0,0,.20);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+.altahaddi-glass-strong {
+  border: 1px solid rgba(255,255,255,.17);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.13), rgba(255,255,255,.045) 38%, rgba(3,15,47,.40)),
+    rgba(5,22,62,.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.15),
+    0 28px 70px rgba(0,0,0,.28);
+  -webkit-backdrop-filter: blur(24px) saturate(130%);
+  backdrop-filter: blur(24px) saturate(130%);
+}
+
+.altahaddi-glass-soft {
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.055);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 12px 30px rgba(0,0,0,.11);
+  -webkit-backdrop-filter: blur(12px) saturate(115%);
+  backdrop-filter: blur(12px) saturate(115%);
+}
+
+.altahaddi-glass-chip {
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(3,16,50,.42);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 20px rgba(0,0,0,.12);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  backdrop-filter: blur(12px) saturate(120%);
+}
+
+.altahaddi-auth-stage {
+  background:
+    radial-gradient(circle at 16% 12%, rgba(255,194,16,.12), transparent 28%),
+    radial-gradient(circle at 84% 74%, rgba(59,130,246,.18), transparent 34%),
+    #04133a;
+}
+
+.altahaddi-auth-shell {
+  border: 1px solid rgba(255,255,255,.17);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.13), rgba(255,255,255,.04) 40%, rgba(3,15,47,.48)),
+    rgba(5,22,62,.54);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 38px 100px rgba(0,0,0,.38);
+  -webkit-backdrop-filter: blur(28px) saturate(135%);
+  backdrop-filter: blur(28px) saturate(135%);
+}
+
+.altahaddi-social-button {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 15px;
+  background: rgba(255,255,255,.06);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  color: #fff;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transition: transform 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+.altahaddi-social-button:hover { transform: translateY(-1px); background: rgba(255,255,255,.09); border-color: rgba(255,194,16,.22); box-shadow: 0 10px 24px rgba(0,0,0,.16); }
+.altahaddi-social-button:active { transform: scale(.98); }
+.altahaddi-social-button:disabled { opacity: .48; cursor: wait; }
+
+.altahaddi-input {
+  background: rgba(3,15,47,.36);
+  border-color: rgba(255,255,255,.14);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.altahaddi-input:focus {
+  background: rgba(3,15,47,.48);
+}
+
+@media (max-width: 767px) {
+  .altahaddi-glass,
+  .altahaddi-glass-strong,
+  .altahaddi-auth-shell {
+    -webkit-backdrop-filter: blur(16px) saturate(118%);
+    backdrop-filter: blur(16px) saturate(118%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .altahaddi-social-button:hover { transform: none; }
+}
+
+/* Progressive glass treatment for existing public cards. Large surfaces blur;
+   small cards stay translucent to avoid stacking expensive backdrop filters. */
+.altahaddi-glass-world :where(article, aside)[class*="border-white"] {
+  background-color: rgba(5,24,70,.44) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 16px 38px rgba(0,0,0,.14);
+  -webkit-backdrop-filter: blur(14px) saturate(118%);
+  backdrop-filter: blur(14px) saturate(118%);
+}
+
+.altahaddi-glass-world :where(div)[class*="bg-white/"][class*="border-white"] {
+  background-color: rgba(255,255,255,.055) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055);
+}
+
+/* Batch 08B — clearer full-page auth backdrop + lighter real glass panel */
+.altahaddi-auth-stage {
+  isolation: isolate;
+  background: #04133a;
+}
+
+.altahaddi-auth-shell {
+  border: 1px solid rgba(255,255,255,.20);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.105), rgba(255,255,255,.022) 44%, rgba(3,15,47,.18)),
+    rgba(5,22,62,.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.17),
+    inset 0 -1px 0 rgba(255,255,255,.035),
+    0 38px 100px rgba(0,0,0,.30);
+  -webkit-backdrop-filter: blur(22px) saturate(138%);
+  backdrop-filter: blur(22px) saturate(138%);
+}
+
+.altahaddi-auth-shell .altahaddi-input {
+  background: rgba(3,15,47,.25);
+  border-color: rgba(255,255,255,.16);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
+}
+
+@media (max-width: 767px) {
+  .altahaddi-auth-shell {
+    background:
+      linear-gradient(145deg, rgba(255,255,255,.10), rgba(255,255,255,.025) 48%, rgba(3,15,47,.16)),
+      rgba(5,22,62,.22);
+    -webkit-backdrop-filter: blur(18px) saturate(128%);
+    backdrop-filter: blur(18px) saturate(128%);
+  }
+}

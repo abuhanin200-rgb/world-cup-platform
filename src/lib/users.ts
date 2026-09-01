@@ -13,6 +13,11 @@ import {
   browserSessionPersistence,
   setPersistence,
   signInWithCustomToken,
+  signInWithPopup,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  OAuthProvider,
+  signOut,
 } from "firebase/auth";
 import { auth, db } from "./firebase";
 
@@ -167,12 +172,114 @@ export type RegisterUserInput = {
   password: string;
   favoriteTeam: string;
   teamEmoji: string;
+  socialProvider?: SocialProvider;
+  socialIdToken?: string;
 };
 
 export type LoginUserInput = {
   fullName: string;
   password: string;
 };
+
+export type SocialProvider = "google" | "facebook" | "apple";
+
+export type SocialRegistrationIdentity = {
+  provider: SocialProvider;
+  email: string;
+  displayName: string;
+  idToken: string;
+};
+
+function createSocialProvider(provider: SocialProvider) {
+  if (provider === "google") {
+    const instance = new GoogleAuthProvider();
+    instance.setCustomParameters({ prompt: "select_account" });
+    return instance;
+  }
+  if (provider === "facebook") {
+    const instance = new FacebookAuthProvider();
+    instance.addScope("email");
+    return instance;
+  }
+
+  const instance = new OAuthProvider("apple.com");
+  instance.addScope("email");
+  instance.addScope("name");
+  return instance;
+}
+
+function socialProviderLabel(provider: SocialProvider) {
+  return provider === "google" ? "Google" : provider === "facebook" ? "Facebook" : "Apple";
+}
+
+function mapSocialAuthError(error: unknown, provider: SocialProvider) {
+  const code = error && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code || "")
+    : "";
+  const label = socialProviderLabel(provider);
+  if (code === "auth/popup-closed-by-user") return new Error(`تم إغلاق نافذة ${label} قبل إكمال العملية.`);
+  if (code === "auth/operation-not-allowed") return new Error(`تسجيل ${label} غير مفعّل في Firebase حتى الآن.`);
+  if (code === "auth/popup-blocked") return new Error(`المتصفح منع نافذة ${label}. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.`);
+  if (code === "auth/account-exists-with-different-credential") return new Error("هذا البريد مستخدم مع مزود دخول آخر. استخدم المزود المرتبط بالحساب أولًا.");
+  return error instanceof Error ? error : new Error(`تعذر المتابعة بواسطة ${label}.`);
+}
+
+export async function beginSocialRegistration(provider: SocialProvider): Promise<SocialRegistrationIdentity> {
+  const authProvider = createSocialProvider(provider);
+  try {
+    const result = await signInWithPopup(auth, authProvider);
+    const idToken = await result.user.getIdToken();
+    const email = String(result.user.email || "").trim().toLowerCase();
+    if (!email) {
+      await signOut(auth).catch(() => undefined);
+      throw new Error("مزود الدخول لم يُرجع بريدًا إلكترونيًا. استخدم حسابًا يسمح بمشاركة البريد.");
+    }
+    return {
+      provider,
+      email,
+      displayName: String(result.user.displayName || "").trim(),
+      idToken,
+    };
+  } catch (error) {
+    await signOut(auth).catch(() => undefined);
+    throw mapSocialAuthError(error, provider);
+  }
+}
+
+export async function loginUserWithSocial(provider: SocialProvider) {
+  const authProvider = createSocialProvider(provider);
+  try {
+    const result = await signInWithPopup(auth, authProvider);
+    const idToken = await result.user.getIdToken();
+    const response = await fetch("/api/member-auth/social", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken, provider }),
+      cache: "no-store",
+    });
+    const data = await readApiJson<{
+      customToken?: string;
+      user?: AppUser;
+      error?: string;
+      code?: string;
+    }>(response, `${socialProviderLabel(provider)} Member Auth`);
+
+    if (!response.ok || !data.customToken || !data.user) {
+      await signOut(auth).catch(() => undefined);
+      throw new Error(data.error || `تعذر تسجيل الدخول بواسطة ${socialProviderLabel(provider)}`);
+    }
+
+    await signInMemberWithCustomToken(data.customToken);
+    return data.user;
+  } catch (error) {
+    await signOut(auth).catch(() => undefined);
+    throw mapSocialAuthError(error, provider);
+  }
+}
+
+export async function loginUserWithGoogle() {
+  return loginUserWithSocial("google");
+}
 
 export type UpdateUserProfileInput = {
   userId: string;
@@ -317,6 +424,8 @@ export async function registerUser(input: RegisterUserInput): Promise<AppUser> {
         password,
         favoriteTeam,
         teamEmoji,
+        socialProvider: input.socialProvider,
+        socialIdToken: input.socialIdToken,
       }),
     });
   } catch (error) {

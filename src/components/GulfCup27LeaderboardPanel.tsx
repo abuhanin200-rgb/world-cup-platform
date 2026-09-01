@@ -17,6 +17,7 @@ import {
   type TournamentUserStatsV2,
 } from "@/domain/tournaments";
 import { getTournamentLeaderboardV2 } from "@/lib/tournamentV2Firestore";
+import MemberProfileLink from "@/components/members/MemberProfileLink";
 
 function PodiumCard({
   row,
@@ -41,7 +42,7 @@ function PodiumCard({
         )}
       </div>
       <div className="mt-3 text-xs font-black text-white/45">المركز {place}</div>
-      <h3 className="mt-1 truncate text-base font-black">{row.fullName}</h3>
+      <h3 className="mt-1 truncate text-base font-black"><MemberProfileLink userId={row.userId}>{row.fullName}</MemberProfileLink></h3>
       <div dir="ltr" className="mt-3 text-2xl font-black text-[var(--tournament-primary)] [unicode-bidi:isolate]">
         {row.points}
       </div>
@@ -60,7 +61,7 @@ function MemberSummary({ row }: { row: TournamentUserStatsV2 }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-black text-emerald-200/80">أداؤك في خليجي 27</p>
-          <h3 className="mt-1 text-lg font-black">{row.fullName}</h3>
+          <h3 className="mt-1 text-lg font-black"><MemberProfileLink userId={row.userId}>{row.fullName}</MemberProfileLink></h3>
         </div>
         <div className="rounded-2xl border border-emerald-200/20 bg-black/15 px-4 py-2 text-center">
           <div className="text-[11px] font-bold text-white/45">مركزك</div>
@@ -189,7 +190,7 @@ export default function GulfCup27LeaderboardPanel() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span dir="ltr" className="text-xs font-black text-white/40 [unicode-bidi:isolate]">#{index + 1}</span>
-                          <h3 className="truncate font-black">{row.fullName}</h3>
+                          <h3 className="truncate font-black"><MemberProfileLink userId={row.userId}>{row.fullName}</MemberProfileLink></h3>
                         </div>
                         {isCurrent && <div className="mt-1 text-[11px] font-black text-emerald-200">أنت</div>}
                       </div>
@@ -240,7 +241,7 @@ export default function GulfCup27LeaderboardPanel() {
                           </span>
                         </td>
                         <td className="px-4 py-3 font-black">
-                          {row.fullName}
+                          <MemberProfileLink userId={row.userId}>{row.fullName}</MemberProfileLink>
                           {isCurrent && <span className="mr-2 rounded-full bg-emerald-300/15 px-2 py-0.5 text-[10px] text-emerald-200">أنت</span>}
                         </td>
                         <td className="px-4 py-3 text-center text-base font-black text-[var(--tournament-primary)]">{row.points}</td>

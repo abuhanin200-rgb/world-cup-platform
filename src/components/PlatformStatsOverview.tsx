@@ -52,22 +52,20 @@ export default function PlatformStatsOverview() {
 
   return (
     <section aria-labelledby="platform-stats-heading">
-      <div className="mb-2.5 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black text-[var(--brand-yellow)] md:text-xs">أرقام المنصة</p>
-          <h2 id="platform-stats-heading" className="mt-0.5 text-lg font-black md:text-xl">التحدي بالأرقام</h2>
-        </div>
-        <span className="text-[10px] font-bold text-white/45 md:text-xs">تتحدث مع نشاط المنصة</span>
+      <div className="mb-3">
+        <p className="text-[10px] font-black text-[var(--brand-yellow)] md:text-xs">أرقام المنصة</p>
+        <h2 id="platform-stats-heading" className="mt-0.5 text-lg font-black md:text-xl">التحدي بالأرقام</h2>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-5 gap-1 sm:gap-1.5">
         {cards.map(({ label, value, icon: Icon }) => (
-          <article key={label} className="flex min-h-[70px] items-center gap-2.5 rounded-[16px] border border-white/10 bg-white/[0.045] p-2.5 md:min-h-[76px] md:rounded-[18px] md:p-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#ffc210]/10 text-[#ffc210]">
-              <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+          <article key={label} className="altahaddi-glass-soft group relative flex min-h-[76px] min-w-0 flex-col justify-between overflow-hidden rounded-[14px] p-2 sm:min-h-[86px] sm:rounded-[16px] sm:p-2.5 md:min-h-[92px]">
+            <div className="pointer-events-none absolute -left-6 -top-7 h-16 w-16 rounded-full bg-[#ffc210]/[0.045] blur-xl" />
+            <div className="relative flex h-6 w-6 items-center justify-center rounded-[8px] bg-[#ffc210]/10 text-[#ffc210] sm:h-7 sm:w-7">
+              <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
             </div>
-            <div className="min-w-0">
-              <div dir="ltr" className="text-lg font-black tracking-tight text-white md:text-xl">{loading ? "—" : value.toLocaleString("en-US")}</div>
-              <div className="mt-0.5 text-[9px] font-bold text-white/48 md:text-[10px]">{label}</div>
+            <div className="relative mt-1.5 min-w-0">
+              <div dir="ltr" className="truncate text-[15px] font-black tracking-tight text-white sm:text-lg md:text-xl">{loading ? "—" : value.toLocaleString("en-US")}</div>
+              <div className="mt-0.5 truncate text-[7px] font-bold leading-none text-white/46 sm:text-[8px] md:text-[9px]">{label}</div>
             </div>
           </article>
         ))}

@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { Flag } from "lucide-react";
+import { findNationalTeamByName } from "@/lib/nationalTeams";
 
 type TeamFlagSize = "xs" | "sm" | "md" | "lg";
 
@@ -91,13 +93,6 @@ const SIZE_CLASSES: Record<TeamFlagSize, string> = {
   lg: "h-10 w-10 rounded-lg",
 };
 
-const EMOJI_SIZE_CLASSES: Record<TeamFlagSize, string> = {
-  xs: "text-[14px]",
-  sm: "text-[18px]",
-  md: "text-[24px]",
-  lg: "text-[34px]",
-};
-
 function normalizeTeamCode(code?: string | null) {
   return String(code || "")
     .trim()
@@ -121,8 +116,12 @@ export default function TeamFlag({
 }: TeamFlagProps) {
   const [failed, setFailed] = useState(false);
 
-  const flagFileName = useMemo(() => getFlagFileName(code), [code]);
-  const safeEmoji = emoji || "🏳️";
+  const flagFileName = useMemo(() => {
+    const direct = getFlagFileName(code);
+    if (direct) return direct;
+    const nationalTeam = name ? findNationalTeamByName(name) : null;
+    return nationalTeam?.code.toLowerCase() || null;
+  }, [code, name]);
   const altText = name ? `علم ${name}` : "علم المنتخب";
 
   if (!flagFileName || failed) {
@@ -135,12 +134,12 @@ export default function TeamFlag({
         whileTap={{ scale: 0.97 }}
         transition={{ duration: 0.14, ease: "easeOut" }}
         className={[
-          "inline-flex shrink-0 transform-gpu items-center justify-center leading-none",
-          EMOJI_SIZE_CLASSES[size],
+          "inline-flex shrink-0 transform-gpu items-center justify-center rounded-md border border-white/12 bg-white/[0.05] text-white/35",
+          SIZE_CLASSES[size],
           className,
         ].join(" ")}
       >
-        {safeEmoji}
+        <Flag className="h-1/2 w-1/2" />
       </motion.span>
     );
   }

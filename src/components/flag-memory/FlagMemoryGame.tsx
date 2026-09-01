@@ -28,6 +28,7 @@ import {
   type FlagMemorySettings,
 } from "@/lib/flagMemory";
 import { getFlagMemoryTeams, type FlagMemoryTeam } from "@/lib/flagMemoryTeams";
+import { playInteractionFeedback } from "@/lib/interactionFeedback";
 
 type MemoryCard = {
   cardId: string;
@@ -484,6 +485,7 @@ export default function FlagMemoryGame() {
     if (autoSaveRef.current) return;
 
     autoSaveRef.current = true;
+    playInteractionFeedback("success");
     setStatus("finished");
     setMessage(
       "أحسنت! أنهيت تحدي الأعلام بنجاح. جاري اعتماد نتيجتك تلقائيًا..."
@@ -551,6 +553,7 @@ export default function FlagMemoryGame() {
       return;
     }
 
+    playInteractionFeedback("selection");
     setCards(buildCards(settings.pairsCount));
     setSelectedCards([]);
     setStatus("playing");
@@ -572,6 +575,7 @@ export default function FlagMemoryGame() {
     }
     if (selectedCards.length >= 2) return;
 
+    playInteractionFeedback("selection");
     const nextSelected = [...selectedCards, card];
     setSelectedCards(nextSelected);
 
@@ -583,6 +587,7 @@ export default function FlagMemoryGame() {
     const isMatch = firstCard.pairId === secondCard.pairId;
 
     if (isMatch) {
+      playInteractionFeedback("success");
       setCards((items) =>
         items.map((item) =>
           item.pairId === firstCard.pairId ? { ...item, matched: true } : item
@@ -592,6 +597,7 @@ export default function FlagMemoryGame() {
       return;
     }
 
+    playInteractionFeedback("error");
     setMistakes((value) => value + 1);
     lockRef.current = true;
 

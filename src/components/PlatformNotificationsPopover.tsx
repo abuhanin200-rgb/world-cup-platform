@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { motion, useReducedMotion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -51,6 +52,8 @@ function NotificationIcon({ type }: { type: UserNotification["type"] }) {
 
 export default function PlatformNotificationsPopover() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const { user, isLoggedIn, loading } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
@@ -75,6 +78,23 @@ export default function PlatformNotificationsPopover() {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
+
+  useEffect(() => {
+    if (!mounted || !open) return;
+
+    const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 40);
+    if (!window.matchMedia("(max-width: 767px)").matches) {
+      return () => window.clearTimeout(focusTimer);
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mounted, open]);
 
   const unread = items.filter((item) => !item.isRead).length;
 
@@ -113,18 +133,22 @@ export default function PlatformNotificationsPopover() {
         type="button"
         aria-label="إغلاق الإشعارات"
         onClick={() => setOpen(false)}
-        className="fixed inset-0 z-[190] bg-black/25 backdrop-blur-[1px] md:bg-black/10"
+        className="fixed inset-0 z-[190] bg-black/45 backdrop-blur-[2px] md:bg-black/10 md:backdrop-blur-[1px]"
       />
-      <section
+      <motion.section
         dir="rtl"
         role="dialog"
         aria-modal="true"
-        aria-label="الإشعارات"
-        className="fixed inset-x-3 top-[calc(env(safe-area-inset-top)+82px)] z-[200] max-h-[calc(100dvh-120px)] overflow-hidden rounded-[24px] border border-white/10 bg-[#071522]/[0.99] shadow-2xl shadow-black/60 backdrop-blur-xl md:inset-x-auto md:left-5 md:top-20 md:w-[400px] md:rounded-3xl"
+        aria-labelledby="platform-notifications-title"
+        initial={reduceMotion ? false : { opacity: 0, y: 28 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: reduceMotion ? 0 : 0.2, ease: "easeOut" }}
+        className="altahaddi-notification-sheet altahaddi-glass-strong fixed bottom-0 z-[200] max-h-[82dvh] overflow-hidden rounded-t-[30px] border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)] md:inset-x-auto md:bottom-auto md:left-5 md:top-[calc(80px+env(safe-area-inset-top))] md:w-[400px] md:max-h-none md:rounded-3xl md:border md:pb-0"
       >
+        <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-white/15 md:hidden" aria-hidden="true" />
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
           <div>
-            <div className="text-sm font-black text-white">الإشعارات</div>
+            <div id="platform-notifications-title" className="text-sm font-black text-white">الإشعارات</div>
             <div className="mt-0.5 text-[11px] font-bold text-slate-400">
               {unread > 0 ? `${unread} غير مقروءة` : "كلها مقروءة"}
             </div>
@@ -142,6 +166,7 @@ export default function PlatformNotificationsPopover() {
               </button>
             )}
             <button
+              ref={closeButtonRef}
               type="button"
               onClick={() => setOpen(false)}
               className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-white/10 hover:text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-yellow)]"
@@ -152,7 +177,7 @@ export default function PlatformNotificationsPopover() {
           </div>
         </div>
 
-        <div className="max-h-[calc(100dvh-190px)] overflow-x-hidden overflow-y-auto p-2.5 md:max-h-[520px]">
+        <div className="max-h-[calc(82dvh-72px-env(safe-area-inset-bottom))] overscroll-contain overflow-x-hidden overflow-y-auto p-2.5 pb-4 [-webkit-overflow-scrolling:touch] md:max-h-[520px] md:pb-2.5">
           {items.length === 0 ? (
             <div className="px-4 py-10 text-center">
               <Bell className="mx-auto h-7 w-7 text-slate-500" aria-hidden="true" />
@@ -198,7 +223,7 @@ export default function PlatformNotificationsPopover() {
             </div>
           )}
         </div>
-      </section>
+      </motion.section>
     </>,
     document.body,
   ) : null;

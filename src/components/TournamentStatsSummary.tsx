@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { collection, getCountFromServer, query, where } from "firebase/firestore";
 import { BarChart3, Target, Trophy, UsersRound } from "lucide-react";
 import { db } from "@/lib/firebase";
-import type { Tournament } from "@/domain/tournaments";
+import { getTournamentDisplayStatus, getTournamentStatusLabel, type Tournament } from "@/domain/tournaments";
 
-type Stats = { matches: number; predictions: number; participants: number; label: string };
+type Stats = { matches: number; predictions: number; participants: number };
 
 export default function TournamentStatsSummary({ tournament }: { tournament: Tournament }) {
-  const [stats, setStats] = useState<Stats>({ matches: 0, predictions: 0, participants: 0, label: tournament.status === "finished" ? "منتهية" : tournament.status === "coming_soon" ? "قريبًا" : "جارية" });
+  const [stats, setStats] = useState<Stats>({ matches: 0, predictions: 0, participants: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,14 +22,14 @@ export default function TournamentStatsSummary({ tournament }: { tournament: Tou
             getCountFromServer(collection(db, "predictions")),
             getCountFromServer(collection(db, "users")),
           ]);
-          if (active) setStats((current) => ({ ...current, matches: matches.data().count, predictions: predictions.data().count, participants: users.data().count }));
+          if (active) setStats({ matches: matches.data().count, predictions: predictions.data().count, participants: users.data().count });
         } else {
           const [matches, predictions, participants] = await Promise.all([
             getCountFromServer(query(collection(db, "tournamentMatches"), where("tournamentId", "==", tournament.id))),
             getCountFromServer(query(collection(db, "tournamentPredictions"), where("tournamentId", "==", tournament.id))),
             getCountFromServer(query(collection(db, "tournamentUserStats"), where("tournamentId", "==", tournament.id))),
           ]);
-          if (active) setStats((current) => ({ ...current, matches: matches.data().count, predictions: predictions.data().count, participants: participants.data().count }));
+          if (active) setStats({ matches: matches.data().count, predictions: predictions.data().count, participants: participants.data().count });
         }
       } catch (error) {
         console.error("Tournament stats error:", error);
@@ -41,24 +41,22 @@ export default function TournamentStatsSummary({ tournament }: { tournament: Tou
     return () => { active = false; };
   }, [tournament.engine, tournament.id]);
 
+  const displayStatus = getTournamentDisplayStatus(tournament);
   const cards = [
-    { label: "المباريات", value: stats.matches, icon: BarChart3 },
-    { label: "التوقعات", value: stats.predictions, icon: Target },
-    { label: "المشاركون", value: stats.participants, icon: UsersRound },
+    { label: "المباريات", value: loading ? "—" : stats.matches.toLocaleString("en-US"), icon: BarChart3, ltr: true },
+    { label: "التوقعات", value: loading ? "—" : stats.predictions.toLocaleString("en-US"), icon: Target, ltr: true },
+    { label: "المشاركون", value: loading ? "—" : stats.participants.toLocaleString("en-US"), icon: UsersRound, ltr: true },
+    { label: "حالة البطولة", value: getTournamentStatusLabel(displayStatus), icon: Trophy, ltr: false },
   ];
 
   return (
-    <section className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {cards.map(({ label, value, icon: Icon }) => (
-        <article key={label} className="flex min-h-[68px] items-center gap-2.5 rounded-[16px] border border-white/10 bg-white/[0.045] p-2.5 md:min-h-[74px] md:p-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]"><Icon className="h-3.5 w-3.5 text-[var(--tournament-primary)]" aria-hidden="true" /></div>
-          <div><div dir="ltr" className="text-lg font-black md:text-xl">{loading ? "—" : value.toLocaleString("en-US")}</div><div className="mt-0.5 text-[9px] font-bold text-white/50 md:text-[10px]">{label}</div></div>
+    <section className="my-3 grid grid-cols-4 gap-1.5 md:my-4 md:gap-2">
+      {cards.map(({ label, value, icon: Icon, ltr }) => (
+        <article key={label} className="min-w-0 rounded-[15px] border border-white/[0.08] bg-white/[0.04] p-2 md:flex md:min-h-[68px] md:items-center md:gap-2.5 md:p-2.5">
+          <div className="mb-2 grid h-7 w-7 place-items-center rounded-lg bg-white/[0.06] md:mb-0 md:h-8 md:w-8 md:shrink-0"><Icon className="h-3.5 w-3.5 text-[var(--tournament-primary)]" /></div>
+          <div className="min-w-0"><div dir={ltr ? "ltr" : undefined} className="truncate text-sm font-black md:text-base">{value}</div><div className="mt-0.5 truncate text-[8px] font-bold text-white/42 md:text-[9px]">{label}</div></div>
         </article>
       ))}
-      <article className="flex min-h-[68px] items-center gap-2.5 rounded-[16px] border border-white/10 bg-white/[0.045] p-2.5 md:min-h-[74px] md:p-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06]"><Trophy className="h-3.5 w-3.5 text-[var(--tournament-accent)]" aria-hidden="true" /></div>
-        <div><div className="text-base font-black md:text-lg">{stats.label}</div><div className="mt-0.5 text-[9px] font-bold text-white/50 md:text-[10px]">حالة البطولة</div></div>
-      </article>
     </section>
   );
 }

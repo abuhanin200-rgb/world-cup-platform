@@ -1,2 +1,17 @@
+import { Target } from "lucide-react";
+import GamePageShell from "@/components/games/GamePageShell";
 import WordGame from "@/components/word-game/WordGame";
-export default function WordGamePage(){return <main dir="rtl" className="mx-auto max-w-5xl px-3 pb-12 pt-5 sm:px-4 md:px-6 md:pt-8"><div className="mb-4"><p className="text-[10px] font-black text-[var(--brand-yellow)] md:text-xs">الألعاب</p><h1 className="mt-1 text-2xl font-black md:text-3xl">خمن كلمة اليوم</h1><p className="mt-1 text-xs font-semibold text-white/50">اكتشف الكلمة الرياضية خلال ست محاولات.</p></div><WordGame/></main>}
+
+export default function WordGamePage() {
+  return (
+    <GamePageShell
+      eyebrow="تحدي اليوم"
+      title="خمن كلمة اليوم"
+      description="ست محاولات فقط لاكتشاف كلمة رياضية واحدة قبل نهاية اليوم."
+      icon={<Target className="h-6 w-6" />}
+      visual={<div className="flex gap-1.5" dir="ltr">{["ت","ح","د","ي"].map((letter) => <span key={letter} className="grid h-11 w-11 place-items-center rounded-xl border border-white/12 bg-white/[0.06] text-lg font-black text-white">{letter}</span>)}</div>}
+    >
+      <WordGame />
+    </GamePageShell>
+  );
+}

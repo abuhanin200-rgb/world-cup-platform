@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { Tournament } from "./types";
+import type { Tournament, TournamentStatus } from "./types";
 
 export type TournamentThemeStyle = CSSProperties & {
   "--tournament-primary": string;
@@ -22,6 +22,41 @@ export function getTournamentThemeStyle(
     "--tournament-card": tournament.branding.cardColor ?? "#0F172A",
     "--tournament-text": tournament.branding.textColor ?? "#F8FAFC",
   };
+}
+
+/**
+ * الحالة البصرية العامة للبطولة.
+ *
+ * تبقى tournament.status هي الحالة التشغيلية المستخدمة في الـEngine والإدارة،
+ * بينما الواجهات العامة تعتمد تاريخ البداية والنهاية حتى لا تظهر بطولة مستقبلية
+ * كأنها جارية فقط لأن محركها مفعّل تشغيليًا.
+ */
+export function getTournamentDisplayStatus(
+  tournament: Tournament,
+  now: number = Date.now(),
+): TournamentStatus {
+  if (
+    tournament.status === "hidden" ||
+    tournament.status === "draft" ||
+    tournament.status === "paused" ||
+    tournament.status === "registration_open"
+  ) {
+    return tournament.status;
+  }
+
+  if (tournament.startAt != null && now < tournament.startAt) {
+    return "coming_soon";
+  }
+
+  if (tournament.endAt != null && now > tournament.endAt) {
+    return "finished";
+  }
+
+  if (tournament.startAt != null && now >= tournament.startAt) {
+    return "active";
+  }
+
+  return tournament.status;
 }
 
 export function formatTournamentDateRange(tournament: Tournament): string | null {

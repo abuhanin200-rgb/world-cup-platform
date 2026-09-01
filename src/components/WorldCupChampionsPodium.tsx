@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Crown, Medal, Sparkles } from "lucide-react";
 import { getLeaderboardUsers, type LeaderboardUser } from "@/lib/leaderboard";
+import MemberProfileLink from "@/components/members/MemberProfileLink";
 
 const PODIUM_META = [
   { rank: 2, label: "الوصيف", height: "md:mt-10", tone: "from-slate-300/20 to-slate-500/5", medal: "text-slate-200" },
@@ -63,7 +64,7 @@ export default function WorldCupChampionsPodium() {
                   </div>
                   <div dir="ltr" className={`mt-2 font-black ${first ? "text-2xl text-amber-300 md:text-4xl" : "text-xl text-white md:text-3xl"}`}>{meta.rank}</div>
                   <div className="mt-1 text-[9px] font-black text-white/45 md:text-xs">{meta.label}</div>
-                  <h3 className={`mt-2 line-clamp-2 font-black text-white ${first ? "text-sm md:text-xl" : "text-[11px] md:text-base"}`}>{user.fullName}</h3>
+                  <h3 className={`mt-2 line-clamp-2 font-black text-white ${first ? "text-sm md:text-xl" : "text-[11px] md:text-base"}`}><MemberProfileLink userId={user.id}>{user.fullName}</MemberProfileLink></h3>
                   <div className="mt-2 inline-flex items-center rounded-full bg-black/25 px-2 py-1 text-[9px] font-black text-white/70 md:px-3 md:text-xs"><span dir="ltr">{user.points.toLocaleString("en-US")}</span>&nbsp;نقطة</div>
                 </article>
               );

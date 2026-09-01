@@ -1,2 +1,17 @@
+import { TimerReset } from "lucide-react";
+import GamePageShell from "@/components/games/GamePageShell";
 import TenSecondsChallengeGame from "@/components/TenSecondsChallengeGame";
-export default function TenSecondsChallengePage(){return <main dir="rtl" className="mx-auto max-w-5xl px-3 pb-12 pt-5 sm:px-4 md:px-6 md:pt-8"><div className="mb-4"><p className="text-[10px] font-black text-[var(--brand-yellow)] md:text-xs">الألعاب</p><h1 className="mt-1 text-2xl font-black md:text-3xl">تحدي العشر ثواني</h1><p className="mt-1 text-xs font-semibold text-white/50">أوقف المؤقت عند عشر ثوانٍ بأعلى دقة ممكنة.</p></div><TenSecondsChallengeGame/></main>}
+
+export default function TenSecondsChallengePage() {
+  return (
+    <GamePageShell
+      eyebrow="دقة التوقيت"
+      title="تحدي العشر ثواني"
+      description="أوقف المؤقت عند 10.000 بالضبط. كل جزء من الثانية يفرق."
+      icon={<TimerReset className="h-6 w-6" />}
+      visual={<div dir="ltr" className="rounded-2xl border border-[var(--brand-yellow)]/20 bg-black/20 px-5 py-3 text-3xl font-black tabular-nums text-[var(--brand-yellow)]">10.000</div>}
+    >
+      <TenSecondsChallengeGame />
+    </GamePageShell>
+  );
+}

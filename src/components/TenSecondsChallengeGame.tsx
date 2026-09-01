@@ -20,6 +20,7 @@ import {
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
+import { playInteractionFeedback } from "@/lib/interactionFeedback";
 import {
   DEFAULT_TEN_SECONDS_SETTINGS,
   formatTenSecondsTime,
@@ -459,6 +460,7 @@ export default function TenSecondsChallengeGame() {
       window.cancelAnimationFrame(animationFrameRef.current);
     }
 
+    playInteractionFeedback("selection");
     stopLockedRef.current = false;
     startTimeRef.current = performance.now();
     setDisplayMs(0);
@@ -510,11 +512,13 @@ export default function TenSecondsChallengeGame() {
         });
 
         if (latestAttempt.won) {
+          playInteractionFeedback("success");
           setMessage(
             `00:10.000 ✅ جابها بالملي — XP تم احتسابه في ترتيب الألعاب`
           );
           await refreshUser();
         } else {
+          playInteractionFeedback(latestAttempt.diffMs <= 500 ? "warning" : "error");
           setMessage("");
         }
       }
@@ -529,6 +533,7 @@ export default function TenSecondsChallengeGame() {
 
       setStatus("finished");
     } catch (error) {
+      playInteractionFeedback("error");
       console.error("Save ten seconds attempt error:", error);
       setMessage(getFriendlyErrorMessage(error));
       setStatus("ready");

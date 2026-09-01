@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import {
   Award,
@@ -2793,12 +2794,11 @@ export default function LeaderboardTable() {
                         <RankMovement user={user} />
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => openUserPredictions(user)}
-                        className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-right text-sm font-black leading-6 underline-offset-4 hover:underline ${style.nameClass}`}
-                        title="اضغط لعرض توقعات العضو"
-                        aria-label={`عرض ملف وتوقعات ${user.fullName}`}
+                      <Link
+                        href={`/members/${encodeURIComponent(user.id)}`}
+                        className={`min-w-0 flex-1 rounded-xl px-2 py-2 text-right text-sm font-black leading-6 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-[var(--brand-yellow)]/45 ${style.nameClass}`}
+                        title="فتح ملف العضو"
+                        aria-label={`فتح ملف ${user.fullName}`}
                       >
                         <span className="flex min-w-0 items-center gap-1.5">
                           {style.icon && (
@@ -2808,7 +2808,7 @@ export default function LeaderboardTable() {
                           )}
                           <span className="min-w-0 break-words">{user.fullName}</span>
                         </span>
-                      </button>
+                      </Link>
 
                       <div
                         className={`flex min-w-[64px] shrink-0 flex-col items-center justify-center rounded-xl px-2 py-1.5 ${
@@ -2921,22 +2921,18 @@ export default function LeaderboardTable() {
                         </td>
 
                         <td className="px-1 py-3 font-black md:px-4 md:py-4">
-                          <button
-                            type="button"
-                            onClick={() => openUserPredictions(user)}
-                            className={`mx-auto flex w-full min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1 text-center leading-5 underline-offset-4 hover:underline ${style.nameClass}`}
-                            title="اضغط لعرض توقعات العضو"
+                          <Link
+                            href={`/members/${encodeURIComponent(user.id)}`}
+                            className={`mx-auto flex w-full min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1 text-center leading-5 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-[var(--brand-yellow)]/45 ${style.nameClass}`}
+                            title="فتح ملف العضو"
                           >
                             {style.icon && (
                               <span className="shrink-0 text-sm md:text-base">
                                 {style.icon}
                               </span>
                             )}
-
-                            <span className="whitespace-normal break-words leading-5">
-                              {user.fullName}
-                            </span>
-                          </button>
+                            <span className="whitespace-normal break-words leading-5">{user.fullName}</span>
+                          </Link>
                         </td>
 
                         <td dir="ltr" className="px-1 py-3 font-black text-slate-200 md:px-4 md:py-4">

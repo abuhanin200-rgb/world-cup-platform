@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
+import { playInteractionFeedback } from "@/lib/interactionFeedback";
 import GameBoard from "@/components/word-game/GameBoard";
 import GuessInput from "@/components/word-game/GuessInput";
 import WordKeyboard from "@/components/word-game/WordKeyboard";
@@ -186,6 +187,7 @@ export default function WordGame() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [showCelebration, setShowCelebration] = useState(false);
+  const [feedbackPulse, setFeedbackPulse] = useState<{ kind: "error" | "success"; tick: number }>({ kind: "error", tick: 0 });
 
   const userId = user?.id ?? "";
   const userName = user?.fullName || "عضو";
@@ -284,11 +286,17 @@ export default function WordGame() {
     setCurrentGuess((previous) => previous.slice(0, -1));
   }
 
+  function triggerGuessFeedback(kind: "error" | "success") {
+    setFeedbackPulse((current) => ({ kind, tick: current.tick + 1 }));
+    playInteractionFeedback(kind);
+  }
+
   async function handleSubmitGuess() {
     if (!userId || !game || inputDisabled) return;
 
     if (currentGuess.length !== WORD_GAME_WORD_LENGTH) {
       setMessage("اكتب كلمة من 5 حروف.");
+      triggerGuessFeedback("error");
       return;
     }
 
@@ -303,6 +311,7 @@ export default function WordGame() {
       setMessage(
         error instanceof Error ? error.message : "حدث خطأ أثناء إدخال الكلمة."
       );
+      triggerGuessFeedback("error");
       return;
     }
 
@@ -312,13 +321,16 @@ export default function WordGame() {
     if (updatedGame.status === "won") {
       setShowCelebration(true);
       setMessage("مبروك! جبت الكلمة صح 🎉");
+      triggerGuessFeedback("success");
       window.setTimeout(() => setShowCelebration(false), 2500);
     } else if (updatedGame.status === "lost") {
       setMessage(
         `انتهت محاولاتك لهذا اليوم. كلمتك اليوم: ${updatedGame.targetWord}`
       );
+      triggerGuessFeedback("error");
     } else {
       setMessage("");
+      triggerGuessFeedback("error");
     }
 
     try {
@@ -503,12 +515,20 @@ export default function WordGame() {
           </motion.div>
 
           <motion.div variants={smallRevealMotion} className="mt-5 space-y-4">
-            <GuessInput
-              value={currentGuess}
-              disabled={inputDisabled}
-              onChange={handleGuessChange}
-              onSubmit={handleSubmitGuess}
-            />
+            <motion.div
+              key={feedbackPulse.tick}
+              animate={feedbackPulse.tick === 0 ? undefined : feedbackPulse.kind === "error"
+                ? { x: [0, -8, 7, -4, 3, 0], scale: [1, 0.995, 1] }
+                : { scale: [1, 1.025, 1], y: [0, -3, 0] }}
+              transition={{ duration: feedbackPulse.kind === "error" ? 0.34 : 0.28, ease: "easeOut" }}
+            >
+              <GuessInput
+                value={currentGuess}
+                disabled={inputDisabled}
+                onChange={handleGuessChange}
+                onSubmit={handleSubmitGuess}
+              />
+            </motion.div>
 
             <WordKeyboard
               disabled={inputDisabled}

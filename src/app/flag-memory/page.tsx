@@ -1,2 +1,17 @@
+import { Flag } from "lucide-react";
+import GamePageShell from "@/components/games/GamePageShell";
 import FlagMemoryGame from "@/components/flag-memory/FlagMemoryGame";
-export default function FlagMemoryPage(){return <main dir="rtl" className="mx-auto max-w-5xl px-3 pb-12 pt-5 sm:px-4 md:px-6 md:pt-8"><div className="mb-4"><p className="text-[10px] font-black text-[var(--brand-yellow)] md:text-xs">الألعاب</p><h1 className="mt-1 text-2xl font-black md:text-3xl">تحدي الأعلام</h1><p className="mt-1 text-xs font-semibold text-white/50">طابق أعلام المنتخبات بأقل وقت وأفضل تركيز.</p></div><FlagMemoryGame/></main>}
+
+export default function FlagMemoryPage() {
+  return (
+    <GamePageShell
+      eyebrow="ذاكرة وتركيز"
+      title="تحدي الأعلام"
+      description="طابق أعلام المنتخبات بأقل وقت وأقل عدد من الأخطاء."
+      icon={<Flag className="h-6 w-6" />}
+      visual={<div className="grid grid-cols-2 gap-2 text-2xl" aria-hidden="true"><span className="grid h-12 w-14 place-items-center rounded-xl bg-white/[0.06]">🇸🇦</span><span className="grid h-12 w-14 place-items-center rounded-xl bg-white/[0.06]">🇯🇵</span><span className="grid h-12 w-14 place-items-center rounded-xl bg-white/[0.06]">🇦🇷</span><span className="grid h-12 w-14 place-items-center rounded-xl bg-white/[0.06]">🇲🇦</span></div>}
+    >
+      <FlagMemoryGame />
+    </GamePageShell>
+  );
+}

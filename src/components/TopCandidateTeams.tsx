@@ -5,6 +5,7 @@ import {
   getTopCandidateTeams,
   TopCandidateTeam,
 } from "@/lib/topCandidates";
+import TeamFlag from "@/components/TeamFlag";
 
 function getRankStyle(rank: number) {
   if (rank === 1) {
@@ -88,8 +89,8 @@ export default function TopCandidateTeams() {
               #{team.rank}
             </div>
 
-            <div className="mt-4 text-2xl md:mt-3 md:text-3xl">
-              {team.teamEmoji || "🏳️"}
+            <div className="mt-4 flex justify-center md:mt-3">
+              <TeamFlag name={team.teamName} size="md" className="h-7 w-10 rounded-md" />
             </div>
 
             <div className="mt-1 truncate text-xs font-black md:text-sm">

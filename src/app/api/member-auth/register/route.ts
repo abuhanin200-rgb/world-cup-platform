@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { registerMember } from "@/lib/serverMemberAuthRest";
+import { verifyFirebaseSocialSession, type SocialProvider } from "@/lib/serverSocialAuth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ export async function POST(request: Request) {
     const password = clean(body.password);
     const favoriteTeam = clean(body.favoriteTeam);
     const teamEmoji = clean(body.teamEmoji);
+    const socialProvider = clean(body.socialProvider) as SocialProvider | "";
+    const socialIdToken = clean(body.socialIdToken);
 
     if (!fullName) return NextResponse.json({ error: "الاسم مطلوب" }, { status: 400 });
     if (fullName.length > 20) {
@@ -35,6 +38,16 @@ export async function POST(request: Request) {
     }
     if (!favoriteTeam) {
       return NextResponse.json({ error: "اختر المنتخب المرشح" }, { status: 400 });
+    }
+
+    if (socialProvider || socialIdToken) {
+      if (!socialProvider || !socialIdToken || !["google", "facebook", "apple"].includes(socialProvider)) {
+        return NextResponse.json({ error: "بيانات التسجيل الاجتماعي غير مكتملة" }, { status: 400 });
+      }
+      const identity = await verifyFirebaseSocialSession(socialIdToken, socialProvider);
+      if (!email || identity.email !== email) {
+        return NextResponse.json({ error: "البريد لا يطابق حساب مزود التسجيل" }, { status: 400 });
+      }
     }
 
     const result = await registerMember({
@@ -59,6 +72,9 @@ export async function POST(request: Request) {
     }
     if (message === "PHONE_EXISTS") {
       return NextResponse.json({ error: "رقم الجوال مستخدم مسبقًا" }, { status: 409 });
+    }
+    if (message === "EMAIL_EXISTS") {
+      return NextResponse.json({ error: "هذا البريد مرتبط بحساب موجود. استخدم تسجيل الدخول بدل إنشاء حساب جديد." }, { status: 409 });
     }
 
     const infrastructure = /FIREBASE_|GOOGLE_OAUTH_|FIRESTORE_/i.test(message);

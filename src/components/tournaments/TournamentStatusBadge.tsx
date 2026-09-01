@@ -13,7 +13,7 @@ type TournamentStatusBadgeProps = { status: TournamentStatus };
 
 const STATUS_STYLES: Record<TournamentStatus, string> = {
   draft: "border-slate-300/25 bg-slate-300/10 text-slate-100",
-  coming_soon: "border-sky-300/30 bg-sky-300/10 text-sky-100",
+  coming_soon: "border-amber-300/30 bg-amber-300/10 text-amber-100",
   registration_open: "border-amber-300/35 bg-amber-300/10 text-amber-100",
   active: "border-emerald-300/35 bg-emerald-300/10 text-emerald-100",
   paused: "border-orange-300/35 bg-orange-300/10 text-orange-100",

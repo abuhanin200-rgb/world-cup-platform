@@ -14,6 +14,9 @@ import {
   AppUser,
   getUserById,
   loginUser,
+  loginUserWithGoogle,
+  loginUserWithSocial,
+  type SocialProvider,
   LoginUserInput,
   registerUser,
   RegisterUserInput,
@@ -24,6 +27,8 @@ type AuthContextType = {
   loading: boolean;
   isLoggedIn: boolean;
   login: (input: LoginUserInput) => Promise<AppUser>;
+  loginWithGoogle: () => Promise<AppUser>;
+  loginWithSocial: (provider: SocialProvider) => Promise<AppUser>;
   register: (input: RegisterUserInput) => Promise<AppUser>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -99,6 +104,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return newUser;
   }
 
+  async function loginWithGoogle() {
+    const loggedUser = await loginUserWithGoogle();
+    localStorage.setItem(STORAGE_KEY, loggedUser.id);
+    setUser(loggedUser);
+    return loggedUser;
+  }
+
+  async function loginWithSocial(provider: SocialProvider) {
+    const loggedUser = await loginUserWithSocial(provider);
+    localStorage.setItem(STORAGE_KEY, loggedUser.id);
+    setUser(loggedUser);
+    return loggedUser;
+  }
+
   function logout() {
     localStorage.removeItem(STORAGE_KEY);
     setUser(null);
@@ -112,6 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       isLoggedIn: Boolean(user),
       login,
+      loginWithGoogle,
+      loginWithSocial,
       register,
       logout,
       refreshUser,

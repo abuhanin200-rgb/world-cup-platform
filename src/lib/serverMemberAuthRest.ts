@@ -105,6 +105,13 @@ export async function findMemberByPhone(phone: string) {
   return documents[0] || null;
 }
 
+export async function findMemberPrivateProfileByEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const documents = await queryCollectionByField("memberPrivateProfiles", "email", normalized, 1);
+  return documents[0] || null;
+}
+
 export async function verifyAndMigrateMemberPassword(
   memberDocument: FirestoreDocument,
   password: string,
@@ -197,13 +204,15 @@ export async function registerMember(input: {
   favoriteTeam: string;
   teamEmoji: string;
 }) {
-  const [sameName, samePhone] = await Promise.all([
+  const [sameName, samePhone, sameEmail] = await Promise.all([
     findMemberByFullName(input.fullName),
     findMemberByPhone(input.phone),
+    input.email ? findMemberPrivateProfileByEmail(input.email) : Promise.resolve(null),
   ]);
 
   if (sameName) throw new Error("NAME_EXISTS");
   if (samePhone) throw new Error("PHONE_EXISTS");
+  if (sameEmail) throw new Error("EMAIL_EXISTS");
 
   const userId = newDocumentId();
   const now = new Date().toISOString();

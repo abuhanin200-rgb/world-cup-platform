@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "التحدي",
+    "slug": "altahaddi",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "altahaddi",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.altahaddi.app"
+    },
+    "android": {
+      "package": "com.altahaddi.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#04133A"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#FFC210",
+          "defaultChannel": "altahaddi"
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "98042c03-7971-4051-b54b-2f4458e40d8b"
+      }
+    }
+  }
+}
