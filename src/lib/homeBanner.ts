@@ -37,12 +37,6 @@ export async function getHomeBanner(): Promise<HomeBannerSettings> {
   const bannerSnap = await getDoc(bannerRef);
 
   if (!bannerSnap.exists()) {
-    await setDoc(bannerRef, {
-      ...defaultBanner,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
     return defaultBanner;
   }
 

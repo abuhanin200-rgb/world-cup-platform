@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -70,8 +71,14 @@ export async function getChallengeStudioBulletins(maxItems = 30) {
 }
 
 export async function getPublishedChallengeStudioBulletins(maxItems = 30) {
-  const bulletins = await getChallengeStudioBulletins(maxItems);
-  return bulletins.filter((item) => item.published);
+  const q = query(
+    collection(db, "challengeStudio"),
+    where("published", "==", true),
+    orderBy("createdAt", "desc"),
+    limit(maxItems)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((docSnap) => mapBulletin(docSnap.id, docSnap.data()));
 }
 
 export async function addChallengeStudioBulletin(input: {

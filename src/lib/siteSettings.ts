@@ -63,12 +63,6 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   const settingsSnap = await getDoc(settingsRef);
 
   if (!settingsSnap.exists()) {
-    await setDoc(settingsRef, {
-      ...defaultSettings,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
     return defaultSettings;
   }
 

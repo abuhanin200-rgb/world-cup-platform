@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { BookOpen, Newspaper, Target, Trophy } from "lucide-react";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { BookOpen, Newspaper, Target } from "lucide-react";
 import MatchesPredictionBox from "@/components/MatchesPredictionBox";
 import LeaderboardTable from "@/components/LeaderboardTable";
 import HomeHighlights from "@/components/HomeHighlights";
@@ -36,7 +36,7 @@ function PredictionsArchive() {
 
 function StudioArchive() {
   const [posts, setPosts] = useState<Bulletin[]>([]); const [loading, setLoading] = useState(true);
-  useEffect(() => { let active = true; (async () => { try { const snap = await getDocs(collection(db, "challengeStudio")); if (!active) return; const items = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Bulletin,"id">) })).filter((x) => x.published !== false).sort((a,b) => String(b.date).localeCompare(String(a.date))); setPosts(items); } catch(e){console.error(e)} finally {if(active)setLoading(false)} })(); return () => {active=false}; }, []);
+  useEffect(() => { let active = true; (async () => { try { const snap = await getDocs(query(collection(db, "challengeStudio"), where("published", "==", true))); if (!active) return; const items = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Bulletin,"id">) })).sort((a,b) => String(b.date).localeCompare(String(a.date))); setPosts(items); } catch(e){console.error(e)} finally {if(active)setLoading(false)} })(); return () => {active=false}; }, []);
   return <div><div className="mb-4"><h2 className="text-xl font-black md:text-2xl">استوديو كأس العالم 2026</h2><p className="mt-1 text-xs font-semibold text-white/50">أبرز النشرات والتحليلات التي رافقت البطولة.</p></div>{loading ? <div className="p-8 text-center text-white/50">جاري تحميل الاستوديو…</div> : posts.length === 0 ? <HomeHighlights /> : <div className="grid gap-3">{posts.map((post) => <article key={post.id} className="rounded-[22px] border border-white/10 bg-white/[0.05] p-4 md:p-5"><div className="flex items-center gap-2 text-xs font-black text-cyan-300"><Newspaper className="h-4 w-4" />{post.date || "نشرة البطولة"}</div><h3 className="mt-2 text-lg font-black">{post.summary || "من استوديو البطولة"}</h3>{Array.isArray(post.cards) && post.cards.length ? <div className="mt-3 grid gap-2 md:grid-cols-2">{post.cards.slice(0,4).map((card,i) => <div key={i} className="rounded-xl bg-black/15 p-3"><div className="text-sm font-black">{card.title || "تحليل"}</div><p className="mt-1 text-xs font-semibold leading-6 text-white/55">{card.content || ""}</p></div>)}</div> : null}</article>)}</div>}</div>;
 }
 

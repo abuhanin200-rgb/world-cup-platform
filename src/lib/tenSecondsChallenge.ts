@@ -11,7 +11,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 import { syncPlatformGameXp } from "@/lib/platformGameXpClient";
 
 export const TEN_SECONDS_TARGET_MS = 10000;
@@ -334,6 +334,8 @@ export async function saveTenSecondsAttempt(
     throw new Error("سجّل دخولك أولًا عشان تحفظ نتيجتك.");
   }
 
+  return saveTenSecondsAttemptViaApi(input);
+
   const settings = await getTenSecondsSettings();
 
   if (!settings.enabled) {
@@ -449,7 +451,7 @@ export async function saveTenSecondsAttempt(
     throw new Error("تعذر تحميل نتيجة تحدي العشر ثواني بعد الحفظ.");
   }
 
-  const updatedResult = mapDailyResult(updatedSnap.id, updatedSnap.data());
+  const updatedResult = mapDailyResult(updatedSnap.id, updatedSnap.data()!);
 
   try {
     await syncPlatformGameXp({
@@ -461,6 +463,24 @@ export async function saveTenSecondsAttempt(
   }
 
   return updatedResult;
+}
+
+async function saveTenSecondsAttemptViaApi(
+  input: SaveTenSecondsAttemptInput,
+): Promise<TenSecondsDailyResult> {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser || firebaseUser.uid !== cleanText(input.userId)) {
+    throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى ثم أعد المحاولة.");
+  }
+  const response = await fetch("/api/games/legacy-results", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await firebaseUser.getIdToken()}` },
+    body: JSON.stringify({ action: "ten-seconds", elapsedMs: input.elapsedMs }),
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => null)) as { result?: TenSecondsDailyResult; error?: string } | null;
+  if (!response.ok || !data?.result) throw new Error(data?.error || "تعذر حفظ النتيجة الآن.");
+  return data.result;
 }
 
 export async function adminDeleteTenSecondsResult(resultId: string) {

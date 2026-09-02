@@ -9,7 +9,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { syncPlatformGameXp } from "@/lib/platformGameXpClient";
 
 export type FlagMemoryResult = {
@@ -282,6 +282,8 @@ export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
     throw new Error("اسم العضو غير موجود");
   }
 
+  return saveFlagMemoryResultViaApi(input);
+
   const settings = await getFlagMemorySettings();
 
   if (!settings.enabled) {
@@ -340,6 +342,22 @@ export async function saveFlagMemoryResult(input: SaveFlagMemoryResultInput) {
     dateKey,
     score,
   };
+}
+
+async function saveFlagMemoryResultViaApi(input: SaveFlagMemoryResultInput) {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser || firebaseUser.uid !== input.userId) {
+    throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى ثم أعد المحاولة.");
+  }
+  const response = await fetch("/api/games/legacy-results", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${await firebaseUser.getIdToken()}` },
+    body: JSON.stringify({ action: "flag-memory", ...input }),
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => null)) as { result?: FlagMemoryResult; error?: string } | null;
+  if (!response.ok || !data?.result) throw new Error(data?.error || "تعذر حفظ النتيجة الآن.");
+  return { id: data.result.id, dateKey: data.result.dateKey, score: data.result.score };
 }
 
 export async function getFlagMemoryDailyLeaderboard(maxItems = 20) {

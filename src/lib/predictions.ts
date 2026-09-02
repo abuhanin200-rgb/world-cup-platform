@@ -9,7 +9,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 import type {
   FinalBonusPrediction,
   FinalBonusResult,
@@ -599,6 +599,8 @@ export async function submitPrediction(
     throw new Error("أدخل نتيجة صحيحة من 0 إلى 30");
   }
 
+  return saveLegacyPredictionViaApi(input);
+
   const predictionDocId = getPredictionDocId(
     input.userId,
     input.matchId
@@ -745,6 +747,8 @@ export async function updatePrediction(
     throw new Error("أدخل نتيجة صحيحة من 0 إلى 30");
   }
 
+  return saveLegacyPredictionViaApi(input);
+
   const predictionDocId = getPredictionDocId(
     input.userId,
     input.matchId
@@ -764,7 +768,7 @@ export async function updatePrediction(
 
   const currentPrediction = mapPrediction(
     predictionSnap.id,
-    predictionSnap.data()
+    predictionSnap.data()!
   );
 
   const matchInfo = await getPredictionMatchInfo(input.matchId);
@@ -813,6 +817,43 @@ export async function updatePrediction(
     ...currentPrediction,
     ...predictionUpdate,
   } as Prediction;
+}
+
+async function saveLegacyPredictionViaApi(
+  input: Pick<
+    SubmitPredictionInput,
+    | "userId"
+    | "matchId"
+    | "homeScore"
+    | "awayScore"
+    | "qualifiedTeamCode"
+    | "qualificationMethod"
+    | "finalBonusPrediction"
+    | "adminOverride"
+  >
+) {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser || (!input.adminOverride && firebaseUser.uid !== input.userId)) {
+    throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى ثم أعد المحاولة.");
+  }
+
+  const response = await fetch("/api/legacy/predictions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await firebaseUser.getIdToken()}`,
+    },
+    body: JSON.stringify(input),
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => null)) as {
+    prediction?: Prediction;
+    error?: string;
+  } | null;
+  if (!response.ok || !data?.prediction) {
+    throw new Error(data?.error || "تعذر حفظ التوقع الآن.");
+  }
+  return data.prediction;
 }
 
 export async function getLatestPredictions(

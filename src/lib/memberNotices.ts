@@ -11,7 +11,7 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 
 export type MemberNoticeType =
   | "update"
@@ -759,12 +759,22 @@ async function updateMemberNoticeStats(
   noticeId: string,
   statKey: keyof MemberNoticeStats
 ) {
-  const noticeRef = doc(db, MEMBER_NOTICES_COLLECTION, noticeId);
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) return;
 
-  await updateDoc(noticeRef, {
-    [`stats.${statKey}`]: increment(1),
-    updatedAt: new Date().toISOString(),
+  const response = await fetch("/api/member-notices/engagement", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await firebaseUser.getIdToken()}`,
+    },
+    body: JSON.stringify({ noticeId, statKey }),
+    cache: "no-store",
   });
+
+  if (!response.ok) {
+    throw new Error("تعذر تحديث تفاعل الإشعار.");
+  }
 }
 
 function validateNoticeData(data: {

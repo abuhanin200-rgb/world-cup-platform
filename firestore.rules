@@ -13,38 +13,38 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
     }
 
-    function ownsUserField(data) {
-      return signedIn() && data.userId == request.auth.uid;
+    function ownsPathUser(userId) {
+      return signedIn() && request.auth.uid == userId;
     }
 
-    function isLegacyCompatibleCollection(collectionName) {
-      return collectionName in [
-        "users",
-        "matches",
-        "predictions",
-        "teams",
-        "settings",
-        "challengeStudio",
-        "challengeStudioChat",
-        "challengeStudioChatLikes",
-        "challengeStudioChatReplies",
-        "flagMemoryResults",
-        "tenSecondsChallengeDaily",
-        "wordGameDailyGames",
-        "wordGameDailyResults",
-        "wordGameUserStats",
-        "onlinePresence",
-        "memberNotices",
-        "memberNoticeViews",
-        "Predictions",
-        "Matches",
-        "Users",
-        "Stats"
+    function ownsResource() {
+      return signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    function requestOwnsResource() {
+      return signedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    function hasOnlyChanged(allowedKeys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedKeys);
+    }
+
+    function isPublicSetting(settingId) {
+      return settingId in [
+        "main",
+        "homeBanner",
+        "flagMemory",
+        "tenSecondsChallenge"
       ];
     }
 
+    function validChatText(value, maxLength) {
+      return value is string && value.size() > 0 && value.size() <= maxLength;
+    }
+
+    // Administration and private member data.
     match /admins/{userId} {
-      allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow get: if ownsPathUser(userId) || isAdmin();
       allow list: if isAdmin();
       allow create, update, delete: if false;
     }
@@ -54,10 +54,263 @@ service cloud.firestore {
     }
 
     match /memberPrivateProfiles/{userId} {
-      allow read, create, update, delete: if signedIn()
-        && (request.auth.uid == userId || isAdmin());
+      allow read: if ownsPathUser(userId) || isAdmin();
+      allow create, update: if ownsPathUser(userId) || isAdmin();
+      allow delete: if false;
     }
 
+    // Legacy users may contain phone numbers and historic score fields. They
+    // are never a public directory: public profile/leaderboard views use APIs
+    // that project only the fields they need.
+    match /users/{userId} {
+      allow get: if ownsPathUser(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        ownsPathUser(userId)
+        && hasOnlyChanged([
+          "fullName",
+          "phone",
+          "favoriteTeam",
+          "teamEmoji",
+          "updatedAt",
+          "seenNotices",
+          "lastSeen",
+          "lastPredictionAt"
+        ])
+      );
+    }
+
+    // Legacy World Cup match and team catalogues are public content. Results
+    // and every administrative change require an administrator.
+    match /matches/{matchId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /teams/{teamId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Legacy prediction writes are intentionally server-only. startAt and the
+    // historic edit timestamps are ISO strings, so enforcing their time window
+    // in Firestore Rules would not be safe. The authenticated server route
+    // validates ownership, immutable fields, and the time window.
+    match /predictions/{predictionId} {
+      allow get, list: if isAdmin() || ownsResource();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Only the explicitly required settings documents are readable by clients.
+    // Initial defaults and all writes are administrative/server operations.
+    match /settings/{settingId} {
+      allow get: if isPublicSetting(settingId) || isAdmin();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Published studio bulletins are public; drafts remain admin-only.
+    match /challengeStudio/{bulletinId} {
+      allow get, list: if isAdmin() || resource.data.published == true;
+      allow write: if isAdmin();
+    }
+
+    // Community chat content is public to read. Members can create their own
+    // message and can edit only its text for five minutes; moderation is admin
+    // only. No client can alter author identity or moderation metadata.
+    match /challengeStudioChat/{messageId} {
+      allow read: if true;
+      allow create: if requestOwnsResource()
+        && request.resource.data.keys().hasOnly([
+          "userId",
+          "userName",
+          "text",
+          "createdAt",
+          "updatedAt",
+          "isEdited",
+          "replyToMessageId",
+          "replyToUserId",
+          "replyToUserName",
+          "replyToText"
+        ])
+        && validChatText(request.resource.data.text, 800)
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() <= 40
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.isEdited == false;
+      allow update: if isAdmin() || (
+        ownsResource()
+        && hasOnlyChanged(["text", "updatedAt", "isEdited"])
+        && validChatText(request.resource.data.text, 800)
+        && request.resource.data.isEdited == true
+        && request.time < resource.data.createdAt + duration.value(5, "m")
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /challengeStudioChatLikes/{likeId} {
+      allow read: if true;
+      allow create: if requestOwnsResource()
+        && likeId == request.resource.data.messageId + "_" + request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          "messageId",
+          "userId",
+          "userName",
+          "createdAt"
+        ])
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() <= 40
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/challengeStudioChat/$(request.resource.data.messageId));
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || ownsResource();
+    }
+
+    // This collection is retained for legacy data. New replies are stored as
+    // chat messages with replyTo* fields above, so member writes are closed.
+    match /challengeStudioChatReplies/{replyId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Game result/score documents are server-calculated. Clients may read the
+    // public leaderboards but cannot write scores, attempts, results, or XP.
+    match /flagMemoryResults/{resultId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tenSecondsChallengeDaily/{resultId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // The active word is private to its owner. Result leaderboards are public,
+    // while aggregate user stats remain private.
+    match /wordGameDailyGames/{gameId} {
+      allow get, list: if isAdmin() || ownsResource();
+      allow write: if isAdmin();
+    }
+
+    match /wordGameDailyResults/{resultId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /wordGameUserStats/{userId} {
+      allow get: if ownsPathUser(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Presence exposes a member's path/activity, so it is visible only to the
+    // member and admins. A member can update only their own fixed-shape record.
+    match /onlinePresence/{userId} {
+      allow get: if ownsPathUser(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if ownsPathUser(userId)
+        && requestOwnsResource()
+        && request.resource.data.keys().hasOnly([
+          "userId",
+          "fullName",
+          "currentPage",
+          "activity",
+          "path",
+          "lastSeen",
+          "lastChallengeStudioVisit",
+          "updatedAt"
+        ]);
+      allow update: if isAdmin() || (
+        ownsPathUser(userId)
+        && ownsResource()
+        && requestOwnsResource()
+        && hasOnlyChanged([
+          "fullName",
+          "currentPage",
+          "activity",
+          "path",
+          "lastSeen",
+          "lastChallengeStudioVisit",
+          "updatedAt"
+        ])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Notices themselves are administered content. A member may maintain only
+    // their own view record; engagement aggregates are incremented server-side.
+    match /memberNotices/{noticeId} {
+      allow get, list: if isAdmin() || (
+        signedIn()
+        && resource.data.isActive == true
+        && resource.data.isArchived == false
+      );
+      allow write: if isAdmin();
+    }
+
+    match /memberNoticeViews/{viewId} {
+      allow get: if isAdmin() || ownsResource();
+      allow list: if isAdmin() || ownsResource();
+      allow create: if requestOwnsResource()
+        && viewId == request.resource.data.noticeId + "_" + request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          "noticeId",
+          "userId",
+          "hasSeen",
+          "hasClosed",
+          "shownCount",
+          "closedCount",
+          "lastShownAt",
+          "lastClosedAt",
+          "primaryClickedAt",
+          "secondaryClickedAt",
+          "createdAt",
+          "updatedAt"
+        ]);
+      allow update: if isAdmin() || (
+        ownsResource()
+        && requestOwnsResource()
+        && hasOnlyChanged([
+          "hasSeen",
+          "hasClosed",
+          "shownCount",
+          "closedCount",
+          "lastShownAt",
+          "lastClosedAt",
+          "primaryClickedAt",
+          "secondaryClickedAt",
+          "updatedAt"
+        ])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Historical uppercase collections are not aliases for their lowercase
+    // counterparts. Keep only the truly public match/stat read paths and close
+    // all client writes until a server projection is explicitly used.
+    match /Matches/{matchId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /Stats/{statId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /Predictions/{predictionId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /Users/{userId} {
+      allow get: if ownsPathUser(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Tournament V2 rules remain explicit and are not affected by Legacy.
     match /tournaments/{documentId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -74,8 +327,7 @@ service cloud.firestore {
     }
 
     match /tournamentPredictions/{documentId} {
-      allow get: if isAdmin() || ownsUserField(resource.data);
-      allow list: if isAdmin() || ownsUserField(resource.data);
+      allow get, list: if isAdmin() || ownsResource();
       allow create, update, delete: if false;
     }
 
@@ -135,20 +387,19 @@ service cloud.firestore {
     }
 
     match /notifications/{documentId} {
-      allow get, list: if isAdmin() || ownsUserField(resource.data);
+      allow get, list: if isAdmin() || ownsResource();
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (
-        ownsUserField(resource.data)
+        ownsResource()
         && request.resource.data.userId == resource.data.userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["isRead", "readAt"])
+        && hasOnlyChanged(["isRead", "readAt"])
       );
     }
 
-    // Compatibility boundary: only the explicitly inventoried Legacy/game
-    // collections retain their existing client behavior. Unknown collections
-    // stay closed by default, and V2 predictions/derived points are not listed.
-    match /{collectionName}/{document=**} {
-      allow read, write: if isLegacyCompatibleCollection(collectionName);
+    // Default deny. This replaces the previous recursive Legacy compatibility
+    // wildcard, so no nested path can gain permission accidentally.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
