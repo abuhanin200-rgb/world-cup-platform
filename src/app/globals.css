@@ -252,8 +252,8 @@ body {
 
 .altahaddi-icon-button {
   display: inline-grid;
-  min-width: 42px;
-  min-height: 42px;
+  min-width: 44px;
+  min-height: 44px;
   place-items: center;
   border: 1px solid rgba(255,255,255,.09);
   border-radius: 13px;
@@ -276,13 +276,13 @@ body {
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
-.altahaddi-input::placeholder { color: rgba(255,255,255,.28); }
+.altahaddi-input::placeholder { color: rgba(255,255,255,.54); }
 .altahaddi-input:focus { border-color: rgba(255,194,16,.68); background: rgba(0,0,0,.24); box-shadow: 0 0 0 4px rgba(255,194,16,.07); }
 
 .altahaddi-carousel-button {
   display: inline-grid;
-  min-width: 42px;
-  min-height: 42px;
+  min-width: 44px;
+  min-height: 44px;
   place-items: center;
   border: 1px solid rgba(255,255,255,.10);
   border-radius: 999px;

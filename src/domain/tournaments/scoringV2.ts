@@ -6,7 +6,7 @@ import type {
 } from "./v2Types";
 
 export const GULF_CUP_27_SCORING_VERSION = "gulf27-v1" as const;
-export const GULF_CUP_27_KNOCKOUT_SCORING_VERSION = "gulf27-ko-v1" as const;
+export const GULF_CUP_27_KNOCKOUT_SCORING_VERSION = "gulf27-ko-v2" as const;
 
 export const GULF_CUP_27_SCORING_V1 = {
   exact: 3,
@@ -19,6 +19,7 @@ export const GULF_CUP_27_KNOCKOUT_SCORING_V1 = {
   outcome: 1,
   qualified: 2,
   method: 1,
+  max: 6,
   wrong: 0,
 } as const;
 
@@ -158,83 +159,35 @@ export function scoreGulfCup27KnockoutPredictionV1({
   const exact =
     prediction.homeScore === actualHome && prediction.awayScore === actualAway;
   const predictedQualified = predictedQualifiedTeam({ prediction, match });
-
-  if (predictedOutcome !== "draw") {
-    if (exact) {
-      return baseResult({
-        points: GULF_CUP_27_KNOCKOUT_SCORING_V1.exact,
-        resultType: "exact",
-        scoringVersion: GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-        score: GULF_CUP_27_KNOCKOUT_SCORING_V1.exact,
-      });
-    }
-
-    if (predictedOutcome === actualOutcome) {
-      return baseResult({
-        points: GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome,
-        resultType: "outcome",
-        scoringVersion: GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-        score: GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome,
-      });
-    }
-
-    if (actualOutcome === "draw" && predictedQualified === actualQualified) {
-      return baseResult({
-        points: GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome,
-        resultType: "outcome",
-        scoringVersion: GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-        score: GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome,
-      });
-    }
-
-    return baseResult({
-      points: 0,
-      resultType: "wrong",
-      scoringVersion: GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-      score: 0,
-    });
-  }
-
-  if (actualOutcome === "draw") {
-    const scorePoints = exact
-      ? GULF_CUP_27_KNOCKOUT_SCORING_V1.exact
-      : GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome;
-    const qualifiedPoints =
-      predictedQualified && predictedQualified === actualQualified
-        ? GULF_CUP_27_KNOCKOUT_SCORING_V1.qualified
-        : 0;
-    const methodPoints =
-      prediction.qualificationMethod &&
-      prediction.qualificationMethod === actualMethod
-        ? GULF_CUP_27_KNOCKOUT_SCORING_V1.method
-        : 0;
-    const points = scorePoints + qualifiedPoints + methodPoints;
-
-    return baseResult({
-      points,
-      resultType: exact ? "exact" : points > 0 ? "outcome" : "wrong",
-      scoringVersion: GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-      score: scorePoints,
-      qualified: qualifiedPoints,
-      method: methodPoints,
-    });
-  }
-
-  // حالة خاصة: توقع تعادلًا واختار المتأهل الصحيح، لكن المباراة حُسمت في الوقت الأصلي.
-  if (predictedQualified && predictedQualified === actualQualified) {
-    return baseResult({
-      points: GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome,
-      resultType: "outcome",
-      scoringVersion: GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-      score: GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome,
-    });
-  }
+  const predictedMethod =
+    predictedOutcome === "draw"
+      ? prediction.qualificationMethod ?? null
+      : "regular";
+  const scorePoints = exact
+    ? GULF_CUP_27_KNOCKOUT_SCORING_V1.exact
+    : predictedOutcome === actualOutcome
+      ? GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome
+      : 0;
+  const qualifiedPoints =
+    predictedQualified === actualQualified
+      ? GULF_CUP_27_KNOCKOUT_SCORING_V1.qualified
+      : 0;
+  const methodPoints =
+    predictedMethod === actualMethod
+      ? GULF_CUP_27_KNOCKOUT_SCORING_V1.method
+      : 0;
+  const points = Math.min(
+    GULF_CUP_27_KNOCKOUT_SCORING_V1.max,
+    scorePoints + qualifiedPoints + methodPoints,
+  );
 
   return baseResult({
-    points: 0,
-    resultType: "wrong",
+    points,
+    resultType: exact ? "exact" : scorePoints > 0 ? "outcome" : "wrong",
     scoringVersion: GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-    score: 0,
+    score: scorePoints,
+    qualified: qualifiedPoints,
+    method: methodPoints,
   });
 }
 

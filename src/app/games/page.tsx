@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import GamesHub from "@/components/GamesHub";
 
 export const metadata: Metadata = {
-  title: "الألعاب والتحديات | التحدي",
+  title: "ألعاب التحدي",
   description: "الألعاب والتحديات الرياضية في منصة التحدي مع مستويات ونقاط خبرة وترتيب عام.",
 };
 

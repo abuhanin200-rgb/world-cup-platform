@@ -184,13 +184,17 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
 
   if (maintenance.loading) {
     return (
-      <motion.main
-        dir="rtl"
-        variants={pageMotion}
-        initial="hidden"
-        animate="show"
-        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#04133a] via-[#061a4d] to-[#08245f] p-4 text-white"
-      >
+      <>
+        {children}
+        <motion.main
+          dir="rtl"
+          aria-label="جاري تجهيز التجربة"
+          aria-live="polite"
+          variants={pageMotion}
+          initial="hidden"
+          animate="show"
+          className="fixed inset-0 z-[200] flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#04133a] via-[#061a4d] to-[#08245f] p-4 text-white"
+        >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.16),transparent_34%),radial-gradient(circle_at_10%_30%,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_90%_70%,rgba(52,211,153,0.10),transparent_30%)]" />
         <div className="pointer-events-none absolute -right-24 top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute -left-24 bottom-24 h-80 w-80 rounded-full bg-amber-400/10 blur-3xl" />
@@ -290,7 +294,8 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
             منصة التحدي
           </motion.div>
         </motion.section>
-      </motion.main>
+        </motion.main>
+      </>
     );
   }
 

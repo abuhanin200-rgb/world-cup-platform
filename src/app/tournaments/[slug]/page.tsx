@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import TournamentHero from "@/components/tournaments/TournamentHero";
 import TournamentNavigation from "@/components/tournaments/TournamentNavigation";
@@ -7,6 +8,13 @@ import { getTournamentThemeStyle, tournamentService } from "@/domain/tournaments
 type TournamentPageProps = {
   params: Promise<{ slug: string }>;
 };
+
+export async function generateMetadata({ params }: TournamentPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const tournament = await tournamentService.getBySlug(slug);
+  if (!tournament) return {};
+  return { title: tournament.name, description: tournament.description || `نظرة عامة على ${tournament.name} في منصة التحدي.` };
+}
 
 export default async function TournamentPage({ params }: TournamentPageProps) {
   const { slug } = await params;

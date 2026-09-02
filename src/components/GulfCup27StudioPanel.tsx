@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Award, Gift, Loader2, LockKeyhole, Newspaper, RefreshCw, Sparkles, Trophy } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Award, Crown, Crosshair, Flame, Gift, Loader2, LockKeyhole, Medal, Newspaper, RefreshCw, Sparkles, Target, Trophy } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { GULF_CUP_27_ACHIEVEMENTS, GULF_CUP_27_TOURNAMENT_ID, type TournamentRewardV2, type TournamentStudioPostV2, type TournamentUserAchievementV2 } from "@/domain/tournaments";
 import { getTournamentRewardsV2, getTournamentStudioPostsV2, getUserTournamentAchievementsV2 } from "@/lib/tournamentEngagementV2";
 
 const CATEGORY_LABELS = { news: "خبر", analysis: "تحليل", alert: "تنبيه", achievement: "إنجاز" } as const;
 const RARITY_LABELS = { common: "عادية", rare: "نادرة", epic: "ملحمية", legendary: "أسطورية" } as const;
+const ACHIEVEMENT_ICONS: Record<string, typeof Trophy> = {
+  first_exact: Target,
+  three_exact: Crosshair,
+  five_streak: Flame,
+  top_three: Medal,
+  prediction_king: Crown,
+  champion: Trophy,
+};
+const RARITY_STYLES = { common: "border-slate-300/15 bg-slate-300/[0.08] text-slate-100", rare: "border-sky-300/20 bg-sky-300/[0.09] text-sky-100", epic: "border-fuchsia-300/20 bg-fuchsia-300/[0.09] text-fuchsia-100", legendary: "border-amber-300/25 bg-amber-300/[0.10] text-amber-100" } as const;
 
 function PostCard({ post }: { post: TournamentStudioPostV2 }) {
   return <article className="rounded-[24px] border border-white/10 bg-black/15 p-5">
@@ -24,8 +33,8 @@ function PostCard({ post }: { post: TournamentStudioPostV2 }) {
 export default function GulfCup27StudioPanel() {
   const { user } = useAuth();
   const [posts,setPosts]=useState<TournamentStudioPostV2[]>([]); const [rewards,setRewards]=useState<TournamentRewardV2[]>([]); const [achievements,setAchievements]=useState<TournamentUserAchievementV2[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState("");
-  async function load(){ setLoading(true);setError(""); try { const [p,r,a]=await Promise.all([getTournamentStudioPostsV2(GULF_CUP_27_TOURNAMENT_ID),getTournamentRewardsV2(GULF_CUP_27_TOURNAMENT_ID),user?getUserTournamentAchievementsV2(GULF_CUP_27_TOURNAMENT_ID,user.id):Promise.resolve([])]); setPosts(p);setRewards(r);setAchievements(a);} catch(e){console.error(e);setError("تعذر تحميل استوديو خليجي 27");} finally{setLoading(false);} }
-  useEffect(()=>{void load();},[user?.id]);
+  const load=useCallback(async()=>{ setLoading(true);setError(""); try { const [p,r,a]=await Promise.all([getTournamentStudioPostsV2(GULF_CUP_27_TOURNAMENT_ID),getTournamentRewardsV2(GULF_CUP_27_TOURNAMENT_ID),user?getUserTournamentAchievementsV2(GULF_CUP_27_TOURNAMENT_ID,user.id):Promise.resolve([])]); setPosts(p);setRewards(r);setAchievements(a);} catch(e){console.error(e);setError("تعذر تحميل استوديو خليجي 27");} finally{setLoading(false);} },[user]);
+  useEffect(()=>{queueMicrotask(()=>void load());},[load]);
   const unlocked=useMemo(()=>new Set(achievements.map((item)=>item.key)),[achievements]);
   if(loading) return <div className="rounded-[28px] border border-white/10 bg-white/5 p-10 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-200"/><p className="mt-3 font-bold text-white/60">جاري تحميل الاستوديو...</p></div>;
   return <div className="space-y-5">
@@ -38,7 +47,7 @@ export default function GulfCup27StudioPanel() {
     <section className="rounded-[28px] border border-white/10 bg-white/5 p-5 md:p-6">
       <div className="flex items-center gap-3"><Award className="h-7 w-7 text-amber-200"/><div><p className="text-xs font-black text-amber-200/70">مسيرتك</p><h2 className="text-xl font-black">الشارات والإنجازات</h2></div></div>
       {!user && <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/15 p-4 text-sm font-bold text-white/55"><LockKeyhole className="h-5 w-5"/>سجّل الدخول لعرض شاراتك المفتوحة.</div>}
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{GULF_CUP_27_ACHIEVEMENTS.map((def)=>{const isUnlocked=unlocked.has(def.key);return <article key={def.key} className={`rounded-[22px] border p-4 ${isUnlocked?"border-amber-300/25 bg-amber-300/[0.08]":"border-white/[0.08] bg-black/10 opacity-65"}`}><div className="flex items-start gap-3"><div className="text-3xl" aria-hidden="true">{def.badge}</div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-black">{def.title}</h3>{isUnlocked&&<Sparkles className="h-4 w-4 text-amber-200"/>}</div><p className="mt-1 text-xs font-semibold leading-6 text-white/50">{def.description}</p><p className="mt-2 text-[10px] font-black text-white/35">{RARITY_LABELS[def.rarity]} · {isUnlocked?"مفتوحة":"مقفلة"}</p></div></div></article>;})}</div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{GULF_CUP_27_ACHIEVEMENTS.map((def)=>{const isUnlocked=unlocked.has(def.key);const Icon=ACHIEVEMENT_ICONS[def.key]||Award;return <article key={def.key} className={`rounded-[22px] border p-4 ${isUnlocked?"border-amber-300/25 bg-amber-300/[0.08]":"border-white/[0.08] bg-black/10 opacity-65"}`}><div className="flex items-start gap-3"><div className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl border ${RARITY_STYLES[def.rarity]}`} aria-hidden="true"><Icon className="h-5 w-5"/></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="font-black">{def.title}</h3>{isUnlocked&&<Sparkles className="h-4 w-4 text-amber-200"/>}</div><p className="mt-1 text-xs font-semibold leading-6 text-white/58">{def.description}</p><p className="mt-2 text-[10px] font-black text-white/50">{RARITY_LABELS[def.rarity]} · {isUnlocked?"مفتوحة":"مقفلة"}</p></div></div></article>;})}</div>
     </section>
 
     <section className="rounded-[28px] border border-white/10 bg-white/5 p-5 md:p-6">

@@ -112,7 +112,7 @@ export default function GulfCup27LeaderboardPanel() {
   }
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, []);
 
   const currentUserRow = useMemo(
@@ -120,6 +120,7 @@ export default function GulfCup27LeaderboardPanel() {
     [rows, user],
   );
   const topThree = rows.slice(0, 3);
+  const competitionStarted = rows.some((row) => row.points > 0);
 
   return (
     <div className="space-y-5">
@@ -133,7 +134,7 @@ export default function GulfCup27LeaderboardPanel() {
             </div>
             <div>
               <p className="text-xs font-black text-amber-200/80">ترتيب البطولة</p>
-              <h2 className="text-xl font-black md:text-2xl">لوحة صدارة خليجي 27</h2>
+              <h2 className="text-xl font-black md:text-2xl">{competitionStarted ? "لوحة صدارة خليجي 27" : "المشاركون حتى الآن"}</h2>
             </div>
           </div>
           <button
@@ -143,7 +144,7 @@ export default function GulfCup27LeaderboardPanel() {
             className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 text-xs font-black transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-            تحديث
+            تحديث الترتيب
           </button>
         </div>
 
@@ -166,7 +167,14 @@ export default function GulfCup27LeaderboardPanel() {
           </div>
         ) : (
           <>
-            {topThree.length > 0 && (
+            {!competitionStarted ? (
+              <div className="mt-5 rounded-[22px] border border-dashed border-amber-300/20 bg-amber-300/[0.06] p-6 text-center">
+                <Trophy className="mx-auto h-9 w-9 text-amber-200/70" aria-hidden="true" />
+                <h3 className="mt-3 text-lg font-black">لم تبدأ المنافسة بعد</h3>
+                <p className="mx-auto mt-2 max-w-xl text-sm font-semibold leading-7 text-white/58">لن تظهر منصة التتويج أو علامة التاج قبل تسجيل نقاط فعلية. يمكنك مشاهدة قائمة المشاركين المسجلين أدناه.</p>
+              </div>
+            ) : null}
+            {competitionStarted && topThree.length > 0 && (
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {topThree.map((row, index) => (
                   <PodiumCard key={row.id} row={row} place={(index + 1) as 1 | 2 | 3} />

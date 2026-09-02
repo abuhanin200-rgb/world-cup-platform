@@ -662,7 +662,7 @@ function predictionFromData(id: string, data: Record<string, unknown>): Tourname
   };
 }
 
-async function rebuildLeaderboardServer(tournamentId: string) {
+export async function rebuildLeaderboardServer(tournamentId: string) {
   const [matchesSnapshot, predictionsSnapshot, existingStats] = await Promise.all([
     adminDb.collection(COLLECTIONS.matches).where("tournamentId", "==", tournamentId).get(),
     adminDb.collection(COLLECTIONS.predictions).where("tournamentId", "==", tournamentId).get(),
@@ -700,7 +700,7 @@ async function rebuildLeaderboardServer(tournamentId: string) {
   return sorted.map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
-async function syncKnockoutBracketServer(tournamentId: string) {
+export async function syncKnockoutBracketServer(tournamentId: string) {
   if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return;
   const [matchRows, teams] = await Promise.all([loadMatches(tournamentId), loadTeams(tournamentId)]);
   const matches = matchRows.map((item) => item.match);
@@ -736,7 +736,7 @@ async function syncKnockoutBracketServer(tournamentId: string) {
   }
 }
 
-async function rebuildAchievementsServer(tournamentId: string) {
+export async function rebuildAchievementsServer(tournamentId: string) {
   if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return;
   const [stats, predictions, matches, existing] = await Promise.all([
     adminDb.collection(COLLECTIONS.stats).where("tournamentId", "==", tournamentId).get(),
@@ -801,6 +801,28 @@ async function calculateMatchServer(matchRow: { ref: DocumentReference; match: M
     throw new Error("المباراة محتسبة بنتيجة مختلفة؛ يلزم تدخل الأدمن");
   }
 
+  const claimed = await adminDb.runTransaction(async (transaction) => {
+    const latestSnapshot = await transaction.get(ref);
+    if (!latestSnapshot.exists) throw new Error("المباراة لم تعد موجودة");
+    const latest = mapMatchDoc(latestSnapshot.id, latestSnapshot.data() || {});
+    if (latest.calculationStatus === "processing") {
+      throw new Error("احتساب هذه المباراة قيد التنفيذ بالفعل");
+    }
+    if (latest.calculationStatus === "calculated") {
+      if (latest.resultHash === candidate.hash) return false;
+      throw new Error("المباراة محتسبة بنتيجة مختلفة؛ يلزم تراجع الأدمن أولًا");
+    }
+    transaction.set(ref, {
+      calculationStatus: "processing",
+      predictionIsOpen: false,
+      calculationVersion: candidate.scoringVersion,
+      resultHash: candidate.hash,
+      updatedAt: now,
+    }, { merge: true });
+    return true;
+  });
+  if (!claimed) return { predictionsCalculated: 0, alreadyCalculated: true };
+
   const predictionsSnapshot = await adminDb.collection(COLLECTIONS.predictions).where("tournamentId", "==", match.tournamentId).where("matchId", "==", match.id).get();
   const scored: Array<{ userId: string; points: number; resultType: "exact" | "outcome" | "wrong" }> = [];
   const resultMatch: TournamentMatchV2 = { ...match, status: "finished", result: { homeScore: candidate.homeScore, awayScore: candidate.awayScore, extraTimeHomeScore: candidate.extraTimeHomeScore, extraTimeAwayScore: candidate.extraTimeAwayScore, penaltiesHomeScore: candidate.penaltiesHomeScore, penaltiesAwayScore: candidate.penaltiesAwayScore, qualifiedTeamId: candidate.qualifiedTeamId, qualificationMethod: candidate.qualificationMethod } };
@@ -812,7 +834,6 @@ async function calculateMatchServer(matchRow: { ref: DocumentReference; match: M
     batch.set(item.ref, { points: score.points, pointsBreakdown: score.pointsBreakdown, isCalculated: true, resultType: score.resultType, calculatedAt: now, scoringVersion: score.scoringVersion, resultHash: candidate.hash, calculationRunId: runId, updatedAt: now }, { merge: true });
   });
 
-  await ref.set({ calculationStatus: "processing", predictionIsOpen: false, providerSyncState: "verified", updatedAt: now }, { merge: true });
   await commitOperations(operations);
   const leaderboard = await rebuildLeaderboardServer(match.tournamentId);
   await ref.set({
@@ -823,6 +844,288 @@ async function calculateMatchServer(matchRow: { ref: DocumentReference; match: M
   await rebuildAchievementsServer(match.tournamentId);
   await sendResultNotificationsServer({ tournamentId: match.tournamentId, match, candidate, resultHash: candidate.hash, scored });
   return { predictionsCalculated: predictionsSnapshot.size, leaderboardRows: leaderboard.length, alreadyCalculated: false };
+}
+
+function validTournamentScore(value: number) {
+  return Number.isInteger(value) && value >= 0 && value <= 30;
+}
+
+export type ManualTournamentCalculationInputV2 = {
+  tournamentId: string;
+  matchId: string;
+  homeScore: number;
+  awayScore: number;
+  qualifiedTeamId?: string | null;
+  qualificationMethod?: TournamentQualificationMethod | null;
+  extraTimeHomeScore?: number | null;
+  extraTimeAwayScore?: number | null;
+  penaltiesHomeScore?: number | null;
+  penaltiesAwayScore?: number | null;
+};
+
+export async function calculateTournamentMatchManuallyServerV2(
+  input: ManualTournamentCalculationInputV2,
+) {
+  const tournamentId = clean(input.tournamentId);
+  const matchId = clean(input.matchId);
+  if (!tournamentId || !matchId) throw new Error("بيانات المباراة غير مكتملة");
+  if (!validTournamentScore(input.homeScore) || !validTournamentScore(input.awayScore)) {
+    throw new Error("النتيجة يجب أن تكون أرقامًا صحيحة من 0 إلى 30");
+  }
+  if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) {
+    throw new Error("محرك الاحتساب الحالي مخصص لخليجي 27 فقط");
+  }
+
+  const ref = adminDb.collection(COLLECTIONS.matches).doc(entityId(tournamentId, matchId));
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new Error("المباراة غير موجودة");
+  const match = mapMatchDoc(snapshot.id, snapshot.data() || {});
+  if (!match.homeTeamId || !match.awayTeamId) throw new Error("حدد طرفي المباراة أولًا");
+  if (match.status === "postponed") throw new Error("لا يمكن احتساب مباراة مؤجلة");
+  if (match.status === "cancelled") throw new Error("لا يمكن احتساب مباراة ملغاة");
+
+  const scoringVersion =
+    match.stage === "knockout"
+      ? GULF_CUP_27_KNOCKOUT_SCORING_VERSION
+      : GULF_CUP_27_SCORING_VERSION;
+  const candidate: ProviderCandidateResult = {
+    homeScore: input.homeScore,
+    awayScore: input.awayScore,
+    qualifiedTeamId: null,
+    qualificationMethod: null,
+    extraTimeHomeScore: nullableNumber(input.extraTimeHomeScore),
+    extraTimeAwayScore: nullableNumber(input.extraTimeAwayScore),
+    penaltiesHomeScore: nullableNumber(input.penaltiesHomeScore),
+    penaltiesAwayScore: nullableNumber(input.penaltiesAwayScore),
+    scoringVersion,
+    hash: "",
+  };
+
+  for (const value of [
+    candidate.extraTimeHomeScore,
+    candidate.extraTimeAwayScore,
+    candidate.penaltiesHomeScore,
+    candidate.penaltiesAwayScore,
+  ]) {
+    if (value != null && !validTournamentScore(value)) {
+      throw new Error("نتائج الإضافي والترجيح يجب أن تكون من 0 إلى 30");
+    }
+  }
+
+  if (match.stage === "knockout") {
+    candidate.qualifiedTeamId = clean(input.qualifiedTeamId) || null;
+    candidate.qualificationMethod =
+      input.qualificationMethod === "regular" ||
+      input.qualificationMethod === "extra_time" ||
+      input.qualificationMethod === "penalties"
+        ? input.qualificationMethod
+        : null;
+    if (!candidate.qualifiedTeamId || !candidate.qualificationMethod) {
+      throw new Error("حدد المتأهل وطريقة التأهل");
+    }
+    validateKnockoutResultV2({
+      homeTeamId: match.homeTeamId,
+      awayTeamId: match.awayTeamId,
+      homeScore: candidate.homeScore,
+      awayScore: candidate.awayScore,
+      qualifiedTeamId: candidate.qualifiedTeamId,
+      qualificationMethod: candidate.qualificationMethod,
+      extraTimeHomeScore: candidate.extraTimeHomeScore,
+      extraTimeAwayScore: candidate.extraTimeAwayScore,
+      penaltiesHomeScore: candidate.penaltiesHomeScore,
+      penaltiesAwayScore: candidate.penaltiesAwayScore,
+    });
+  }
+
+  candidate.hash = createTournamentResultHash({
+    tournamentId,
+    matchId,
+    homeScore: candidate.homeScore,
+    awayScore: candidate.awayScore,
+    scoringVersion,
+    qualifiedTeamId: candidate.qualifiedTeamId,
+    qualificationMethod: candidate.qualificationMethod,
+    extraTimeHomeScore: candidate.extraTimeHomeScore,
+    extraTimeAwayScore: candidate.extraTimeAwayScore,
+    penaltiesHomeScore: candidate.penaltiesHomeScore,
+    penaltiesAwayScore: candidate.penaltiesAwayScore,
+  });
+
+  try {
+    const result = await calculateMatchServer({ ref, match }, candidate);
+    const latest = await ref.get();
+    return {
+      tournamentId,
+      matchId,
+      predictionsCalculated:
+        result.alreadyCalculated
+          ? num(latest.data()?.calculatedPredictions)
+          : result.predictionsCalculated,
+      leaderboardRows: "leaderboardRows" in result ? result.leaderboardRows : 0,
+      resultHash: candidate.hash,
+      calculationRunId: clean(latest.data()?.calculationRunId) || candidate.hash,
+      scoringVersion,
+      alreadyCalculated: result.alreadyCalculated,
+    };
+  } catch (error) {
+    const latest = await ref.get();
+    if (latest.data()?.calculationStatus === "processing") {
+      await ref.set({
+        calculationStatus: "error",
+        calculationError: (error instanceof Error ? error.message : "خطأ غير معروف").slice(0, 300),
+        updatedAt: Date.now(),
+      }, { merge: true });
+    }
+    throw error;
+  }
+}
+
+export async function undoTournamentMatchCalculationServerV2(input: {
+  tournamentId: string;
+  matchId: string;
+}) {
+  const tournamentId = clean(input.tournamentId);
+  const matchId = clean(input.matchId);
+  const ref = adminDb.collection(COLLECTIONS.matches).doc(entityId(tournamentId, matchId));
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new Error("المباراة غير موجودة");
+  const match = mapMatchDoc(snapshot.id, snapshot.data() || {});
+  if (match.calculationStatus !== "calculated" && match.status !== "finished") {
+    throw new Error("هذه المباراة غير محتسبة حاليًا");
+  }
+
+  const predictions = await adminDb.collection(COLLECTIONS.predictions)
+    .where("tournamentId", "==", tournamentId)
+    .where("matchId", "==", matchId)
+    .get();
+  await commitOperations(predictions.docs.map((item) => (batch) => batch.set(item.ref, {
+    points: null,
+    pointsBreakdown: null,
+    isCalculated: false,
+    resultType: null,
+    calculatedAt: null,
+    scoringVersion: null,
+    resultHash: null,
+    calculationRunId: null,
+    updatedAt: Date.now(),
+  }, { merge: true })));
+
+  const now = Date.now();
+  await ref.set({
+    result: {
+      ...match.result,
+      homeScore: null,
+      awayScore: null,
+      extraTimeHomeScore: null,
+      extraTimeAwayScore: null,
+      penaltiesHomeScore: null,
+      penaltiesAwayScore: null,
+      qualifiedTeamId: null,
+      qualificationMethod: null,
+    },
+    status: "scheduled",
+    predictionIsOpen: false,
+    predictionClosesAt: match.kickoffAt,
+    calculationStatus: "not_calculated",
+    calculationVersion: null,
+    resultHash: null,
+    calculationRunId: null,
+    calculationError: null,
+    calculatedAt: null,
+    calculatedPredictions: 0,
+    lastUndoAt: now,
+    updatedAt: now,
+  }, { merge: true });
+
+  const leaderboard = await rebuildLeaderboardServer(tournamentId);
+  await syncKnockoutBracketServer(tournamentId);
+  await rebuildAchievementsServer(tournamentId);
+  return {
+    tournamentId,
+    matchId,
+    predictionsReset: predictions.size,
+    leaderboardRows: leaderboard.length,
+  };
+}
+
+export async function updateTournamentPredictionByAdminServerV2(input: {
+  predictionId: string;
+  homeScore: number;
+  awayScore: number;
+  qualifiedTeamId?: string | null;
+  qualificationMethod?: TournamentQualificationMethod | null;
+}) {
+  if (!validTournamentScore(input.homeScore) || !validTournamentScore(input.awayScore)) {
+    throw new Error("النتيجة يجب أن تكون بين 0 و30");
+  }
+  const ref = adminDb.collection(COLLECTIONS.predictions).doc(clean(input.predictionId));
+  const snapshot = await ref.get();
+  if (!snapshot.exists) throw new Error("التوقع غير موجود");
+  const prediction = snapshot.data() || {};
+  if (prediction.isCalculated === true) {
+    throw new Error("تراجع عن احتساب المباراة أولًا قبل تعديل توقع محتسب");
+  }
+  const tournamentId = clean(prediction.tournamentId);
+  const matchId = clean(prediction.matchId);
+  const matchSnapshot = await adminDb.collection(COLLECTIONS.matches)
+    .doc(entityId(tournamentId, matchId)).get();
+  if (!matchSnapshot.exists) throw new Error("المباراة المرتبطة بالتوقع غير موجودة");
+  const match = mapMatchDoc(matchSnapshot.id, matchSnapshot.data() || {});
+  let qualifiedTeamId: string | null = null;
+  let qualificationMethod: TournamentQualificationMethod | null = null;
+  if (match.stage === "knockout") {
+    if (input.homeScore > input.awayScore) {
+      qualifiedTeamId = match.homeTeamId;
+      qualificationMethod = "regular";
+    } else if (input.awayScore > input.homeScore) {
+      qualifiedTeamId = match.awayTeamId;
+      qualificationMethod = "regular";
+    } else {
+      qualifiedTeamId = clean(input.qualifiedTeamId) || null;
+      qualificationMethod =
+        input.qualificationMethod === "extra_time" || input.qualificationMethod === "penalties"
+          ? input.qualificationMethod
+          : null;
+      if (!qualifiedTeamId || ![match.homeTeamId, match.awayTeamId].includes(qualifiedTeamId)) {
+        throw new Error("اختر المتأهل عند توقع التعادل");
+      }
+      if (!qualificationMethod) throw new Error("اختر طريقة التأهل عند توقع التعادل");
+    }
+  }
+  await ref.set({
+    homeScore: input.homeScore,
+    awayScore: input.awayScore,
+    qualifiedTeamId,
+    qualificationMethod,
+    updatedAt: Date.now(),
+  }, { merge: true });
+  return { updated: true };
+}
+
+export async function deleteTournamentPredictionByAdminServerV2(predictionId: string) {
+  const ref = adminDb.collection(COLLECTIONS.predictions).doc(clean(predictionId));
+  const snapshot = await ref.get();
+  if (!snapshot.exists) return { deleted: false };
+  if (snapshot.data()?.isCalculated === true) {
+    throw new Error("تراجع عن احتساب المباراة أولًا قبل حذف توقع محتسب");
+  }
+  await ref.delete();
+  return { deleted: true };
+}
+
+export async function deleteTournamentMatchPredictionsByAdminServerV2(input: {
+  tournamentId: string;
+  matchId: string;
+}) {
+  const snapshot = await adminDb.collection(COLLECTIONS.predictions)
+    .where("tournamentId", "==", clean(input.tournamentId))
+    .where("matchId", "==", clean(input.matchId))
+    .get();
+  if (snapshot.docs.some((item) => item.data().isCalculated === true)) {
+    throw new Error("يوجد توقعات محتسبة. تراجع عن احتساب المباراة أولًا");
+  }
+  await commitOperations(snapshot.docs.map((item) => (batch) => batch.delete(item.ref)));
+  return { deleted: snapshot.size };
 }
 
 async function updateProviderCandidate(row: { ref: DocumentReference; match: MatchRow }, candidate: ProviderCandidateResult, allowAutoCalculate: boolean) {
@@ -970,7 +1273,7 @@ export async function runTournamentSportsAutomation(options?: { force?: boolean 
   });
   if (!acquired) return { skipped: true, reason: "throttled", nextGapMs: gap };
 
-  let seasonState = await checkTournamentSportsSeasonAvailability(tournamentId);
+  const seasonState = await checkTournamentSportsSeasonAvailability(tournamentId);
   if (!seasonState.available) {
     return {
       skipped: true,

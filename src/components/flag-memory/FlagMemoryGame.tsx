@@ -17,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import AuthGateCard from "@/components/auth/AuthGateCard";
 import {
   calculateFlagMemoryScore,
   DEFAULT_FLAG_MEMORY_SETTINGS,
@@ -443,7 +444,7 @@ export default function FlagMemoryGame() {
 
   useEffect(() => {
     if (loading) return;
-    loadGameData();
+    queueMicrotask(() => void loadGameData());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, userId]);
 
@@ -607,40 +608,6 @@ export default function FlagMemoryGame() {
     }, 900);
   }
 
-  async function handleSaveResult() {
-    if (!userId) {
-      setMessage("سجّل دخولك أولًا عشان نحفظ نتيجتك.");
-      return;
-    }
-
-    if (status !== "finished") return;
-
-    try {
-      setSaving(true);
-      setMessage("");
-
-      await saveFlagMemoryResult({
-        userId,
-        userName,
-        timeSeconds: seconds,
-        moves,
-        mistakes,
-        matchesCount: pairsCount,
-      });
-
-      setStatus("saved");
-      setMessage("تم حفظ نتيجتك الرسمية في تحدي الأعلام.");
-      await loadGameData();
-    } catch (error) {
-      console.error("Save flag memory result error:", error);
-      setMessage(
-        error instanceof Error ? error.message : "تعذر حفظ نتيجة تحدي الأعلام."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
   function isCardVisible(card: MemoryCard) {
     return (
       card.matched ||
@@ -672,6 +639,10 @@ export default function FlagMemoryGame() {
         </div>
       </motion.section>
     );
+  }
+
+  if (!isLoggedIn || !userId) {
+    return <AuthGateCard returnTo="/flag-memory" title="سجّل الدخول لبدء تحدي الأعلام" description="اكشف الأزواج المتطابقة وسجّل أفضل وقت لك في الترتيب اليومي." benefit="ستعود إلى تحدي الأعلام مباشرة بعد الدخول، ولن تظهر لك بطاقات معطلة أو زر بدء غير فعّال." />;
   }
 
   return (
@@ -720,13 +691,13 @@ export default function FlagMemoryGame() {
           >
             <div className="mb-2 inline-flex items-center justify-center gap-2 text-[14px] font-black text-white">
               <Target className="h-4 w-4 text-amber-300" />
-              <span>شرح النقاط</span>
+              <span>شرح XP</span>
             </div>
 
             <div className="space-y-1 text-[11px] font-bold leading-5 text-slate-300 md:text-xs">
               <p>
                 كل زوج أعلام ={" "}
-                <span className="text-amber-300">20 نقطة</span>، ومكافأة
+                <span className="text-amber-300">20 XP</span>، ومكافأة
                 السرعة تصل إلى <span className="text-emerald-300">+50</span>.
               </p>
 
@@ -764,7 +735,7 @@ export default function FlagMemoryGame() {
             />
 
             <StatCard
-              label="النقاط"
+              label="XP المتوقع"
               value={currentScore}
               icon={<Trophy className="h-4 w-4 text-emerald-300" />}
               valueClassName="text-emerald-200"
@@ -783,7 +754,7 @@ export default function FlagMemoryGame() {
                 <span className="inline-flex items-center justify-center gap-2">
                   <ShieldCheck className="h-4 w-4" />
                   <span>
-                    نتيجتك اليوم: {todayResult.score} نقطة — الوقت{" "}
+                    نتيجتك اليوم: {todayResult.score} XP — الوقت{" "}
                     {formatTime(todayResult.timeSeconds)} — المحاولات{" "}
                     {todayResult.moves} — الأخطاء {todayResult.mistakes}.
                   </span>
@@ -1015,7 +986,7 @@ export default function FlagMemoryGame() {
 
                   <div className="relative grid grid-cols-4 gap-1.5">
                     <LeaderboardStat
-                      label="النقاط"
+                      label="XP"
                       value={result.score}
                       className="border-amber-400/15 bg-amber-400/10 text-amber-300"
                     />

@@ -9,7 +9,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 import {
   GULF_CUP_27_GROUP_MATCHES,
   GULF_CUP_27_KNOCKOUT_MATCHES,
@@ -17,22 +17,15 @@ import {
   GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT,
   GULF_CUP_27_TOURNAMENT_ID,
-  GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-  GULF_CUP_27_SCORING_VERSION,
-  getGulfCup27Team,
+  getTournamentPredictionWindowStateV2,
   calculateTournamentGroupStandingsV2,
-  createTournamentResultHash,
-  scoreGulfCup27KnockoutPredictionV1,
-  scoreGulfCup27PredictionV1,
-  validateKnockoutResultV2,
   type TournamentMatchV2,
   type TournamentPredictionV2,
   type TournamentQualificationMethod,
   type TournamentTeamV2,
   type TournamentUserStatsV2,
 } from "@/domain/tournaments";
-import { sendTournamentCalculationNotificationsV2 } from "./tournamentNotificationsV2";
-import { rebuildTournamentAchievementsV2 } from "./tournamentEngagementV2";
+import { requestAdminTournamentPredictionActionV2 } from "./adminTournamentPredictionsApiV2";
 
 export const TOURNAMENT_V2_COLLECTIONS = {
   tournaments: "tournaments",
@@ -80,18 +73,6 @@ function isValidScore(value: number) {
 
 function entityDocId(tournamentId: string, entityId: string) {
   return `${tournamentId}_${entityId}`;
-}
-
-function predictionDocId(
-  tournamentId: string,
-  userId: string,
-  matchId: string,
-) {
-  return `${tournamentId}_${userId}_${matchId}`;
-}
-
-function statsDocId(tournamentId: string, userId: string) {
-  return `${tournamentId}_${userId}`;
 }
 
 function dropUndefined<T>(value: T): T {
@@ -383,19 +364,12 @@ async function deleteTournamentPredictionsForMatchV2(
   tournamentId: string,
   matchId: string,
 ) {
-  const q = query(
-    collection(db, TOURNAMENT_V2_COLLECTIONS.predictions),
-    where("tournamentId", "==", tournamentId),
-    where("matchId", "==", matchId),
-  );
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) return 0;
-
-  const operations = snapshot.docs.map(
-    (item) => (batch: ReturnType<typeof writeBatch>) => batch.delete(item.ref),
-  );
-  await commitChunked(operations);
-  return snapshot.size;
+  const result = await requestAdminTournamentPredictionActionV2<{ deleted: number }>({
+    action: "delete_match_predictions",
+    tournamentId,
+    matchId,
+  });
+  return result.deleted;
 }
 
 export async function syncGulfCup27KnockoutBracketV2() {
@@ -636,14 +610,7 @@ export function isTournamentPredictionOpen(
   match: TournamentMatchRuntimeV2,
   now = Date.now(),
 ) {
-  if (!match.predictionIsOpen) return false;
-  if (match.status === "finished" || match.status === "cancelled") return false;
-  if (match.status === "live") return false;
-
-  const opensAt = match.predictionOpensAt ?? 0;
-  const closesAt = match.predictionClosesAt ?? match.kickoffAt;
-
-  return now >= opensAt && now < closesAt && now < match.kickoffAt;
+  return getTournamentPredictionWindowStateV2(match, now) === "open";
 }
 
 export async function setTournamentMatchPredictionOpen(
@@ -663,16 +630,27 @@ export async function setTournamentMatchPredictionOpen(
   }
 
   const current = mapMatchDoc(matchSnap.id, matchSnap.data());
+  const now = Date.now();
 
   if (current.status === "finished" || current.status === "cancelled") {
     throw new Error("لا يمكن فتح التوقعات لمباراة منتهية أو ملغاة");
+  }
+
+  if (predictionIsOpen && now >= current.kickoffAt) {
+    throw new Error("لا يمكن إعادة فتح التوقع بعد بداية المباراة");
   }
 
   if (predictionIsOpen && (!current.homeTeamId || !current.awayTeamId)) {
     throw new Error("لا يمكن فتح التوقع قبل تحديد طرفي مباراة خروج المغلوب");
   }
 
-  const now = Date.now();
+  const nextClosesAt =
+    predictionIsOpen &&
+    (current.predictionClosesAt == null ||
+      current.predictionClosesAt <= now ||
+      current.predictionClosesAt > current.kickoffAt)
+      ? current.kickoffAt
+      : current.predictionClosesAt ?? current.kickoffAt;
 
   await setDoc(
     matchRef,
@@ -683,7 +661,53 @@ export async function setTournamentMatchPredictionOpen(
         predictionIsOpen && current.predictionOpensAt == null
           ? now
           : current.predictionOpensAt,
-      predictionClosesAt: current.predictionClosesAt ?? current.kickoffAt,
+      predictionClosesAt: nextClosesAt,
+      updatedAt: now,
+      updatedAtServer: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+export async function setTournamentMatchPredictionEditingOpen(
+  tournamentId: string,
+  matchId: string,
+  predictionEditingIsOpen: boolean,
+) {
+  const matchRef = doc(
+    db,
+    TOURNAMENT_V2_COLLECTIONS.matches,
+    entityDocId(tournamentId, matchId),
+  );
+  const matchSnap = await getDoc(matchRef);
+
+  if (!matchSnap.exists()) {
+    throw new Error("المباراة غير موجودة");
+  }
+
+  const current = mapMatchDoc(matchSnap.id, matchSnap.data());
+  const now = Date.now();
+  if (current.calculationStatus === "calculated") {
+    throw new Error("لا يمكن تغيير صلاحية التعديل بعد احتساب المباراة");
+  }
+  if (
+    predictionEditingIsOpen &&
+    (now >= current.kickoffAt ||
+      !["scheduled", "prediction_open"].includes(current.status))
+  ) {
+    throw new Error("لا يمكن فتح تعديل التوقع بعد بداية المباراة أو في حالتها الحالية");
+  }
+  if (
+    predictionEditingIsOpen &&
+    (!current.homeTeamId || !current.awayTeamId)
+  ) {
+    throw new Error("لا يمكن فتح التعديل قبل تحديد طرفي المباراة");
+  }
+
+  await setDoc(
+    matchRef,
+    {
+      predictionEditingIsOpen,
       updatedAt: now,
       updatedAtServer: serverTimestamp(),
     },
@@ -709,6 +733,15 @@ export async function setAllTournamentPredictionsOpen(
   matches.forEach((match) => {
     if (match.status === "finished" || match.status === "cancelled") return;
     if (predictionIsOpen && (!match.homeTeamId || !match.awayTeamId)) return;
+    if (predictionIsOpen && now >= match.kickoffAt) return;
+
+    const nextClosesAt =
+      predictionIsOpen &&
+      (match.predictionClosesAt == null ||
+        match.predictionClosesAt <= now ||
+        match.predictionClosesAt > match.kickoffAt)
+        ? match.kickoffAt
+        : match.predictionClosesAt ?? match.kickoffAt;
 
     batch.set(
       doc(
@@ -723,7 +756,7 @@ export async function setAllTournamentPredictionsOpen(
           predictionIsOpen && match.predictionOpensAt == null
             ? now
             : match.predictionOpensAt,
-        predictionClosesAt: match.predictionClosesAt ?? match.kickoffAt,
+        predictionClosesAt: nextClosesAt,
         updatedAt: now,
       },
       { merge: true },
@@ -749,114 +782,38 @@ export async function saveTournamentPredictionV2(
     throw new Error("النتيجة يجب أن تكون أرقامًا صحيحة من 0 إلى 30");
   }
 
-  const matchRef = doc(
-    db,
-    TOURNAMENT_V2_COLLECTIONS.matches,
-    entityDocId(tournamentId, matchId),
-  );
-  const matchSnap = await getDoc(matchRef);
-
-  if (!matchSnap.exists()) {
-    throw new Error("المباراة لم تتم تهيئتها بعد");
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser || firebaseUser.uid !== userId) {
+    throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى ثم أعد المحاولة.");
   }
 
-  const match = mapMatchDoc(matchSnap.id, matchSnap.data());
+  const token = await firebaseUser.getIdToken();
+  const response = await fetch("/api/tournaments/predictions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      tournamentId,
+      matchId,
+      homeScore: input.homeScore,
+      awayScore: input.awayScore,
+      qualifiedTeamId: input.qualifiedTeamId ?? null,
+      qualificationMethod: input.qualificationMethod ?? null,
+    }),
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => null)) as {
+    prediction?: TournamentPredictionV2;
+    error?: string;
+  } | null;
 
-  if (!match.homeTeamId || !match.awayTeamId) {
-    throw new Error("لم يتم تحديد طرفي المباراة بعد");
+  if (!response.ok || !data?.prediction) {
+    throw new Error(data?.error || "تعذر حفظ التوقع الآن. بقيت بقية توقعاتك دون تغيير.");
   }
 
-  const predictionRef = doc(
-    db,
-    TOURNAMENT_V2_COLLECTIONS.predictions,
-    predictionDocId(tournamentId, userId, matchId),
-  );
-  const existing = await getDoc(predictionRef);
-
-  if (existing.exists()) {
-    if (!match.predictionEditingIsOpen) {
-      throw new Error("تعديل التوقعات مغلق لهذه المباراة");
-    }
-    if (!["scheduled", "prediction_open"].includes(match.status)) {
-      throw new Error("لا يمكن تعديل التوقع في الحالة الحالية للمباراة");
-    }
-  } else if (!isTournamentPredictionOpen(match)) {
-    throw new Error("التوقعات مغلقة لهذه المباراة");
-  }
-
-  let qualifiedTeamId: string | null = null;
-  let qualificationMethod: TournamentQualificationMethod | null = null;
-
-  if (match.stage === "knockout") {
-    if (input.homeScore > input.awayScore) {
-      qualifiedTeamId = match.homeTeamId;
-      qualificationMethod = "regular";
-    } else if (input.awayScore > input.homeScore) {
-      qualifiedTeamId = match.awayTeamId;
-      qualificationMethod = "regular";
-    } else {
-      qualifiedTeamId = cleanText(input.qualifiedTeamId) || null;
-      qualificationMethod =
-        input.qualificationMethod === "extra_time" ||
-        input.qualificationMethod === "penalties"
-          ? input.qualificationMethod
-          : null;
-
-      if (
-        !qualifiedTeamId ||
-        ![match.homeTeamId, match.awayTeamId].includes(qualifiedTeamId)
-      ) {
-        throw new Error("اختر المنتخب المتوقع تأهله");
-      }
-
-      if (!qualificationMethod) {
-        throw new Error("اختر طريقة التأهل المتوقعة");
-      }
-    }
-  }
-
-  const now = Date.now();
-
-  const payload = {
-    tournamentId,
-    matchId,
-    userId,
-    userName,
-    homeScore: input.homeScore,
-    awayScore: input.awayScore,
-    qualifiedTeamId,
-    qualificationMethod,
-    points: null,
-    isCalculated: false,
-    resultType: null,
-    submittedAt: existing.exists()
-      ? toNumber(existing.data().submittedAt, now)
-      : now,
-    updatedAt: now,
-    updatedAtServer: serverTimestamp(),
-    schemaVersion: 2,
-  };
-
-  await setDoc(predictionRef, payload, { merge: true });
-
-  return {
-    id: predictionRef.id,
-    tournamentId,
-    matchId,
-    userId,
-    userName,
-    homeScore: input.homeScore,
-    awayScore: input.awayScore,
-    qualifiedTeamId,
-    qualificationMethod,
-    points: null,
-    pointsBreakdown: null,
-    isCalculated: false,
-    resultType: null,
-    submittedAt: payload.submittedAt,
-    updatedAt: now,
-    calculatedAt: null,
-  };
+  return data.prediction;
 }
 
 export async function getUserTournamentPredictionsV2(
@@ -899,578 +856,3 @@ export async function getTournamentLeaderboardV2(
     })
     .map((item, index) => ({ ...item, rank: index + 1 }));
 }
-
-export async function ensureTournamentUserStatsV2({
-  tournamentId,
-  userId,
-  fullName,
-}: {
-  tournamentId: string;
-  userId: string;
-  fullName: string;
-}) {
-  const ref = doc(
-    db,
-    TOURNAMENT_V2_COLLECTIONS.userStats,
-    statsDocId(tournamentId, userId),
-  );
-  const snapshot = await getDoc(ref);
-
-  if (snapshot.exists()) return;
-
-  const now = Date.now();
-
-  await setDoc(ref, {
-    tournamentId,
-    userId,
-    fullName,
-    points: 0,
-    rank: null,
-    played: 0,
-    exact: 0,
-    correctOutcome: 0,
-    wrong: 0,
-    currentStreak: 0,
-    bestStreak: 0,
-    updatedAt: now,
-    schemaVersion: 2,
-  });
-}
-export type CalculateTournamentMatchV2Input = {
-  tournamentId: string;
-  matchId: string;
-  homeScore: number;
-  awayScore: number;
-  qualifiedTeamId?: string | null;
-  qualificationMethod?: TournamentQualificationMethod | null;
-  extraTimeHomeScore?: number | null;
-  extraTimeAwayScore?: number | null;
-  penaltiesHomeScore?: number | null;
-  penaltiesAwayScore?: number | null;
-};
-
-export type CalculateTournamentMatchV2Result = {
-  tournamentId: string;
-  matchId: string;
-  predictionsCalculated: number;
-  leaderboardRows: number;
-  resultHash: string;
-  calculationRunId: string;
-  scoringVersion: string;
-};
-
-async function commitChunked(
-  operations: Array<(batch: ReturnType<typeof writeBatch>) => void>,
-  chunkSize = 400,
-) {
-  for (let index = 0; index < operations.length; index += chunkSize) {
-    const batch = writeBatch(db);
-    operations.slice(index, index + chunkSize).forEach((operation) => {
-      operation(batch);
-    });
-    await batch.commit();
-  }
-}
-
-async function getTournamentPredictionsForCalculationV2(
-  tournamentId: string,
-): Promise<TournamentPredictionV2[]> {
-  const q = query(
-    collection(db, TOURNAMENT_V2_COLLECTIONS.predictions),
-    where("tournamentId", "==", tournamentId),
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((item) => mapPredictionDoc(item.id, item.data()));
-}
-
-export async function rebuildTournamentLeaderboardV2(tournamentId: string) {
-  const [matches, predictions, existingStatsSnapshot] = await Promise.all([
-    getTournamentMatchesV2(tournamentId, { fallback: false }),
-    getTournamentPredictionsForCalculationV2(tournamentId),
-    getDocs(
-      query(
-        collection(db, TOURNAMENT_V2_COLLECTIONS.userStats),
-        where("tournamentId", "==", tournamentId),
-      ),
-    ),
-  ]);
-
-  const matchById = new Map(matches.map((match) => [match.id, match]));
-  const calculatedPredictions = predictions
-    .filter(
-      (prediction) =>
-        prediction.isCalculated === true &&
-        prediction.points != null &&
-        prediction.resultType != null &&
-        matchById.has(prediction.matchId),
-    )
-    .sort((a, b) => {
-      const aKickoff = matchById.get(a.matchId)?.kickoffAt ?? 0;
-      const bKickoff = matchById.get(b.matchId)?.kickoffAt ?? 0;
-      if (aKickoff !== bKickoff) return aKickoff - bKickoff;
-      return a.matchId.localeCompare(b.matchId);
-    });
-
-  const aggregate = new Map<string, TournamentUserStatsV2>();
-  const now = Date.now();
-
-  calculatedPredictions.forEach((prediction) => {
-    const current = aggregate.get(prediction.userId) ?? {
-      id: statsDocId(tournamentId, prediction.userId),
-      tournamentId,
-      userId: prediction.userId,
-      fullName: cleanText(prediction.userName) || "عضو",
-      points: 0,
-      rank: null,
-      played: 0,
-      exact: 0,
-      correctOutcome: 0,
-      wrong: 0,
-      currentStreak: 0,
-      bestStreak: 0,
-      updatedAt: now,
-    };
-
-    current.fullName = cleanText(prediction.userName) || current.fullName;
-    current.points += prediction.points ?? 0;
-    current.played += 1;
-
-    if (prediction.resultType === "exact") {
-      current.exact += 1;
-      current.currentStreak += 1;
-    } else if (prediction.resultType === "outcome") {
-      current.correctOutcome += 1;
-      current.currentStreak += 1;
-    } else {
-      current.wrong += 1;
-      current.currentStreak = 0;
-    }
-
-    current.bestStreak = Math.max(
-      current.bestStreak,
-      current.currentStreak,
-    );
-    current.updatedAt = now;
-    aggregate.set(prediction.userId, current);
-  });
-
-  const rows = [...aggregate.values()]
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.exact !== a.exact) return b.exact - a.exact;
-      if (b.correctOutcome !== a.correctOutcome) {
-        return b.correctOutcome - a.correctOutcome;
-      }
-      if (a.wrong !== b.wrong) return a.wrong - b.wrong;
-      return a.fullName.localeCompare(b.fullName, "ar");
-    })
-    .map((row, index) => ({ ...row, rank: index + 1 }));
-
-  const operations: Array<
-    (batch: ReturnType<typeof writeBatch>) => void
-  > = [];
-
-  existingStatsSnapshot.docs.forEach((item) => {
-    operations.push((batch) => batch.delete(item.ref));
-  });
-
-  rows.forEach((row) => {
-    const ref = doc(
-      db,
-      TOURNAMENT_V2_COLLECTIONS.userStats,
-      statsDocId(tournamentId, row.userId),
-    );
-    operations.push((batch) =>
-      batch.set(ref, {
-        ...row,
-        schemaVersion: 2,
-      }),
-    );
-  });
-
-  if (operations.length > 0) {
-    await commitChunked(operations);
-  }
-
-  return rows;
-}
-
-export async function calculateTournamentMatchV2(
-  input: CalculateTournamentMatchV2Input,
-): Promise<CalculateTournamentMatchV2Result> {
-  const tournamentId = cleanText(input.tournamentId);
-  const matchId = cleanText(input.matchId);
-
-  if (!tournamentId || !matchId) {
-    throw new Error("بيانات المباراة غير مكتملة");
-  }
-
-  if (!isValidScore(input.homeScore) || !isValidScore(input.awayScore)) {
-    throw new Error("النتيجة يجب أن تكون أرقامًا صحيحة من 0 إلى 30");
-  }
-
-  if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) {
-    throw new Error("محرك الاحتساب الحالي مخصص لخليجي 27 فقط");
-  }
-
-  const matchRef = doc(
-    db,
-    TOURNAMENT_V2_COLLECTIONS.matches,
-    entityDocId(tournamentId, matchId),
-  );
-  const matchSnap = await getDoc(matchRef);
-
-  if (!matchSnap.exists()) {
-    throw new Error("المباراة غير موجودة في Firestore V2");
-  }
-
-  const match = mapMatchDoc(matchSnap.id, matchSnap.data());
-  if (!match.homeTeamId || !match.awayTeamId) {
-    throw new Error("حدد طرفي المباراة قبل إدخال النتيجة");
-  }
-
-  const scoringVersion =
-    match.stage === "knockout"
-      ? GULF_CUP_27_KNOCKOUT_SCORING_VERSION
-      : GULF_CUP_27_SCORING_VERSION;
-
-  let qualifiedTeamId: string | null = null;
-  let qualificationMethod: TournamentQualificationMethod | null = null;
-  let extraTimeHomeScore: number | null = null;
-  let extraTimeAwayScore: number | null = null;
-  let penaltiesHomeScore: number | null = null;
-  let penaltiesAwayScore: number | null = null;
-
-  if (match.stage === "knockout") {
-    qualifiedTeamId = cleanText(input.qualifiedTeamId) || null;
-    qualificationMethod =
-      input.qualificationMethod === "regular" ||
-      input.qualificationMethod === "extra_time" ||
-      input.qualificationMethod === "penalties"
-        ? input.qualificationMethod
-        : null;
-
-    if (!qualifiedTeamId || !qualificationMethod) {
-      throw new Error("حدد المتأهل وطريقة التأهل");
-    }
-
-    extraTimeHomeScore =
-      input.extraTimeHomeScore == null ? null : Number(input.extraTimeHomeScore);
-    extraTimeAwayScore =
-      input.extraTimeAwayScore == null ? null : Number(input.extraTimeAwayScore);
-    penaltiesHomeScore =
-      input.penaltiesHomeScore == null ? null : Number(input.penaltiesHomeScore);
-    penaltiesAwayScore =
-      input.penaltiesAwayScore == null ? null : Number(input.penaltiesAwayScore);
-
-    [extraTimeHomeScore, extraTimeAwayScore, penaltiesHomeScore, penaltiesAwayScore]
-      .filter((value): value is number => value != null)
-      .forEach((value) => {
-        if (!isValidScore(value)) {
-          throw new Error("نتائج الإضافي والترجيح يجب أن تكون من 0 إلى 30");
-        }
-      });
-
-    validateKnockoutResultV2({
-      homeTeamId: match.homeTeamId,
-      awayTeamId: match.awayTeamId,
-      homeScore: input.homeScore,
-      awayScore: input.awayScore,
-      qualifiedTeamId,
-      qualificationMethod,
-      extraTimeHomeScore,
-      extraTimeAwayScore,
-      penaltiesHomeScore,
-      penaltiesAwayScore,
-    });
-  }
-
-  const now = Date.now();
-  const resultHash = createTournamentResultHash({
-    tournamentId,
-    matchId,
-    homeScore: input.homeScore,
-    awayScore: input.awayScore,
-    scoringVersion,
-    qualifiedTeamId,
-    qualificationMethod,
-    extraTimeHomeScore,
-    extraTimeAwayScore,
-    penaltiesHomeScore,
-    penaltiesAwayScore,
-  });
-  const calculationRunId = `${tournamentId}_${matchId}_${now}`;
-  const resultMatch: TournamentMatchRuntimeV2 = {
-    ...match,
-    status: "finished",
-    predictionIsOpen: false,
-    calculationStatus: "processing",
-    calculationVersion: scoringVersion,
-    resultHash,
-    calculatedAt: null,
-    result: {
-      ...match.result,
-      homeScore: input.homeScore,
-      awayScore: input.awayScore,
-      extraTimeHomeScore,
-      extraTimeAwayScore,
-      penaltiesHomeScore,
-      penaltiesAwayScore,
-      qualifiedTeamId,
-      qualificationMethod,
-    },
-  };
-
-  await setDoc(
-    matchRef,
-    {
-      result: resultMatch.result,
-      status: "finished",
-      predictionIsOpen: false,
-      predictionClosesAt: Math.min(match.predictionClosesAt ?? now, now),
-      calculationStatus: "processing",
-      calculationVersion: scoringVersion,
-      resultHash,
-      calculationRunId,
-      calculationError: null,
-      calculatedAt: null,
-      calculatedPredictions: 0,
-      updatedAt: now,
-      updatedAtServer: serverTimestamp(),
-    },
-    { merge: true },
-  );
-
-  try {
-    const previousLeaderboard = await getTournamentLeaderboardV2(tournamentId);
-    const q = query(
-      collection(db, TOURNAMENT_V2_COLLECTIONS.predictions),
-      where("tournamentId", "==", tournamentId),
-      where("matchId", "==", matchId),
-    );
-    const snapshot = await getDocs(q);
-    const operations: Array<
-      (batch: ReturnType<typeof writeBatch>) => void
-    > = [];
-    const scoredNotifications: Array<{
-      userId: string;
-      points: number;
-      resultType: "exact" | "outcome" | "wrong";
-    }> = [];
-
-    snapshot.docs.forEach((item) => {
-      const prediction = mapPredictionDoc(item.id, item.data());
-      const scored =
-        match.stage === "knockout"
-          ? scoreGulfCup27KnockoutPredictionV1({
-              prediction,
-              match: resultMatch,
-            })
-          : scoreGulfCup27PredictionV1({
-              prediction,
-              match: resultMatch,
-            });
-
-      scoredNotifications.push({
-        userId: prediction.userId,
-        points: scored.points,
-        resultType: scored.resultType,
-      });
-
-      operations.push((batch) =>
-        batch.set(
-          item.ref,
-          {
-            points: scored.points,
-            pointsBreakdown: scored.pointsBreakdown,
-            isCalculated: true,
-            resultType: scored.resultType,
-            calculatedAt: now,
-            scoringVersion: scored.scoringVersion,
-            resultHash,
-            calculationRunId,
-            updatedAtServer: serverTimestamp(),
-          },
-          { merge: true },
-        ),
-      );
-    });
-
-    if (operations.length > 0) {
-      await commitChunked(operations);
-    }
-
-    const leaderboard = await rebuildTournamentLeaderboardV2(tournamentId);
-
-    await setDoc(
-      matchRef,
-      {
-        calculationStatus: "calculated",
-        calculationVersion: scoringVersion,
-        resultHash,
-        calculationRunId,
-        calculatedAt: now,
-        calculatedPredictions: snapshot.size,
-        calculationError: null,
-        updatedAt: Date.now(),
-        updatedAtServer: serverTimestamp(),
-      },
-      { merge: true },
-    );
-
-    // يحدّث نصف النهائي بعد اكتمال المجموعات، والنهائي بعد اكتمال نصف النهائي.
-    await syncGulfCup27KnockoutBracketV2();
-    await rebuildTournamentAchievementsV2(tournamentId);
-
-    try {
-      const homeName = getGulfCup27Team(match.homeTeamId)?.nameAr || match.homeTeamId;
-      const awayName = getGulfCup27Team(match.awayTeamId)?.nameAr || match.awayTeamId;
-      await sendTournamentCalculationNotificationsV2({
-        tournamentId,
-        matchId,
-        matchLabel: `${homeName} × ${awayName}`,
-        resultLabel: `${input.homeScore}-${input.awayScore}`,
-        resultHash,
-        route: "/tournaments/gulf-cup-27/predictions",
-        predictions: scoredNotifications,
-        leaderboard: leaderboard.map((row) => ({
-          userId: row.userId,
-          rank: row.rank,
-          points: row.points,
-        })),
-        previousLeaderboard: previousLeaderboard.map((row) => ({
-          userId: row.userId,
-          rank: row.rank,
-          points: row.points,
-        })),
-      });
-    } catch (notificationError) {
-      console.error("Tournament V2 result notifications failed:", notificationError);
-    }
-
-    return {
-      tournamentId,
-      matchId,
-      predictionsCalculated: snapshot.size,
-      leaderboardRows: leaderboard.length,
-      resultHash,
-      calculationRunId,
-      scoringVersion,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "خطأ غير معروف";
-    await setDoc(
-      matchRef,
-      {
-        calculationStatus: "error",
-        calculationError: message.slice(0, 300),
-        updatedAt: Date.now(),
-        updatedAtServer: serverTimestamp(),
-      },
-      { merge: true },
-    );
-    throw error;
-  }
-}
-
-export async function undoTournamentMatchCalculationV2({
-  tournamentId,
-  matchId,
-}: {
-  tournamentId: string;
-  matchId: string;
-}) {
-  const matchRef = doc(
-    db,
-    TOURNAMENT_V2_COLLECTIONS.matches,
-    entityDocId(tournamentId, matchId),
-  );
-  const matchSnap = await getDoc(matchRef);
-
-  if (!matchSnap.exists()) {
-    throw new Error("المباراة غير موجودة في Firestore V2");
-  }
-
-  const match = mapMatchDoc(matchSnap.id, matchSnap.data());
-  if (match.calculationStatus !== "calculated" && match.status !== "finished") {
-    throw new Error("هذه المباراة غير محتسبة حاليًا");
-  }
-
-  const q = query(
-    collection(db, TOURNAMENT_V2_COLLECTIONS.predictions),
-    where("tournamentId", "==", tournamentId),
-    where("matchId", "==", matchId),
-  );
-  const snapshot = await getDocs(q);
-  const now = Date.now();
-  const operations: Array<
-    (batch: ReturnType<typeof writeBatch>) => void
-  > = [];
-
-  snapshot.docs.forEach((item) => {
-    operations.push((batch) =>
-      batch.set(
-        item.ref,
-        {
-          points: null,
-          pointsBreakdown: null,
-          isCalculated: false,
-          resultType: null,
-          calculatedAt: null,
-          scoringVersion: null,
-          resultHash: null,
-          calculationRunId: null,
-          updatedAtServer: serverTimestamp(),
-        },
-        { merge: true },
-      ),
-    );
-  });
-
-  if (operations.length > 0) {
-    await commitChunked(operations);
-  }
-
-  await setDoc(
-    matchRef,
-    {
-      result: {
-        ...match.result,
-        homeScore: null,
-        awayScore: null,
-        extraTimeHomeScore: null,
-        extraTimeAwayScore: null,
-        penaltiesHomeScore: null,
-        penaltiesAwayScore: null,
-        qualifiedTeamId: null,
-        qualificationMethod: null,
-      },
-      status: "scheduled",
-      predictionIsOpen: false,
-      predictionClosesAt: match.kickoffAt,
-      calculationStatus: "not_calculated",
-      calculationVersion: null,
-      resultHash: null,
-      calculationRunId: null,
-      calculationError: null,
-      calculatedAt: null,
-      calculatedPredictions: 0,
-      lastUndoAt: now,
-      updatedAt: now,
-      updatedAtServer: serverTimestamp(),
-    },
-    { merge: true },
-  );
-
-  const leaderboard = await rebuildTournamentLeaderboardV2(tournamentId);
-  await syncGulfCup27KnockoutBracketV2();
-  await rebuildTournamentAchievementsV2(tournamentId);
-
-  return {
-    tournamentId,
-    matchId,
-    predictionsReset: snapshot.size,
-    leaderboardRows: leaderboard.length,
-  };
-}
-

@@ -1,6 +1,5 @@
 import {
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -11,6 +10,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { requestAdminTournamentPredictionActionV2 } from "./adminTournamentPredictionsApiV2";
 import type { TournamentPredictionV2, TournamentQualificationMethod } from "@/domain/tournaments";
 import { TOURNAMENT_V2_COLLECTIONS, getTournamentMatchesV2, type TournamentMatchRuntimeV2 } from "@/lib/tournamentV2Firestore";
 
@@ -88,63 +88,30 @@ export async function updateAdminTournamentPredictionV2({
   if (!Number.isInteger(homeScore) || homeScore < 0 || homeScore > 30 || !Number.isInteger(awayScore) || awayScore < 0 || awayScore > 30) {
     throw new Error("النتيجة يجب أن تكون بين 0 و30");
   }
-  const ref = doc(db, TOURNAMENT_V2_COLLECTIONS.predictions, predictionId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error("التوقع غير موجود");
-  if (snap.data().isCalculated) throw new Error("تراجع عن احتساب المباراة أولًا قبل تعديل توقع محتسب");
-
-  const prediction = snap.data();
-  const matchRef = doc(db, TOURNAMENT_V2_COLLECTIONS.matches, `${clean(prediction.tournamentId)}_${clean(prediction.matchId)}`);
-  const matchSnap = await getDoc(matchRef);
-  if (!matchSnap.exists()) throw new Error("المباراة المرتبطة بالتوقع غير موجودة");
-  const match = matchSnap.data();
-  let nextQualifiedTeamId = qualifiedTeamId || null;
-  let nextQualificationMethod = qualificationMethod || null;
-  if (match.stage === "group") {
-    nextQualifiedTeamId = null;
-    nextQualificationMethod = null;
-  } else if (homeScore > awayScore) {
-    nextQualifiedTeamId = clean(match.homeTeamId);
-    nextQualificationMethod = "regular";
-  } else if (awayScore > homeScore) {
-    nextQualifiedTeamId = clean(match.awayTeamId);
-    nextQualificationMethod = "regular";
-  } else {
-    if (![clean(match.homeTeamId), clean(match.awayTeamId)].includes(clean(nextQualifiedTeamId))) throw new Error("اختر المتأهل عند توقع التعادل");
-    if (nextQualificationMethod !== "extra_time" && nextQualificationMethod !== "penalties") throw new Error("اختر طريقة التأهل عند توقع التعادل");
-  }
-
-  await updateDoc(ref, {
+  await requestAdminTournamentPredictionActionV2({
+    action: "update_prediction",
+    predictionId,
     homeScore,
     awayScore,
-    qualifiedTeamId: nextQualifiedTeamId,
-    qualificationMethod: nextQualificationMethod,
-    updatedAt: Date.now(),
-    updatedAtServer: serverTimestamp(),
+    qualifiedTeamId: qualifiedTeamId || null,
+    qualificationMethod: qualificationMethod || null,
   });
 }
 
 export async function deleteAdminTournamentPredictionV2(predictionId: string) {
-  const ref = doc(db, TOURNAMENT_V2_COLLECTIONS.predictions, predictionId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return;
-  if (snap.data().isCalculated) throw new Error("تراجع عن احتساب المباراة أولًا قبل حذف توقع محتسب");
-  await deleteDoc(ref);
+  await requestAdminTournamentPredictionActionV2({
+    action: "delete_prediction",
+    predictionId,
+  });
 }
 
 export async function deleteAdminTournamentMatchPredictionsV2(tournamentId: string, matchId: string) {
-  const snapshot = await getDocs(query(
-    collection(db, TOURNAMENT_V2_COLLECTIONS.predictions),
-    where("tournamentId", "==", tournamentId),
-    where("matchId", "==", matchId),
-  ));
-  if (snapshot.docs.some((item) => Boolean(item.data().isCalculated))) {
-    throw new Error("يوجد توقعات محتسبة. تراجع عن احتساب المباراة أولًا");
-  }
-  const batch = writeBatch(db);
-  snapshot.docs.forEach((item) => batch.delete(item.ref));
-  await batch.commit();
-  return snapshot.size;
+  const result = await requestAdminTournamentPredictionActionV2<{ deleted: number }>({
+    action: "delete_match_predictions",
+    tournamentId,
+    matchId,
+  });
+  return result.deleted;
 }
 
 export async function setTournamentPredictionEditingV2(tournamentId: string, matchId: string, open: boolean) {

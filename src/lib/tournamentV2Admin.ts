@@ -343,6 +343,17 @@ export async function updateTournamentMatchV2(tournamentId: string, matchId: str
   const current = snap.data();
   if (current.calculationStatus === "calculated") throw new Error("لا تعدّل بيانات مباراة محتسبة. تراجع عن الاحتساب أولًا.");
 
+  const currentKickoffAt = Number(current.kickoffAt || 0);
+  const currentPredictionClosesAt =
+    current.predictionClosesAt == null
+      ? null
+      : Number(current.predictionClosesAt);
+  const predictionClosesAt =
+    currentPredictionClosesAt == null ||
+    currentPredictionClosesAt === currentKickoffAt
+      ? input.kickoffAt
+      : currentPredictionClosesAt;
+
   await updateDoc(ref, {
     stage: input.stage,
     round: clean(input.round),
@@ -355,7 +366,7 @@ export async function updateTournamentMatchV2(tournamentId: string, matchId: str
     stadium: clean(input.stadium),
     city: clean(input.city),
     status: input.status,
-    predictionClosesAt: current.predictionIsOpen ? input.kickoffAt : current.predictionClosesAt ?? null,
+    predictionClosesAt,
     updatedAt: Date.now(),
   });
 }

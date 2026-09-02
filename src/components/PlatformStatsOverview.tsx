@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getCountFromServer } from "firebase/firestore";
 import { BarChart3, Gamepad2, Target, Trophy, UsersRound } from "lucide-react";
-import { db } from "@/lib/firebase";
 import { getRegisteredTournaments } from "@/domain/tournaments";
 
 type Stats = { members: number; predictions: number; matches: number; gamePlayers: number };
@@ -17,21 +15,11 @@ export default function PlatformStatsOverview() {
     let active = true;
     async function load() {
       try {
-        const [users, legacyPredictions, tournamentPredictions, legacyMatches, tournamentMatches, gamePlayers] = await Promise.all([
-          getCountFromServer(collection(db, "users")),
-          getCountFromServer(collection(db, "predictions")),
-          getCountFromServer(collection(db, "tournamentPredictions")),
-          getCountFromServer(collection(db, "matches")),
-          getCountFromServer(collection(db, "tournamentMatches")),
-          getCountFromServer(collection(db, "platformGameStats")),
-        ]);
+        const response = await fetch("/api/public/stats", { cache: "no-store" });
+        if (!response.ok) throw new Error(`PLATFORM_STATS_${response.status}`);
+        const data = (await response.json()) as Stats;
         if (!active) return;
-        setStats({
-          members: users.data().count,
-          predictions: legacyPredictions.data().count + tournamentPredictions.data().count,
-          matches: legacyMatches.data().count + tournamentMatches.data().count,
-          gamePlayers: gamePlayers.data().count,
-        });
+        setStats(data);
       } catch (error) {
         console.error("Platform stats error:", error);
       } finally {

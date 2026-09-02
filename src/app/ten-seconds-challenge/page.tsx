@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { TimerReset } from "lucide-react";
 import GamePageShell from "@/components/games/GamePageShell";
 import TenSecondsChallengeGame from "@/components/TenSecondsChallengeGame";
+
+export const metadata: Metadata = { title: "تحدي العشر ثواني", description: "أوقف المؤقت عند 10.000 بالضبط وسجّل محاولاتك اليومية وXP." };
 
 export default function TenSecondsChallengePage() {
   return (

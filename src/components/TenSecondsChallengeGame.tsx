@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import AuthGateCard from "@/components/auth/AuthGateCard";
 import { db } from "@/lib/firebase";
 import { playInteractionFeedback } from "@/lib/interactionFeedback";
 import {
@@ -368,7 +369,7 @@ export default function TenSecondsChallengeGame() {
 
   useEffect(() => {
     if (loading) return;
-    loadGameData();
+    queueMicrotask(() => void loadGameData());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, userId]);
 
@@ -562,6 +563,10 @@ export default function TenSecondsChallengeGame() {
         </div>
       </motion.section>
     );
+  }
+
+  if (!isLoggedIn || !userId) {
+    return <AuthGateCard returnTo="/ten-seconds-challenge" title="سجّل الدخول لتحدي العشر ثواني" description="أوقف المؤقت عند 10.000 بالضبط واحفظ محاولاتك اليومية." benefit="بعد تسجيل الدخول ستعود مباشرة إلى المؤقت، وXP لا يُحتسب إلا للمحاولات الرسمية المسجلة." />;
   }
 
   return (

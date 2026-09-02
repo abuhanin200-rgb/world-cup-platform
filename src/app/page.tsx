@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import PlatformHome from "@/components/PlatformHome";
 
 export const metadata: Metadata = {
-  title: "التحدي | منصة التوقعات والألعاب الرياضية",
+  title: { absolute: "التحدي | توقعات وبطولات وألعاب" },
   description:
     "التحدي منصة رياضية دائمة للتوقعات والبطولات والألعاب والتحديات الرياضية.",
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -14,6 +14,14 @@ import { playInteractionFeedback } from "@/lib/interactionFeedback";
 const forgotPasswordMessage = "السلام عليكم، نسيت الرقم السري في منصة التحدي وأرغب في استعادته.";
 const forgotUrl = `https://wa.me/966542180200?text=${encodeURIComponent(forgotPasswordMessage)}`;
 
+type LoginFieldErrors = { fullName?: string; password?: string };
+
+function getSafeReturnTo() {
+  if (typeof window === "undefined") return "/";
+  const value = new URLSearchParams(window.location.search).get("returnTo") || "/";
+  return value.startsWith("/") && !value.startsWith("//") ? value : "/";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -24,10 +32,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<SocialProvider | null>(null);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({});
   const [success, setSuccess] = useState(false);
+  const fullNameRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!authLoading && isLoggedIn) router.replace("/");
+    if (!authLoading && isLoggedIn) router.replace(getSafeReturnTo());
   }, [authLoading, isLoggedIn, router]);
 
   async function complete(action: () => Promise<unknown>) {
@@ -36,7 +47,7 @@ export default function LoginPage() {
       await action();
       setSuccess(true);
       playInteractionFeedback("success");
-      window.setTimeout(() => router.push("/"), reduceMotion ? 80 : 360);
+      window.setTimeout(() => router.push(getSafeReturnTo()), reduceMotion ? 80 : 360);
     } catch (err) {
       setSuccess(false);
       playInteractionFeedback("error");
@@ -46,6 +57,15 @@ export default function LoginPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const nextErrors: LoginFieldErrors = {};
+    if (!fullName.trim()) nextErrors.fullName = "اكتب اسم المستخدم";
+    if (!password.trim()) nextErrors.password = "اكتب الرقم السري";
+    setFieldErrors(nextErrors);
+    if (nextErrors.fullName || nextErrors.password) {
+      playInteractionFeedback("error");
+      window.requestAnimationFrame(() => (nextErrors.fullName ? fullNameRef : passwordRef).current?.focus());
+      return;
+    }
     setLoading(true);
     await complete(() => login({ fullName, password }));
     setLoading(false);
@@ -100,12 +120,14 @@ export default function LoginPage() {
 
           <div className="my-5 flex items-center gap-3 text-[10px] font-black text-white/32"><span className="h-px flex-1 bg-white/[0.10]" /><span>أو بالاسم والرقم السري</span><span className="h-px flex-1 bg-white/[0.10]" /></div>
 
-          <form onSubmit={submit} className="space-y-4">
-            <label className="block text-xs font-black">الاسم
-              <div className="relative mt-1.5"><User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" /><input value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="username" required className="altahaddi-input pr-10" placeholder="اكتب اسمك" /></div>
+          <form onSubmit={submit} noValidate className="space-y-4">
+            <label htmlFor="login-full-name" className="block text-xs font-black">اسم المستخدم
+              <div className="relative mt-1.5"><User className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" aria-hidden="true" /><input ref={fullNameRef} id="login-full-name" value={fullName} onChange={(event) => { setFullName(event.target.value); if (fieldErrors.fullName) setFieldErrors((current) => ({ ...current, fullName: undefined })); }} onBlur={() => { if (!fullName.trim()) setFieldErrors((current) => ({ ...current, fullName: "اكتب اسم المستخدم" })); }} autoComplete="username" aria-invalid={Boolean(fieldErrors.fullName)} aria-describedby={fieldErrors.fullName ? "login-full-name-error" : undefined} className={`altahaddi-input pr-10 ${fieldErrors.fullName ? "border-red-300/70 focus:border-red-300 focus:ring-red-300/20" : ""}`} placeholder="اكتب اسم المستخدم" /></div>
+              {fieldErrors.fullName ? <span id="login-full-name-error" role="alert" className="mt-1.5 block text-[11px] font-bold text-red-200">{fieldErrors.fullName}</span> : null}
             </label>
-            <label className="block text-xs font-black">الرقم السري
-              <div className="relative mt-1.5"><KeyRound className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" /><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required className="altahaddi-input pl-11 pr-10" placeholder="اكتب الرقم السري" /><button type="button" onClick={() => { setShowPassword((value) => !value); playInteractionFeedback("selection", { vibrate: false }); }} aria-label={showPassword ? "إخفاء الرقم السري" : "إظهار الرقم السري"} className="absolute left-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-xl text-white/45 transition hover:bg-white/[0.08] hover:text-[var(--brand-yellow)]">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
+            <label htmlFor="login-password" className="block text-xs font-black">الرقم السري
+              <div className="relative mt-1.5"><KeyRound className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" aria-hidden="true" /><input ref={passwordRef} id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={(event) => { setPassword(event.target.value); if (fieldErrors.password) setFieldErrors((current) => ({ ...current, password: undefined })); }} onBlur={() => { if (!password.trim()) setFieldErrors((current) => ({ ...current, password: "اكتب الرقم السري" })); }} autoComplete="current-password" aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? "login-password-error" : undefined} className={`altahaddi-input pl-12 pr-10 ${fieldErrors.password ? "border-red-300/70 focus:border-red-300 focus:ring-red-300/20" : ""}`} placeholder="اكتب الرقم السري" /><button type="button" onClick={() => { setShowPassword((value) => !value); playInteractionFeedback("selection", { vibrate: false }); }} aria-label={showPassword ? "إخفاء الرقم السري" : "إظهار الرقم السري"} className="absolute left-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-xl text-white/60 transition hover:bg-white/[0.08] hover:text-[var(--brand-yellow)]">{showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}</button></div>
+              {fieldErrors.password ? <span id="login-password-error" role="alert" className="mt-1.5 block text-[11px] font-bold text-red-200">{fieldErrors.password}</span> : null}
             </label>
 
             {error ? <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} role="alert" className="altahaddi-glass-soft rounded-2xl border-red-300/18 bg-red-400/[0.08] p-3 text-xs font-bold text-red-100">{error}</motion.div> : null}
@@ -114,7 +136,7 @@ export default function LoginPage() {
             <button disabled={loading || Boolean(socialLoading) || authLoading} className="altahaddi-primary-button w-full justify-center">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}{loading ? "جاري الدخول…" : "دخول"}</button>
           </form>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold"><a href={forgotUrl} target="_blank" rel="noreferrer" className="text-[var(--brand-yellow)] transition hover:text-[#ffd65f]">نسيت الرقم السري؟</a><Link href="/register" className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.07] px-3 text-[var(--brand-yellow)] backdrop-blur-xl transition hover:bg-[var(--brand-yellow)]/12"><UserPlus className="h-3.5 w-3.5" /> إنشاء حساب</Link></div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold"><a href={forgotUrl} target="_blank" rel="noreferrer" className="text-[var(--brand-yellow)] transition hover:text-[#ffd65f]">التواصل مع الدعم لاستعادة الحساب</a><Link href="/register" onClick={(event) => { event.preventDefault(); router.push(`/register?returnTo=${encodeURIComponent(getSafeReturnTo())}`); }} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.07] px-3 text-[var(--brand-yellow)] backdrop-blur-xl transition hover:bg-[var(--brand-yellow)]/12"><UserPlus className="h-3.5 w-3.5" /> إنشاء حساب</Link></div>
           <p className="mt-5 text-[9px] font-semibold leading-5 text-white/32">الدخول الاجتماعي يربطك بنفس حساب «التحدي» عند تطابق البريد الإلكتروني.</p>
         </section>
       </motion.div>

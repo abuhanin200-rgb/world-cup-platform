@@ -1,13 +1,11 @@
 import {
-  addDoc,
   collection,
   getDocs,
   limit,
   orderBy,
   query,
-  serverTimestamp,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 
 export type AdminLogAction =
   | "add_match"
@@ -56,16 +54,22 @@ function toText(value: unknown) {
 }
 
 export async function addAdminLog(input: AddAdminLogInput) {
-  const now = new Date().toISOString();
-
-  await addDoc(collection(db, "admin_logs"), {
-    action: input.action,
-    title: input.title,
-    description: input.description,
-    metadata: input.metadata || {},
-    createdAt: now,
-    createdAtServer: serverTimestamp(),
+  const user = auth.currentUser;
+  if (!user) throw new Error("انتهت جلسة الإدارة");
+  const token = await user.getIdToken();
+  const response = await fetch("/api/admin/logs", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(input),
+    cache: "no-store",
   });
+  if (!response.ok) {
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(data?.error || "تعذر حفظ سجل الإدارة");
+  }
 }
 
 export async function getAdminLogs(maxCount = 50): Promise<AdminLog[]> {

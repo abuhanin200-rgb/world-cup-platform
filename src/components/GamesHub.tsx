@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -110,15 +110,15 @@ function GameVisual({ kind }: { kind: (typeof GAMES)[number]["visual"] }) {
 
   if (kind === "flags") {
     return (
-      <div className="grid grid-cols-2 gap-2.5 text-3xl" aria-hidden="true">
-        {["🇸🇦", "🇯🇵", "🇦🇷", "🇲🇦"].map((flag, index) => (
+      <div className="grid grid-cols-2 gap-2.5" aria-hidden="true">
+        {["sa", "jp", "ar", "ma"].map((flag, index) => (
           <motion.span
             key={flag}
             animate={{ rotate: [0, index % 2 === 0 ? 2 : -2, 0], y: [0, -3, 0] }}
             transition={{ duration: 2.7 + index * 0.12, repeat: Infinity, ease: "easeInOut" }}
             className="grid h-14 w-16 place-items-center rounded-2xl border border-white/10 bg-white/[0.06]"
           >
-            {flag}
+            <img src={`/flags/${flag}.svg`} alt="" className="h-8 w-12 rounded object-cover" />
           </motion.span>
         ))}
       </div>
@@ -165,27 +165,22 @@ export default function GamesHub() {
   }, []);
 
   useEffect(() => {
-    if (!user?.id) {
-      setMemberStats(null);
-      return;
-    }
+    if (!user?.id) return;
 
     return onSnapshot(doc(db, "platformGameStats", user.id), (snapshot) => {
       setMemberStats(snapshot.exists() ? mapStats(snapshot.id, snapshot.data()) : null);
     });
   }, [user?.id]);
 
-  const memberRank = useMemo(() => {
-    if (!user?.id) return null;
-    const index = leaderboard.findIndex((item) => item.userId === user.id);
-    return index >= 0 ? index + 1 : null;
-  }, [leaderboard, user?.id]);
+  const memberIndex = user?.id ? leaderboard.findIndex((item) => item.userId === user.id) : -1;
+  const memberRank = memberIndex >= 0 ? memberIndex + 1 : null;
 
   const selectedGame = GAMES.find((game) => game.id === activeGame) ?? GAMES[0];
   const SelectedGameIcon = selectedGame.icon;
-  const xp = memberStats?.totalXp ?? 0;
+  const xp = user?.id && memberStats?.userId === user.id ? memberStats.totalXp : 0;
   const levelProgress = getLevelProgress(xp);
   const topThree = leaderboard.slice(0, 3);
+  const nextRankGap = memberRank && memberRank > 1 ? Math.max(0, leaderboard[memberRank - 2].totalXp - xp) : null;
 
   return (
     <main dir="rtl" className="relative min-h-screen overflow-hidden bg-[var(--brand-navy-950)] text-white">
@@ -226,6 +221,7 @@ export default function GamesHub() {
                   </div>
                   <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[var(--brand-yellow)] transition-[width]" style={{ width: `${levelProgress.progress}%` }} /></div>
                   <div className="mt-3 flex items-center justify-between text-[10px] font-bold text-white/38"><span>المستوى {levelProgress.level}</span><span dir="ltr">{levelProgress.xpToNextLevel} XP متبقي</span></div>
+                  {nextRankGap != null ? <div className="mt-2 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 py-2 text-center text-[10px] font-bold text-white/55">يفصلك عن المركز التالي <span dir="ltr" className="font-black text-[var(--brand-yellow)] [unicode-bidi:isolate]">{nextRankGap} XP</span></div> : null}
                 </>
               ) : (
                 <div className="text-center">
@@ -242,7 +238,7 @@ export default function GamesHub() {
         <section className="mt-5 md:mt-7" aria-labelledby="games-showcase-heading">
           <div className="mb-3 flex items-end justify-between gap-3">
             <div><p className="text-[10px] font-black text-[var(--brand-yellow)]">اختر لعبتك</p><h2 id="games-showcase-heading" className="mt-1 text-2xl font-black md:text-3xl">تحدي مختلف كل مرة</h2></div>
-            <div className="hidden items-center gap-1.5 text-[10px] font-bold text-white/38 sm:flex"><Zap className="h-3.5 w-3.5 text-[var(--brand-yellow)]" /> XP مستقل عن نقاط البطولات</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold text-white/55 sm:text-[10px]"><Zap className="h-3.5 w-3.5 text-[var(--brand-yellow)]" /> XP الألعاب مستقل عن نقاط البطولات</div>
           </div>
 
           <div className="altahaddi-glass relative overflow-hidden rounded-[30px] md:rounded-[36px]">
@@ -306,7 +302,7 @@ export default function GamesHub() {
                   return (
                     <div key={item.userId} className={`grid min-h-[60px] grid-cols-[38px_1fr_auto] items-center gap-3 px-3 py-3 md:px-4 ${isCurrent ? "bg-[var(--brand-yellow)]/[0.07]" : ""}`}>
                       <div className="flex items-center justify-center"><RankIcon rank={rank} /></div>
-                      <div className="min-w-0"><div className="flex items-center gap-2"><span className="truncate text-xs font-black md:text-sm"><MemberProfileLink userId={item.userId}>{item.userName}</MemberProfileLink></span>{isCurrent ? <span className="rounded-full bg-[var(--brand-yellow)] px-2 py-0.5 text-[8px] font-black text-[#04133a]">أنت</span> : null}</div><div className="mt-1 flex gap-2 text-[9px] font-bold text-white/30"><span>Lv {item.level}</span><span>{item.gamesPlayed} لعبة</span><span>{item.wins} فوز</span></div></div>
+                      <div className="min-w-0"><div className="flex items-center gap-2"><span className="truncate text-xs font-black md:text-sm"><MemberProfileLink userId={item.userId}>{item.userName}</MemberProfileLink></span>{isCurrent ? <span className="rounded-full bg-[var(--brand-yellow)] px-2 py-0.5 text-[8px] font-black text-[#04133a]">أنت</span> : null}</div><div className="mt-1 flex gap-2 text-[9px] font-bold text-white/45"><span>المستوى {item.level}</span><span>{item.gamesPlayed} لعبة</span><span>{item.wins} فوز</span></div></div>
                       <div dir="ltr" className="text-xs font-black text-[var(--brand-yellow)] md:text-sm">{item.totalXp} XP</div>
                     </div>
                   );

@@ -81,7 +81,17 @@ export default function PlatformChrome({ children }: { children: React.ReactNode
 
       <motion.div key={pathname} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeOut" }} className="min-h-[calc(100vh-72px)] pb-[calc(108px+env(safe-area-inset-bottom))] md:pb-0">{children}</motion.div>
 
-      <footer className="border-t border-white/[0.07] bg-[#04133a] px-4 pb-[calc(112px+env(safe-area-inset-bottom))] pt-7 text-center text-xs font-bold text-white/48 md:py-7"><div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-2 sm:flex-row sm:gap-4"><span>منصة التحدي</span><span className="hidden h-1 w-1 rounded-full bg-white/20 sm:block" /><a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="text-white/68 transition hover:text-[#ffc210]">برمجة وتطوير: عبدالسلام العنزي</a></div></footer>
+      <footer className="border-t border-white/[0.07] bg-[#04133a] px-4 pb-[calc(112px+env(safe-area-inset-bottom))] pt-7 text-center text-xs font-bold text-white/60 md:py-7">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-4">
+          <nav aria-label="روابط الفوتر" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <Link href="/" className="transition hover:text-[#ffc210]">الرئيسية</Link>
+            <Link href="/tournaments" className="transition hover:text-[#ffc210]">البطولات</Link>
+            <Link href="/games" className="transition hover:text-[#ffc210]">الألعاب</Link>
+            <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="transition hover:text-[#ffc210]">الدعم</a>
+          </nav>
+          <div className="flex flex-col items-center justify-center gap-2 border-t border-white/[0.06] pt-3 sm:flex-row sm:gap-4"><span>منصة التحدي</span><span className="hidden h-1 w-1 rounded-full bg-white/20 sm:block" /><a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="text-white/78 transition hover:text-[#ffc210]">برمجة وتطوير: عبدالسلام العنزي</a></div>
+        </div>
+      </footer>
 
       <nav className="altahaddi-mobile-dock altahaddi-glass-strong fixed inset-x-2 bottom-[max(8px,env(safe-area-inset-bottom))] z-[80] mx-auto max-w-[520px] rounded-[26px] p-1.5 md:hidden" aria-label="التنقل الرئيسي للجوال">
         <div className="grid grid-cols-5 gap-0.5">

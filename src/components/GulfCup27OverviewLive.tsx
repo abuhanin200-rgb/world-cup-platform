@@ -16,6 +16,7 @@ import TeamFlag from "@/components/TeamFlag";
 import { useAuth } from "@/context/AuthContext";
 import {
   GULF_CUP_27_TEAMS,
+  GULF_CUP_27_TOURNAMENT,
   GULF_CUP_27_TOURNAMENT_ID,
   calculateTournamentGroupStandingsV2,
   getGulfCup27Team,
@@ -90,6 +91,7 @@ export default function GulfCup27OverviewLive() {
   const [matches, setMatches] = useState<TournamentMatchRuntimeV2[]>([]);
   const [leaderboard, setLeaderboard] = useState<TournamentUserStatsV2[]>([]);
   const [loading, setLoading] = useState(true);
+  const [now] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,11 +110,10 @@ export default function GulfCup27OverviewLive() {
   }, []);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   const focusMatch = useMemo(() => {
-    const now = Date.now();
     const open = matches.find((match) => isTournamentPredictionOpen(match));
     if (open) return open;
     const upcoming = [...matches]
@@ -122,7 +123,7 @@ export default function GulfCup27OverviewLive() {
     return [...matches]
       .filter((match) => match.status === "finished")
       .sort((a, b) => b.kickoffAt - a.kickoffAt)[0] ?? null;
-  }, [matches]);
+  }, [matches, now]);
 
   const groupA = useMemo(
     () => calculateTournamentGroupStandingsV2({ teams: GULF_CUP_27_TEAMS, matches, group: "A" }),
@@ -152,6 +153,8 @@ export default function GulfCup27OverviewLive() {
     focusMatch.result.homeScore != null &&
     focusMatch.result.awayScore != null;
   const focusOpen = focusMatch ? isTournamentPredictionOpen(focusMatch) : false;
+  const beforeTournament = Boolean(GULF_CUP_27_TOURNAMENT.startAt && now < GULF_CUP_27_TOURNAMENT.startAt);
+  const afterTournament = Boolean(GULF_CUP_27_TOURNAMENT.endAt && now > GULF_CUP_27_TOURNAMENT.endAt);
 
   return (
     <div className="mb-7 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
@@ -159,9 +162,9 @@ export default function GulfCup27OverviewLive() {
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-black text-[var(--tournament-primary)]">
-              {focusOpen ? "التوقع مفتوح الآن" : focusFinished ? "آخر نتيجة" : "المباراة القادمة"}
+              {beforeTournament ? "المباراة الافتتاحية" : focusOpen ? "التوقع مفتوح الآن" : focusFinished ? "آخر نتيجة" : "المباراة القادمة"}
             </p>
-            <h2 className="mt-1 text-xl font-black md:text-2xl">واجهة البطولة الحية</h2>
+            <h2 className="mt-1 text-xl font-black md:text-2xl">{beforeTournament ? "البطولة تنطلق قريبًا" : afterTournament ? "النتائج النهائية" : "واجهة البطولة الحية"}</h2>
           </div>
           {focusOpen ? (
             <Target className="h-6 w-6 text-[var(--tournament-primary)]" aria-hidden="true" />

@@ -31,26 +31,27 @@ import {
 import {
   ASIAN_CUP_2027_TOURNAMENT_ID,
   GULF_CUP_27_KNOCKOUT_SCORING_V1,
-  GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
   GULF_CUP_27_SCORING_V1,
-  GULF_CUP_27_SCORING_VERSION,
   GULF_CUP_27_TOURNAMENT_ID,
   getGulfCup27Team,
   type TournamentQualificationMethod,
 } from "@/domain/tournaments";
 import { addAdminLog } from "@/lib/adminLogs";
 import {
+  calculateTournamentMatchViaServerV2,
+  undoTournamentMatchCalculationViaServerV2,
+} from "@/lib/adminTournamentPredictionsApiV2";
+import {
   sendTournamentAnnouncementV2,
   sendTournamentMatchReminderV2,
 } from "@/lib/tournamentNotificationsV2";
 import {
-  calculateTournamentMatchV2,
   getTournamentMatchesV2,
   initializeGulfCup27V2Data,
   setAllTournamentPredictionsOpen,
+  setTournamentMatchPredictionEditingOpen,
   setTournamentMatchPredictionOpen,
   syncGulfCup27KnockoutBracketV2,
-  undoTournamentMatchCalculationV2,
   type TournamentMatchRuntimeV2,
 } from "@/lib/tournamentV2Firestore";
 
@@ -182,7 +183,7 @@ export default function AdminTournamentV2Panel() {
   }
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, []);
 
   async function initialize() {
@@ -279,6 +280,40 @@ export default function AdminTournamentV2Panel() {
     }
   }
 
+  async function toggleEditing(match: TournamentMatchRuntimeV2) {
+    const nextOpen = !match.predictionEditingIsOpen;
+    setWorking(`toggle-editing-${match.id}`);
+    setMessage("");
+    setError("");
+    try {
+      await setTournamentMatchPredictionEditingOpen(
+        GULF_CUP_27_TOURNAMENT_ID,
+        match.id,
+        nextOpen,
+      );
+      await addAdminLog({
+        action: "other",
+        title: nextOpen ? "فتح تعديل توقعات خليجي 27" : "إغلاق تعديل توقعات خليجي 27",
+        description: `${formatMatch(match)} — ${nextOpen ? "تم فتح التعديل" : "تم إغلاق التعديل"}.`,
+        metadata: {
+          tournamentId: GULF_CUP_27_TOURNAMENT_ID,
+          matchId: match.id,
+          predictionEditingIsOpen: nextOpen,
+        },
+      });
+      setMessage(nextOpen ? "تم فتح تعديل التوقعات." : "تم إغلاق تعديل التوقعات.");
+      await load();
+    } catch (toggleError) {
+      setError(
+        toggleError instanceof Error
+          ? toggleError.message
+          : "تعذر تغيير صلاحية تعديل التوقعات",
+      );
+    } finally {
+      setWorking("");
+    }
+  }
+
   async function toggleAll(open: boolean) {
     setWorking(open ? "all-open" : "all-close");
     setMessage("");
@@ -365,7 +400,7 @@ export default function AdminTournamentV2Panel() {
     setMessage("");
     setError("");
     try {
-      const result = await calculateTournamentMatchV2({
+      const result = await calculateTournamentMatchViaServerV2({
         tournamentId: GULF_CUP_27_TOURNAMENT_ID,
         matchId: match.id,
         homeScore,
@@ -404,7 +439,7 @@ export default function AdminTournamentV2Panel() {
     setMessage("");
     setError("");
     try {
-      const result = await undoTournamentMatchCalculationV2({
+      const result = await undoTournamentMatchCalculationViaServerV2({
         tournamentId: GULF_CUP_27_TOURNAMENT_ID,
         matchId: match.id,
       });
@@ -503,7 +538,7 @@ export default function AdminTournamentV2Panel() {
         </div>
         <div className="rounded-2xl border border-sky-300/15 bg-sky-300/[0.06] p-4">
           <p className="text-xs font-bold text-sky-200/70">خروج المغلوب</p>
-          <p className="mt-1 font-black text-white">بالملي {GULF_CUP_27_KNOCKOUT_SCORING_V1.exact} · الفائز {GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome} · المتأهل {GULF_CUP_27_KNOCKOUT_SCORING_V1.qualified} · الطريقة {GULF_CUP_27_KNOCKOUT_SCORING_V1.method}</p>
+          <p className="mt-1 font-black text-white">نتيجة 90 دقيقة: بالملي {GULF_CUP_27_KNOCKOUT_SCORING_V1.exact} · الاتجاه {GULF_CUP_27_KNOCKOUT_SCORING_V1.outcome} · المتأهل {GULF_CUP_27_KNOCKOUT_SCORING_V1.qualified} · الطريقة {GULF_CUP_27_KNOCKOUT_SCORING_V1.method} · الأعلى {GULF_CUP_27_KNOCKOUT_SCORING_V1.max}</p>
         </div>
           </div>
         </>
@@ -561,14 +596,20 @@ export default function AdminTournamentV2Panel() {
                       <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-400"><CalendarDays className="h-4 w-4" aria-hidden="true" />{formatKickoff(match.kickoffAt)} · {match.stadium}</p>
                       {match.resultHash && <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500"><Hash className="h-3.5 w-3.5" aria-hidden="true" /><span dir="ltr" className="[unicode-bidi:isolate]">{match.resultHash}</span> · {match.calculatedPredictions} توقع</p>}
                     </div>
-                    <button type="button" onClick={() => void toggle(match)} disabled={Boolean(working) || calculated || !teamsReady} className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50 ${match.predictionIsOpen ? "border border-red-300/20 bg-red-400/10 text-red-100" : "bg-emerald-400 text-slate-950"}`}>
-                      {working === `toggle-${match.id}` ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : match.predictionIsOpen ? <LockKeyhole className="h-4 w-4" aria-hidden="true" /> : <UnlockKeyhole className="h-4 w-4" aria-hidden="true" />}
-                      {!teamsReady ? "بانتظار المتأهلين" : match.predictionIsOpen ? "إغلاق التوقع" : "فتح التوقع"}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void toggle(match)} disabled={Boolean(working) || calculated || !teamsReady} className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50 ${match.predictionIsOpen ? "border border-red-300/20 bg-red-400/10 text-red-100" : "bg-emerald-400 text-slate-950"}`}>
+                        {working === `toggle-${match.id}` ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : match.predictionIsOpen ? <LockKeyhole className="h-4 w-4" aria-hidden="true" /> : <UnlockKeyhole className="h-4 w-4" aria-hidden="true" />}
+                        {!teamsReady ? "بانتظار المتأهلين" : match.predictionIsOpen ? "إغلاق التوقع" : "فتح التوقع"}
+                      </button>
+                      <button type="button" onClick={() => void toggleEditing(match)} disabled={Boolean(working) || calculated || !teamsReady} className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50 ${match.predictionEditingIsOpen ? "border-amber-300/20 bg-amber-300/10 text-amber-100" : "border-white/10 bg-white/5 text-slate-200"}`}>
+                        {working === `toggle-editing-${match.id}` ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : match.predictionEditingIsOpen ? <LockKeyhole className="h-4 w-4" aria-hidden="true" /> : <UnlockKeyhole className="h-4 w-4" aria-hidden="true" />}
+                        {match.predictionEditingIsOpen ? "إغلاق التعديل" : "فتح التعديل"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mt-4 border-t border-white/10 pt-4">
-                    <p className="mb-2 text-xs font-black text-slate-400">{match.stage === "knockout" ? "النتيجة في الوقت الأصلي" : "النتيجة النهائية"}</p>
+                    <p className="mb-2 text-xs font-black text-slate-400">{match.stage === "knockout" ? "النتيجة بعد 90 دقيقة (نهاية الوقت الأصلي)" : "النتيجة النهائية"}</p>
                     <div className="flex items-center gap-2">
                       <input aria-label={`نتيجة ${teamName(match.homeTeamId, match.homeSourceLabel)}`} type="number" inputMode="numeric" min={0} max={30} value={draft.home} disabled={calculated || Boolean(working) || !teamsReady} onChange={(event) => setResultDrafts((current) => ({ ...current, [match.id]: { ...draft, home: event.target.value } }))} className="h-12 w-20 rounded-xl border border-white/10 bg-black/25 text-center text-lg font-black outline-none focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-300/25 disabled:opacity-55" />
                       <span className="font-black text-slate-500">—</span>

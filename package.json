@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:predictions": "node --test tests/predictions/*.test.mjs",
+    "test:firestore-rules": "firebase emulators:exec --only firestore --project demo-altahaddi-rules \"node --test tests/firestore-rules/*.test.mjs\"",
+    "test:predictions:all": "npm run test:predictions && npm run test:firestore-rules",
     "purge:notifications": "node --env-file=.env.local scripts/purge-notifications.js"
   },
   "dependencies": {
@@ -23,12 +26,14 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "firebase-tools": "^15.28.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

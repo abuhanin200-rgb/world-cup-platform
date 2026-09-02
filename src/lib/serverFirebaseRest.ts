@@ -342,6 +342,7 @@ export async function getDocument(collectionId: string, id: string) {
 type FirestoreWrite = {
   update: FirestoreDocument;
   updateMask?: { fieldPaths: string[] };
+  currentDocument?: { exists?: boolean; updateTime?: string };
 };
 
 export async function commitWrites(writes: FirestoreWrite[]) {
@@ -368,6 +369,20 @@ export function createDocumentWrite(
       fields: encodeFields(data),
     },
     ...(fieldPaths ? { updateMask: { fieldPaths } } : {}),
+  };
+}
+
+export function createDocumentIfMissingWrite(
+  collectionId: string,
+  id: string,
+  data: Record<string, unknown>,
+): FirestoreWrite {
+  return {
+    update: {
+      name: documentName(collectionId, id),
+      fields: encodeFields(data),
+    },
+    currentDocument: { exists: false },
   };
 }
 

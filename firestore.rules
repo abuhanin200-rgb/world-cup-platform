@@ -1,0 +1,154 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == "admin"
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true;
+    }
+
+    function ownsUserField(data) {
+      return signedIn() && data.userId == request.auth.uid;
+    }
+
+    function isLegacyCompatibleCollection(collectionName) {
+      return collectionName in [
+        "users",
+        "matches",
+        "predictions",
+        "teams",
+        "settings",
+        "challengeStudio",
+        "challengeStudioChat",
+        "challengeStudioChatLikes",
+        "challengeStudioChatReplies",
+        "flagMemoryResults",
+        "tenSecondsChallengeDaily",
+        "wordGameDailyGames",
+        "wordGameDailyResults",
+        "wordGameUserStats",
+        "onlinePresence",
+        "memberNotices",
+        "memberNoticeViews",
+        "Predictions",
+        "Matches",
+        "Users",
+        "Stats"
+      ];
+    }
+
+    match /admins/{userId} {
+      allow get: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /memberCredentials/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /memberPrivateProfiles/{userId} {
+      allow read, create, update, delete: if signedIn()
+        && (request.auth.uid == userId || isAdmin());
+    }
+
+    match /tournaments/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tournamentTeams/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tournamentMatches/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tournamentPredictions/{documentId} {
+      allow get: if isAdmin() || ownsUserField(resource.data);
+      allow list: if isAdmin() || ownsUserField(resource.data);
+      allow create, update, delete: if false;
+    }
+
+    match /tournamentUserStats/{documentId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    match /tournamentIntegrations/{documentId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /tournamentSyncRuns/{documentId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /systemAutomationState/{documentId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /tournamentNotificationDispatches/{documentId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /admin_logs/{documentId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /tournamentStudioNews/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tournamentAchievements/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /tournamentRewards/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /gameXpEvents/{documentId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
+    match /platformGameStats/{documentId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    match /notifications/{documentId} {
+      allow get, list: if isAdmin() || ownsUserField(resource.data);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        ownsUserField(resource.data)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["isRead", "readAt"])
+      );
+    }
+
+    // Compatibility boundary: only the explicitly inventoried Legacy/game
+    // collections retain their existing client behavior. Unknown collections
+    // stay closed by default, and V2 predictions/derived points are not listed.
+    match /{collectionName}/{document=**} {
+      allow read, write: if isLegacyCompatibleCollection(collectionName);
+    }
+  }
+}

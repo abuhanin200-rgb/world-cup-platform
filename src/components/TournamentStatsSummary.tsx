@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getCountFromServer, query, where } from "firebase/firestore";
 import { BarChart3, Target, Trophy, UsersRound } from "lucide-react";
-import { db } from "@/lib/firebase";
 import { getTournamentDisplayStatus, getTournamentStatusLabel, type Tournament } from "@/domain/tournaments";
 
 type Stats = { matches: number; predictions: number; participants: number };
@@ -17,19 +15,15 @@ export default function TournamentStatsSummary({ tournament }: { tournament: Tou
     async function load() {
       try {
         if (tournament.engine === "legacy_wc2026") {
-          const [matches, predictions, users] = await Promise.all([
-            getCountFromServer(collection(db, "matches")),
-            getCountFromServer(collection(db, "predictions")),
-            getCountFromServer(collection(db, "users")),
-          ]);
-          if (active) setStats({ matches: matches.data().count, predictions: predictions.data().count, participants: users.data().count });
+          const response = await fetch("/api/public/stats?scope=legacy", { cache: "no-store" });
+          if (!response.ok) throw new Error(`TOURNAMENT_STATS_${response.status}`);
+          const data = (await response.json()) as Stats;
+          if (active) setStats(data);
         } else {
-          const [matches, predictions, participants] = await Promise.all([
-            getCountFromServer(query(collection(db, "tournamentMatches"), where("tournamentId", "==", tournament.id))),
-            getCountFromServer(query(collection(db, "tournamentPredictions"), where("tournamentId", "==", tournament.id))),
-            getCountFromServer(query(collection(db, "tournamentUserStats"), where("tournamentId", "==", tournament.id))),
-          ]);
-          if (active) setStats({ matches: matches.data().count, predictions: predictions.data().count, participants: participants.data().count });
+          const response = await fetch(`/api/public/stats?tournamentId=${encodeURIComponent(tournament.id)}`, { cache: "no-store" });
+          if (!response.ok) throw new Error(`TOURNAMENT_STATS_${response.status}`);
+          const data = (await response.json()) as Stats;
+          if (active) setStats(data);
         }
       } catch (error) {
         console.error("Tournament stats error:", error);

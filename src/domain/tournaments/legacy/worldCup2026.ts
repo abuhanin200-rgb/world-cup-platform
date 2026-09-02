@@ -33,7 +33,7 @@ export const WORLD_CUP_2026_TOURNAMENT = {
   scoringTemplateId: "world-cup-2026-legacy",
   scoringVersion: "legacy-final",
   branding: {
-    logoUrl: "/wc2026-logo-black.png",
+    logoUrl: "/wc2026-logo.png",
     shareImageUrl: "/og-image.png",
     faviconUrl: "/favicon.png",
     primaryColor: "#22D3EE",

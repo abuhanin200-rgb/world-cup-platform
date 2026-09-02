@@ -13,6 +13,8 @@ export * from "./v2Types";
 export * from "./gulfCup27Data";
 
 export * from "./scoringV2";
+export * from "./predictionPolicyV2";
+export * from "./leaderboardV2";
 
 export * from "./standingsV2";
 export * from "./engagementV2";

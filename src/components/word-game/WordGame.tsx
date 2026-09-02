@@ -7,13 +7,12 @@ import {
   CheckCircle2,
   Gamepad2,
   Loader2,
-  Medal,
   PartyPopper,
   Sparkles,
-  Trophy,
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
+import AuthGateCard from "@/components/auth/AuthGateCard";
 import { playInteractionFeedback } from "@/lib/interactionFeedback";
 import GameBoard from "@/components/word-game/GameBoard";
 import GuessInput from "@/components/word-game/GuessInput";
@@ -374,20 +373,7 @@ export default function WordGame() {
   }
 
   if (!isLoggedIn || !userId) {
-    return (
-      <motion.div
-        variants={revealMotion}
-        initial="hidden"
-        animate="show"
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-6 text-center shadow-lg shadow-slate-950/25 backdrop-blur-sm"
-      >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-red-300/10" />
-
-        <p className="relative text-[14px] font-bold text-slate-200">
-          سجل دخولك أولًا عشان تلعب خمن كلمة اليوم.
-        </p>
-      </motion.div>
-    );
+    return <AuthGateCard returnTo="/word-game" title="سجّل دخولك لتخمين كلمة اليوم" description="ست محاولات يومية، ونتيجتك تُحفظ تلقائيًا في حسابك." benefit="ارجع إلى اللعبة مباشرة بعد الدخول وتابع تحدي اليوم دون خطوات إضافية." />;
   }
 
   return (

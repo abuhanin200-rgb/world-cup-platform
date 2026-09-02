@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { Target } from "lucide-react";
 import GamePageShell from "@/components/games/GamePageShell";
 import WordGame from "@/components/word-game/WordGame";
+
+export const metadata: Metadata = { title: "خمن كلمة اليوم", description: "خمن كلمة رياضية جديدة كل يوم خلال ست محاولات واحفظ XP في حسابك." };
 
 export default function WordGamePage() {
   return (

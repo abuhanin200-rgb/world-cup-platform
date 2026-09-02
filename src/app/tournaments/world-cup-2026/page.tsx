@@ -4,7 +4,10 @@ import TournamentOverview from "@/components/tournaments/TournamentOverview";
 import WorldCupChampionsPodium from "@/components/WorldCupChampionsPodium";
 import { WORLD_CUP_2026_TOURNAMENT, getTournamentThemeStyle } from "@/domain/tournaments";
 
+export const metadata: Metadata = { title: "كأس العالم 2026", description: WORLD_CUP_2026_TOURNAMENT.description };
+
 export default function WorldCup2026Page() {
   const tournament = WORLD_CUP_2026_TOURNAMENT;
   return <main dir="rtl" style={getTournamentThemeStyle(tournament)} className="min-h-screen bg-[var(--tournament-background)] text-[var(--tournament-text)]"><TournamentHero tournament={tournament}/><TournamentNavigation tournament={tournament} activeSection="home"/><WorldCupChampionsPodium/><TournamentOverview tournament={tournament}/></main>;
 }
+import type { Metadata } from "next";

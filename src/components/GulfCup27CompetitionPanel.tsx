@@ -49,13 +49,26 @@ function formatDateTime(timestamp: number) {
   };
 }
 
-function statusLabel(match: TournamentMatchRuntimeV2) {
+function statusLabel(match: TournamentMatchRuntimeV2, now: number) {
   if (match.status === "finished") return "انتهت";
   if (match.status === "live") return "مباشر";
   if (match.status === "postponed") return "مؤجلة";
   if (match.status === "cancelled") return "ملغاة";
   if (isTournamentPredictionOpen(match)) return "التوقع مفتوح";
+  if (match.predictionOpensAt != null && now < match.predictionOpensAt) return "التوقع لم يفتح";
+  if (now >= (match.predictionClosesAt ?? match.kickoffAt)) return "التوقع مغلق";
   return "مجدولة";
+}
+
+function relativeKickoff(timestamp: number, now: number) {
+  const diff = timestamp - now;
+  if (diff <= 0) return null;
+  const minutes = Math.ceil(diff / 60000);
+  if (minutes < 60) return `متبقي ${minutes} دقيقة`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 48) return `متبقي ${hours} ساعة`;
+  const days = Math.ceil(hours / 24);
+  return `متبقي ${days} أيام`;
 }
 
 function statusClass(match: TournamentMatchRuntimeV2) {
@@ -151,7 +164,7 @@ function StandingTable({
   );
 }
 
-function RuntimeMatchCard({ match }: { match: TournamentMatchRuntimeV2 }) {
+function RuntimeMatchCard({ match, now }: { match: TournamentMatchRuntimeV2; now: number }) {
   const home = getGulfCup27Team(match.homeTeamId);
   const away = getGulfCup27Team(match.awayTeamId);
   const { date, time } = formatDateTime(match.kickoffAt);
@@ -160,6 +173,7 @@ function RuntimeMatchCard({ match }: { match: TournamentMatchRuntimeV2 }) {
     match.result.homeScore != null &&
     match.result.awayScore != null;
   const open = isTournamentPredictionOpen(match);
+  const kickoffCountdown = relativeKickoff(match.kickoffAt, now);
 
   return (
     <article className="rounded-[24px] border border-white/10 bg-black/20 p-4 shadow-lg shadow-black/10 backdrop-blur-sm md:p-5">
@@ -169,7 +183,7 @@ function RuntimeMatchCard({ match }: { match: TournamentMatchRuntimeV2 }) {
           <span>{match.group ? `المجموعة ${match.group}` : "خروج المغلوب"}</span>
         </div>
         <span className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${statusClass(match)}`}>
-          {statusLabel(match)}
+          {statusLabel(match, now)}
         </span>
       </div>
 
@@ -269,6 +283,8 @@ function RuntimeMatchCard({ match }: { match: TournamentMatchRuntimeV2 }) {
         </span>
       </div>
 
+      {kickoffCountdown ? <div dir="ltr" className="mt-3 text-center text-[11px] font-black text-[var(--tournament-accent)] [unicode-bidi:isolate]">{kickoffCountdown}</div> : null}
+
       {open && (
         <Link
           href="/tournaments/gulf-cup-27/predictions"
@@ -287,6 +303,7 @@ export default function GulfCup27CompetitionPanel() {
   const [filter, setFilter] = useState<MatchFilter>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [now] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -302,7 +319,7 @@ export default function GulfCup27CompetitionPanel() {
   }, []);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
   }, [load]);
 
   const groupA = useMemo(
@@ -325,7 +342,6 @@ export default function GulfCup27CompetitionPanel() {
   );
 
   const filteredMatches = useMemo(() => {
-    const now = Date.now();
     return matches.filter((match) => {
       if (filter === "open") return isTournamentPredictionOpen(match);
       if (filter === "finished") return match.status === "finished";
@@ -334,7 +350,7 @@ export default function GulfCup27CompetitionPanel() {
       }
       return true;
     });
-  }, [filter, matches]);
+  }, [filter, matches, now]);
 
   const groupMatches = matches.filter((match) => match.stage === "group");
   const finishedCount = groupMatches.filter((match) => match.status === "finished").length;
@@ -358,8 +374,8 @@ export default function GulfCup27CompetitionPanel() {
   }
 
   return (
-    <div className="space-y-8">
-      <section aria-labelledby="group-standings-heading">
+    <div className="flex flex-col gap-8">
+      <section aria-labelledby="group-standings-heading" className="order-2">
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-xs font-black text-[var(--tournament-primary)]">يتحدث مع النتائج المعتمدة</p>
@@ -378,7 +394,7 @@ export default function GulfCup27CompetitionPanel() {
         </p>
       </section>
 
-      <section aria-labelledby="matches-heading">
+      <section aria-labelledby="matches-heading" className="order-1">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black text-[var(--tournament-primary)]">الجدول والنتائج</p>
@@ -427,7 +443,7 @@ export default function GulfCup27CompetitionPanel() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {filteredMatches.map((match) => (
-              <RuntimeMatchCard key={match.id} match={match} />
+              <RuntimeMatchCard key={match.id} match={match} now={now} />
             ))}
           </div>
         )}
