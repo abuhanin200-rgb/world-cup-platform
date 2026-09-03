@@ -1,10 +1,19 @@
 import type { Metadata, Viewport } from "next";
+import { Alexandria } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import PresenceTracker from "@/components/PresenceTracker";
 import SuperGoldenNotice from "@/components/SuperGoldenNotice";
 import PlatformChrome from "@/components/PlatformChrome";
+
+const alexandria = Alexandria({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-alexandria",
+  fallback: ["Tahoma", "Arial", "sans-serif"],
+});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://world-cup-platform.vercel.app";
 const brandName = "التحدي";
@@ -31,7 +40,7 @@ export const viewport: Viewport = { themeColor: "#061A4D", width: "device-width"
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" className={alexandria.variable}>
       <body>
         <AuthProvider>
           <PresenceTracker />

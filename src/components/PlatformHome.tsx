@@ -34,7 +34,7 @@ export default function PlatformHome() {
   return (
     <main
       dir="rtl"
-      className="relative overflow-x-clip bg-[var(--brand-navy-950)] text-white"
+      className="relative bg-[var(--brand-navy-950)] text-white"
     >
       {isLoggedIn && user ? <MemberNoticeRenderer userId={user.id} /> : null}
       <div
@@ -45,25 +45,21 @@ export default function PlatformHome() {
       <div className="relative z-10 mx-auto max-w-7xl px-3 pb-12 pt-3 sm:px-4 md:px-6 md:pb-16 md:pt-7">
         <section
           aria-labelledby="home-hero-heading"
-          className="altahaddi-hero-v3 altahaddi-glass-strong relative isolate flex min-h-[min(25rem,calc(100dvh-5.5rem))] overflow-hidden rounded-[30px] px-4 py-7 pb-[calc(6.25rem+env(safe-area-inset-bottom))] md:min-h-[min(28rem,calc(100dvh-7rem))] md:rounded-[42px] md:px-9 md:py-10 lg:px-11"
+          className="altahaddi-hero-v3 altahaddi-home-hero relative isolate overflow-hidden rounded-[30px] px-4 py-8 md:rounded-[42px] md:px-9 md:py-10 lg:px-11"
         >
           <SportsVideoBackdrop
-            className="-z-10"
-            opacity={0.58}
+            className="altahaddi-home-hero-backdrop -z-10"
+            opacity={0.72}
             poster="/tournaments/gulf-cup-27/identity-cover.jpg"
-            overlayClassName="bg-[linear-gradient(270deg,rgba(4,19,58,.96)_0%,rgba(4,19,58,.86)_54%,rgba(4,19,58,.48)_100%),linear-gradient(180deg,rgba(4,19,58,.08),rgba(4,19,58,.46))]"
-          />
-          <div
-            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,194,16,.09),transparent_24%),radial-gradient(circle_at_82%_88%,rgba(44,95,255,.09),transparent_30%)]"
-            aria-hidden="true"
+            overlayClassName="bg-[linear-gradient(270deg,rgba(4,19,58,.91)_0%,rgba(4,19,58,.68)_48%,rgba(4,19,58,.28)_100%),linear-gradient(180deg,rgba(4,19,58,.04),rgba(4,19,58,.20))]"
           />
 
-          <div className="relative w-full max-w-3xl">
+          <div className="relative w-full max-w-[42rem]">
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={revealTransition()}
-              className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[#ffc210]/20 bg-[#ffc210]/[0.08] px-3 text-[10px] font-black text-[#ffc210] md:text-xs"
+              className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[#ffc210]/20 bg-[#ffc210]/[0.08] px-3 text-[10px] font-semibold text-[#ffc210] md:text-xs"
             >
               <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
               منصة التحدي الرياضية
@@ -74,21 +70,22 @@ export default function PlatformHome() {
               initial={reduceMotion ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={revealTransition(0.05)}
-              className="mt-4 max-w-3xl text-balance text-[clamp(2.15rem,9.5vw,4.3rem)] font-black leading-[1.1] tracking-[-0.045em]"
+              className="mt-4 max-w-[42rem] text-balance text-[clamp(2.25rem,7vw,4.15rem)] font-extrabold leading-[1.22] tracking-[-0.035em]"
             >
-              توقّع .. نافس <span className="text-[#ffc210]">تصدّر</span>
+              <span className="block sm:inline">توقع. نافس.</span>{" "}
+              <span className="text-[#ffc210]">تصدر</span>
             </motion.h1>
 
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={revealTransition(0.11)}
-              className="mt-7 flex w-full flex-col gap-2.5 min-[420px]:flex-row sm:w-auto"
+              className="mt-6 grid w-full grid-cols-1 gap-3 min-[410px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
             >
               <Link
                 href="/tournaments"
                 onClick={() => playInteractionFeedback("selection")}
-                className="altahaddi-primary-button w-full justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210] focus-visible:ring-offset-2 focus-visible:ring-offset-[#04133a] min-[420px]:flex-1 md:flex-none"
+                className="altahaddi-primary-button min-w-0 w-full justify-center whitespace-nowrap px-3.5 text-[0.8125rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210] focus-visible:ring-offset-2 focus-visible:ring-offset-[#04133a]"
               >
                 <Trophy className="h-4 w-4" aria-hidden="true" />
                 <span>استعرض البطولات</span>
@@ -97,7 +94,7 @@ export default function PlatformHome() {
               <Link
                 href="/games"
                 onClick={() => playInteractionFeedback("selection")}
-                className="altahaddi-secondary-button w-full justify-center border-white/22 bg-[#04133a]/46 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210] focus-visible:ring-offset-2 focus-visible:ring-offset-[#04133a] min-[420px]:flex-1 md:flex-none"
+                className="altahaddi-secondary-button min-w-0 w-full justify-center whitespace-nowrap border-white/22 bg-[#04133a]/46 px-3.5 text-[0.8125rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210] focus-visible:ring-offset-2 focus-visible:ring-offset-[#04133a]"
               >
                 <Gamepad2 className="h-4 w-4" aria-hidden="true" />
                 <span>الألعاب والتحديات</span>

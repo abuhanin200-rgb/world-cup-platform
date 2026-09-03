@@ -64,8 +64,8 @@ export default function PlatformChrome({ children }: { children: React.ReactNode
               alt=""
               width={1412}
               height={1462}
-              sizes="(max-width: 767px) 50px, 60px"
-              className="h-[50px] w-auto shrink-0 object-contain md:h-[60px]"
+              sizes="(max-width: 767px) 52px, 60px"
+              className="h-[52px] w-auto shrink-0 object-contain md:h-[60px]"
             />
           </Link>
 

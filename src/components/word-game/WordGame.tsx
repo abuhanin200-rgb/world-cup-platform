@@ -13,7 +13,10 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import AuthGateCard from "@/components/auth/AuthGateCard";
-import { playInteractionFeedback } from "@/lib/interactionFeedback";
+import {
+  playWordGameFeedback,
+  prepareInteractionAudio,
+} from "@/lib/interactionFeedback";
 import GameBoard from "@/components/word-game/GameBoard";
 import GuessInput from "@/components/word-game/GuessInput";
 import WordKeyboard from "@/components/word-game/WordKeyboard";
@@ -278,11 +281,13 @@ export default function WordGame() {
 
   function triggerGuessFeedback(kind: "error" | "success") {
     setFeedbackPulse((current) => ({ kind, tick: current.tick + 1 }));
-    playInteractionFeedback(kind);
+    playWordGameFeedback(kind === "success" ? "correct" : "incorrect");
   }
 
   async function handleSubmitGuess() {
     if (!userId || !game || inputDisabled) return;
+
+    prepareInteractionAudio();
 
     if (currentGuess.length !== WORD_GAME_WORD_LENGTH) {
       setMessage("اكتب كلمة من 5 حروف.");

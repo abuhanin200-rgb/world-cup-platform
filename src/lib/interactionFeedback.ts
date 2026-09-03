@@ -1,6 +1,7 @@
 "use client";
 
 type FeedbackKind = "selection" | "success" | "error" | "warning";
+type WordGameFeedbackKind = "correct" | "incorrect";
 
 const SOUND_KEY = "altahaddi_interaction_sound";
 const CHANGE_EVENT = "altahaddi:sound-preference";
@@ -13,6 +14,11 @@ function getContext() {
   if (!AudioContextClass) return null;
   if (!audioContext) audioContext = new AudioContextClass();
   return audioContext;
+}
+
+export function prepareInteractionAudio() {
+  const context = getContext();
+  if (context?.state === "suspended") void context.resume();
 }
 
 export function isInteractionSoundEnabled() {
@@ -68,6 +74,84 @@ function vibrate(kind: FeedbackKind) {
     error: [32, 42, 32],
   };
   navigator.vibrate(pattern[kind]);
+}
+
+function vibrateWordGame(kind: WordGameFeedbackKind) {
+  if (typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+  navigator.vibrate(kind === "correct" ? [14, 26, 20, 26, 28] : [26, 34, 38]);
+}
+
+function playErrorSqueak() {
+  const context = getContext();
+  if (!context) return;
+
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  const start = context.currentTime;
+  const end = start + 0.19;
+
+  oscillator.type = "triangle";
+  oscillator.frequency.setValueAtTime(330, start);
+  oscillator.frequency.exponentialRampToValueAtTime(155, end);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.034, start + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(start);
+  oscillator.stop(end + 0.02);
+}
+
+function playApplauseBurst(startOffset: number) {
+  const context = getContext();
+  if (!context) return;
+
+  const duration = 0.105;
+  const frameCount = Math.ceil(context.sampleRate * duration);
+  const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+  const samples = buffer.getChannelData(0);
+  for (let index = 0; index < frameCount; index += 1) {
+    samples[index] = (Math.random() * 2 - 1) * (1 - index / frameCount);
+  }
+
+  const source = context.createBufferSource();
+  const filter = context.createBiquadFilter();
+  const gain = context.createGain();
+  const start = context.currentTime + startOffset;
+  const end = start + duration;
+
+  source.buffer = buffer;
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(1450, start);
+  filter.Q.setValueAtTime(0.65, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.028, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(context.destination);
+  source.start(start);
+  source.stop(end + 0.015);
+}
+
+export function playWordGameFeedback(kind: WordGameFeedbackKind) {
+  vibrateWordGame(kind);
+  if (!isInteractionSoundEnabled()) return;
+
+  prepareInteractionAudio();
+
+  if (kind === "incorrect") {
+    playErrorSqueak();
+    return;
+  }
+
+  playApplauseBurst(0);
+  playApplauseBurst(0.1);
+  playApplauseBurst(0.2);
+  tone(660, 0.09, 0.022, 0.035);
+  tone(880, 0.12, 0.02, 0.125);
 }
 
 export function playInteractionFeedback(kind: FeedbackKind, options?: { vibrate?: boolean }) {
