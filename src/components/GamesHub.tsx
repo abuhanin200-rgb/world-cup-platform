@@ -196,11 +196,11 @@ export default function GamesHub() {
           <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,.045),transparent_42%),radial-gradient(circle_at_8%_20%,rgba(255,194,16,.12),transparent_24%)]" />
           <div className="relative grid gap-5 lg:grid-cols-[1fr_330px] lg:items-center">
             <div>
-              <div className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.07] px-2.5 text-[10px] font-black text-[var(--brand-yellow)] md:text-xs">
+              <div className="altahaddi-eyebrow inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.07] px-2.5 font-black text-[var(--brand-yellow)]">
                 <Gamepad2 className="h-3.5 w-3.5" /> وقت التحدي
               </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">العب. اجمع XP. ارفع مستواك.</h1>
-              <p className="mt-2 max-w-xl text-xs font-semibold leading-6 text-white/48 md:text-sm">ثلاث ألعاب سريعة، ترتيب واحد، ومستوى يتطور مع كل مشاركة.</p>
+              <h1 className="altahaddi-display-title mt-3 font-black">العب. اجمع XP. ارفع مستواك</h1>
+              <p className="altahaddi-body-copy mt-2 max-w-xl font-semibold text-white/48">ثلاث ألعاب سريعة، ترتيب واحد، ومستوى يتطور مع كل مشاركة.</p>
 
               <div className="mt-5 grid grid-cols-3 gap-2 max-w-xl">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><div dir="ltr" className="text-lg font-black text-[var(--brand-yellow)] md:text-xl">{xp} XP</div><div className="mt-1 text-[9px] font-bold text-white/38">نقاط الخبرة</div></div>
@@ -237,7 +237,7 @@ export default function GamesHub() {
 
         <section className="mt-5 md:mt-7" aria-labelledby="games-showcase-heading">
           <div className="mb-3 flex items-end justify-between gap-3">
-            <div><p className="text-[10px] font-black text-[var(--brand-yellow)]">اختر لعبتك</p><h2 id="games-showcase-heading" className="mt-1 text-2xl font-black md:text-3xl">تحدي مختلف كل مرة</h2></div>
+            <div><p className="altahaddi-eyebrow font-black text-[var(--brand-yellow)]">اختر لعبتك</p><h2 id="games-showcase-heading" className="altahaddi-section-title mt-1 font-black">تحدي مختلف كل مرة</h2></div>
             <div className="flex items-center gap-1.5 text-[9px] font-bold text-white/55 sm:text-[10px]"><Zap className="h-3.5 w-3.5 text-[var(--brand-yellow)]" /> XP الألعاب مستقل عن نقاط البطولات</div>
           </div>
 
@@ -246,8 +246,8 @@ export default function GamesHub() {
             <div className="relative grid min-h-[350px] gap-5 p-4 md:grid-cols-[1fr_310px] md:items-center md:p-7">
               <div className="order-2 md:order-1">
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-[10px] font-black text-white/58"><SelectedGameIcon className="h-3.5 w-3.5 text-[var(--brand-yellow)]" />{selectedGame.tag}</div>
-                <h3 className="mt-3 text-3xl font-black md:text-4xl">{selectedGame.title}</h3>
-                <p className="mt-2 max-w-lg text-xs font-semibold leading-6 text-white/46 md:text-sm">{selectedGame.description}</p>
+                <h3 className="altahaddi-feature-title mt-3 font-black">{selectedGame.title}</h3>
+                <p className="altahaddi-body-copy mt-2 max-w-lg font-semibold text-white/46">{selectedGame.description}</p>
                 <div className="mt-4 inline-flex rounded-xl border border-[var(--brand-yellow)]/18 bg-[var(--brand-yellow)]/[0.06] px-3 py-2 text-[10px] font-black text-[var(--brand-yellow)]" dir="ltr">{selectedGame.xp}</div>
                 <div className="mt-5"><Link href={selectedGame.href} onClick={() => playInteractionFeedback("selection")} className="inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-[var(--brand-yellow)] px-5 text-sm font-black text-[#04133a] shadow-[0_14px_34px_rgba(255,194,16,.18)] transition active:scale-[0.98]">ابدأ اللعب <ArrowLeft className="h-4 w-4" /></Link></div>
               </div>
@@ -271,7 +271,7 @@ export default function GamesHub() {
 
         <section className="mt-8 md:mt-10" aria-labelledby="games-leaderboard-heading">
           <div className="mb-4 flex items-end justify-between gap-3">
-            <div><p className="text-[10px] font-black text-[var(--brand-yellow)]">أبطال الألعاب</p><h2 id="games-leaderboard-heading" className="mt-1 text-2xl font-black md:text-3xl">ترتيب XP العام</h2></div>
+            <div><p className="altahaddi-eyebrow font-black text-[var(--brand-yellow)]">أبطال الألعاب</p><h2 id="games-leaderboard-heading" className="altahaddi-section-title mt-1 font-black">ترتيب XP العام</h2></div>
             <div className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-[10px] font-black text-white/42"><Trophy className="h-3.5 w-3.5 text-[var(--brand-yellow)]" /> أعلى 20 لاعب</div>
           </div>
 

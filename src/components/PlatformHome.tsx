@@ -59,7 +59,7 @@ export default function PlatformHome() {
               initial={reduceMotion ? false : { opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={revealTransition()}
-              className="inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[#ffc210]/20 bg-[#ffc210]/[0.08] px-3 text-[10px] font-semibold text-[#ffc210] md:text-xs"
+              className="altahaddi-eyebrow inline-flex min-h-[32px] items-center gap-2 rounded-full border border-[#ffc210]/20 bg-[#ffc210]/[0.08] px-3 font-semibold text-[#ffc210]"
             >
               <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
               منصة التحدي الرياضية
@@ -70,9 +70,9 @@ export default function PlatformHome() {
               initial={reduceMotion ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={revealTransition(0.05)}
-              className="mt-4 max-w-[42rem] text-balance text-[clamp(2.25rem,7vw,4.15rem)] font-extrabold leading-[1.22] tracking-[-0.035em]"
+              className="altahaddi-display-title mt-4 max-w-[42rem] text-balance font-extrabold"
             >
-              <span className="block sm:inline">توقع. نافس.</span>{" "}
+              <span className="block sm:inline">توقع. نافس</span>{" "}
               <span className="text-[#ffc210]">تصدر</span>
             </motion.h1>
 
@@ -85,7 +85,7 @@ export default function PlatformHome() {
               <Link
                 href="/tournaments"
                 onClick={() => playInteractionFeedback("selection")}
-                className="altahaddi-primary-button min-w-0 w-full justify-center whitespace-nowrap px-3.5 text-[0.8125rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210] focus-visible:ring-offset-2 focus-visible:ring-offset-[#04133a]"
+                className="altahaddi-primary-button min-w-0 w-full justify-center whitespace-nowrap px-3.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210] focus-visible:ring-offset-2 focus-visible:ring-offset-[#04133a]"
               >
                 <Trophy className="h-4 w-4" aria-hidden="true" />
                 <span>استعرض البطولات</span>
@@ -94,7 +94,7 @@ export default function PlatformHome() {
               <Link
                 href="/games"
                 onClick={() => playInteractionFeedback("selection")}
-                className="altahaddi-secondary-button min-w-0 w-full justify-center whitespace-nowrap border-white/22 bg-[#04133a]/46 px-3.5 text-[0.8125rem] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210] focus-visible:ring-offset-2 focus-visible:ring-offset-[#04133a]"
+                className="altahaddi-secondary-button min-w-0 w-full justify-center whitespace-nowrap border-white/22 bg-[#04133a]/46 px-3.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210] focus-visible:ring-offset-2 focus-visible:ring-offset-[#04133a]"
               >
                 <Gamepad2 className="h-4 w-4" aria-hidden="true" />
                 <span>الألعاب والتحديات</span>

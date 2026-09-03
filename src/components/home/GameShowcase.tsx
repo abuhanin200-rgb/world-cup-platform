@@ -131,8 +131,8 @@ export default function GameShowcase() {
     <section aria-labelledby="home-games-title">
       <div className="mb-4 flex items-end justify-between gap-3 md:mb-5">
         <div>
-          <p className="text-[10px] font-black text-[#ffc210] md:text-xs">وقت التحدي</p>
-          <h2 id="home-games-title" className="mt-1 text-xl font-black md:text-3xl">اختر لعبتك وابدأ</h2>
+          <p className="altahaddi-eyebrow font-black text-[#ffc210]">وقت التحدي</p>
+          <h2 id="home-games-title" className="altahaddi-section-title mt-1 font-black">اختر لعبتك وابدأ</h2>
         </div>
         <Link href="/games" className="hidden min-h-[40px] items-center gap-1 rounded-xl px-2 text-xs font-black text-white/60 transition hover:text-white sm:inline-flex">
           كل الألعاب <ArrowLeft className="h-4 w-4" />
@@ -157,8 +157,8 @@ export default function GameShowcase() {
               <div className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-black/15 px-2.5 py-1.5 text-[9px] font-black text-white/72 backdrop-blur-md md:text-[10px]">
                 <ActiveIcon className="h-3.5 w-3.5" style={{ color: active.accent }} /> لعبة سريعة
               </div>
-              <h3 className="mt-3 text-2xl font-black tracking-[-0.02em] md:text-4xl">{active.title}</h3>
-              <p className="mt-2 max-w-lg text-xs font-semibold leading-6 text-white/58 md:text-sm md:leading-7">{active.description}</p>
+              <h3 className="altahaddi-feature-title mt-3 font-black">{active.title}</h3>
+              <p className="altahaddi-body-copy mt-2 max-w-lg font-semibold text-white/58">{active.description}</p>
               <Link
                 href={active.href}
                 onClick={() => playInteractionFeedback("selection")}

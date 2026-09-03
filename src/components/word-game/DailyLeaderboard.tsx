@@ -166,11 +166,11 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
           <Trophy className="h-5 w-5" />
         </div>
 
-        <h2 className="text-[21px] font-black leading-tight text-white md:text-[25px]">
+        <h2 className="altahaddi-section-title font-black text-white">
           ترتيب تحدي خمن كلمة اليوم
         </h2>
 
-        <p className="mt-1.5 text-[12px] font-semibold leading-5 text-slate-300 md:text-[13px]">
+        <p className="altahaddi-body-copy mt-1.5 font-semibold text-slate-300">
           حسب الفوز ثم الأسرع وقتًا، ثم الأقل محاولات.
         </p>
       </div>
@@ -259,7 +259,7 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
 
                 <StatBox
                   label="التصنيف"
-                  value={(item as any).categoryLabel ?? "عامّة"}
+                  value={item.categoryLabel ?? "عامّة"}
                   icon={<Flame className="h-3.5 w-3.5" />}
                   className="border-emerald-300/15 bg-emerald-400/10 text-emerald-200"
                 />

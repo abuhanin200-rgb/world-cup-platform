@@ -143,16 +143,16 @@ export default function RegisterPage() {
           <div className="altahaddi-grid absolute inset-0 opacity-18" />
           <div className="relative text-center">
             <div className="mx-auto grid h-44 w-44 place-items-center rounded-[42px] border border-white/[0.14] bg-white/[0.08] shadow-[0_30px_70px_rgba(0,0,0,.28)] backdrop-blur-2xl"><UserPlus className="h-16 w-16 text-[var(--brand-yellow)]" /></div>
-            <h1 className="mt-6 text-4xl font-black">ابدأ تحديك</h1>
-            <p className="mx-auto mt-3 max-w-sm text-sm font-semibold leading-7 text-white/58">حساب واحد للبطولات، الألعاب، النقاط والإنجازات.</p>
+            <h1 className="altahaddi-page-title mt-6 font-black">ابدأ تحديك</h1>
+            <p className="altahaddi-body-copy mx-auto mt-3 max-w-sm font-semibold text-white/58">حساب واحد للبطولات، الألعاب، النقاط والإنجازات.</p>
           </div>
         </section>
 
         <section className="p-4 sm:p-6 md:p-8 lg:p-10">
           <div className="mb-5 flex items-center gap-3 md:hidden"><img src="/brand/altahaddi-symbol-white.png" alt="" className="h-11 w-11 object-contain" /><div><div className="text-xl font-black">التحدي</div><div className="mt-1 text-[9px] font-bold text-[var(--brand-yellow)]">توقعات · بطولات · ألعاب</div></div></div>
-          <p className="text-[10px] font-black text-[var(--brand-yellow)]">عضوية جديدة</p>
-          <h2 className="mt-1 text-2xl font-black md:text-4xl">أنشئ حسابك</h2>
-          <p className="mt-2 text-xs font-semibold leading-6 text-white/52 md:text-sm">سجّل مباشرة أو ابدأ بحساب Google أو Apple أو Facebook.</p>
+          <p className="altahaddi-eyebrow font-black text-[var(--brand-yellow)]">عضوية جديدة</p>
+          <h2 className="altahaddi-page-title mt-1 font-black">أنشئ حسابك</h2>
+          <p className="altahaddi-body-copy mt-2 font-semibold text-white/52">سجّل مباشرة أو ابدأ بحساب Google أو Apple أو Facebook.</p>
 
           <div className="mt-5">
             <SocialAuthButtons loadingProvider={socialLoading} onSelect={socialRegister} disabled={loading || authLoading} />

@@ -169,6 +169,46 @@ body {
   --brand-white: #ffffff;
 }
 
+/* A shared type scale keeps public Arabic content compact and readable. */
+.altahaddi-eyebrow {
+  font-size: clamp(0.6875rem, 0.2vw + 0.64rem, 0.75rem);
+  line-height: 1.45;
+}
+
+.altahaddi-display-title {
+  font-size: clamp(2rem, 4.2vw + 0.55rem, 3.5rem);
+  line-height: 1.28;
+  letter-spacing: -0.028em;
+}
+
+.altahaddi-page-title {
+  font-size: clamp(1.625rem, 2.3vw + 0.72rem, 2.75rem);
+  line-height: 1.32;
+  letter-spacing: -0.022em;
+}
+
+.altahaddi-feature-title {
+  font-size: clamp(1.375rem, 1.45vw + 0.82rem, 2.25rem);
+  line-height: 1.34;
+  letter-spacing: -0.018em;
+}
+
+.altahaddi-section-title {
+  font-size: clamp(1.1875rem, 0.72vw + 0.96rem, 1.625rem);
+  line-height: 1.42;
+  letter-spacing: -0.012em;
+}
+
+.altahaddi-card-title {
+  font-size: clamp(1.0625rem, 0.4vw + 0.94rem, 1.25rem);
+  line-height: 1.48;
+}
+
+.altahaddi-body-copy {
+  font-size: clamp(0.875rem, 0.25vw + 0.8125rem, 1rem);
+  line-height: 1.75;
+}
+
 ::selection { background: rgba(255,194,16,.28); color: #fff; }
 
 @media (max-width: 767px) {

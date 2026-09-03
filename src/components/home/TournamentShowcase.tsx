@@ -94,8 +94,8 @@ export default function TournamentShowcase({ tournaments }: Props) {
     <section aria-labelledby="home-tournaments-title">
       <div className="mb-4 flex items-end justify-between gap-3 md:mb-5">
         <div>
-          <p className="text-[10px] font-black text-[#ffc210] md:text-xs">بطولات التحدي</p>
-          <h2 id="home-tournaments-title" className="mt-1 text-xl font-black md:text-3xl">اختر البطولة وابدأ المنافسة</h2>
+          <p className="altahaddi-eyebrow font-black text-[#ffc210]">بطولات التحدي</p>
+          <h2 id="home-tournaments-title" className="altahaddi-section-title mt-1 font-black">اختر البطولة وابدأ المنافسة</h2>
         </div>
         <Link href="/tournaments" className="hidden min-h-[42px] items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.045] px-3 text-xs font-black text-white/62 transition hover:bg-white/[0.08] hover:text-white sm:inline-flex">
           جميع البطولات <ArrowLeft className="h-4 w-4" />
@@ -143,11 +143,11 @@ export default function TournamentShowcase({ tournaments }: Props) {
                   ) : null}
                   <div className="min-w-0 pt-0.5">
                     <TournamentStatusBadge status={status} />
-                    <h3 className="mt-2 text-3xl font-black leading-tight tracking-[-0.025em] text-white sm:text-4xl md:text-5xl">{active.shortName}</h3>
+                    <h3 className="altahaddi-feature-title mt-2 font-black text-white">{active.shortName}</h3>
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-bold text-white/88 sm:text-xs md:text-sm">
+                <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-white/88 md:text-sm">
                   {location ? <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-white/14 bg-[#031039]/52 px-2.5 py-1.5 shadow-[0_10px_28px_rgba(0,0,0,.16)] backdrop-blur-xl"><MapPin className="h-3.5 w-3.5 text-[#ffc210] sm:h-4 sm:w-4" />{location}</span> : null}
                   {date ? <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-white/14 bg-[#031039]/52 px-2.5 py-1.5 shadow-[0_10px_28px_rgba(0,0,0,.16)] backdrop-blur-xl"><CalendarDays className="h-3.5 w-3.5 text-[#ffc210] sm:h-4 sm:w-4" />{date}</span> : null}
                 </div>

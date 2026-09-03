@@ -24,14 +24,14 @@ export default function GamePageShell({ eyebrow, title, description, icon, visua
         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,.045),transparent_42%),radial-gradient(circle_at_12%_18%,rgba(255,194,16,.10),transparent_24%)]" />
         <div className="relative grid gap-5 md:grid-cols-[1fr_270px] md:items-center">
           <div>
-            <div className="inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.07] px-2.5 text-[10px] font-black text-[var(--brand-yellow)] md:text-xs">
+            <div className="altahaddi-eyebrow inline-flex min-h-[30px] items-center gap-1.5 rounded-full border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.07] px-2.5 font-black text-[var(--brand-yellow)]">
               <Sparkles className="h-3.5 w-3.5" /> {eyebrow}
             </div>
             <div className="mt-3 flex items-center gap-3">
               <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] text-[var(--brand-yellow)] md:h-14 md:w-14">{icon}</div>
               <div>
-                <h1 className="text-2xl font-black md:text-4xl">{title}</h1>
-                <p className="mt-1 max-w-2xl text-xs font-semibold leading-6 text-white/48 md:text-sm">{description}</p>
+                <h1 className="altahaddi-page-title font-black">{title}</h1>
+                <p className="altahaddi-body-copy mt-1 max-w-2xl font-semibold text-white/48">{description}</p>
               </div>
             </div>
           </div>

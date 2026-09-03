@@ -51,8 +51,8 @@ export default function TournamentCard({ tournament }: TournamentCardProps) {
         <div>
           <div className="mb-4 flex items-end justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-black text-white/48 md:text-xs">بطولات التحدي</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight md:text-4xl">{tournament.shortName}</h2>
+              <p className="altahaddi-eyebrow font-black text-white/48">بطولات التحدي</p>
+              <h2 className="altahaddi-feature-title mt-1 font-black">{tournament.shortName}</h2>
             </div>
             {tournament.branding.logoUrl ? (
               <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[20px] border border-white/15 bg-white/92 p-2 shadow-2xl md:h-20 md:w-20 md:rounded-[24px]">
