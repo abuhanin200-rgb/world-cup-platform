@@ -110,6 +110,9 @@ beforeEach(async () => {
       setDoc(doc(db, "wordGameDailyResults", "user-1_2026-01-01"), { userId: "user-1", score: 3 }),
       setDoc(doc(db, "wordGameUserStats", "user-1"), { userId: "user-1", totalScore: 3 }),
       setDoc(doc(db, "onlinePresence", "user-1"), { userId: "user-1", path: "/account" }),
+      setDoc(doc(db, "challengeStudioPresence", "user-1"), {
+        userId: "user-1", fullName: "owner", lastSeen: 1, firstSeenToday: 1,
+      }),
       setDoc(doc(db, "memberNotices", "active"), { isActive: true, isArchived: false, title: "notice" }),
       setDoc(doc(db, "memberNotices", "archived"), { isActive: true, isArchived: true, title: "archived" }),
       setDoc(doc(db, "memberNoticeViews", "active_user-1"), { noticeId: "active", userId: "user-1", hasSeen: false }),
@@ -304,6 +307,26 @@ test("Owners can only create their presence and notice views, and active notices
     collection(owner, "memberNotices"), where("isActive", "==", true), where("isArchived", "==", false),
   )));
   assert.equal(activeNotices.size, 1);
+});
+
+test("Unused challengeStudioPresence falls through to default deny for every client role and operation", async () => {
+  const contexts = [
+    testEnv.unauthenticatedContext().firestore(),
+    testEnv.authenticatedContext("user-1").firestore(),
+    testEnv.authenticatedContext("user-2").firestore(),
+    testEnv.authenticatedContext("admin-1").firestore(),
+  ];
+
+  for (const db of contexts) {
+    const existing = doc(db, "challengeStudioPresence", "user-1");
+    await assertFails(getDoc(existing));
+    await assertFails(getDocs(collection(db, "challengeStudioPresence")));
+    await assertFails(setDoc(doc(db, "challengeStudioPresence", "new-document"), {
+      userId: "user-1", fullName: "owner", lastSeen: 2, firstSeenToday: 1,
+    }));
+    await assertFails(updateDoc(existing, { lastSeen: 2 }));
+    await assertFails(deleteDoc(existing));
+  }
 });
 
 test("Chat writes are owner-bound and admin access does not reopen the catch-all", async () => {
