@@ -1,6 +1,7 @@
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { getLeaderboardUsers, type LeaderboardUser } from "@/lib/leaderboard";
+import "server-only";
+
+import { adminDb } from "@/lib/firebaseAdmin";
+import { buildLegacyLeaderboard, type LeaderboardUser } from "@/lib/legacyLeaderboardLogic";
 import { getAllMatches, type Match } from "@/lib/matches";
 
 export type ChallengeStudioEventType =
@@ -183,11 +184,20 @@ function getUserRankData(
   });
 }
 
+async function getLeaderboardUsersForEngine(): Promise<LeaderboardUser[]> {
+  const [users, predictions] = await Promise.all([
+    adminDb.collection("users").get(),
+    adminDb.collection("predictions").get(),
+  ]);
+  return buildLegacyLeaderboard(
+    users.docs.map((item) => ({ id: item.id, data: item.data() as Record<string, unknown> })),
+    predictions.docs.map((item) => ({ id: item.id, data: item.data() as Record<string, unknown> })),
+  );
+}
+
 async function getTodayFlagMemoryResultsForEngine(): Promise<RawFlagMemoryResult[]> {
   const dateKey = getMakkahDateKey();
-  const snapshot = await getDocs(
-    query(collection(db, "flagMemoryResults"), where("dateKey", "==", dateKey))
-  );
+  const snapshot = await adminDb.collection("flagMemoryResults").where("dateKey", "==", dateKey).get();
 
   const results = snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
@@ -232,9 +242,7 @@ async function getTodayFlagMemoryResultsForEngine(): Promise<RawFlagMemoryResult
 
 async function getTodayWordGameResultsForEngine(): Promise<RawWordGameResult[]> {
   const dateKey = getMakkahDateKey();
-  const snapshot = await getDocs(
-    query(collection(db, "wordGameDailyResults"), where("dateKey", "==", dateKey))
-  );
+  const snapshot = await adminDb.collection("wordGameDailyResults").where("dateKey", "==", dateKey).get();
 
   return snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
@@ -266,12 +274,7 @@ async function getTodayWordGameResultsForEngine(): Promise<RawWordGameResult[]> 
 
 async function getTodayTenSecondsResultsForEngine(): Promise<RawTenSecondsResult[]> {
   const dateKey = getMakkahDateKey();
-  const snapshot = await getDocs(
-    query(
-      collection(db, "tenSecondsChallengeDaily"),
-      where("dateKey", "==", dateKey)
-    )
-  );
+  const snapshot = await adminDb.collection("tenSecondsChallengeDaily").where("dateKey", "==", dateKey).get();
 
   return snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
@@ -303,7 +306,7 @@ async function getTodayTenSecondsResultsForEngine(): Promise<RawTenSecondsResult
 }
 
 async function getAllPredictionsForEngine(): Promise<RawPrediction[]> {
-  const snapshot = await getDocs(collection(db, "predictions"));
+  const snapshot = await adminDb.collection("predictions").get();
 
   return snapshot.docs
     .filter((docSnap) => docSnap.id !== "_init")
@@ -1597,7 +1600,7 @@ export async function buildChallengeStudioEvents(): Promise<
     wordGameResults,
     tenSecondsResults,
   ] = await Promise.all([
-    getLeaderboardUsers(),
+    getLeaderboardUsersForEngine(),
     getAllMatches(),
     getAllPredictionsForEngine(),
     getTodayFlagMemoryResultsForEngine(),

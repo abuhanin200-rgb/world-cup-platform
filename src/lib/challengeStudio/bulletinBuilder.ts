@@ -1,7 +1,4 @@
-import {
-  addChallengeStudioBulletin,
-  type ChallengeStudioCard,
-} from "@/lib/challengeStudio";
+import type { ChallengeStudioCard } from "@/lib/challengeStudio";
 import {
   buildChallengeStudioEvents,
   type ChallengeStudioEvent,
@@ -839,21 +836,14 @@ export async function generateChallengeStudioBulletinFromEvents() {
 
   const finalCards = cards.slice(0, REQUIRED_CARDS_COUNT);
 
-  const bulletinId = await addChallengeStudioBulletin({
+  return {
     date: getTodaySaudiDate(),
     summary:
       mainEvent.type === "golden_prediction_alert"
         ? "السوبر ذهبي يشعل الجولة"
         : mainEvent.title,
-    cards: finalCards,
-    mentionedMembers: Array.from(usedMembers),
-    published: false,
-    generatedByAI: false,
-  });
-
-  return {
-    bulletinId,
     events,
     cards: finalCards,
+    mentionedMembers: Array.from(usedMembers),
   };
 }

@@ -23,18 +23,17 @@ import DailyLeaderboard from "@/components/word-game/DailyLeaderboard";
 import WordGameStats from "@/components/word-game/WordGameStats";
 
 import type {
-  WordGameDailyGame,
   WordGameLeaderboardItem,
   WordGameTileStatus,
   WordGameUserStats,
 } from "@/types/wordGame";
 
 import {
-  buildWordGameGuessResult,
   getOrCreateTodayWordGame,
   getTodayWordGameLeaderboard,
   getWordGameUserStats,
-  saveWordGameProgress,
+  submitWordGameGuess,
+  type WordGameClientGame,
 } from "@/lib/wordGameService";
 
 import {
@@ -43,10 +42,6 @@ import {
   WORD_GAME_WORD_LENGTH,
 } from "@/lib/wordGameLogic";
 
-import {
-  getWordGameCategoryLabel,
-  getWordGameWordCategory,
-} from "@/lib/wordGameWords";
 
 const STATUS_PRIORITY: Record<WordGameTileStatus, number> = {
   empty: 0,
@@ -178,7 +173,7 @@ function buildMiniConfetti() {
 export default function WordGame() {
   const { user, loading, isLoggedIn } = useAuth();
 
-  const [game, setGame] = useState<WordGameDailyGame | null>(null);
+  const [game, setGame] = useState<WordGameClientGame | null>(null);
   const [currentGuess, setCurrentGuess] = useState("");
   const [leaderboard, setLeaderboard] = useState<WordGameLeaderboardItem[]>([]);
   const [stats, setStats] = useState<WordGameUserStats | null>(null);
@@ -189,14 +184,10 @@ export default function WordGame() {
   const [feedbackPulse, setFeedbackPulse] = useState<{ kind: "error" | "success"; tick: number }>({ kind: "error", tick: 0 });
 
   const userId = user?.id ?? "";
-  const userName = user?.fullName || "عضو";
-
   const gameFinished = game?.status === "won" || game?.status === "lost";
   const inputDisabled = saving || !game || gameFinished;
 
-  const categoryLabel = game
-    ? getWordGameCategoryLabel(getWordGameWordCategory(game.targetWord))
-    : "عامة";
+  const categoryLabel = game?.categoryLabel || "عامة";
 
   const categoryIcon = getCategoryIcon(categoryLabel);
   const miniConfetti = useMemo(() => buildMiniConfetti(), []);
@@ -299,18 +290,20 @@ export default function WordGame() {
       return;
     }
 
-    let updatedGame: WordGameDailyGame;
+    let updatedGame: WordGameClientGame;
 
     try {
-      updatedGame = buildWordGameGuessResult({
-        currentGame: game,
-        guess: currentGuess,
-      });
+      setSaving(true);
+      const nextState = await submitWordGameGuess({ userId, guess: currentGuess });
+      updatedGame = nextState.game;
+      setLeaderboard(nextState.leaderboard);
+      setStats(nextState.stats);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "حدث خطأ أثناء إدخال الكلمة."
       );
       triggerGuessFeedback("error");
+      setSaving(false);
       return;
     }
 
@@ -324,7 +317,7 @@ export default function WordGame() {
       window.setTimeout(() => setShowCelebration(false), 2500);
     } else if (updatedGame.status === "lost") {
       setMessage(
-        `انتهت محاولاتك لهذا اليوم. كلمتك اليوم: ${updatedGame.targetWord}`
+        `انتهت محاولاتك لهذا اليوم. كلمتك اليوم: ${updatedGame.targetWord || "—"}`
       );
       triggerGuessFeedback("error");
     } else {
@@ -333,13 +326,6 @@ export default function WordGame() {
     }
 
     try {
-      setSaving(true);
-
-      await saveWordGameProgress({
-        updatedGame,
-        userName,
-      });
-
       await refreshExtraData(userId);
     } catch (error) {
       console.error(error);

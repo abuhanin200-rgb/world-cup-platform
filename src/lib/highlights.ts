@@ -1,10 +1,10 @@
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "./firebase";
 import type {
   KnockoutRound,
   PredictionType,
   QualificationMethod,
 } from "./matches";
+
+type RecordWithId = { id: string; data: Record<string, unknown> };
 
 export type HomeHighlightUser = {
   id: string;
@@ -213,21 +213,19 @@ type MatchesHighlightMeta = {
   isFinalCalculated: boolean;
 };
 
-async function getMatchesHighlightMeta(): Promise<MatchesHighlightMeta> {
-  const snapshot = await getDocs(collection(db, "matches"));
+function getMatchesHighlightMeta(records: RecordWithId[]): MatchesHighlightMeta {
   const knockoutRoundsByMatchId = new Map<string, KnockoutRound>();
   let isFinalCalculated = false;
 
-  snapshot.docs
-    .filter((docSnap) => docSnap.id !== "_init")
-    .forEach((docSnap) => {
-      const data = docSnap.data();
+  records
+    .filter((item) => item.id !== "_init")
+    .forEach(({ id, data }) => {
 
       if (data.matchStage !== "knockout") return;
 
       const knockoutRound = normalizeKnockoutRound(data.knockoutRound);
 
-      knockoutRoundsByMatchId.set(docSnap.id, knockoutRound);
+      knockoutRoundsByMatchId.set(id, knockoutRound);
 
       if (
         knockoutRound === "final" &&
@@ -299,16 +297,13 @@ function getTodaySaudiDateKey() {
   }).format(new Date());
 }
 
-async function getUsersForHighlights(): Promise<HomeHighlightUser[]> {
-  const snapshot = await getDocs(collection(db, "users"));
-
-  const users = snapshot.docs
-    .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => {
-      const data = docSnap.data();
+function getUsersForHighlights(records: RecordWithId[]): HomeHighlightUser[] {
+  const users = records
+    .filter((item) => item.id !== "_init")
+    .map(({ id, data }) => {
 
       return {
-        id: docSnap.id,
+        id,
         fullName: toText(data.fullName) || "عضو بدون اسم",
         favoriteTeam: toText(data.favoriteTeam),
         teamEmoji: toText(data.teamEmoji),
@@ -368,19 +363,16 @@ async function getUsersForHighlights(): Promise<HomeHighlightUser[]> {
     });
 }
 
-async function getPredictionsForHighlights(): Promise<HighlightPrediction[]> {
-  const snapshot = await getDocs(collection(db, "predictions"));
-
-  return snapshot.docs
-    .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) => {
-      const data = docSnap.data();
+function getPredictionsForHighlights(records: RecordWithId[]): HighlightPrediction[] {
+  return records
+    .filter((item) => item.id !== "_init")
+    .map(({ id, data }) => {
 
       const createdAt = toText(data.createdAt);
       const calculatedAt = toText(data.calculatedAt);
 
       return {
-        id: docSnap.id,
+        id,
         userId: toText(data.userId),
         userName: toText(data.userName) || "عضو بدون اسم",
 
@@ -578,12 +570,14 @@ function getExactHits(
     });
 }
 
-export async function getHomeHighlights() {
-  const [users, predictions, matchesMeta] = await Promise.all([
-    getUsersForHighlights(),
-    getPredictionsForHighlights(),
-    getMatchesHighlightMeta(),
-  ]);
+export function buildHomeHighlights(input: {
+  users: RecordWithId[];
+  predictions: RecordWithId[];
+  matches: RecordWithId[];
+}) {
+  const users = getUsersForHighlights(input.users);
+  const predictions = getPredictionsForHighlights(input.predictions);
+  const matchesMeta = getMatchesHighlightMeta(input.matches);
 
   const excludedUserIds = new Set<string>();
 
@@ -654,4 +648,15 @@ export async function getHomeHighlights() {
     isFinalCalculated: matchesMeta.isFinalCalculated,
     platformChampions,
   };
+}
+
+export async function getHomeHighlights() {
+  const response = await fetch("/api/public/legacy-community?view=highlights", {
+    cache: "no-store",
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) {
+    throw new Error(data?.error || "تعذر تحميل إبرازات المنصة الآن.");
+  }
+  return data as ReturnType<typeof buildHomeHighlights>;
 }

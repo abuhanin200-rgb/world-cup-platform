@@ -1,5 +1,5 @@
-import { WORD_GAME_WORDS } from "@/lib/wordGameWords";
-import type { WordGameGuessLetter } from "@/types/wordGame";
+import { WORD_GAME_WORDS } from "./wordGameWords.ts";
+import type { WordGameGuessLetter } from "../types/wordGame.ts";
 
 export const WORD_GAME_WORD_LENGTH = 5;
 export const WORD_GAME_MAX_ATTEMPTS = 6;

@@ -10,8 +10,6 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 type HomeStatsData = {
   totalPredictions: number;
@@ -20,6 +18,13 @@ type HomeStatsData = {
   calculatedMatches: number;
   successRate: number;
 };
+
+function isHomeStatsData(value: unknown): value is HomeStatsData {
+  if (!value || typeof value !== "object") return false;
+  const data = value as Record<string, unknown>;
+  return ["totalPredictions", "winnerCorrect", "exactCorrect", "calculatedMatches", "successRate"]
+    .every((key) => typeof data[key] === "number");
+}
 
 type StatsCard = {
   titleLines: string[];
@@ -31,35 +36,6 @@ type StatsCard = {
   glowClass: string;
   borderClass: string;
 };
-
-function toNumber(value: unknown) {
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : 0;
-}
-
-function toText(value: unknown) {
-  return String(value || "").trim();
-}
-
-function isExactPrediction(data: Record<string, unknown>) {
-  const points = toNumber(data.points);
-  const resultType = toText(data.resultType);
-
-  return (
-    Boolean(data.isCalculated) &&
-    (resultType === "exact" || points === 3 || points === 6)
-  );
-}
-
-function isWinnerPrediction(data: Record<string, unknown>) {
-  const points = toNumber(data.points);
-  const resultType = toText(data.resultType);
-
-  return (
-    Boolean(data.isCalculated) &&
-    (resultType === "winner" || points === 1 || points === 2)
-  );
-}
 
 function CountUpNumber({
   value,
@@ -77,21 +53,21 @@ function CountUpNumber({
 
   useEffect(() => {
     if (loading) {
-      setDisplayValue(0);
-      return;
+      const timeoutId = window.setTimeout(() => setDisplayValue(0), 0);
+      return () => window.clearTimeout(timeoutId);
     }
 
     if (shouldReduceMotion) {
-      setDisplayValue(value);
-      return;
+      const timeoutId = window.setTimeout(() => setDisplayValue(value), 0);
+      return () => window.clearTimeout(timeoutId);
     }
 
     const startValue = displayValue;
     const difference = value - startValue;
 
     if (Math.abs(difference) < 0.01) {
-      setDisplayValue(value);
-      return;
+      const timeoutId = window.setTimeout(() => setDisplayValue(value), 0);
+      return () => window.clearTimeout(timeoutId);
     }
 
     const duration = 1800;
@@ -153,49 +129,14 @@ export default function HomeStats() {
     try {
       setLoading(true);
 
-      const [predictionsSnapshot, matchesSnapshot] = await Promise.all([
-        getDocs(collection(db, "predictions")),
-        getDocs(collection(db, "matches")),
-      ]);
-
-      const predictions = predictionsSnapshot.docs
-        .filter((docSnap) => docSnap.id !== "_init")
-        .map((docSnap) => docSnap.data());
-
-      const matches = matchesSnapshot.docs
-        .filter((docSnap) => docSnap.id !== "_init")
-        .map((docSnap) => docSnap.data());
-
-      const totalPredictions = predictions.length;
-
-      const calculatedPredictions = predictions.filter((prediction) =>
-        Boolean(prediction.isCalculated)
-      ).length;
-
-      const winnerCorrect = predictions.filter((prediction) =>
-        isWinnerPrediction(prediction)
-      ).length;
-
-      const exactCorrect = predictions.filter((prediction) =>
-        isExactPrediction(prediction)
-      ).length;
-
-      const calculatedMatches = matches.filter((match) =>
-        Boolean(match.resultCalculated)
-      ).length;
-
-      const successRate =
-        calculatedPredictions > 0
-          ? ((winnerCorrect + exactCorrect) / calculatedPredictions) * 100
-          : 0;
-
-      setStats({
-        totalPredictions,
-        winnerCorrect,
-        exactCorrect,
-        calculatedMatches,
-        successRate,
+      const response = await fetch("/api/public/legacy-community?view=home-stats", {
+        cache: "no-store",
       });
+      const data = (await response.json().catch(() => null)) as HomeStatsData | { error?: string } | null;
+      if (!response.ok || !isHomeStatsData(data)) {
+        throw new Error(data && "error" in data ? data.error : "تعذر تحميل إحصاءات المنصة الآن.");
+      }
+      setStats(data);
     } catch (error) {
       console.error("Home stats error:", error);
     } finally {
@@ -204,7 +145,7 @@ export default function HomeStats() {
   }
 
   useEffect(() => {
-    loadStats();
+    queueMicrotask(() => void loadStats());
   }, []);
 
   const cards: StatsCard[] = useMemo(

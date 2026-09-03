@@ -290,6 +290,76 @@ test("Private legacy documents and derived scores resist guest, other-user, and 
   }
 });
 
+test("Word-game state is readable only as needed and is never writable from a browser", async () => {
+  const guest = testEnv.unauthenticatedContext().firestore();
+  const owner = testEnv.authenticatedContext("user-1").firestore();
+  const other = testEnv.authenticatedContext("user-2").firestore();
+  const admin = testEnv.authenticatedContext("admin-1").firestore();
+  const gamePath = ["wordGameDailyGames", "user-1_2026-01-01"];
+  const resultPath = ["wordGameDailyResults", "user-1_2026-01-01"];
+  const statsPath = ["wordGameUserStats", "user-1"];
+
+  await assertFails(getDoc(doc(guest, ...gamePath)));
+  await assertSucceeds(getDoc(doc(owner, ...gamePath)));
+  await assertFails(getDoc(doc(other, ...gamePath)));
+  await assertSucceeds(getDoc(doc(admin, ...gamePath)));
+  await assertSucceeds(getDocs(query(
+    collection(owner, "wordGameDailyGames"),
+    where("userId", "==", "user-1"),
+  )));
+  await assertFails(getDocs(query(
+    collection(owner, "wordGameDailyGames"),
+    where("dateKey", "==", "2026-01-01"),
+  )));
+  await assertSucceeds(getDoc(doc(guest, ...resultPath)));
+  await assertFails(getDoc(doc(guest, ...statsPath)));
+  await assertSucceeds(getDoc(doc(owner, ...statsPath)));
+  await assertFails(getDoc(doc(other, ...statsPath)));
+  await assertSucceeds(getDoc(doc(admin, ...statsPath)));
+  await assertFails(setDoc(doc(owner, "wordGameDailyGames", "spoofed-owner"), {
+    userId: "user-2", dateKey: "2026-01-01", targetWord: "secret",
+  }));
+
+  for (const db of [guest, owner, other, admin]) {
+    await assertFails(setDoc(doc(db, "wordGameDailyGames", "forged-game"), {
+      userId: "user-1", dateKey: "2026-01-01", targetWord: "secret", points: 999,
+    }));
+    await assertFails(updateDoc(doc(db, ...gamePath), { guesses: [], status: "won", won: true }));
+    await assertFails(deleteDoc(doc(db, ...gamePath)));
+    await assertFails(setDoc(doc(db, "wordGameDailyResults", "forged-result"), {
+      userId: "user-1", score: 999, won: true,
+    }));
+    await assertFails(updateDoc(doc(db, ...resultPath), { score: 999 }));
+    await assertFails(deleteDoc(doc(db, ...resultPath)));
+    await assertFails(setDoc(doc(db, "wordGameUserStats", "user-1"), {
+      userId: "user-1", gamesWon: 999,
+    }));
+    await assertFails(updateDoc(doc(db, ...statsPath), { gamesWon: 999 }));
+    await assertFails(deleteDoc(doc(db, ...statsPath)));
+  }
+});
+
+test("Word-game server persistence bypasses client rules and keeps the player identity server-owned", async () => {
+  await adminDb.doc("wordGameDailyGames/user-1_2026-01-02").set({
+    userId: "user-1", dateKey: "2026-01-02", targetWord: "secret", status: "playing",
+  });
+  await adminDb.doc("wordGameDailyResults/user-1_2026-01-02").set({
+    userId: "user-1", dateKey: "2026-01-02", won: true, attemptsUsed: 2,
+  });
+  await adminDb.doc("wordGameUserStats/user-1").set({
+    userId: "user-1", gamesPlayed: 1, gamesWon: 1,
+  }, { merge: true });
+
+  const [game, result, stats] = await Promise.all([
+    adminDb.doc("wordGameDailyGames/user-1_2026-01-02").get(),
+    adminDb.doc("wordGameDailyResults/user-1_2026-01-02").get(),
+    adminDb.doc("wordGameUserStats/user-1").get(),
+  ]);
+  assert.equal(game.data()?.userId, "user-1");
+  assert.equal(result.data()?.won, true);
+  assert.equal(stats.data()?.gamesWon, 1);
+});
+
 test("Owners can only create their presence and notice views, and active notices require sign-in", async () => {
   const owner = testEnv.authenticatedContext("user-1").firestore();
   const other = testEnv.authenticatedContext("user-2").firestore();

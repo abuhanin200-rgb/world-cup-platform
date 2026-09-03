@@ -180,18 +180,21 @@ service cloud.firestore {
 
     match /wordGameDailyGames/{gameId} {
       allow get, list: if isAdmin() || ownsResource();
-      allow write: if isAdmin();
+      // Daily words, guesses, and completion state are calculated server-side.
+      allow write: if false;
     }
 
     match /wordGameDailyResults/{resultId} {
       allow read: if true;
-      allow write: if isAdmin();
+      // A result is an immutable, derived record written only with Admin SDK.
+      allow write: if false;
     }
 
     match /wordGameUserStats/{userId} {
       allow get: if ownsPathUser(userId) || isAdmin();
       allow list: if isAdmin();
-      allow write: if isAdmin();
+      // Statistics are derived from a completed result on the server.
+      allow write: if false;
     }
 
     match /onlinePresence/{userId} {

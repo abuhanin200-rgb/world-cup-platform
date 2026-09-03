@@ -12,7 +12,7 @@ import {
   type ChallengeStudioCard,
   type ChallengeStudioCardType,
 } from "@/lib/challengeStudio";
-import { generateChallengeStudioBulletinFromEvents } from "@/lib/challengeStudio/bulletinBuilder";
+import { auth } from "@/lib/firebase";
 import AdminChallengeStudioViewersPanel from "@/components/AdminChallengeStudioViewersPanel";
 
 type AiGenerateResponse = {
@@ -73,7 +73,11 @@ export default function AdminChallengeStudioPanel() {
   }
 
   useEffect(() => {
-    loadBulletins();
+    const timer = window.setTimeout(() => {
+      void loadBulletins();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   function startEdit(bulletin: ChallengeStudioBulletin) {
@@ -227,7 +231,38 @@ export default function AdminChallengeStudioPanel() {
     try {
       setGenerating(true);
 
-      const result = await generateChallengeStudioBulletinFromEvents();
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        throw new Error("سجّل الدخول بحساب إداري أولًا.");
+      }
+
+      const response = await fetch("/api/challenge-studio/events", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await firebaseUser.getIdToken()}`,
+        },
+      });
+      const result = (await response.json()) as {
+        date?: string;
+        summary?: string;
+        cards?: ChallengeStudioCard[];
+        mentionedMembers?: string[];
+        events: unknown[];
+        error?: string;
+      };
+
+      if (!response.ok || !result.date || !result.summary || !result.cards) {
+        throw new Error(result.error || "تعذر توليد نشرة الاستوديو.");
+      }
+
+      await addChallengeStudioBulletin({
+        date: result.date,
+        summary: result.summary,
+        cards: result.cards,
+        mentionedMembers: result.mentionedMembers || [],
+        published: false,
+        generatedByAI: false,
+      });
 
       alert(
         `تم توليد النشرة من محرك الأحداث ✅\nعدد الأحداث المكتشفة: ${result.events.length}`

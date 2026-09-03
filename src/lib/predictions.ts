@@ -859,79 +859,18 @@ async function saveLegacyPredictionViaApi(
 export async function getLatestPredictions(
   maxItems = 100
 ): Promise<LatestPrediction[]> {
-  const [predictionsSnapshot, matchesSnapshot] = await Promise.all([
-    getDocs(collection(db, "predictions")),
-    getDocs(collection(db, "matches")),
-  ]);
-
-  const knockoutRoundByMatchId = new Map<string, KnockoutRound>();
-
-  matchesSnapshot.docs
-    .filter((docSnap) => docSnap.id !== "_init")
-    .forEach((docSnap) => {
-      const matchData = docSnap.data();
-      const matchStage = normalizeMatchStage(matchData.matchStage);
-
-      if (matchStage !== "knockout") return;
-
-      knockoutRoundByMatchId.set(
-        docSnap.id,
-        normalizeKnockoutRound(matchData.knockoutRound) || "general"
-      );
-    });
-
-  return predictionsSnapshot.docs
-    .filter((docSnap) => docSnap.id !== "_init")
-    .map((docSnap) =>
-      mapPrediction(docSnap.id, docSnap.data())
-    )
-    .filter((prediction) => {
-      const hasPredictionData =
-        prediction.userName &&
-        prediction.matchId &&
-        prediction.homeTeamName &&
-        prediction.awayTeamName;
-
-      return (
-        hasPredictionData &&
-        prediction.isCalculated === false
-      );
-    })
-    .sort(
-      (a, b) =>
-        getTimeValue(b.createdAt) -
-        getTimeValue(a.createdAt)
-    )
-    .slice(0, maxItems)
-    .map((prediction) => ({
-      id: prediction.id,
-
-      userName: prediction.userName,
-
-      matchId: prediction.matchId,
-
-      homeTeamName: prediction.homeTeamName,
-      homeTeamEmoji: prediction.homeTeamEmoji,
-      homeTeamCode: prediction.homeTeamCode,
-
-      awayTeamName: prediction.awayTeamName,
-      awayTeamEmoji: prediction.awayTeamEmoji,
-      awayTeamCode: prediction.awayTeamCode,
-
-      homeScore: prediction.homeScore,
-      awayScore: prediction.awayScore,
-
-      qualifiedTeamCode: prediction.qualifiedTeamCode,
-      qualificationMethod: prediction.qualificationMethod,
-
-      predictionType: prediction.predictionType,
-      matchStage: prediction.matchStage,
-      knockoutRound: knockoutRoundByMatchId.get(
-        prediction.matchId
-      ),
-
-      createdAt: prediction.createdAt,
-    }));
+  const limit = Math.min(2_000, Math.max(1, Math.floor(maxItems)));
+  const response = await fetch(`/api/public/legacy-community?view=latest-predictions&limit=${limit}`, {
+    cache: "no-store",
+  });
+  const data = (await response.json().catch(() => null)) as {
+    predictions?: LatestPrediction[];
+    error?: string;
+  } | null;
+  if (!response.ok || !data?.predictions) {
+    throw new Error(data?.error || "تعذر تحميل التوقعات المعلنة الآن.");
+  }
+  return data.predictions;
 }
 
 export async function getPredictionsByUserId(
