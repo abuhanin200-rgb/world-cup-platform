@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { CircleUserRound, Gamepad2, Home, LogOut, Medal, Trophy } from "lucide-react";
@@ -57,9 +58,15 @@ export default function PlatformChrome({ children }: { children: React.ReactNode
       <NetworkStatusBanner />
       <header className="sticky top-0 z-[70] border-b border-white/[0.09] bg-[#04133a]/58 pt-[env(safe-area-inset-top)] backdrop-blur-2xl">
         <div className="mx-auto flex min-h-[64px] max-w-7xl items-center justify-between gap-2 px-2.5 sm:px-4 md:min-h-[72px] md:px-6">
-          <Link href="/" aria-label="منصة التحدي - الرئيسية" className="flex min-w-0 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210]">
-            <img src="/brand/altahaddi-symbol-white.png" alt="" className="h-9 w-9 shrink-0 object-contain md:h-10 md:w-10" />
-            <div className="min-w-0"><div className="text-base font-black leading-none sm:text-lg md:text-xl">التحدي</div><div className="mt-1 whitespace-nowrap text-[8.5px] font-bold leading-none text-[#ffc210]/90 sm:text-[10px]">توقعات · بطولات · ألعاب</div></div>
+          <Link href="/" aria-label="العودة إلى الصفحة الرئيسية" className="flex min-w-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ffc210]">
+            <Image
+              src="/brand/altahaddi-logo-white.png"
+              alt=""
+              width={1412}
+              height={1462}
+              sizes="(max-width: 767px) 50px, 60px"
+              className="h-[50px] w-auto shrink-0 object-contain md:h-[60px]"
+            />
           </Link>
 
           <nav className="altahaddi-glass-soft hidden items-center gap-1 rounded-2xl p-1 lg:flex" aria-label="التنقل الرئيسي">
