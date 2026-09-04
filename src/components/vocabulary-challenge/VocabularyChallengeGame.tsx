@@ -158,10 +158,12 @@ function PlayerBadge({
   player,
   active,
   me = false,
+  action = null,
 }: {
   player: VocabularyChallengePlayerSummary | null;
   active: boolean;
   me?: boolean;
+  action?: ReactNode;
 }) {
   const name = player?.userName || (me ? "أنت" : "بانتظار لاعب");
   return (
@@ -172,13 +174,56 @@ function PlayerBadge({
       </div>
       <div className="min-w-0">
         <div className="max-w-[170px] truncate text-[11px] font-black text-white/85 sm:text-xs">{name}</div>
-        <div className="mt-1 inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[10px] font-black text-white/75">
-          <span className="grid h-4 w-4 place-items-center rounded bg-white/10 text-[9px]">▣</span>
-          <span dir="ltr">{player?.cardCount ?? "—"}</span>
-          <span className="font-semibold text-white/40">بطاقة</span>
+        <div className="mt-1 flex items-center gap-1.5">
+          <div className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[10px] font-black text-white/75">
+            <span className="grid h-4 w-4 place-items-center rounded bg-white/10 text-[9px]">▣</span>
+            <span dir="ltr">{player?.cardCount ?? "—"}</span>
+            <span className="font-semibold text-white/40">بطاقة</span>
+          </div>
+          {action}
         </div>
       </div>
     </div>
+  );
+}
+
+function VoiceMicButton({
+  enabled,
+  supported,
+  state,
+  onClick,
+}: {
+  enabled: boolean;
+  supported: boolean;
+  state: "off" | "connecting" | "connected" | "error" | "unsupported";
+  onClick: () => void;
+}) {
+  const stateRing = state === "connected"
+    ? "border-lime-300/60 text-lime-200"
+    : state === "connecting"
+      ? "border-amber-300/55 text-amber-100 animate-pulse"
+      : state === "error"
+        ? "border-rose-300/55 text-rose-100"
+        : "border-white/12 text-white/55";
+  const label = !supported
+    ? "المحادثة الصوتية غير مدعومة في هذا المتصفح"
+    : enabled
+      ? "كتم المايك"
+      : "تشغيل المايك";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!supported}
+      aria-label={label}
+      title={label}
+      aria-pressed={enabled}
+      className={`relative grid h-8 w-8 shrink-0 place-items-center rounded-lg border bg-black/25 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-35 ${stateRing}`}
+    >
+      {enabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+      <span className={`absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-emerald-950 ${state === "connected" ? "bg-lime-300" : state === "connecting" ? "bg-amber-300" : state === "error" ? "bg-rose-400" : "bg-white/30"}`} aria-hidden="true" />
+    </button>
   );
 }
 
@@ -746,11 +791,11 @@ export default function VocabularyChallengeGame() {
 
       <div className="mb-3 flex items-center justify-between gap-2">
         <Link href="/games" className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-black text-white/60 transition hover:bg-white/[0.07] hover:text-white"><ArrowRight className="h-4 w-4" /> الألعاب</Link>
-        {room ? (
-          <button type="button" onClick={handleForfeit} disabled={busy || finished || cancelled} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-red-200/10 bg-red-400/[0.055] px-3 text-[11px] font-black text-red-100/70 disabled:opacity-35"><LogOut className="h-4 w-4" /> {room.status === "waiting" ? "إلغاء الغرفة" : "إنهاء"}</button>
-        ) : (
+        {room?.status === "waiting" ? (
+          <button type="button" onClick={handleForfeit} disabled={busy || cancelled} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-red-200/10 bg-red-400/[0.055] px-3 text-[11px] font-black text-red-100/70 disabled:opacity-35"><LogOut className="h-4 w-4" /> إلغاء الغرفة</button>
+        ) : !room ? (
           <div className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-emerald-200/10 bg-emerald-300/[0.05] px-3 text-[10px] font-black text-emerald-100/70"><ShieldCheck className="h-3.5 w-3.5" /> كلمات عربية معتمدة</div>
-        )}
+        ) : <span aria-hidden="true" />}
       </div>
 
       {!roomId ? (
@@ -831,12 +876,12 @@ export default function VocabularyChallengeGame() {
           </div>
         </section>
       ) : (
-        <section ref={gameArenaRef} className="relative mx-auto max-w-[620px] scroll-mt-2 overflow-hidden rounded-[30px] border border-emerald-100/20 bg-[linear-gradient(180deg,#064638_0%,#0b8060_38%,#086249_64%,#043b32_100%)] shadow-[0_28px_90px_rgba(0,0,0,.40)]">
+        <section ref={gameArenaRef} onPointerDown={() => voiceChat.unlockAudio()} className="relative mx-auto max-w-[620px] scroll-mt-2 overflow-hidden rounded-[30px] border border-emerald-100/20 bg-[linear-gradient(180deg,#064638_0%,#0b8060_38%,#086249_64%,#043b32_100%)] shadow-[0_28px_90px_rgba(0,0,0,.40)]">
           <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_50%_50%,rgba(255,255,255,.11)_0_1px,transparent_1.4px),linear-gradient(30deg,transparent_48%,rgba(255,255,255,.06)_49%_51%,transparent_52%),linear-gradient(-30deg,transparent_48%,rgba(255,255,255,.05)_49%_51%,transparent_52%)] [background-size:24px_24px,48px_42px,48px_42px]" />
           <div className="pointer-events-none absolute inset-x-[8%] -top-48 h-[330px] rounded-[50%] border-[2px] border-emerald-100/14 bg-black/[0.06]" />
 
           <div className="relative min-h-[520px] px-3 pb-3 pt-2.5 sm:min-h-[590px] sm:px-4 sm:pb-4 sm:pt-3">
-            <div className="grid grid-cols-[62px_minmax(0,1fr)_62px] items-center gap-2">
+            <div className="grid grid-cols-[58px_minmax(0,1fr)_58px_48px] items-center gap-1.5 sm:gap-2">
               <div className={`relative grid h-[58px] w-[58px] place-items-center rounded-full border-[3px] bg-black/45 shadow-[0_8px_24px_rgba(0,0,0,.25)] ${isMyTurn ? "border-lime-300/70" : "border-white/15"}`}>
                 <svg className="absolute inset-[-4px] h-[62px] w-[62px] -rotate-90" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" /><circle cx="36" cy="36" r="31" fill="none" stroke={turnSeconds <= 3 ? "#fb7185" : "#bef264"} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${194.8 * turnProgress / 100} 194.8`} /></svg>
                 <span dir="ltr" className={`relative text-lg font-black ${turnSeconds <= 3 ? "text-rose-200" : "text-lime-200"}`}>{turnSeconds}s</span>
@@ -850,32 +895,27 @@ export default function VocabularyChallengeGame() {
               <div className={`grid h-[58px] w-[58px] place-items-center rounded-2xl border text-center ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.10]" : "border-white/10 bg-black/18"}`}>
                 <div><div className="text-base font-black text-white">{me?.cardCount ?? hand.cards.length}</div><div className="text-[8px] font-bold text-white/38">بطاقاتك</div></div>
               </div>
+
+              <button
+                type="button"
+                onClick={handleForfeit}
+                disabled={busy || finished || cancelled}
+                aria-label={room.mode === "duel" ? "الانسحاب من المباراة" : "إنهاء التحدي"}
+                title={room.mode === "duel" ? "الانسحاب من المباراة" : "إنهاء التحدي"}
+                className="flex h-[58px] w-12 flex-col items-center justify-center gap-1 rounded-xl border border-rose-200/15 bg-rose-400/[0.08] text-rose-100/75 transition active:scale-95 disabled:opacity-30"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="text-[7px] font-black">إنهاء</span>
+              </button>
             </div>
 
             <div className="mt-2 flex min-h-[54px] items-center justify-center">
               <PlayerBadge player={opponent} active={Boolean(opponent && room.turnPlayerId === opponent.userId)} />
             </div>
 
-            {room.mode === "duel" ? (
-              <div className="mx-auto mt-1 flex max-w-sm items-center justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void voiceChat.toggleMic()}
-                  disabled={!voiceChat.supported}
-                  className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-[9px] font-black transition ${voiceChat.micEnabled ? "border-rose-200/25 bg-rose-400/[0.12] text-rose-100" : "border-white/10 bg-black/20 text-white/62"} disabled:opacity-35`}
-                  aria-pressed={voiceChat.micEnabled}
-                >
-                  {voiceChat.micEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                  {voiceChat.micEnabled ? "إغلاق المايك" : "فتح المايك"}
-                </button>
-                <span className={`text-[8px] font-bold ${voiceChat.state === "connected" ? "text-lime-200" : voiceChat.state === "error" ? "text-rose-200" : "text-white/35"}`}>
-                  {voiceChat.state === "connected" ? "الصوت متصل" : voiceChat.state === "connecting" ? "جاري ربط الصوت…" : voiceChat.state === "unsupported" ? "غير مدعوم" : "الصوت اختياري"}
-                </span>
-              </div>
-            ) : (
+            {room.mode === "solo" ? (
               <div className="mx-auto mt-1 flex w-fit items-center gap-1.5 rounded-full border border-cyan-200/12 bg-cyan-300/[0.06] px-3 py-1 text-[8px] font-black text-cyan-100/70"><Bot className="h-3 w-3" /> البوت يختار حركاته بدون الاطلاع على بطاقاتك</div>
-            )}
-            {room.mode === "duel" && voiceChat.error ? <div className="mx-auto mt-1 max-w-sm text-center text-[8px] font-semibold text-rose-100/75">{voiceChat.error}</div> : null}
+            ) : null}
 
             <div className={`mx-auto mt-1 w-fit rounded-full border px-3 py-1 text-[9px] font-black ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.11] text-lime-100" : "border-white/10 bg-black/15 text-white/52"}`}>{isMyTurn ? "حان دورك الآن" : room.mode === "duel" ? "دور الخصم" : "دور بوت التحدي"}</div>
 
@@ -915,8 +955,23 @@ export default function VocabularyChallengeGame() {
                 <span className="text-[8px] font-black text-white/58">{!isMyTurn ? "انتظر دورك" : hasLegalMove ? "عندك حركة" : "اسحب"}</span>
               </button>
 
-              <div className="flex-1 text-left" dir="ltr"><PlayerBadge player={me} active={isMyTurn} me /></div>
+              <div className="flex-1 text-left" dir="ltr">
+                <PlayerBadge
+                  player={me}
+                  active={isMyTurn}
+                  me
+                  action={room.mode === "duel" ? (
+                    <VoiceMicButton
+                      enabled={voiceChat.micEnabled}
+                      supported={voiceChat.supported}
+                      state={voiceChat.state}
+                      onClick={() => void voiceChat.toggleMic()}
+                    />
+                  ) : null}
+                />
+              </div>
             </div>
+            {room.mode === "duel" && voiceChat.error ? <div aria-live="polite" className="mx-auto mt-1 max-w-sm text-center text-[8px] font-semibold text-rose-100/75">{voiceChat.error}</div> : null}
 
             <div className="mt-1 overflow-x-auto pb-2 pt-3 hidden-scrollbar" dir="rtl">
               <div className="mx-auto flex min-w-max items-end justify-center px-2 pb-2">

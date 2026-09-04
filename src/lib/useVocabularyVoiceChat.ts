@@ -6,12 +6,29 @@ import type { VocabularyChallengeRoom } from "@/types/vocabularyChallenge";
 
 type VoiceConnectionState = "off" | "connecting" | "connected" | "error" | "unsupported";
 
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-];
+function optionalTurnServer(): RTCIceServer | null {
+  const rawUrls = process.env.NEXT_PUBLIC_VOCABULARY_TURN_URLS || "";
+  const urls = rawUrls.split(",").map((value) => value.trim()).filter(Boolean);
+  if (!urls.length) return null;
+  const username = process.env.NEXT_PUBLIC_VOCABULARY_TURN_USERNAME || "";
+  const credential = process.env.NEXT_PUBLIC_VOCABULARY_TURN_CREDENTIAL || "";
+  return {
+    urls,
+    ...(username ? { username } : {}),
+    ...(credential ? { credential } : {}),
+  };
+}
 
-function waitForIceGatheringComplete(pc: RTCPeerConnection, timeoutMs = 4200) {
+function buildIceServers(): RTCIceServer[] {
+  const servers: RTCIceServer[] = [
+    { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+  ];
+  const turn = optionalTurnServer();
+  if (turn) servers.push(turn);
+  return servers;
+}
+
+function waitForIceGatheringComplete(pc: RTCPeerConnection, timeoutMs = 6000) {
   if (pc.iceGatheringState === "complete") return Promise.resolve();
   return new Promise<void>((resolve) => {
     let settled = false;
@@ -31,13 +48,37 @@ function waitForIceGatheringComplete(pc: RTCPeerConnection, timeoutMs = 4200) {
 }
 
 function voiceErrorMessage(error: unknown) {
-  if (error instanceof DOMException && error.name === "NotAllowedError") return "تم رفض إذن الميكروفون. فعّله من إعدادات المتصفح ثم حاول مرة أخرى.";
+  if (error instanceof DOMException && ["NotAllowedError", "SecurityError"].includes(error.name)) return "تم رفض إذن الميكروفون. اسمح بالمايك من إعدادات المتصفح ثم اضغط الأيقونة مرة أخرى.";
   if (error instanceof DOMException && error.name === "NotFoundError") return "لم يتم العثور على ميكروفون على هذا الجهاز.";
+  if (error instanceof DOMException && error.name === "NotReadableError") return "الميكروفون مستخدم من تطبيق آخر أو تعذر الوصول إليه.";
+  if (error instanceof DOMException && error.name === "OverconstrainedError") return "تعذر تشغيل إعدادات الميكروفون على هذا الجهاز.";
   return error instanceof Error ? error.message : "تعذر تشغيل المحادثة الصوتية الآن.";
 }
 
+async function requestMicrophone() {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+      },
+      video: false,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "OverconstrainedError") {
+      return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    }
+    throw error;
+  }
+}
+
 export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, userId: string | undefined) {
-  const supported = typeof window !== "undefined" && typeof RTCPeerConnection !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
+  const supported = typeof window !== "undefined"
+    && window.isSecureContext
+    && typeof RTCPeerConnection !== "undefined"
+    && Boolean(navigator.mediaDevices?.getUserMedia);
   const [micEnabled, setMicEnabled] = useState(false);
   const [state, setState] = useState<VoiceConnectionState>(supported ? "off" : "unsupported");
   const [error, setError] = useState("");
@@ -45,10 +86,46 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
   const senderRef = useRef<RTCRtpSender | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackUnlockedRef = useRef(false);
   const offerKeyRef = useRef("");
   const answerKeyRef = useRef("");
   const appliedAnswerRef = useRef("");
   const roomKeyRef = useRef("");
+
+  const ensureRemoteAudio = useCallback(() => {
+    if (typeof document === "undefined") return null;
+    if (remoteAudioRef.current) return remoteAudioRef.current;
+    const audio = document.createElement("audio");
+    audio.autoplay = true;
+    audio.preload = "auto";
+    audio.controls = false;
+    audio.muted = false;
+    audio.volume = 1;
+    audio.setAttribute("playsinline", "true");
+    audio.setAttribute("webkit-playsinline", "true");
+    audio.setAttribute("aria-hidden", "true");
+    audio.style.position = "fixed";
+    audio.style.width = "1px";
+    audio.style.height = "1px";
+    audio.style.opacity = "0.001";
+    audio.style.pointerEvents = "none";
+    audio.style.left = "-10px";
+    audio.style.bottom = "0";
+    document.body.appendChild(audio);
+    remoteAudioRef.current = audio;
+    return audio;
+  }, []);
+
+  const unlockAudio = useCallback(() => {
+    playbackUnlockedRef.current = true;
+    const audio = ensureRemoteAudio();
+    if (!audio?.srcObject) return;
+    void audio.play().then(() => {
+      setError((current) => current.includes("صوت الخصم") ? "" : current);
+    }).catch(() => {
+      // Safari may require the next direct tap on the mic icon; keep the game usable.
+    });
+  }, [ensureRemoteAudio]);
 
   const stopLocalMic = useCallback(async () => {
     const stream = localStreamRef.current;
@@ -70,8 +147,10 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     if (remoteAudioRef.current) {
       remoteAudioRef.current.pause();
       remoteAudioRef.current.srcObject = null;
+      remoteAudioRef.current.remove();
       remoteAudioRef.current = null;
     }
+    playbackUnlockedRef.current = false;
     offerKeyRef.current = "";
     answerKeyRef.current = "";
     appliedAnswerRef.current = "";
@@ -83,33 +162,64 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     if (!supported) return null;
     if (pcRef.current) return pcRef.current;
 
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({
+      iceServers: buildIceServers(),
+      iceCandidatePoolSize: 4,
+      bundlePolicy: "max-bundle",
+    });
     const transceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
     senderRef.current = transceiver.sender;
+
     pc.ontrack = (event) => {
-      const audio = remoteAudioRef.current || document.createElement("audio");
-      audio.autoplay = true;
-      audio.setAttribute("playsinline", "true");
+      const audio = ensureRemoteAudio();
+      if (!audio) return;
+      const stream = event.streams[0] || new MediaStream([event.track]);
+      audio.srcObject = stream;
+      audio.muted = false;
       audio.volume = 1;
-      audio.srcObject = event.streams[0] || new MediaStream([event.track]);
-      remoteAudioRef.current = audio;
-      void audio.play().catch(() => undefined);
+      event.track.onunmute = () => {
+        void audio.play().catch(() => {
+          if (!playbackUnlockedRef.current) {
+            setError("اضغط أيقونة المايك مرة واحدة لتفعيل صوت الخصم في هذا المتصفح.");
+          }
+        });
+      };
+      void audio.play().then(() => {
+        setError("");
+      }).catch(() => {
+        if (!playbackUnlockedRef.current) {
+          setError("اضغط أيقونة المايك مرة واحدة لتفعيل صوت الخصم في هذا المتصفح.");
+        }
+      });
     };
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "connected") {
+
+    const syncConnectionState = () => {
+      const connectionState = pc.connectionState;
+      const iceState = pc.iceConnectionState;
+      if (connectionState === "connected" || iceState === "connected" || iceState === "completed") {
         setState("connected");
         setError("");
-      } else if (pc.connectionState === "connecting" || pc.connectionState === "new") {
+      } else if (["connecting", "new"].includes(connectionState) || ["checking", "new"].includes(iceState)) {
         setState("connecting");
-      } else if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+      } else if (connectionState === "failed" || iceState === "failed") {
         setState("error");
-        setError("تعذر تثبيت الاتصال الصوتي. جرّب إغلاق المايك وفتحه أو أعد المباراة.");
+        setError(optionalTurnServer()
+          ? "تعذر تثبيت الاتصال الصوتي. أغلق المايك وافتحه مرة أخرى."
+          : "تعذر ربط الصوت على هذه الشبكة. دعم TURN اختياري للشبكات المقيدة.");
+      } else if (connectionState === "disconnected") {
+        setState("connecting");
       }
     };
+    pc.onconnectionstatechange = syncConnectionState;
+    pc.oniceconnectionstatechange = syncConnectionState;
+    pc.onicecandidateerror = () => {
+      if (pc.iceConnectionState === "failed") syncConnectionState();
+    };
+
     pcRef.current = pc;
     setState("connecting");
     return pc;
-  }, [supported]);
+  }, [ensureRemoteAudio, supported]);
 
   useEffect(() => {
     if (!room || room.mode !== "duel" || room.status !== "playing" || !userId) {
@@ -165,7 +275,6 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     void (async () => {
       try {
         if (pc.signalingState !== "stable") {
-          cleanup();
           answerKeyRef.current = "";
           return;
         }
@@ -187,9 +296,12 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
   useEffect(() => cleanup, [cleanup]);
 
   const toggleMic = useCallback(async () => {
+    unlockAudio();
     if (!supported) {
       setState("unsupported");
-      setError("المحادثة الصوتية غير مدعومة في هذا المتصفح.");
+      setError(window.isSecureContext
+        ? "المحادثة الصوتية غير مدعومة في هذا المتصفح."
+        : "الميكروفون يحتاج اتصال HTTPS آمن.");
       return;
     }
     const pc = ensurePeer();
@@ -197,35 +309,34 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
 
     if (micEnabled) {
       await stopLocalMic();
-      void remoteAudioRef.current?.play().catch(() => undefined);
+      const audio = ensureRemoteAudio();
+      void audio?.play().catch(() => undefined);
       return;
     }
 
     try {
       setError("");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: false,
-      });
+      setState("connecting");
+      const stream = await requestMicrophone();
       const track = stream.getAudioTracks()[0];
       if (!track) throw new Error("لم يتم العثور على مسار صوتي.");
+      track.enabled = true;
       localStreamRef.current = stream;
       await senderRef.current?.replaceTrack(track);
-      track.enabled = true;
       setMicEnabled(true);
-      if (pc.connectionState === "connected") setState("connected");
-      else setState("connecting");
-      void remoteAudioRef.current?.play().catch(() => undefined);
+      if (pc.connectionState === "connected" || ["connected", "completed"].includes(pc.iceConnectionState)) setState("connected");
+      const audio = ensureRemoteAudio();
+      if (audio?.srcObject) {
+        await audio.play().catch(() => {
+          setError("اضغط أيقونة المايك مرة أخرى إذا لم تسمع صوت الخصم.");
+        });
+      }
     } catch (voiceError) {
       await stopLocalMic();
       setState("error");
       setError(voiceErrorMessage(voiceError));
     }
-  }, [ensurePeer, micEnabled, stopLocalMic, supported]);
+  }, [ensurePeer, ensureRemoteAudio, micEnabled, stopLocalMic, supported, unlockAudio]);
 
   return {
     supported,
@@ -233,5 +344,6 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     state,
     error,
     toggleMic,
+    unlockAudio,
   };
 }
