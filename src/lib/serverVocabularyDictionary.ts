@@ -4,6 +4,7 @@ import {
   VOCABULARY_BASE_WORDS,
   VOCABULARY_STARTING_WORDS,
   getVocabularyMoves,
+  type VocabularyMove,
   isApprovedVocabularyWord,
   isValidVocabularyShape,
   normalizeVocabularyWord,
@@ -58,6 +59,42 @@ export async function hasVocabularyMoveServer(
     const snapshot = snapshots[index];
     return enabledFromOverride(snapshot?.exists ? snapshot.data() : undefined, isApprovedVocabularyWord(word));
   });
+}
+
+
+export async function getVocabularyMovesServer(
+  currentWord: string,
+  handLetters: readonly string[],
+  transaction?: Transaction,
+): Promise<VocabularyMove[]> {
+  const cleanWord = normalizeVocabularyWord(currentWord);
+  const uniqueLetters = Array.from(new Set(handLetters.map(normalizeVocabularyWord).filter(Boolean)));
+  const candidates: VocabularyMove[] = [];
+
+  for (let position = 0; position < 3; position += 1) {
+    for (const letter of uniqueLetters) {
+      const candidate = replaceVocabularyLetter(cleanWord, position, letter);
+      if (!candidate || !isValidVocabularyShape(candidate)) continue;
+      candidates.push({ word: candidate, position: position as 0 | 1 | 2, letter });
+    }
+  }
+
+  if (!candidates.length) return [];
+
+  const uniqueWords = Array.from(new Set(candidates.map((move) => move.word)));
+  const snapshots = transaction
+    ? await Promise.all(uniqueWords.map((word) => transaction.get(overrideRef(word))))
+    : await adminDb.getAll(...uniqueWords.map((word) => overrideRef(word)));
+  const approved = new Set<string>();
+
+  uniqueWords.forEach((word, index) => {
+    const snapshot = snapshots[index];
+    if (enabledFromOverride(snapshot?.exists ? snapshot.data() : undefined, isApprovedVocabularyWord(word))) {
+      approved.add(word);
+    }
+  });
+
+  return candidates.filter((move) => approved.has(move.word));
 }
 
 export async function randomActiveStartingWord() {

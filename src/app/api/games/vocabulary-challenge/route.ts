@@ -5,10 +5,12 @@ import {
   VOCABULARY_DICTIONARY_VERSION,
   createFairVocabularyLetters,
   drawFairVocabularyLetter,
+  getVocabularyMoves,
   replaceVocabularyLetter,
 } from "@/lib/vocabularyChallengeDictionary";
 import {
   getVocabularyDictionaryOverrides,
+  getVocabularyMovesServer,
   hasVocabularyMoveServer,
   isApprovedVocabularyWordServer,
   randomActiveStartingWord,
@@ -30,6 +32,8 @@ const MATCHMAKING_COLLECTION = "vocabularyChallengeMatchmaking";
 const HAND_SIZE = 10;
 const TURN_DURATION_MS = 10_000;
 const MATCH_DURATION_MS = 5 * 60_000;
+const BOT_ID = "vocabulary-bot";
+const BOT_NAME = "بوت التحدي";
 
 function text(value: unknown) {
   return String(value || "").trim();
@@ -111,9 +115,22 @@ function updatePlayer(room: Record<string, unknown>, userId: string, patch: Reco
 }
 
 function nextPlayerId(room: Record<string, unknown>, currentUserId: string) {
-  if (text(room.mode) !== "duel") return currentUserId;
   const ids = roomPlayerIds(room);
   return ids.find((id) => id !== currentUserId) || currentUserId;
+}
+
+function humanPlayerIds(room: Record<string, unknown>) {
+  return roomPlayerIds(room).filter((id) => id !== BOT_ID);
+}
+
+function timeWinnerId(room: Record<string, unknown>) {
+  const ids = roomPlayerIds(room);
+  if (ids.length !== 2) return null;
+  const [a, b] = ids;
+  const aCount = cardCount(room, a);
+  const bCount = cardCount(room, b);
+  if (aCount === bCount) return null;
+  return aCount < bCount ? a : b;
 }
 
 function resultId(roomId: string, userId: string) {
@@ -165,7 +182,7 @@ function finalizeRoom(params: {
   reason: "cards" | "time" | "forfeit";
   now: number;
 }) {
-  const ids = roomPlayerIds(params.room);
+  const ids = humanPlayerIds(params.room);
   const resultIds: Record<string, string> = {};
 
   for (const userId of ids) {
@@ -215,11 +232,19 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
   const now = Date.now();
   const startingWord = await randomActiveStartingWord();
   const roomRef = adminDb.collection(ROOM_COLLECTION).doc();
-  const cards = createCards(createFairVocabularyLetters(startingWord, HAND_SIZE));
+  const userCards = createCards(createFairVocabularyLetters(startingWord, HAND_SIZE));
   const roomCode = mode === "duel" ? await uniqueRoomCode() : null;
   const startsNow = mode === "solo";
   const matchStartedAt = startsNow ? now : null;
   const matchEndsAt = startsNow ? now + MATCH_DURATION_MS : null;
+  const botCards = startsNow ? createCards(createFairVocabularyLetters(startingWord, HAND_SIZE)) : [];
+
+  const players: Record<string, Record<string, unknown>> = {
+    [userId]: { userId, userName, cardCount: userCards.length, moves: 0, draws: 0 },
+  };
+  if (startsNow) {
+    players[BOT_ID] = { userId: BOT_ID, userName: BOT_NAME, cardCount: botCards.length, moves: 0, draws: 0, isBot: true };
+  }
 
   const room = {
     id: roomRef.id,
@@ -229,12 +254,10 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
     roomCode,
     hostId: userId,
     hostName: userName,
-    guestId: null,
-    guestName: null,
-    playerOrder: [userId],
-    players: {
-      [userId]: { userId, userName, cardCount: cards.length, moves: 0, draws: 0 },
-    },
+    guestId: startsNow ? BOT_ID : null,
+    guestName: startsNow ? BOT_NAME : null,
+    playerOrder: startsNow ? [userId, BOT_ID] : [userId],
+    players,
     startingWord,
     currentWord: startingWord,
     turnPlayerId: startsNow ? userId : null,
@@ -251,13 +274,18 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
     resultIds: {},
     rematchRequestedBy: null,
     rematchRoomId: null,
+    voiceSessionId: null,
+    voiceOffer: null,
+    voiceAnswer: null,
+    voiceUpdatedAt: null,
     createdAt: now,
     updatedAt: now,
   };
 
   const batch = adminDb.batch();
   batch.set(roomRef, room);
-  batch.set(roomRef.collection("hands").doc(userId), { userId, cards, updatedAt: now });
+  batch.set(roomRef.collection("hands").doc(userId), { userId, cards: userCards, updatedAt: now });
+  if (startsNow) batch.set(roomRef.collection("hands").doc(BOT_ID), { userId: BOT_ID, cards: botCards, updatedAt: now });
   await batch.commit();
 
   return { roomId: roomRef.id, roomCode, status: room.status };
@@ -307,6 +335,10 @@ function startedDuelRoomData(params: {
     resultIds: {},
     rematchRequestedBy: null,
     rematchRoomId: null,
+    voiceSessionId: null,
+    voiceOffer: null,
+    voiceAnswer: null,
+    voiceUpdatedAt: null,
     createdAt: params.now,
     updatedAt: params.now,
   };
@@ -533,14 +565,7 @@ async function makeMove(userId: string, roomId: string, cardId: string, rawPosit
     if (text(room.status) !== "playing") throw new Error("GAME_NOT_PLAYING");
 
     if (number(room.matchEndsAt) && now >= number(room.matchEndsAt)) {
-      const ids = roomPlayerIds(room);
-      let winnerId: string | null = null;
-      if (text(room.mode) === "duel" && ids.length === 2) {
-        const [a, b] = ids;
-        const aCount = cardCount(room, a);
-        const bCount = cardCount(room, b);
-        if (aCount !== bCount) winnerId = aCount < bCount ? a : b;
-      }
+      const winnerId = timeWinnerId(room);
       const resultIds = finalizeRoom({ transaction, roomRef, roomId, room, winnerId, reason: "time", now });
       return { finished: true, resultIds };
     }
@@ -625,6 +650,188 @@ async function makeMove(userId: string, roomId: string, cardId: string, rawPosit
   return result;
 }
 
+
+function botMoveScore(currentWord: string, candidateWord: string) {
+  // The bot never reads the human hand. It only prefers words with fewer onward
+  // paths, which makes it strategic without giving it hidden information.
+  const onwardMoves = getVocabularyMoves(candidateWord).filter((move) => move.word !== candidateWord).length;
+  const unchangedPenalty = candidateWord === currentWord ? 30 : 0;
+  return onwardMoves + unchangedPenalty + Math.random() * 2.5;
+}
+
+async function playBotTurn(userId: string, roomId: string) {
+  if (!roomId) throw new Error("ROOM_NOT_FOUND");
+  const roomRef = adminDb.collection(ROOM_COLLECTION).doc(roomId);
+  const botHandRef = roomRef.collection("hands").doc(BOT_ID);
+  const now = Date.now();
+
+  const result = await adminDb.runTransaction(async (transaction: Transaction) => {
+    const [roomSnap, botHandSnap] = await Promise.all([transaction.get(roomRef), transaction.get(botHandRef)]);
+    if (!roomSnap.exists || !botHandSnap.exists) throw new Error("ROOM_NOT_FOUND");
+    const room = roomSnap.data() || {};
+    if (!participant(room, userId)) throw new Error("FORBIDDEN");
+    if (text(room.mode) !== "solo") throw new Error("BOT_ONLY_SOLO");
+    if (text(room.status) !== "playing") throw new Error("GAME_NOT_PLAYING");
+    if (text(room.turnPlayerId) !== BOT_ID) return { noop: true };
+
+    if (number(room.matchEndsAt) && now >= number(room.matchEndsAt)) {
+      const winnerId = timeWinnerId(room);
+      const resultIds = finalizeRoom({ transaction, roomRef, roomId, room, winnerId, reason: "time", now });
+      return { finished: true, resultIds };
+    }
+
+    const handData = botHandSnap.data() || {};
+    const cards = Array.isArray(handData.cards) ? (handData.cards as VocabularyChallengeCard[]) : [];
+    const beforeWord = text(room.currentWord);
+    const legalMoves = await getVocabularyMovesServer(beforeWord, cards.map((card) => text(card.letter)), transaction);
+
+    if (!legalMoves.length) {
+      const newCard = createCards([drawFairVocabularyLetter(beforeWord, cards.map((card) => text(card.letter)))])[0];
+      const nextCards = [...cards, newCard];
+      const existingPlayers = room.players && typeof room.players === "object"
+        ? room.players as Record<string, Record<string, unknown>>
+        : {};
+      const currentSummary = existingPlayers[BOT_ID] || {};
+      const players = updatePlayer(room, BOT_ID, {
+        cardCount: nextCards.length,
+        draws: Math.max(0, Math.floor(number(currentSummary.draws))) + 1,
+        isBot: true,
+      });
+      const matchEndsAt = number(room.matchEndsAt);
+
+      transaction.set(botHandRef, { userId: BOT_ID, cards: nextCards, updatedAt: now }, { merge: true });
+      transaction.update(roomRef, {
+        players,
+        turnPlayerId: text(room.hostId),
+        turnStartedAt: now,
+        turnEndsAt: matchEndsAt ? Math.min(now + TURN_DURATION_MS, matchEndsAt) : now + TURN_DURATION_MS,
+        updatedAt: now,
+      });
+      return { botDrew: true };
+    }
+
+    const strategicMoves = [...legalMoves].sort((a, b) => botMoveScore(beforeWord, a.word) - botMoveScore(beforeWord, b.word));
+    const shortlist = strategicMoves.slice(0, Math.min(4, strategicMoves.length));
+    const chosen = shortlist[Math.floor(Math.random() * shortlist.length)] || strategicMoves[0];
+    const cardIndex = cards.findIndex((card) => text(card.letter) === chosen.letter);
+    if (cardIndex < 0) throw new Error("CARD_NOT_FOUND");
+    const playedCard = cards[cardIndex];
+    const nextCards = cards.filter((_, index) => index !== cardIndex);
+    const existingPlayers = room.players && typeof room.players === "object"
+      ? room.players as Record<string, Record<string, unknown>>
+      : {};
+    const currentSummary = existingPlayers[BOT_ID] || {};
+    const players = updatePlayer(room, BOT_ID, {
+      cardCount: nextCards.length,
+      moves: Math.max(0, Math.floor(number(currentSummary.moves))) + 1,
+      isBot: true,
+    });
+    const move = {
+      actorId: BOT_ID,
+      actorName: BOT_NAME,
+      beforeWord,
+      afterWord: chosen.word,
+      letter: text(playedCard.letter),
+      position: chosen.position,
+      at: now,
+    };
+    const previousMoves = Array.isArray(room.recentMoves) ? room.recentMoves.slice(-7) : [];
+    const recentMoves = [...previousMoves, move];
+    const nextRoom = { ...room, players, currentWord: chosen.word, lastMove: move, recentMoves };
+
+    transaction.set(botHandRef, { userId: BOT_ID, cards: nextCards, updatedAt: now }, { merge: true });
+
+    if (nextCards.length === 0) {
+      const resultIds = finalizeRoom({
+        transaction,
+        roomRef,
+        roomId,
+        room: nextRoom,
+        winnerId: BOT_ID,
+        reason: "cards",
+        now,
+      });
+      transaction.update(roomRef, {
+        players,
+        currentWord: chosen.word,
+        lastMove: move,
+        recentMoves,
+      });
+      return { finished: true, botWord: chosen.word, resultIds };
+    }
+
+    const matchEndsAt = number(room.matchEndsAt);
+    transaction.update(roomRef, {
+      players,
+      currentWord: chosen.word,
+      turnPlayerId: text(room.hostId),
+      turnStartedAt: now,
+      turnEndsAt: matchEndsAt ? Math.min(now + TURN_DURATION_MS, matchEndsAt) : now + TURN_DURATION_MS,
+      lastMove: move,
+      recentMoves,
+      updatedAt: now,
+    });
+    return { botWord: chosen.word };
+  });
+
+  if ("finished" in result && result.finished) await syncFinishedResults(result.resultIds);
+  return result;
+}
+
+async function updateVoiceSignal(
+  userId: string,
+  roomId: string,
+  kind: "offer" | "answer" | "reset",
+  sessionId: string,
+  rawSdp?: string,
+) {
+  if (!roomId) throw new Error("ROOM_NOT_FOUND");
+  const cleanSessionId = text(sessionId).slice(0, 160);
+  const sdp = String(rawSdp || "");
+  if (kind !== "reset" && (!cleanSessionId || !sdp || sdp.length > 28_000 || !sdp.includes("v=0"))) {
+    throw new Error("INVALID_VOICE_SIGNAL");
+  }
+
+  const roomRef = adminDb.collection(ROOM_COLLECTION).doc(roomId);
+  const now = Date.now();
+  return adminDb.runTransaction(async (transaction: Transaction) => {
+    const roomSnap = await transaction.get(roomRef);
+    if (!roomSnap.exists) throw new Error("ROOM_NOT_FOUND");
+    const room = roomSnap.data() || {};
+    if (!participant(room, userId)) throw new Error("FORBIDDEN");
+    if (text(room.mode) !== "duel" || text(room.status) !== "playing") throw new Error("VOICE_NOT_AVAILABLE");
+
+    if (kind === "reset") {
+      transaction.update(roomRef, {
+        voiceSessionId: null,
+        voiceOffer: null,
+        voiceAnswer: null,
+        voiceUpdatedAt: now,
+      });
+      return { voiceUpdated: true };
+    }
+
+    if (kind === "offer") {
+      if (text(room.hostId) !== userId) throw new Error("VOICE_HOST_ONLY");
+      transaction.update(roomRef, {
+        voiceSessionId: cleanSessionId,
+        voiceOffer: { sessionId: cleanSessionId, fromUserId: userId, sdp, at: now },
+        voiceAnswer: null,
+        voiceUpdatedAt: now,
+      });
+      return { voiceUpdated: true };
+    }
+
+    if (text(room.guestId) !== userId) throw new Error("VOICE_GUEST_ONLY");
+    if (text(room.voiceSessionId) !== cleanSessionId) throw new Error("VOICE_SESSION_CHANGED");
+    transaction.update(roomRef, {
+      voiceAnswer: { sessionId: cleanSessionId, fromUserId: userId, sdp, at: now },
+      voiceUpdatedAt: now,
+    });
+    return { voiceUpdated: true };
+  });
+}
+
 async function drawCard(userId: string, roomId: string) {
   if (!roomId) throw new Error("ROOM_NOT_FOUND");
   const roomRef = adminDb.collection(ROOM_COLLECTION).doc(roomId);
@@ -686,14 +893,7 @@ async function handleTimeout(userId: string, roomId: string) {
 
     const matchEndsAt = number(room.matchEndsAt);
     if (matchEndsAt && now >= matchEndsAt) {
-      const ids = roomPlayerIds(room);
-      let winnerId: string | null = null;
-      if (text(room.mode) === "duel" && ids.length === 2) {
-        const [a, b] = ids;
-        const aCount = cardCount(room, a);
-        const bCount = cardCount(room, b);
-        if (aCount !== bCount) winnerId = aCount < bCount ? a : b;
-      }
+      const winnerId = timeWinnerId(room);
       const resultIds = finalizeRoom({ transaction, roomRef, roomId, room, winnerId, reason: "time", now });
       return { finished: true, resultIds };
     }
@@ -1012,6 +1212,12 @@ function errorResponse(error: unknown) {
     REMATCH_CHANGED: "تغيرت حالة طلب الإعادة. حاول مرة أخرى.",
     MATCH_CHANGED: "تم حجز الخصم قبل لحظات. جاري البحث عن منافس آخر.",
     ROOM_CODE_FAILED: "تعذر إنشاء كود الغرفة. حاول مرة أخرى.",
+    BOT_ONLY_SOLO: "دور البوت متاح فقط في اللعب الفردي.",
+    VOICE_NOT_AVAILABLE: "المحادثة الصوتية متاحة فقط أثناء مباراة لاعب ضد لاعب.",
+    VOICE_HOST_ONLY: "جاري إعادة تجهيز الاتصال الصوتي.",
+    VOICE_GUEST_ONLY: "جاري إعادة تجهيز الاتصال الصوتي.",
+    VOICE_SESSION_CHANGED: "تغير الاتصال الصوتي. جاري إعادة المحاولة.",
+    INVALID_VOICE_SIGNAL: "تعذر تجهيز الاتصال الصوتي.",
   };
 
   const status = code === "UNAUTHORIZED" ? 401
@@ -1056,6 +1262,12 @@ export async function POST(request: NextRequest) {
     }
     if (body.action === "cancelMatchmaking") {
       return NextResponse.json(await cancelMatchmaking(member.userId));
+    }
+    if (body.action === "botTurn") {
+      return NextResponse.json(await playBotTurn(member.userId, text(body.roomId)));
+    }
+    if (body.action === "voiceSignal") {
+      return NextResponse.json(await updateVoiceSignal(member.userId, text(body.roomId), body.kind, text(body.sessionId), body.sdp));
     }
 
     throw new Error("INVALID_MOVE");

@@ -9,6 +9,7 @@ export type VocabularyChallengePlayerSummary = {
   cardCount: number;
   moves: number;
   draws: number;
+  isBot?: boolean;
 };
 
 export type VocabularyChallengeMove = {
@@ -22,6 +23,14 @@ export type VocabularyChallengeMove = {
 };
 
 export type VocabularyChallengeLastMove = VocabularyChallengeMove | null;
+
+
+export type VocabularyVoiceDescription = {
+  sessionId: string;
+  fromUserId: string;
+  sdp: string;
+  at: number;
+};
 
 export type VocabularyChallengeRoom = {
   id: string;
@@ -51,6 +60,10 @@ export type VocabularyChallengeRoom = {
   resultIds: Record<string, string>;
   rematchRequestedBy?: string | null;
   rematchRoomId?: string | null;
+  voiceSessionId?: string | null;
+  voiceOffer?: VocabularyVoiceDescription | null;
+  voiceAnswer?: VocabularyVoiceDescription | null;
+  voiceUpdatedAt?: number | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -131,4 +144,6 @@ export type VocabularyChallengeAction =
   | { action: "forfeit"; roomId: string }
   | { action: "rematch"; roomId: string }
   | { action: "matchmake" }
-  | { action: "cancelMatchmaking" };
+  | { action: "cancelMatchmaking" }
+  | { action: "botTurn"; roomId: string }
+  | { action: "voiceSignal"; roomId: string; kind: "offer" | "answer" | "reset"; sessionId: string; sdp?: string };

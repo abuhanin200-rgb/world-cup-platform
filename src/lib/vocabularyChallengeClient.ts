@@ -111,6 +111,20 @@ export function cancelVocabularyMatchmaking() {
   return actionRequest({ action: "cancelMatchmaking" });
 }
 
+
+export function playVocabularyBotTurn(roomId: string) {
+  return actionRequest({ action: "botTurn", roomId });
+}
+
+export function sendVocabularyVoiceSignal(
+  roomId: string,
+  kind: "offer" | "answer" | "reset",
+  sessionId: string,
+  sdp?: string,
+) {
+  return actionRequest({ action: "voiceSignal", roomId, kind, sessionId, sdp });
+}
+
 export async function getVocabularyLeaderboard(period: VocabularyLeaderboardPeriod = "daily"): Promise<VocabularyLeaderboard> {
   const response = await fetch(`/api/games/vocabulary-challenge?view=leaderboard&period=${period}`, {
     method: "GET",
