@@ -44,7 +44,7 @@ const EMPTY_V2: V2Stats = { points: 0, rank: null, played: 0, exact: 0, correctO
 function Stat({ label, value, accent = false }: { label: string; value: string | number; accent?: boolean }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3 text-center md:p-4">
-      <div dir="ltr" className={`text-xl font-black md:text-2xl ${accent ? "text-[var(--brand-yellow)]" : "text-white"}`}>{value}</div>
+      <div dir="ltr" className={`text-lg font-black md:text-xl ${accent ? "text-[var(--brand-yellow)]" : "text-white"}`}>{value}</div>
       <div className="mt-1 text-[9px] font-bold text-white/38 md:text-[10px]">{label}</div>
     </div>
   );
@@ -54,7 +54,7 @@ function SectionIntro({ eyebrow, title, text }: { eyebrow: string; title: string
   return (
     <div className="mb-4">
       <p className="text-[10px] font-black text-[var(--brand-yellow)]">{eyebrow}</p>
-      <h2 className="mt-1 text-xl font-black md:text-2xl">{title}</h2>
+      <h2 className="mt-1 text-lg font-black md:text-xl">{title}</h2>
       <p className="mt-1 text-xs font-semibold text-white/42">{text}</p>
     </div>
   );
@@ -175,7 +175,7 @@ export default function AccountPage() {
           <div className="grid h-16 w-16 shrink-0 place-items-center rounded-[20px] border border-white/12 bg-white/[0.06] text-2xl font-black text-[var(--brand-yellow)] md:h-20 md:w-20 md:rounded-[24px]">{user.fullName.trim().charAt(0)}</div>
           <div className="min-w-0 flex-1">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--brand-yellow)]/18 bg-[var(--brand-yellow)]/[0.06] px-2.5 py-1.5 text-[9px] font-black text-[var(--brand-yellow)]"><Sparkles className="h-3 w-3" /> ملف العضو</div>
-            <h1 className="mt-2 truncate text-2xl font-black md:text-3xl">{user.fullName}</h1>
+            <h1 className="mt-2 truncate text-xl font-black md:text-2xl">{user.fullName}</h1>
             <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold text-white/45 md:text-xs">{user.favoriteTeam ? <><TeamFlag name={user.favoriteTeam} size="sm" /><span>يشجع {user.favoriteTeam}</span></> : <span>عضو في منصة التحدي</span>}</div>
           </div>
           <button type="button" onClick={handleLogout} className="hidden min-h-[44px] items-center gap-1.5 rounded-xl border border-red-300/15 bg-red-400/[0.06] px-3 text-xs font-black text-red-100 transition hover:bg-red-400/[0.12] sm:inline-flex"><LogOut className="h-4 w-4" /> خروج</button>
@@ -196,7 +196,7 @@ export default function AccountPage() {
             <SectionIntro eyebrow="ملخصك" title="كل أرقامك في مكان واحد" text="نظرة سريعة على البطولات والألعاب من حساب واحد." />
             <div className="grid grid-cols-5 gap-1.5 md:gap-2.5">
               <Stat label="نقاط البطولات" value={general.points} accent />
-              <Stat label="المشاركات" value={general.played} />
+              <Stat label="التوقعات" value={general.played} />
               <Stat label="الصحيح" value={general.exact} />
               <Stat label="أفضل سلسلة" value={general.bestMath} />
               <Stat label="XP الألعاب" value={general.gameXp} />
@@ -228,7 +228,7 @@ export default function AccountPage() {
         {tab === "gulf" ? (
           <div className="altahaddi-glass rounded-[26px] p-4 md:p-6">
             <SectionIntro eyebrow="خليجي 27" title="أرقامك في البطولة" text="إحصائيات مستقلة عن بقية البطولات والألعاب." />
-            <div className="grid grid-cols-3 gap-2 md:grid-cols-6"><Stat label="المركز" value={gulf.rank || "—"} accent /><Stat label="النقاط" value={gulf.points} /><Stat label="المباريات" value={gulf.played} /><Stat label="بالملي" value={gulf.exact} /><Stat label="صحيح" value={gulf.correctOutcome} /><Stat label="أفضل سلسلة" value={gulf.bestStreak} /></div>
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-6"><Stat label="المركز" value={gulf.rank || "—"} accent /><Stat label="النقاط" value={gulf.points} /><Stat label="التوقعات" value={gulf.played} /><Stat label="بالملي" value={gulf.exact} /><Stat label="صحيح" value={gulf.correctOutcome} /><Stat label="أفضل سلسلة" value={gulf.bestStreak} /></div>
             <Link href="/tournaments/gulf-cup-27" className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--brand-yellow)] px-4 text-xs font-black text-[#061a4d]">دخول البطولة <ArrowLeft className="h-4 w-4" /></Link>
           </div>
         ) : null}
@@ -247,7 +247,7 @@ export default function AccountPage() {
 
         {tab === "games" ? (
           <div className="altahaddi-glass rounded-[26px] p-4 md:p-6">
-            <SectionIntro eyebrow="الألعاب والتحديات" title="مستواك في اللعب" text="XP منفصل تمامًا عن نقاط البطولات." />
+            <SectionIntro eyebrow="الألعاب والتحديات" title="مستواك في الألعاب" text="XP منفصل تمامًا عن نقاط البطولات." />
             <div className="grid grid-cols-5 gap-1.5 md:gap-2.5"><Stat label="XP" value={games?.totalXp || 0} accent /><Stat label="المستوى" value={games?.level || 1} /><Stat label="التحديات" value={games?.gamesPlayed || 0} /><Stat label="الفوز" value={games?.wins || 0} /><Stat label="التصنيف" value={getLevelLabel(games?.level || 1)} /></div>
             <Link href="/games" className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--brand-yellow)] px-4 text-xs font-black text-[#061a4d]">فتح الألعاب <Gamepad2 className="h-4 w-4" /></Link>
           </div>

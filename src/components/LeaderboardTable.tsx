@@ -2724,7 +2724,7 @@ export default function LeaderboardTable() {
         <div className="pointer-events-none absolute -left-24 bottom-14 h-56 w-56 rounded-full bg-cyan-300/10 blur-2xl" />
         <div className="relative">
         <div className="mb-4 text-center md:mb-6">
-          <h2 className="text-[24px] font-black md:text-3xl">لوحة الصدارة</h2>
+          <h2 className="text-[22px] font-black md:text-3xl">لوحة الصدارة</h2>
 
           <p className="mt-2 text-xs leading-6 text-slate-300 md:text-sm">
             ترتيب جميع الأعضاء حسب النقاط ثم عدد التوقعات الصحيحة

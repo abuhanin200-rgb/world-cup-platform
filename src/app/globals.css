@@ -169,44 +169,44 @@ body {
   --brand-white: #ffffff;
 }
 
-/* A shared type scale keeps public Arabic content compact and readable. */
+/* A restrained Arabic type scale for a denser, more consistent sports UI. */
 .altahaddi-eyebrow {
-  font-size: clamp(0.6875rem, 0.2vw + 0.64rem, 0.75rem);
-  line-height: 1.45;
+  font-size: clamp(0.6875rem, 0.12vw + 0.66rem, 0.75rem);
+  line-height: 1.5;
 }
 
 .altahaddi-display-title {
-  font-size: clamp(2rem, 4.2vw + 0.55rem, 3.5rem);
-  line-height: 1.28;
-  letter-spacing: -0.028em;
+  font-size: clamp(1.75rem, 2.8vw + 0.7rem, 3rem);
+  line-height: 1.34;
+  letter-spacing: 0;
 }
 
 .altahaddi-page-title {
-  font-size: clamp(1.625rem, 2.3vw + 0.72rem, 2.75rem);
-  line-height: 1.32;
-  letter-spacing: -0.022em;
+  font-size: clamp(1.45rem, 1.8vw + 0.78rem, 2.25rem);
+  line-height: 1.38;
+  letter-spacing: 0;
 }
 
 .altahaddi-feature-title {
-  font-size: clamp(1.375rem, 1.45vw + 0.82rem, 2.25rem);
-  line-height: 1.34;
-  letter-spacing: -0.018em;
+  font-size: clamp(1.2rem, 1vw + 0.82rem, 1.8rem);
+  line-height: 1.42;
+  letter-spacing: 0;
 }
 
 .altahaddi-section-title {
-  font-size: clamp(1.1875rem, 0.72vw + 0.96rem, 1.625rem);
-  line-height: 1.42;
-  letter-spacing: -0.012em;
+  font-size: clamp(1.05rem, 0.5vw + 0.92rem, 1.4rem);
+  line-height: 1.48;
+  letter-spacing: 0;
 }
 
 .altahaddi-card-title {
-  font-size: clamp(1.0625rem, 0.4vw + 0.94rem, 1.25rem);
-  line-height: 1.48;
+  font-size: clamp(0.98rem, 0.28vw + 0.91rem, 1.125rem);
+  line-height: 1.52;
 }
 
 .altahaddi-body-copy {
-  font-size: clamp(0.875rem, 0.25vw + 0.8125rem, 1rem);
-  line-height: 1.75;
+  font-size: clamp(0.8125rem, 0.18vw + 0.775rem, 0.95rem);
+  line-height: 1.85;
 }
 
 ::selection { background: rgba(255,194,16,.28); color: #fff; }
@@ -575,3 +575,85 @@ body {
     backdrop-filter: blur(18px) saturate(128%);
   }
 }
+
+/* =========================================================
+   Public typography normalization V5
+   Keeps headings strong while reducing visual weight on body copy.
+   Admin UI is intentionally excluded.
+   ========================================================= */
+.altahaddi-public-shell {
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+}
+
+.altahaddi-public-shell .font-black,
+.altahaddi-public-shell .font-extrabold {
+  font-weight: 700 !important;
+}
+
+.altahaddi-public-shell .font-bold {
+  font-weight: 500 !important;
+}
+
+.altahaddi-public-shell .font-semibold {
+  font-weight: 400 !important;
+}
+
+.altahaddi-public-shell :where(h1, h2, h3, h4) {
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  text-wrap: balance;
+}
+
+.altahaddi-public-shell :where(p) {
+  font-weight: 400 !important;
+  text-wrap: pretty;
+}
+
+.altahaddi-public-shell button[class*="font-"],
+.altahaddi-public-shell nav a[class*="font-"] {
+  font-weight: 600 !important;
+}
+
+.altahaddi-public-shell p.font-black {
+  font-weight: 600 !important;
+}
+
+.altahaddi-public-shell :where(dt, small, label) {
+  font-weight: 400;
+}
+
+.altahaddi-public-shell :where(dd, [dir="ltr"].tabular-nums) {
+  font-weight: 700;
+}
+
+.altahaddi-public-shell .altahaddi-eyebrow {
+  font-weight: 600 !important;
+}
+
+@media (max-width: 767px) {
+  .altahaddi-public-shell :where(h1) {
+    line-height: 1.34;
+  }
+
+  .altahaddi-public-shell :where(h2) {
+    line-height: 1.42;
+  }
+
+  .altahaddi-public-shell :where(h3, h4) {
+    line-height: 1.48;
+  }
+
+  .altahaddi-public-shell :where(p) {
+    line-height: 1.8;
+  }
+}
+
+@media (max-width: 380px) {
+  .altahaddi-display-title { font-size: 1.625rem; }
+  .altahaddi-page-title { font-size: 1.35rem; }
+  .altahaddi-feature-title { font-size: 1.125rem; }
+  .altahaddi-section-title { font-size: 1rem; }
+  .altahaddi-body-copy { font-size: 0.8rem; }
+}
+

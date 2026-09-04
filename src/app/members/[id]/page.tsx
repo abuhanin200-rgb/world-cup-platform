@@ -50,7 +50,7 @@ type MemberProfile = {
 function SmallStat({ label, value, accent = false }: { label: string; value: string | number; accent?: boolean }) {
   return (
     <div className="altahaddi-glass-soft rounded-2xl p-3 text-center">
-      <div dir="ltr" className={`text-lg font-black md:text-xl ${accent ? "text-[var(--brand-yellow)]" : "text-white"}`}>{value}</div>
+      <div dir="ltr" className={`text-base font-black md:text-lg ${accent ? "text-[var(--brand-yellow)]" : "text-white"}`}>{value}</div>
       <div className="mt-1 text-[9px] font-bold text-white/40">{label}</div>
     </div>
   );
@@ -95,7 +95,7 @@ export default function PublicMemberProfilePage() {
           <div className="grid h-16 w-16 shrink-0 place-items-center rounded-[22px] border border-white/14 bg-white/[0.07] text-2xl font-black text-[var(--brand-yellow)] md:h-20 md:w-20">{member.fullName.charAt(0)}</div>
           <div className="min-w-0 flex-1">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.07] px-2.5 py-1.5 text-[9px] font-black text-[var(--brand-yellow)]"><Sparkles className="h-3 w-3" /> ملف عضو التحدي</div>
-            <h1 className="mt-2 truncate text-2xl font-black md:text-4xl">{member.fullName}</h1>
+            <h1 className="mt-2 truncate text-xl font-black md:text-3xl">{member.fullName}</h1>
             <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/15 px-3 py-1.5 text-[11px] font-bold text-white/65">
               {member.favoriteTeam ? <TeamFlag name={member.favoriteTeam} size="sm" /> : <Flag className="h-3.5 w-3.5 text-white/35" />}
               <span>{member.favoriteTeam ? `يشجع ${member.favoriteTeam}` : "لم يحدد منتخبًا مفضلًا"}</span>
@@ -107,20 +107,20 @@ export default function PublicMemberProfilePage() {
 
       <section className="mt-4 grid grid-cols-4 gap-1.5 md:gap-3">
         <SmallStat label="نقاط البطولات" value={summary.tournamentPoints} accent />
-        <SmallStat label="المشاركات" value={summary.tournamentPlayed} />
+        <SmallStat label="التوقعات" value={summary.tournamentPlayed} />
         <SmallStat label="بالملي" value={summary.tournamentExact} />
         <SmallStat label="XP الألعاب" value={summary.gameXp} />
       </section>
 
       <section className="mt-7">
-        <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black text-[var(--brand-yellow)]">مسيرته في البطولات</p><h2 className="mt-1 text-2xl font-black">كل البطولات</h2></div><Trophy className="h-6 w-6 text-[var(--brand-yellow)]" /></div>
+        <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[10px] font-black text-[var(--brand-yellow)]">مسيرته في البطولات</p><h2 className="mt-1 text-xl font-black md:text-2xl">كل البطولات</h2></div><Trophy className="h-6 w-6 text-[var(--brand-yellow)]" /></div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {tournaments.map((item) => (
             <article key={item.id} className="altahaddi-glass relative overflow-hidden rounded-[26px] p-4 md:p-5">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_0%,rgba(255,194,16,.08),transparent_30%)]" />
               <div className="relative">
                 <div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-black text-white/35">{item.legacy ? "سجل تاريخي" : item.status === "upcoming" ? "قريبًا" : "بطولة"}</p><h3 className="mt-1 text-lg font-black">{item.name}</h3></div><div className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.05]"><Medal className="h-5 w-5 text-[var(--brand-yellow)]" /></div></div>
-                <div className="mt-4 grid grid-cols-3 gap-1.5"><SmallStat label="المركز" value={item.rank || "—"} accent /><SmallStat label="النقاط" value={item.points} /><SmallStat label="لعب" value={item.played} /></div>
+                <div className="mt-4 grid grid-cols-3 gap-1.5"><SmallStat label="المركز" value={item.rank || "—"} accent /><SmallStat label="النقاط" value={item.points} /><SmallStat label="التوقعات" value={item.played} /></div>
                 <div className="mt-1.5 grid grid-cols-3 gap-1.5"><SmallStat label="بالملي" value={item.exact} /><SmallStat label="صحيح" value={item.correct} /><SmallStat label="سلسلة" value={item.bestStreak} /></div>
                 {item.slug ? <Link href={`/tournaments/${item.slug}/leaderboard`} className="mt-4 inline-flex min-h-[42px] items-center gap-2 text-[10px] font-black text-[var(--brand-yellow)]">فتح ترتيب البطولة <ArrowLeft className="h-3.5 w-3.5" /></Link> : null}
               </div>
@@ -130,11 +130,11 @@ export default function PublicMemberProfilePage() {
       </section>
 
       <section className="mt-7 altahaddi-glass-strong rounded-[30px] p-4 md:p-6">
-        <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-black text-[var(--brand-yellow)]">الألعاب والتحديات</p><h2 className="mt-1 text-2xl font-black">تقدمه في الألعاب</h2></div><Gamepad2 className="h-6 w-6 text-[var(--brand-yellow)]" /></div>
+        <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-black text-[var(--brand-yellow)]">الألعاب والتحديات</p><h2 className="mt-1 text-xl font-black md:text-2xl">تقدمه في الألعاب</h2></div><Gamepad2 className="h-6 w-6 text-[var(--brand-yellow)]" /></div>
         <div className="mt-4 grid grid-cols-4 gap-1.5 md:gap-3"><SmallStat label="XP" value={games.totalXp} accent /><SmallStat label="المستوى" value={games.level} /><SmallStat label="التحديات" value={games.gamesPlayed} /><SmallStat label="الفوز" value={games.wins} /></div>
         <div className="mt-3 grid gap-2 md:grid-cols-3">
           {games.breakdown.map((game) => (
-            <div key={game.gameId} className="altahaddi-glass-soft rounded-[22px] p-4"><div className="flex items-center justify-between gap-2"><h3 className="font-black">{GAME_LABELS[game.gameId] || "لعبة"}</h3><Award className="h-4 w-4 text-[var(--brand-yellow)]" /></div><div className="mt-3 grid grid-cols-3 gap-1.5"><SmallStat label="لعب" value={game.played} /><SmallStat label="فوز" value={game.wins} /><SmallStat label="XP" value={game.xp} accent /></div></div>
+            <div key={game.gameId} className="altahaddi-glass-soft rounded-[22px] p-4"><div className="flex items-center justify-between gap-2"><h3 className="font-black">{GAME_LABELS[game.gameId] || "لعبة"}</h3><Award className="h-4 w-4 text-[var(--brand-yellow)]" /></div><div className="mt-3 grid grid-cols-3 gap-1.5"><SmallStat label="جولات" value={game.played} /><SmallStat label="فوز" value={game.wins} /><SmallStat label="XP" value={game.xp} accent /></div></div>
           ))}
         </div>
         <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-[10px] font-bold text-white/45"><Target className="h-3.5 w-3.5 text-[var(--brand-yellow)]" /> {getLevelLabel(games.level)}</div>

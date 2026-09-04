@@ -53,7 +53,7 @@ export default function PlatformChrome({ children }: { children: React.ReactNode
   }
 
   return (
-    <div className="altahaddi-glass-world min-h-screen bg-[var(--brand-navy-950)] text-white">
+    <div className="altahaddi-public-shell altahaddi-glass-world min-h-screen bg-[var(--brand-navy-950)] text-white">
       <TournamentAutomationHeartbeat />
       <NetworkStatusBanner />
       <header className="sticky top-0 z-[70] border-b border-white/[0.09] bg-[#04133a]/58 pt-[env(safe-area-inset-top)] backdrop-blur-2xl">
