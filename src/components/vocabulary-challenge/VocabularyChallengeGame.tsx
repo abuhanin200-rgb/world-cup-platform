@@ -12,6 +12,7 @@ import {
   Copy,
   Crown,
   DoorOpen,
+  Flag,
   Gamepad2,
   Hand,
   Hash,
@@ -33,6 +34,7 @@ import {
   UserCircle2,
   UserRound,
   UsersRound,
+  WifiOff,
   XCircle,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -43,6 +45,7 @@ import {
   cancelVocabularyMatchmaking,
   createVocabularyChallenge,
   drawVocabularyCard,
+  getVocabularyActiveRoom,
   getVocabularyDictionaryOverrides,
   getVocabularyLeaderboard,
   matchmakeVocabularyChallenge,
@@ -51,6 +54,7 @@ import {
   playVocabularyBotTurn,
   playVocabularyCard,
   processVocabularyTimeout,
+  reportVocabularyWord,
   requestVocabularyRematch,
 } from "@/lib/vocabularyChallengeClient";
 import { playVocabularySound, prepareVocabularyAudio } from "@/lib/vocabularyChallengeAudio";
@@ -58,6 +62,7 @@ import { useVocabularyVoiceChat } from "@/lib/useVocabularyVoiceChat";
 import { syncPlatformGameXp as syncPlatformGameXpClient } from "@/lib/platformGameXpClient";
 import { hasVocabularyMoveWithOverrides } from "@/lib/vocabularyChallengeDictionary";
 import type {
+  VocabularyBotDifficulty,
   VocabularyChallengeCard,
   VocabularyChallengeHand,
   VocabularyChallengePlayerSummary,
@@ -340,6 +345,9 @@ export default function VocabularyChallengeGame() {
   const [leaderboardError, setLeaderboardError] = useState("");
   const [dictionaryOverrides, setDictionaryOverrides] = useState<VocabularyDictionaryClientOverrides>({ enabledWords: [], disabledWords: [] });
   const [matchmaking, setMatchmaking] = useState(false);
+  const [botDifficulty, setBotDifficulty] = useState<VocabularyBotDifficulty>("normal");
+  const [restoringRoom, setRestoringRoom] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<"success" | "error" | "info">("info");
   const [now, setNow] = useState(Date.now());
@@ -349,9 +357,35 @@ export default function VocabularyChallengeGame() {
   const turnSoundKeyRef = useRef("");
   const countdownSoundKeyRef = useRef("");
   const resultSoundKeyRef = useRef("");
+  const lastMoveSoundKeyRef = useRef("");
   const botTurnKeyRef = useRef("");
   const gameArenaRef = useRef<HTMLElement | null>(null);
   const voiceChat = useVocabularyVoiceChat(room, user?.id);
+
+  useEffect(() => {
+    const update = () => setIsOnline(typeof navigator === "undefined" ? true : navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn || !user?.id) { setRestoringRoom(false); return; }
+    let cancelled = false;
+    setRestoringRoom(true);
+    void getVocabularyActiveRoom()
+      .then((active) => {
+        if (cancelled || roomId || !active.roomId) return;
+        setRoomId(active.roomId);
+        setMessageKind("info");
+        setMessage(active.status === "waiting" ? "تم استعادة الغرفة التي كنت تنتظر فيها." : "تم استعادة مباراتك الحالية.");
+      })
+      .catch((error) => console.warn("Vocabulary active room recovery failed:", error))
+      .finally(() => { if (!cancelled) setRestoringRoom(false); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, user?.id]);
 
   async function refreshLeaderboard(period = leaderboardPeriod) {
     if (!isLoggedIn || !user) return;
@@ -480,15 +514,16 @@ export default function VocabularyChallengeGame() {
 
   useEffect(() => {
     if (!room || room.status !== "playing" || !user?.id || room.turnPlayerId !== user.id) return;
-    if (room.turnStartedAt && room.matchStartedAt && room.turnStartedAt === room.matchStartedAt) return;
+    if (room.turnStartedAt && now < room.turnStartedAt) return;
     const key = `${room.id}:${room.turnPlayerId}:${room.turnStartedAt || room.turnEndsAt || 0}`;
     if (turnSoundKeyRef.current === key) return;
     turnSoundKeyRef.current = key;
     playVocabularySound("yourTurn");
-  }, [room?.id, room?.matchStartedAt, room?.status, room?.turnEndsAt, room?.turnPlayerId, room?.turnStartedAt, user?.id]);
+  }, [now, room?.id, room?.status, room?.turnEndsAt, room?.turnPlayerId, room?.turnStartedAt, user?.id]);
 
   useEffect(() => {
     if (!room || room.status !== "playing" || !user?.id || room.turnPlayerId !== user.id) return;
+    if (room.turnStartedAt && now < room.turnStartedAt) return;
     const seconds = Math.max(0, Math.ceil(((room.turnEndsAt || 0) - now) / 1000));
     if (seconds < 1 || seconds > 3) return;
     const key = `${room.id}:${room.turnEndsAt || 0}:${seconds}`;
@@ -513,17 +548,29 @@ export default function VocabularyChallengeGame() {
   }, [room?.id, room?.mode, room?.status, room?.updatedAt, room?.winnerId, user?.id]);
 
   useEffect(() => {
+    if (!room?.lastMove || !user?.id || room.lastMove.actorId === user.id) return;
+    const key = `${room.id}:${room.lastMove.at}:${room.lastMove.actorId}`;
+    if (lastMoveSoundKeyRef.current === key) return;
+    lastMoveSoundKeyRef.current = key;
+    playVocabularySound("cardPlace", { vibrate: false });
+    const timer = window.setTimeout(() => playVocabularySound("correct", { vibrate: false }), 220);
+    return () => window.clearTimeout(timer);
+  }, [room?.id, room?.lastMove, user?.id]);
+
+  useEffect(() => {
     if (!room || !user?.id || room.mode !== "solo" || room.status !== "playing" || room.turnPlayerId !== "vocabulary-bot") return;
     const key = `${room.id}:${room.turnStartedAt || room.updatedAt}`;
     if (botTurnKeyRef.current === key) return;
     botTurnKeyRef.current = key;
+    const botThinkDelay = room.botDifficulty === "hard" ? 520 : room.botDifficulty === "easy" ? 1350 : 900;
+    const transitionDelay = Math.max(2_050, Math.max(0, (room.turnStartedAt || Date.now()) - Date.now()));
     const delay = window.setTimeout(() => {
       void playVocabularyBotTurn(room.id).catch((error) => {
-        if (error instanceof VocabularyChallengeApiError && ["NOT_YOUR_TURN", "GAME_NOT_PLAYING"].includes(error.code)) return;
+        if (error instanceof VocabularyChallengeApiError && ["NOT_YOUR_TURN", "TURN_NOT_READY", "GAME_NOT_PLAYING"].includes(error.code)) return;
         botTurnKeyRef.current = "";
         console.warn("Vocabulary bot turn failed:", error);
       });
-    }, reduceMotion ? 350 : 850);
+    }, transitionDelay + (reduceMotion ? 260 : botThinkDelay));
     return () => window.clearTimeout(delay);
   }, [reduceMotion, room, user?.id]);
 
@@ -569,12 +616,16 @@ export default function VocabularyChallengeGame() {
     return id ? room.players[id] || null : null;
   }, [room, user?.id]);
   const isMyTurn = Boolean(room && user?.id && room.turnPlayerId === user.id);
-  const turnRemainingMs = room?.turnEndsAt ? Math.max(0, room.turnEndsAt - now) : 0;
+  const transitionRemainingMs = room?.turnStartedAt ? Math.max(0, room.turnStartedAt - now) : 0;
+  const turnIsReady = transitionRemainingMs <= 0;
+  const rawTurnRemainingMs = room?.turnEndsAt ? Math.max(0, room.turnEndsAt - now) : 0;
+  const turnRemainingMs = turnIsReady ? rawTurnRemainingMs : (room?.turnDurationMs || 10_000);
   const matchRemainingMs = room?.matchEndsAt ? Math.max(0, room.matchEndsAt - now) : 0;
+  const transitionSeconds = Math.max(0, Math.ceil(transitionRemainingMs / 1000));
   const turnSeconds = Math.max(0, Math.ceil(turnRemainingMs / 1000));
   const turnProgress = room?.turnDurationMs ? Math.min(100, Math.max(0, (turnRemainingMs / room.turnDurationMs) * 100)) : 0;
   const selectedCard = hand?.cards.find((card) => card.id === selectedCardId) || null;
-  const canPlay = Boolean(room?.status === "playing" && isMyTurn && hand && !busy && turnRemainingMs > 0);
+  const canPlay = Boolean(room?.status === "playing" && isMyTurn && turnIsReady && hand && !busy && turnRemainingMs > 0);
   const hasLegalMove = Boolean(room && hand && hasVocabularyMoveWithOverrides(room.currentWord, hand.cards.map((card) => card.letter), dictionaryOverrides));
   const canDraw = canPlay && !hasLegalMove;
 
@@ -589,7 +640,7 @@ export default function VocabularyChallengeGame() {
       playVocabularySound("cardSelect");
       setBusy(true);
       setMessage("");
-      const result = await createVocabularyChallenge(mode);
+      const result = await createVocabularyChallenge(mode, botDifficulty);
       if (!result.roomId) throw new Error("تعذر إنشاء المباراة.");
       setRoomId(result.roomId);
       setSelectedCardId("");
@@ -684,6 +735,21 @@ export default function VocabularyChallengeGame() {
     }
   }
 
+  async function handleReportLatestWord() {
+    if (!room?.lastMove?.afterWord || busy) return;
+    const word = room.lastMove.afterWord;
+    if (!window.confirm(`هل تريد إرسال «${word}» للإدارة لمراجعة صحتها؟`)) return;
+    try {
+      setBusy(true);
+      await reportVocabularyWord(room.id, word);
+      setFeedback("info", `تم إرسال «${word}» للمراجعة، ولن تتوقف المباراة.`);
+    } catch (error) {
+      setFeedback("error", error instanceof Error ? error.message : "تعذر إرسال الكلمة للمراجعة.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleForfeit() {
     if (!room) return;
     const label = room.status === "waiting" ? "إلغاء الغرفة" : room.mode === "duel" ? "الانسحاب من المباراة" : "إنهاء التحدي";
@@ -736,6 +802,7 @@ export default function VocabularyChallengeGame() {
     turnSoundKeyRef.current = "";
     countdownSoundKeyRef.current = "";
     resultSoundKeyRef.current = "";
+    lastMoveSoundKeyRef.current = "";
     botTurnKeyRef.current = "";
     setNow(Date.now());
   }
@@ -784,6 +851,13 @@ export default function VocabularyChallengeGame() {
   const finishLeaderboardLabel = leaderboardPeriod === "daily" ? "اليومي" : leaderboardPeriod === "weekly" ? "الأسبوعي" : "الموسمي";
   const rematchRequestedByMe = Boolean(room?.mode === "duel" && room?.rematchRequestedBy === user.id);
   const rematchRequestedByOpponent = Boolean(room?.mode === "duel" && room?.rematchRequestedBy && room.rematchRequestedBy !== user.id);
+  const handCount = hand?.cards.length || 0;
+  const handOverlap = handCount <= 7 ? -6 : handCount <= 8 ? -9 : handCount <= 9 ? -13 : handCount <= 10 ? -17 : handCount <= 11 ? -20 : handCount <= 12 ? -22 : handCount <= 13 ? -24 : handCount <= 14 ? -27 : -30;
+  const botDifficultyLabel = room?.botDifficulty === "easy" ? "سهل" : room?.botDifficulty === "hard" ? "صعب" : "متوسط";
+  const latestMoveAgeMs = room?.lastMove?.at ? Math.max(0, now - room.lastMove.at) : Number.MAX_SAFE_INTEGER;
+  const showBotMoveFx = Boolean(room?.mode === "solo" && room.lastMove?.actorId === "vocabulary-bot" && latestMoveAgeMs < 1_900);
+  const botThinking = Boolean(room?.mode === "solo" && room.status === "playing" && room.turnPlayerId === "vocabulary-bot" && turnIsReady);
+  const turnOwnerLabel = isMyTurn ? "دورك" : room?.mode === "solo" ? "دور بوت التحدي" : "دور الخصم";
 
   return (
     <main dir="rtl" className="relative mx-auto max-w-7xl overflow-hidden px-3 pb-16 pt-3 sm:px-4 md:px-6 md:pb-20 md:pt-6">
@@ -827,8 +901,16 @@ export default function VocabularyChallengeGame() {
             <div className="rounded-[30px] border border-white/10 bg-black/20 p-4 backdrop-blur-xl md:p-5">
               <div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-black text-lime-200">اختر نمط اللعب</p><h2 className="mt-1 text-xl font-black">كيف تبي تلعب؟</h2></div><Gamepad2 className="h-6 w-6 text-lime-200" /></div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <ModeCard icon={<Bot className="h-5 w-5" />} title="العب بمفردك" description="واجه بوت التحدي الذكي وتخلّص من بطاقاتك قبله خلال 5 دقائق." accent="emerald" onClick={() => handleCreate("solo")} disabled={busy || matchmaking} />
-                <ModeCard icon={<Swords className="h-5 w-5" />} title="لاعب ضد لاعب" description="أنشئ غرفة خاصة أو واجه خصمًا أونلاين، وأول من يتخلّص من بطاقاته يفوز." accent="amber" onClick={() => handleCreate("duel")} disabled={busy || matchmaking} />
+                <ModeCard icon={<Bot className="h-5 w-5" />} title="العب بمفردك" description={`واجه بوت التحدي بمستوى ${botDifficulty === "easy" ? "سهل" : botDifficulty === "hard" ? "صعب" : "متوسط"} وتخلّص من بطاقاتك قبله.`} accent="emerald" onClick={() => handleCreate("solo")} disabled={busy || matchmaking || restoringRoom} />
+                <ModeCard icon={<Swords className="h-5 w-5" />} title="لاعب ضد لاعب" description="أنشئ غرفة خاصة أو واجه خصمًا أونلاين، وأول من يتخلّص من بطاقاته يفوز." accent="amber" onClick={() => handleCreate("duel")} disabled={busy || matchmaking || restoringRoom} />
+              </div>
+              <div className="mt-2 rounded-2xl border border-emerald-200/10 bg-black/15 p-2.5">
+                <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-black text-emerald-100/70">مستوى بوت اللعب الفردي</span>{restoringRoom ? <span className="inline-flex items-center gap-1 text-[9px] font-bold text-white/35"><LoaderCircle className="h-3 w-3 animate-spin" /> فحص مباراة سابقة…</span> : null}</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([['easy','سهل'],['normal','متوسط'],['hard','صعب']] as Array<[VocabularyBotDifficulty,string]>).map(([value,label]) => (
+                    <button key={value} type="button" onClick={() => setBotDifficulty(value)} className={`min-h-10 rounded-xl text-[10px] font-black transition ${botDifficulty === value ? "bg-lime-300 text-emerald-950" : "border border-white/[0.08] bg-white/[0.035] text-white/55"}`}>{label}</button>
+                  ))}
+                </div>
               </div>
 
               <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2 rounded-[22px] border border-cyan-200/15 bg-cyan-300/[0.055] p-3">
@@ -881,10 +963,14 @@ export default function VocabularyChallengeGame() {
           <div className="pointer-events-none absolute inset-x-[8%] -top-48 h-[330px] rounded-[50%] border-[2px] border-emerald-100/14 bg-black/[0.06]" />
 
           <div className="relative min-h-[520px] px-3 pb-3 pt-2.5 sm:min-h-[590px] sm:px-4 sm:pb-4 sm:pt-3">
-            <div className="grid grid-cols-[58px_minmax(0,1fr)_58px_48px] items-center gap-1.5 sm:gap-2">
-              <div className={`relative grid h-[58px] w-[58px] place-items-center rounded-full border-[3px] bg-black/45 shadow-[0_8px_24px_rgba(0,0,0,.25)] ${isMyTurn ? "border-lime-300/70" : "border-white/15"}`}>
-                <svg className="absolute inset-[-4px] h-[62px] w-[62px] -rotate-90" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" /><circle cx="36" cy="36" r="31" fill="none" stroke={turnSeconds <= 3 ? "#fb7185" : "#bef264"} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${194.8 * turnProgress / 100} 194.8`} /></svg>
-                <span dir="ltr" className={`relative text-lg font-black ${turnSeconds <= 3 ? "text-rose-200" : "text-lime-200"}`}>{turnSeconds}s</span>
+            {!isOnline ? <div role="status" className="mb-2 flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200/20 bg-rose-500/18 px-3 text-[10px] font-black text-rose-50"><WifiOff className="h-4 w-4" /> الاتصال بالإنترنت متوقف — ستعود المباراة تلقائيًا عند رجوع الشبكة</div> : null}
+            <div className="grid grid-cols-[58px_minmax(0,1fr)_58px] items-center gap-1.5 sm:gap-2">
+              <div className={`relative grid h-[58px] w-[58px] place-items-center rounded-full border-[3px] bg-black/45 shadow-[0_8px_24px_rgba(0,0,0,.25)] ${!turnIsReady ? "border-amber-300/70" : isMyTurn ? "border-lime-300/70" : "border-white/15"}`}>
+                <svg className="absolute inset-[-4px] h-[62px] w-[62px] -rotate-90" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" /><circle cx="36" cy="36" r="31" fill="none" stroke={!turnIsReady ? "#fcd34d" : turnSeconds <= 3 ? "#fb7185" : "#bef264"} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${194.8 * (!turnIsReady ? 1 : turnProgress / 100)} 194.8`} /></svg>
+                <div className="relative text-center">
+                  <span dir="ltr" className={`block text-lg font-black ${!turnIsReady ? "text-amber-200" : turnSeconds <= 3 ? "text-rose-200" : "text-lime-200"}`}>{!turnIsReady ? transitionSeconds : turnSeconds}s</span>
+                  {!turnIsReady ? <span className="block text-[6px] font-black text-amber-100/65">استعد</span> : null}
+                </div>
               </div>
 
               <div className="mx-auto min-w-0 rounded-2xl border border-white/12 bg-black/22 px-5 py-2 text-center shadow-inner">
@@ -895,37 +981,56 @@ export default function VocabularyChallengeGame() {
               <div className={`grid h-[58px] w-[58px] place-items-center rounded-2xl border text-center ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.10]" : "border-white/10 bg-black/18"}`}>
                 <div><div className="text-base font-black text-white">{me?.cardCount ?? hand.cards.length}</div><div className="text-[8px] font-bold text-white/38">بطاقاتك</div></div>
               </div>
+            </div>
 
+            <div className="mt-2 grid grid-cols-[66px_minmax(0,1fr)_66px] items-center gap-2">
               <button
                 type="button"
                 onClick={handleForfeit}
                 disabled={busy || finished || cancelled}
-                aria-label={room.mode === "duel" ? "الانسحاب من المباراة" : "إنهاء التحدي"}
-                title={room.mode === "duel" ? "الانسحاب من المباراة" : "إنهاء التحدي"}
-                className="flex h-[58px] w-12 flex-col items-center justify-center gap-1 rounded-xl border border-rose-200/15 bg-rose-400/[0.08] text-rose-100/75 transition active:scale-95 disabled:opacity-30"
+                aria-label={room.mode === "duel" ? "إنهاء المباراة والانسحاب" : "إنهاء التحدي"}
+                title={room.mode === "duel" ? "إنهاء المباراة والانسحاب" : "إنهاء التحدي"}
+                className="inline-flex min-h-[42px] items-center justify-center gap-1 rounded-xl border border-rose-200/20 bg-rose-500/[0.12] px-2 text-[9px] font-black text-rose-100 transition active:scale-95 disabled:opacity-30"
               >
-                <LogOut className="h-4 w-4" />
-                <span className="text-[7px] font-black">إنهاء</span>
+                <LogOut className="h-3.5 w-3.5" />
+                إنهاء
               </button>
-            </div>
-
-            <div className="mt-2 flex min-h-[54px] items-center justify-center">
-              <PlayerBadge player={opponent} active={Boolean(opponent && room.turnPlayerId === opponent.userId)} />
+              <div className="flex min-h-[54px] items-center justify-center">
+                <PlayerBadge player={opponent} active={Boolean(opponent && room.turnPlayerId === opponent.userId && turnIsReady)} />
+              </div>
+              <div aria-hidden="true" />
             </div>
 
             {room.mode === "solo" ? (
-              <div className="mx-auto mt-1 flex w-fit items-center gap-1.5 rounded-full border border-cyan-200/12 bg-cyan-300/[0.06] px-3 py-1 text-[8px] font-black text-cyan-100/70"><Bot className="h-3 w-3" /> البوت يختار حركاته بدون الاطلاع على بطاقاتك</div>
+              <div className="mx-auto mt-1 flex w-fit items-center gap-1.5 rounded-full border border-cyan-200/12 bg-cyan-300/[0.06] px-3 py-1 text-[8px] font-black text-cyan-100/70"><Bot className="h-3 w-3" /> مستوى البوت: {botDifficultyLabel} · لا يطّلع على بطاقاتك</div>
             ) : null}
 
-            <div className={`mx-auto mt-1 w-fit rounded-full border px-3 py-1 text-[9px] font-black ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.11] text-lime-100" : "border-white/10 bg-black/15 text-white/52"}`}>{isMyTurn ? "حان دورك الآن" : room.mode === "duel" ? "دور الخصم" : "دور بوت التحدي"}</div>
+            <div className={`mx-auto mt-1 flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-[9px] font-black ${!turnIsReady ? "border-amber-200/20 bg-amber-300/[0.10] text-amber-100" : isMyTurn ? "border-lime-200/20 bg-lime-300/[0.11] text-lime-100" : "border-white/10 bg-black/15 text-white/52"}`}>
+              {!turnIsReady ? <><Clock3 className="h-3 w-3" /> {turnOwnerLabel} بعد {transitionSeconds}ث</> : isMyTurn ? "حان دورك الآن" : room.mode === "duel" ? "دور الخصم" : botThinking ? <><Bot className="h-3 w-3 animate-pulse" /> بوت التحدي يفكر…</> : "دور بوت التحدي"}
+            </div>
 
-            <div className="mt-2.5 flex items-center justify-center gap-2.5 sm:gap-3.5" dir="rtl">
-              {Array.from(room.currentWord).map((letter, index) => (
-                <button key={`${room.currentWord}-${index}`} type="button" disabled={!canPlay || !selectedCard} onClick={() => handlePosition(index)} aria-label={selectedCard ? `استبدال الحرف ${letter} بالحرف ${selectedCard.letter}` : `الحرف ${letter}`} className="relative min-h-0 min-w-0 rounded-[17px] disabled:cursor-default">
-                  <CardFace letter={letter} index={index} size="center" />
-                  {selectedCard && canPlay ? <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-lime-200/20 bg-emerald-950 px-2 py-0.5 text-[8px] font-black text-lime-200">ضع هنا</span> : null}
-                </button>
-              ))}
+            <div className="relative mt-2.5">
+              <div className="flex items-center justify-center gap-2.5 sm:gap-3.5" dir="rtl">
+                {Array.from(room.currentWord).map((letter, index) => (
+                  <motion.button key={`${room.currentWord}-${index}`} layout type="button" disabled={!canPlay || !selectedCard} onClick={() => handlePosition(index)} aria-label={selectedCard ? `استبدال الحرف ${letter} بالحرف ${selectedCard.letter}` : `الحرف ${letter}`} className="relative min-h-0 min-w-0 rounded-[17px] disabled:cursor-default">
+                    <CardFace letter={letter} index={index} size="center" />
+                    {selectedCard && canPlay ? <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-lime-200/20 bg-emerald-950 px-2 py-0.5 text-[8px] font-black text-lime-200">ضع هنا</span> : null}
+                  </motion.button>
+                ))}
+              </div>
+              <AnimatePresence>
+                {showBotMoveFx && room.lastMove ? (
+                  <motion.div
+                    key={`bot-card-${room.lastMove.at}`}
+                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -74, x: room.lastMove.position === 0 ? 76 : room.lastMove.position === 2 ? -76 : 0, scale: 0.72, rotate: -7 }}
+                    animate={reduceMotion ? { opacity: 1 } : { opacity: [0, 1, 1, 0], y: [-74, -20, 3, 3], x: room.lastMove.position === 0 ? 76 : room.lastMove.position === 2 ? -76 : 0, scale: [0.72, 0.9, 1, 1], rotate: [-7, -3, 0, 0] }}
+                    transition={{ duration: 1.25, times: [0, 0.28, 0.68, 1] }}
+                    className="pointer-events-none absolute left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2"
+                  >
+                    <CardFace letter={room.lastMove.letter} size="mini" />
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
             </div>
 
             <AnimatePresence mode="wait">
@@ -935,7 +1040,7 @@ export default function VocabularyChallengeGame() {
                     {messageKind === "success" ? <CheckCircle2 className="h-4 w-4" /> : messageKind === "error" ? <XCircle className="h-4 w-4" /> : <CircleHelp className="h-4 w-4" />}{message}
                   </div>
                 ) : room.lastMove ? (
-                  <div className="flex min-h-[36px] items-center justify-center gap-2 rounded-xl border border-lime-200/18 bg-lime-300/[0.13] px-3 text-[11px] font-black text-lime-50"><CheckCircle2 className="h-4 w-4" /> {room.lastMove.afterWord}</div>
+                  <div className="flex min-h-[36px] items-center justify-center gap-2 rounded-xl border border-lime-200/18 bg-lime-300/[0.13] px-3 text-[11px] font-black text-lime-50"><CheckCircle2 className="h-4 w-4" /> {room.lastMove.actorId === "vocabulary-bot" ? `بوت التحدي كوّن «${room.lastMove.afterWord}»` : room.lastMove.actorId === user.id ? `كلمتك: «${room.lastMove.afterWord}»` : `${room.lastMove.actorName}: «${room.lastMove.afterWord}»`}</div>
                 ) : (
                   <div className="flex min-h-[36px] items-center justify-center text-[9px] font-semibold text-white/38">اختر بطاقة ثم اضغط على الحرف الذي تريد استبداله.</div>
                 )}
@@ -946,13 +1051,14 @@ export default function VocabularyChallengeGame() {
               <div className="mx-auto mt-2 flex max-w-full items-center justify-center gap-1.5 overflow-x-auto px-1 pb-1 hidden-scrollbar" dir="rtl" aria-label="آخر الكلمات">
                 <History className="h-3.5 w-3.5 shrink-0 text-white/35" />
                 {room.recentMoves.slice(-5).map((move, index) => <span key={`${move.at}-${index}`} className={`shrink-0 rounded-lg border px-2 py-1 text-[9px] font-black ${index === room.recentMoves!.slice(-5).length - 1 ? "border-lime-200/20 bg-lime-300/[0.10] text-lime-100" : "border-white/[0.08] bg-black/14 text-white/42"}`}>{move.afterWord}</span>)}
+                <button type="button" onClick={() => void handleReportLatestWord()} disabled={busy || !room.lastMove?.afterWord} title="إرسال آخر كلمة للمراجعة" aria-label="إرسال آخر كلمة للمراجعة" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-amber-200/12 bg-amber-300/[0.06] text-amber-100/55 disabled:opacity-30"><Flag className="h-3.5 w-3.5" /></button>
               </div>
             ) : null}
 
             <div className="mt-2.5 flex items-end justify-between gap-3">
               <button type="button" onClick={handleDraw} disabled={!canDraw} className="group flex w-[70px] shrink-0 flex-col items-center gap-1 disabled:opacity-35" title={hasLegalMove ? "لا يمكن السحب لأن لديك حركة صحيحة" : "اسحب بطاقة عند عدم وجود حركة صحيحة"}>
                 <div className="relative h-[52px] w-[47px]" aria-hidden="true"><div className="absolute inset-0 translate-x-2 translate-y-2 rotate-6 rounded-lg border border-white/15 bg-[#173f38]" /><div className="absolute inset-0 translate-x-1 translate-y-1 rotate-3 rounded-lg border border-white/15 bg-[#1b4b41]" /><div className="absolute inset-0 grid place-items-center rounded-lg border border-white/20 bg-[linear-gradient(145deg,#173f38,#0c2926)] shadow-[0_8px_18px_rgba(0,0,0,.3)]"><Sparkles className="h-4 w-4 text-amber-200/70" /></div></div>
-                <span className="text-[8px] font-black text-white/58">{!isMyTurn ? "انتظر دورك" : hasLegalMove ? "عندك حركة" : "اسحب"}</span>
+                <span className="text-[8px] font-black text-white/58">{!isMyTurn ? "انتظر دورك" : !turnIsReady ? "استعد" : hasLegalMove ? "عندك حركة" : "اسحب"}</span>
               </button>
 
               <div className="flex-1 text-left" dir="ltr">
@@ -973,8 +1079,8 @@ export default function VocabularyChallengeGame() {
             </div>
             {room.mode === "duel" && voiceChat.error ? <div aria-live="polite" className="mx-auto mt-1 max-w-sm text-center text-[8px] font-semibold text-rose-100/75">{voiceChat.error}</div> : null}
 
-            <div className="mt-1 overflow-x-auto pb-2 pt-3 hidden-scrollbar" dir="rtl">
-              <div className="mx-auto flex min-w-max items-end justify-center px-2 pb-2">
+            <div className="mt-1 overflow-hidden pb-2 pt-3" dir="rtl">
+              <div className="mx-auto flex w-full items-end justify-center px-1 pb-2">
                 {hand.cards.map((card, index) => {
                   const selected = card.id === selectedCardId;
                   return (
@@ -992,7 +1098,7 @@ export default function VocabularyChallengeGame() {
                       aria-pressed={selected}
                       aria-label={`بطاقة الحرف ${card.letter}`}
                       className="relative min-h-0 min-w-0 rounded-[15px] transition disabled:cursor-default"
-                      style={{ marginInlineStart: index === 0 ? 0 : -12, zIndex: selected ? 50 : index + 1 }}
+                      style={{ marginInlineStart: index === 0 ? 0 : handOverlap, zIndex: selected ? 50 : index + 1 }}
                     >
                       <CardFace letter={card.letter} index={index} selected={selected} disabled={!canPlay} />
                     </button>

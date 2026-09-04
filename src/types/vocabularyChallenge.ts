@@ -1,4 +1,5 @@
 export type VocabularyChallengeMode = "solo" | "duel";
+export type VocabularyBotDifficulty = "easy" | "normal" | "hard";
 export type VocabularyChallengeRoomStatus = "waiting" | "playing" | "finished" | "cancelled";
 export type VocabularyChallengeFinishReason = "cards" | "time" | "forfeit" | "cancelled" | null;
 export type VocabularyLeaderboardPeriod = "daily" | "weekly" | "season";
@@ -25,6 +26,13 @@ export type VocabularyChallengeMove = {
 export type VocabularyChallengeLastMove = VocabularyChallengeMove | null;
 
 
+
+export type VocabularyVoiceIceConfig = {
+  iceServers: RTCIceServer[];
+  turnEnabled: boolean;
+  provider: "cloudflare" | "static" | "stun-only";
+};
+
 export type VocabularyVoiceDescription = {
   sessionId: string;
   fromUserId: string;
@@ -36,6 +44,7 @@ export type VocabularyChallengeRoom = {
   id: string;
   dictionaryVersion: string;
   mode: VocabularyChallengeMode;
+  botDifficulty?: VocabularyBotDifficulty | null;
   status: VocabularyChallengeRoomStatus;
   roomCode: string | null;
   hostId: string;
@@ -136,7 +145,7 @@ export type VocabularyDictionaryClientOverrides = {
 };
 
 export type VocabularyChallengeAction =
-  | { action: "create"; mode: VocabularyChallengeMode }
+  | { action: "create"; mode: VocabularyChallengeMode; botDifficulty?: VocabularyBotDifficulty }
   | { action: "join"; roomCode: string }
   | { action: "move"; roomId: string; cardId: string; position: number }
   | { action: "draw"; roomId: string }
@@ -146,4 +155,5 @@ export type VocabularyChallengeAction =
   | { action: "matchmake" }
   | { action: "cancelMatchmaking" }
   | { action: "botTurn"; roomId: string }
-  | { action: "voiceSignal"; roomId: string; kind: "offer" | "answer" | "reset"; sessionId: string; sdp?: string };
+  | { action: "voiceSignal"; roomId: string; kind: "offer" | "answer" | "reset"; sessionId: string; sdp?: string }
+  | { action: "reportWord"; roomId: string; word: string };

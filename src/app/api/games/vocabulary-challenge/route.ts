@@ -18,6 +18,7 @@ import {
 import { syncPlatformGameXp } from "@/lib/serverPlatformGameXp";
 import type {
   VocabularyChallengeAction,
+  VocabularyBotDifficulty,
   VocabularyChallengeCard,
   VocabularyChallengeMode,
 } from "@/types/vocabularyChallenge";
@@ -29,8 +30,10 @@ export const revalidate = 0;
 const ROOM_COLLECTION = "vocabularyChallengeRooms";
 const RESULT_COLLECTION = "vocabularyChallengeResults";
 const MATCHMAKING_COLLECTION = "vocabularyChallengeMatchmaking";
+const REPORT_COLLECTION = "vocabularyDictionaryReports";
 const HAND_SIZE = 10;
 const TURN_DURATION_MS = 10_000;
+const TURN_TRANSITION_MS = 2_000;
 const MATCH_DURATION_MS = 5 * 60_000;
 const BOT_ID = "vocabulary-bot";
 const BOT_NAME = "بوت التحدي";
@@ -42,6 +45,13 @@ function text(value: unknown) {
 function number(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+
+function nextTurnWindow(now: number, matchEndsAt: number) {
+  const startedAt = now + TURN_TRANSITION_MS;
+  const endsAt = matchEndsAt ? Math.min(startedAt + TURN_DURATION_MS, matchEndsAt) : startedAt + TURN_DURATION_MS;
+  return { turnStartedAt: startedAt, turnEndsAt: endsAt };
 }
 
 function bearerToken(request: NextRequest) {
@@ -228,7 +238,7 @@ async function syncFinishedResults(resultIds: Record<string, string> | undefined
   );
 }
 
-async function createRoom(userId: string, userName: string, mode: VocabularyChallengeMode) {
+async function createRoom(userId: string, userName: string, mode: VocabularyChallengeMode, botDifficulty: VocabularyBotDifficulty = "normal") {
   const now = Date.now();
   const startingWord = await randomActiveStartingWord();
   const roomRef = adminDb.collection(ROOM_COLLECTION).doc();
@@ -237,6 +247,7 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
   const startsNow = mode === "solo";
   const matchStartedAt = startsNow ? now : null;
   const matchEndsAt = startsNow ? now + MATCH_DURATION_MS : null;
+  const firstTurn = startsNow ? nextTurnWindow(now, matchEndsAt || 0) : null;
   const botCards = startsNow ? createCards(createFairVocabularyLetters(startingWord, HAND_SIZE)) : [];
 
   const players: Record<string, Record<string, unknown>> = {
@@ -250,6 +261,7 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
     id: roomRef.id,
     dictionaryVersion: VOCABULARY_DICTIONARY_VERSION,
     mode,
+    botDifficulty: startsNow ? botDifficulty : null,
     status: startsNow ? "playing" : "waiting",
     roomCode,
     hostId: userId,
@@ -261,8 +273,8 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
     startingWord,
     currentWord: startingWord,
     turnPlayerId: startsNow ? userId : null,
-    turnStartedAt: startsNow ? now : null,
-    turnEndsAt: startsNow ? now + TURN_DURATION_MS : null,
+    turnStartedAt: firstTurn?.turnStartedAt ?? null,
+    turnEndsAt: firstTurn?.turnEndsAt ?? null,
     turnDurationMs: TURN_DURATION_MS,
     matchStartedAt,
     matchEndsAt,
@@ -304,6 +316,7 @@ function startedDuelRoomData(params: {
   const guestCards = createCards(createFairVocabularyLetters(params.startingWord, HAND_SIZE));
   const firstPlayer = Math.random() < 0.5 ? params.hostId : params.guestId;
   const matchEndsAt = params.now + MATCH_DURATION_MS;
+  const firstTurn = nextTurnWindow(params.now, matchEndsAt);
   const room = {
     id: params.roomId,
     dictionaryVersion: VOCABULARY_DICTIONARY_VERSION,
@@ -322,8 +335,8 @@ function startedDuelRoomData(params: {
     startingWord: params.startingWord,
     currentWord: params.startingWord,
     turnPlayerId: firstPlayer,
-    turnStartedAt: params.now,
-    turnEndsAt: Math.min(params.now + TURN_DURATION_MS, matchEndsAt),
+    turnStartedAt: firstTurn.turnStartedAt,
+    turnEndsAt: firstTurn.turnEndsAt,
     turnDurationMs: TURN_DURATION_MS,
     matchStartedAt: params.now,
     matchEndsAt,
@@ -375,6 +388,7 @@ async function joinRoom(userId: string, userName: string, rawCode: unknown) {
       : {};
     const firstPlayer = Math.random() < 0.5 ? hostId : userId;
     const matchEndsAt = now + MATCH_DURATION_MS;
+    const firstTurn = nextTurnWindow(now, matchEndsAt);
 
     transaction.set(roomRef.collection("hands").doc(userId), { userId, cards, updatedAt: now });
     transaction.update(roomRef, {
@@ -391,8 +405,7 @@ async function joinRoom(userId: string, userName: string, rawCode: unknown) {
         },
       },
       turnPlayerId: firstPlayer,
-      turnStartedAt: now,
-      turnEndsAt: Math.min(now + TURN_DURATION_MS, matchEndsAt),
+      ...firstTurn,
       matchStartedAt: now,
       matchEndsAt,
       updatedAt: now,
@@ -499,7 +512,8 @@ async function requestRematch(userId: string, userName: string, roomId: string) 
   if (text(room.status) !== "finished") throw new Error("GAME_NOT_FINISHED");
 
   if (text(room.mode) === "solo") {
-    return createRoom(userId, userName, "solo");
+    const difficulty = (["easy", "normal", "hard"] as string[]).includes(text(room.botDifficulty)) ? text(room.botDifficulty) as VocabularyBotDifficulty : "normal";
+    return createRoom(userId, userName, "solo", difficulty);
   }
 
   if (text(room.rematchRoomId)) {
@@ -571,6 +585,7 @@ async function makeMove(userId: string, roomId: string, cardId: string, rawPosit
     }
 
     if (text(room.turnPlayerId) !== userId) throw new Error("NOT_YOUR_TURN");
+    if (number(room.turnStartedAt) && now < number(room.turnStartedAt)) throw new Error("TURN_NOT_READY");
     if (number(room.turnEndsAt) && now >= number(room.turnEndsAt)) throw new Error("TURN_EXPIRED");
 
     const handData = handSnap.data() || {};
@@ -632,12 +647,12 @@ async function makeMove(userId: string, roomId: string, cardId: string, rawPosit
 
     const nextTurn = nextPlayerId(room, userId);
     const matchEndsAt = number(room.matchEndsAt);
+    const nextWindow = nextTurnWindow(now, matchEndsAt);
     transaction.update(roomRef, {
       players,
       currentWord: afterWord,
       turnPlayerId: nextTurn,
-      turnStartedAt: now,
-      turnEndsAt: matchEndsAt ? Math.min(now + TURN_DURATION_MS, matchEndsAt) : now + TURN_DURATION_MS,
+      ...nextWindow,
       lastMove: move,
       recentMoves,
       updatedAt: now,
@@ -673,6 +688,7 @@ async function playBotTurn(userId: string, roomId: string) {
     if (text(room.mode) !== "solo") throw new Error("BOT_ONLY_SOLO");
     if (text(room.status) !== "playing") throw new Error("GAME_NOT_PLAYING");
     if (text(room.turnPlayerId) !== BOT_ID) return { noop: true };
+    if (number(room.turnStartedAt) && now < number(room.turnStartedAt)) return { noop: true, waiting: true };
 
     if (number(room.matchEndsAt) && now >= number(room.matchEndsAt)) {
       const winnerId = timeWinnerId(room);
@@ -698,21 +714,27 @@ async function playBotTurn(userId: string, roomId: string) {
         isBot: true,
       });
       const matchEndsAt = number(room.matchEndsAt);
+      const nextWindow = nextTurnWindow(now, matchEndsAt);
 
       transaction.set(botHandRef, { userId: BOT_ID, cards: nextCards, updatedAt: now }, { merge: true });
       transaction.update(roomRef, {
         players,
         turnPlayerId: text(room.hostId),
-        turnStartedAt: now,
-        turnEndsAt: matchEndsAt ? Math.min(now + TURN_DURATION_MS, matchEndsAt) : now + TURN_DURATION_MS,
+        ...nextWindow,
         updatedAt: now,
       });
       return { botDrew: true };
     }
 
+    const difficulty = (["easy", "normal", "hard"] as string[]).includes(text(room.botDifficulty))
+      ? text(room.botDifficulty) as VocabularyBotDifficulty
+      : "normal";
     const strategicMoves = [...legalMoves].sort((a, b) => botMoveScore(beforeWord, a.word) - botMoveScore(beforeWord, b.word));
-    const shortlist = strategicMoves.slice(0, Math.min(4, strategicMoves.length));
-    const chosen = shortlist[Math.floor(Math.random() * shortlist.length)] || strategicMoves[0];
+    const chosen = difficulty === "easy"
+      ? legalMoves[Math.floor(Math.random() * legalMoves.length)]
+      : difficulty === "hard"
+        ? strategicMoves[0]
+        : strategicMoves.slice(0, Math.min(4, strategicMoves.length))[Math.floor(Math.random() * Math.min(4, strategicMoves.length))] || strategicMoves[0];
     const cardIndex = cards.findIndex((card) => text(card.letter) === chosen.letter);
     if (cardIndex < 0) throw new Error("CARD_NOT_FOUND");
     const playedCard = cards[cardIndex];
@@ -761,12 +783,12 @@ async function playBotTurn(userId: string, roomId: string) {
     }
 
     const matchEndsAt = number(room.matchEndsAt);
+    const nextWindow = nextTurnWindow(now, matchEndsAt);
     transaction.update(roomRef, {
       players,
       currentWord: chosen.word,
       turnPlayerId: text(room.hostId),
-      turnStartedAt: now,
-      turnEndsAt: matchEndsAt ? Math.min(now + TURN_DURATION_MS, matchEndsAt) : now + TURN_DURATION_MS,
+      ...nextWindow,
       lastMove: move,
       recentMoves,
       updatedAt: now,
@@ -846,6 +868,7 @@ async function drawCard(userId: string, roomId: string) {
     if (text(room.status) !== "playing") throw new Error("GAME_NOT_PLAYING");
     if (number(room.matchEndsAt) && now >= number(room.matchEndsAt)) throw new Error("TURN_EXPIRED");
     if (text(room.turnPlayerId) !== userId) throw new Error("NOT_YOUR_TURN");
+    if (number(room.turnStartedAt) && now < number(room.turnStartedAt)) throw new Error("TURN_NOT_READY");
     if (number(room.turnEndsAt) && now >= number(room.turnEndsAt)) throw new Error("TURN_EXPIRED");
 
     const handData = handSnap.data() || {};
@@ -865,13 +888,13 @@ async function drawCard(userId: string, roomId: string) {
     });
     const nextTurn = nextPlayerId(room, userId);
     const matchEndsAt = number(room.matchEndsAt);
+    const nextWindow = nextTurnWindow(now, matchEndsAt);
 
     transaction.set(handRef, { userId, cards: nextCards, updatedAt: now }, { merge: true });
     transaction.update(roomRef, {
       players,
       turnPlayerId: nextTurn,
-      turnStartedAt: now,
-      turnEndsAt: matchEndsAt ? Math.min(now + TURN_DURATION_MS, matchEndsAt) : now + TURN_DURATION_MS,
+      ...nextWindow,
       updatedAt: now,
     });
 
@@ -919,13 +942,13 @@ async function handleTimeout(userId: string, roomId: string) {
       draws: Math.max(0, Math.floor(number(currentSummary.draws))) + 1,
     });
     const nextTurn = nextPlayerId(room, timedOutId);
+    const nextWindow = nextTurnWindow(now, matchEndsAt);
 
     transaction.set(timedOutHandRef, { userId: timedOutId, cards: nextCards, updatedAt: now }, { merge: true });
     transaction.update(roomRef, {
       players,
       turnPlayerId: nextTurn,
-      turnStartedAt: now,
-      turnEndsAt: matchEndsAt ? Math.min(now + TURN_DURATION_MS, matchEndsAt) : now + TURN_DURATION_MS,
+      ...nextWindow,
       updatedAt: now,
     });
     return { timedOut: true };
@@ -945,11 +968,12 @@ async function forfeitRoom(userId: string, roomId: string) {
     const room = roomSnap.data() || {};
     if (!participant(room, userId)) throw new Error("FORBIDDEN");
 
-    if (text(room.status) === "waiting" || text(room.mode) === "solo") {
+    if (text(room.status) === "waiting") {
       transaction.update(roomRef, {
         status: "cancelled",
         finishReason: "cancelled",
         turnPlayerId: null,
+        turnStartedAt: null,
         turnEndsAt: null,
         updatedAt: now,
       });
@@ -957,7 +981,7 @@ async function forfeitRoom(userId: string, roomId: string) {
     }
 
     if (text(room.status) !== "playing") return { noop: true };
-    const winnerId = roomPlayerIds(room).find((id) => id !== userId) || null;
+    const winnerId = text(room.mode) === "solo" ? BOT_ID : roomPlayerIds(room).find((id) => id !== userId) || null;
     const resultIds = finalizeRoom({ transaction, roomRef, roomId, room, winnerId, reason: "forfeit", now });
     return { finished: true, resultIds };
   });
@@ -1094,6 +1118,49 @@ async function leaderboard(userId: string, period: LeaderboardPeriod) {
   };
 }
 
+async function activeVocabularyRoom(userId: string) {
+  const [hostSnap, guestSnap] = await Promise.all([
+    adminDb.collection(ROOM_COLLECTION).where("hostId", "==", userId).limit(20).get(),
+    adminDb.collection(ROOM_COLLECTION).where("guestId", "==", userId).limit(20).get(),
+  ]);
+  const seen = new Map<string, Record<string, unknown>>();
+  for (const snap of [...hostSnap.docs, ...guestSnap.docs]) seen.set(snap.id, { id: snap.id, ...(snap.data() || {}) });
+  const now = Date.now();
+  const candidates = Array.from(seen.values())
+    .filter((room) => ["waiting", "playing"].includes(text(room.status)))
+    .filter((room) => text(room.status) !== "waiting" || now - number(room.updatedAt) < 30 * 60_000)
+    .sort((a, b) => number(b.updatedAt) - number(a.updatedAt));
+  const room = candidates[0];
+  return room ? { roomId: text(room.id), status: text(room.status), mode: text(room.mode) } : { roomId: null };
+}
+
+async function reportVocabularyWord(userId: string, roomId: string, rawWord: string) {
+  if (!roomId) throw new Error("ROOM_NOT_FOUND");
+  const word = text(rawWord);
+  const roomRef = adminDb.collection(ROOM_COLLECTION).doc(roomId);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new Error("ROOM_NOT_FOUND");
+  const room = roomSnap.data() || {};
+  if (!participant(room, userId)) throw new Error("FORBIDDEN");
+  const allowedWords = new Set<string>([
+    text(room.startingWord),
+    text(room.currentWord),
+    ...((Array.isArray(room.recentMoves) ? room.recentMoves : []) as Array<Record<string, unknown>>).flatMap((move) => [text(move.beforeWord), text(move.afterWord)]),
+  ].filter(Boolean));
+  if (!allowedWords.has(word)) throw new Error("REPORT_WORD_INVALID");
+  const reportId = `${roomId}_${userId}_${word}`;
+  await adminDb.collection(REPORT_COLLECTION).doc(reportId).set({
+    roomId,
+    userId,
+    userName: playerName(room, userId),
+    word,
+    status: "pending",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  }, { merge: true });
+  return { reported: true, word };
+}
+
 async function vocabularyProfile(userId: string) {
   const snapshot = await adminDb.collection(RESULT_COLLECTION).where("userId", "==", userId).limit(1500).get();
   const results = snapshot.docs
@@ -1173,12 +1240,74 @@ async function vocabularyProfile(userId: string) {
   };
 }
 
+async function vocabularyVoiceIceServers(userId: string, roomId: string) {
+  if (!roomId) throw new Error("ROOM_NOT_FOUND");
+  const roomSnap = await adminDb.collection(ROOM_COLLECTION).doc(roomId).get();
+  if (!roomSnap.exists) throw new Error("ROOM_NOT_FOUND");
+  const room = roomSnap.data() || {};
+  if (!participant(room, userId)) throw new Error("FORBIDDEN");
+  if (text(room.mode) !== "duel" || text(room.status) !== "playing") throw new Error("VOICE_NOT_AVAILABLE");
+
+  const keyId = text(process.env.CLOUDFLARE_TURN_KEY_ID);
+  const apiToken = text(process.env.CLOUDFLARE_TURN_KEY_API_TOKEN);
+
+  if (keyId && apiToken) {
+    const response = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(keyId)}/credentials/generate-ice-servers`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ttl: 3600 }),
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error("TURN_CREDENTIALS_FAILED");
+    const payload = await response.json() as { iceServers?: Array<{ urls?: string | string[]; username?: string; credential?: string }> };
+    const iceServers = (payload.iceServers || []).map((server) => {
+      const urls = Array.isArray(server.urls) ? server.urls : server.urls ? [server.urls] : [];
+      const browserSafeUrls = urls.filter((url) => !url.includes(":53"));
+      return {
+        urls: browserSafeUrls.length ? browserSafeUrls : urls,
+        ...(server.username ? { username: server.username } : {}),
+        ...(server.credential ? { credential: server.credential } : {}),
+      };
+    }).filter((server) => Array.isArray(server.urls) && server.urls.length);
+    if (iceServers.some((server) => server.urls.some((url) => url.startsWith("turn:" ) || url.startsWith("turns:")))) {
+      return { iceServers, turnEnabled: true, provider: "cloudflare" as const };
+    }
+  }
+
+  const staticUrls = text(process.env.VOCABULARY_TURN_URLS).split(",").map((value) => value.trim()).filter(Boolean);
+  if (staticUrls.length) {
+    return {
+      iceServers: [
+        { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] },
+        {
+          urls: staticUrls,
+          ...(text(process.env.VOCABULARY_TURN_USERNAME) ? { username: text(process.env.VOCABULARY_TURN_USERNAME) } : {}),
+          ...(text(process.env.VOCABULARY_TURN_CREDENTIAL) ? { credential: text(process.env.VOCABULARY_TURN_CREDENTIAL) } : {}),
+        },
+      ],
+      turnEnabled: true,
+      provider: "static" as const,
+    };
+  }
+
+  return {
+    iceServers: [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
+    turnEnabled: false,
+    provider: "stun-only" as const,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const member = await verifiedMember(request);
     const view = request.nextUrl.searchParams.get("view") || "leaderboard";
     if (view === "overrides") return NextResponse.json(await getVocabularyDictionaryOverrides());
     if (view === "profile") return NextResponse.json(await vocabularyProfile(member.userId));
+    if (view === "active") return NextResponse.json(await activeVocabularyRoom(member.userId));
+    if (view === "voice-ice") return NextResponse.json(await vocabularyVoiceIceServers(member.userId, text(request.nextUrl.searchParams.get("roomId"))));
     const rawPeriod = request.nextUrl.searchParams.get("period");
     const period: LeaderboardPeriod = rawPeriod === "weekly" || rawPeriod === "season" ? rawPeriod : "daily";
     return NextResponse.json(await leaderboard(member.userId, period));
@@ -1202,6 +1331,7 @@ function errorResponse(error: unknown) {
     ROOM_NOT_AVAILABLE: "هذه الغرفة بدأت أو لم تعد متاحة.",
     OWN_ROOM: "لا يمكنك الانضمام إلى الغرفة التي أنشأتها بنفس الحساب.",
     NOT_YOUR_TURN: "انتظر دورك.",
+    TURN_NOT_READY: "استعد — يبدأ الدور بعد لحظات.",
     TURN_EXPIRED: "انتهى وقت الدور. جاري الانتقال للدور التالي.",
     INVALID_MOVE: "اختر بطاقة ومكانًا صحيحًا.",
     CARD_NOT_FOUND: "هذه البطاقة لم تعد موجودة في يدك.",
@@ -1218,12 +1348,14 @@ function errorResponse(error: unknown) {
     VOICE_GUEST_ONLY: "جاري إعادة تجهيز الاتصال الصوتي.",
     VOICE_SESSION_CHANGED: "تغير الاتصال الصوتي. جاري إعادة المحاولة.",
     INVALID_VOICE_SIGNAL: "تعذر تجهيز الاتصال الصوتي.",
+    TURN_CREDENTIALS_FAILED: "تعذر إصدار بيانات TURN الآمنة الآن. حاول فتح المايك مرة أخرى.",
+    REPORT_WORD_INVALID: "لا يمكن إرسال هذه الكلمة للمراجعة من هذه المباراة.",
   };
 
   const status = code === "UNAUTHORIZED" ? 401
     : code === "FORBIDDEN" ? 403
       : ["ROOM_NOT_FOUND"].includes(code) ? 404
-        : ["INVALID_WORD", "MOVE_AVAILABLE", "NOT_YOUR_TURN", "TURN_EXPIRED", "ROOM_NOT_AVAILABLE", "OWN_ROOM", "GAME_NOT_FINISHED", "REMATCH_CHANGED", "MATCH_CHANGED"].includes(code) ? 409
+        : ["INVALID_WORD", "MOVE_AVAILABLE", "NOT_YOUR_TURN", "TURN_NOT_READY", "TURN_EXPIRED", "ROOM_NOT_AVAILABLE", "OWN_ROOM", "GAME_NOT_FINISHED", "REMATCH_CHANGED", "MATCH_CHANGED"].includes(code) ? 409
           : 400;
 
   return NextResponse.json({ error: messages[code] || "تعذر إتمام عملية تحدي المفردات الآن.", code, proposedWord }, { status });
@@ -1237,7 +1369,8 @@ export async function POST(request: NextRequest) {
 
     if (body.action === "create") {
       const mode = body.mode === "duel" ? "duel" : "solo";
-      return NextResponse.json(await createRoom(member.userId, member.userName, mode));
+      const botDifficulty: VocabularyBotDifficulty = body.botDifficulty === "easy" || body.botDifficulty === "hard" ? body.botDifficulty : "normal";
+      return NextResponse.json(await createRoom(member.userId, member.userName, mode, botDifficulty));
     }
     if (body.action === "join") {
       return NextResponse.json(await joinRoom(member.userId, member.userName, body.roomCode));
@@ -1268,6 +1401,9 @@ export async function POST(request: NextRequest) {
     }
     if (body.action === "voiceSignal") {
       return NextResponse.json(await updateVoiceSignal(member.userId, text(body.roomId), body.kind, text(body.sessionId), body.sdp));
+    }
+    if (body.action === "reportWord") {
+      return NextResponse.json(await reportVocabularyWord(member.userId, text(body.roomId), text(body.word)));
     }
 
     throw new Error("INVALID_MOVE");

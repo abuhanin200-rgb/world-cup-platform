@@ -1,34 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { sendVocabularyVoiceSignal } from "@/lib/vocabularyChallengeClient";
+import { getVocabularyVoiceIceServers, sendVocabularyVoiceSignal } from "@/lib/vocabularyChallengeClient";
 import type { VocabularyChallengeRoom } from "@/types/vocabularyChallenge";
 
 type VoiceConnectionState = "off" | "connecting" | "connected" | "error" | "unsupported";
 
-function optionalTurnServer(): RTCIceServer | null {
-  const rawUrls = process.env.NEXT_PUBLIC_VOCABULARY_TURN_URLS || "";
-  const urls = rawUrls.split(",").map((value) => value.trim()).filter(Boolean);
-  if (!urls.length) return null;
-  const username = process.env.NEXT_PUBLIC_VOCABULARY_TURN_USERNAME || "";
-  const credential = process.env.NEXT_PUBLIC_VOCABULARY_TURN_CREDENTIAL || "";
-  return {
-    urls,
-    ...(username ? { username } : {}),
-    ...(credential ? { credential } : {}),
-  };
-}
+const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
+  { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+];
 
-function buildIceServers(): RTCIceServer[] {
-  const servers: RTCIceServer[] = [
-    { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-  ];
-  const turn = optionalTurnServer();
-  if (turn) servers.push(turn);
-  return servers;
-}
-
-function waitForIceGatheringComplete(pc: RTCPeerConnection, timeoutMs = 6000) {
+function waitForIceGatheringComplete(pc: RTCPeerConnection, timeoutMs = 7000) {
   if (pc.iceGatheringState === "complete") return Promise.resolve();
   return new Promise<void>((resolve) => {
     let settled = false;
@@ -82,6 +64,10 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
   const [micEnabled, setMicEnabled] = useState(false);
   const [state, setState] = useState<VoiceConnectionState>(supported ? "off" : "unsupported");
   const [error, setError] = useState("");
+  const [iceServers, setIceServers] = useState<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
+  const [iceReady, setIceReady] = useState(false);
+  const [turnEnabled, setTurnEnabled] = useState(false);
+  const [restartNonce, setRestartNonce] = useState(0);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const senderRef = useRef<RTCRtpSender | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -91,6 +77,7 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
   const answerKeyRef = useRef("");
   const appliedAnswerRef = useRef("");
   const roomKeyRef = useRef("");
+  const reconnectTimerRef = useRef<number | null>(null);
 
   const ensureRemoteAudio = useCallback(() => {
     if (typeof document === "undefined") return null;
@@ -122,9 +109,7 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     if (!audio?.srcObject) return;
     void audio.play().then(() => {
       setError((current) => current.includes("صوت الخصم") ? "" : current);
-    }).catch(() => {
-      // Safari may require the next direct tap on the mic icon; keep the game usable.
-    });
+    }).catch(() => undefined);
   }, [ensureRemoteAudio]);
 
   const stopLocalMic = useCallback(async () => {
@@ -139,11 +124,22 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     setMicEnabled(false);
   }, []);
 
-  const cleanup = useCallback(() => {
-    void stopLocalMic();
+  const closePeer = useCallback(() => {
+    if (reconnectTimerRef.current !== null) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
     pcRef.current?.close();
     pcRef.current = null;
     senderRef.current = null;
+    offerKeyRef.current = "";
+    answerKeyRef.current = "";
+    appliedAnswerRef.current = "";
+  }, []);
+
+  const cleanup = useCallback(() => {
+    void stopLocalMic();
+    closePeer();
     if (remoteAudioRef.current) {
       remoteAudioRef.current.pause();
       remoteAudioRef.current.srcObject = null;
@@ -151,21 +147,45 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
       remoteAudioRef.current = null;
     }
     playbackUnlockedRef.current = false;
-    offerKeyRef.current = "";
-    answerKeyRef.current = "";
-    appliedAnswerRef.current = "";
+    setRestartNonce(0);
     setState(supported ? "off" : "unsupported");
     setError("");
-  }, [stopLocalMic, supported]);
+  }, [closePeer, stopLocalMic, supported]);
+
+  useEffect(() => {
+    if (!room || room.mode !== "duel" || room.status !== "playing" || !userId || !supported) {
+      setIceReady(false);
+      setTurnEnabled(false);
+      return;
+    }
+    let cancelled = false;
+    setIceReady(false);
+    void getVocabularyVoiceIceServers(room.id)
+      .then((config) => {
+        if (cancelled) return;
+        setIceServers(config.iceServers.length ? config.iceServers : FALLBACK_ICE_SERVERS);
+        setTurnEnabled(config.turnEnabled);
+        setIceReady(true);
+      })
+      .catch((voiceError) => {
+        if (cancelled) return;
+        console.warn("Vocabulary TURN config failed:", voiceError);
+        setIceServers(FALLBACK_ICE_SERVERS);
+        setTurnEnabled(false);
+        setIceReady(true);
+      });
+    return () => { cancelled = true; };
+  }, [room?.id, room?.matchStartedAt, room?.mode, room?.status, supported, userId]);
 
   const ensurePeer = useCallback(() => {
-    if (!supported) return null;
+    if (!supported || !iceReady) return null;
     if (pcRef.current) return pcRef.current;
 
     const pc = new RTCPeerConnection({
-      iceServers: buildIceServers(),
-      iceCandidatePoolSize: 4,
+      iceServers,
+      iceCandidatePoolSize: turnEnabled ? 8 : 4,
       bundlePolicy: "max-bundle",
+      iceTransportPolicy: "all",
     });
     const transceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
     senderRef.current = transceiver.sender;
@@ -177,37 +197,44 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
       audio.srcObject = stream;
       audio.muted = false;
       audio.volume = 1;
-      event.track.onunmute = () => {
-        void audio.play().catch(() => {
-          if (!playbackUnlockedRef.current) {
-            setError("اضغط أيقونة المايك مرة واحدة لتفعيل صوت الخصم في هذا المتصفح.");
-          }
+      const tryPlay = () => {
+        void audio.play().then(() => setError("")).catch(() => {
+          if (!playbackUnlockedRef.current) setError("اضغط أيقونة المايك مرة واحدة لتفعيل صوت الخصم في هذا المتصفح.");
         });
       };
-      void audio.play().then(() => {
-        setError("");
-      }).catch(() => {
-        if (!playbackUnlockedRef.current) {
-          setError("اضغط أيقونة المايك مرة واحدة لتفعيل صوت الخصم في هذا المتصفح.");
+      event.track.onunmute = tryPlay;
+      tryPlay();
+    };
+
+    const scheduleIceRestart = () => {
+      if (reconnectTimerRef.current !== null) return;
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null;
+        if (pc.connectionState === "failed" || pc.iceConnectionState === "failed" || pc.connectionState === "disconnected") {
+          setRestartNonce((value) => value + 1);
         }
-      });
+      }, 1800);
     };
 
     const syncConnectionState = () => {
       const connectionState = pc.connectionState;
       const iceState = pc.iceConnectionState;
       if (connectionState === "connected" || iceState === "connected" || iceState === "completed") {
+        if (reconnectTimerRef.current !== null) {
+          window.clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = null;
+        }
         setState("connected");
         setError("");
       } else if (["connecting", "new"].includes(connectionState) || ["checking", "new"].includes(iceState)) {
         setState("connecting");
       } else if (connectionState === "failed" || iceState === "failed") {
-        setState("error");
-        setError(optionalTurnServer()
-          ? "تعذر تثبيت الاتصال الصوتي. أغلق المايك وافتحه مرة أخرى."
-          : "تعذر ربط الصوت على هذه الشبكة. دعم TURN اختياري للشبكات المقيدة.");
+        setState("connecting");
+        setError(turnEnabled ? "جاري إعادة ربط الصوت عبر خادم TURN…" : "تعذر ربط الصوت على هذه الشبكة. يلزم تفعيل TURN في إعدادات الخادم.");
+        scheduleIceRestart();
       } else if (connectionState === "disconnected") {
         setState("connecting");
+        scheduleIceRestart();
       }
     };
     pc.onconnectionstatechange = syncConnectionState;
@@ -219,10 +246,10 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     pcRef.current = pc;
     setState("connecting");
     return pc;
-  }, [ensureRemoteAudio, supported]);
+  }, [ensureRemoteAudio, iceReady, iceServers, supported, turnEnabled]);
 
   useEffect(() => {
-    if (!room || room.mode !== "duel" || room.status !== "playing" || !userId) {
+    if (!room || room.mode !== "duel" || room.status !== "playing" || !userId || !iceReady) {
       roomKeyRef.current = "";
       if (pcRef.current) cleanup();
       return;
@@ -237,13 +264,14 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     const isHost = room.hostId === userId;
 
     if (isHost) {
-      const offerKey = `${room.id}:${room.matchStartedAt || 0}`;
+      const offerKey = `${room.id}:${room.matchStartedAt || 0}:${restartNonce}`;
       if (offerKeyRef.current !== offerKey) {
         offerKeyRef.current = offerKey;
         const sessionId = `${room.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         void (async () => {
           try {
-            const offer = await pc.createOffer();
+            if (restartNonce > 0) pc.restartIce();
+            const offer = await pc.createOffer(restartNonce > 0 ? { iceRestart: true } : undefined);
             await pc.setLocalDescription(offer);
             await waitForIceGatheringComplete(pc);
             const sdp = pc.localDescription?.sdp || "";
@@ -275,8 +303,7 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
     void (async () => {
       try {
         if (pc.signalingState !== "stable") {
-          answerKeyRef.current = "";
-          return;
+          await pc.setLocalDescription({ type: "rollback" }).catch(() => undefined);
         }
         await pc.setRemoteDescription({ type: "offer", sdp: offer.sdp });
         const answer = await pc.createAnswer();
@@ -291,7 +318,7 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
         setError(voiceErrorMessage(voiceError));
       }
     })();
-  }, [cleanup, ensurePeer, room, userId]);
+  }, [cleanup, ensurePeer, iceReady, restartNonce, room, userId]);
 
   useEffect(() => cleanup, [cleanup]);
 
@@ -302,6 +329,11 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
       setError(window.isSecureContext
         ? "المحادثة الصوتية غير مدعومة في هذا المتصفح."
         : "الميكروفون يحتاج اتصال HTTPS آمن.");
+      return;
+    }
+    if (!iceReady) {
+      setState("connecting");
+      setError("جاري تجهيز الاتصال الصوتي…");
       return;
     }
     const pc = ensurePeer();
@@ -327,22 +359,21 @@ export function useVocabularyVoiceChat(room: VocabularyChallengeRoom | null, use
       if (pc.connectionState === "connected" || ["connected", "completed"].includes(pc.iceConnectionState)) setState("connected");
       const audio = ensureRemoteAudio();
       if (audio?.srcObject) {
-        await audio.play().catch(() => {
-          setError("اضغط أيقونة المايك مرة أخرى إذا لم تسمع صوت الخصم.");
-        });
+        await audio.play().catch(() => setError("اضغط أيقونة المايك مرة أخرى إذا لم تسمع صوت الخصم."));
       }
     } catch (voiceError) {
       await stopLocalMic();
       setState("error");
       setError(voiceErrorMessage(voiceError));
     }
-  }, [ensurePeer, ensureRemoteAudio, micEnabled, stopLocalMic, supported, unlockAudio]);
+  }, [ensurePeer, ensureRemoteAudio, iceReady, micEnabled, stopLocalMic, supported, unlockAudio]);
 
   return {
     supported,
     micEnabled,
     state,
     error,
+    turnEnabled,
     toggleMic,
     unlockAudio,
   };
