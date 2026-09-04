@@ -13,7 +13,7 @@ function getBearerToken(request: NextRequest) {
 }
 
 function isPlatformGameId(value: unknown): value is PlatformGameId {
-  return value === "word-game" || value === "flag-memory" || value === "ten-seconds";
+  return value === "word-game" || value === "flag-memory" || value === "ten-seconds" || value === "vocabulary";
 }
 
 export async function POST(request: NextRequest) {

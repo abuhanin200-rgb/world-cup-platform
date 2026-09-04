@@ -62,6 +62,13 @@ export function getPresenceInfoFromPath(path: string): {
     };
   }
 
+  if (path.startsWith("/vocabulary-challenge")) {
+    return {
+      currentPage: "vocabularyChallenge",
+      activity: "يلعب تحدي المفردات",
+    };
+  }
+
   if (path.startsWith("/admin")) {
     return {
       currentPage: "admin",

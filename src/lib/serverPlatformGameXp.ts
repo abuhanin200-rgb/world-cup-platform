@@ -99,13 +99,44 @@ async function getTenSecondsAward(sourceResultId: string): Promise<GameXpAward |
   };
 }
 
+
+async function getVocabularyAward(sourceResultId: string): Promise<GameXpAward | null> {
+  const snap = await adminDb.collection("vocabularyChallengeResults").doc(sourceResultId).get();
+  if (!snap.exists) return null;
+  const data = snap.data() || {};
+  if (!bool(data.completed)) return null;
+
+  const won = bool(data.won);
+  const mode = text(data.mode);
+  const outcome = text(data.outcome);
+  const draws = Math.max(0, Math.floor(number(data.draws)));
+  const xp = mode === "solo"
+    ? (won ? clamp(28 - draws * 2, 14, 28) : 3)
+    : (won ? 35 : outcome === "draw" ? 8 : 6);
+  const finishedAt = Math.max(0, number(data.finishedAt));
+
+  return {
+    gameId: "vocabulary",
+    sourceResultId,
+    userId: text(data.userId),
+    userName: text(data.userName) || "عضو",
+    xp,
+    won,
+    dateKey: finishedAt ? new Date(finishedAt).toISOString().slice(0, 10) : "",
+    reason: mode === "solo"
+      ? (won ? "إنهاء تحدي المفردات الفردي" : "إكمال تحدي المفردات الفردي")
+      : (won ? "الفوز في تحدي المفردات ضد لاعب" : outcome === "draw" ? "تعادل في تحدي المفردات" : "إكمال تحدي المفردات ضد لاعب"),
+  };
+}
+
 export async function getGameXpAward(
   gameId: PlatformGameId,
   sourceResultId: string,
 ): Promise<GameXpAward | null> {
   if (gameId === "word-game") return getWordGameAward(sourceResultId);
   if (gameId === "flag-memory") return getFlagMemoryAward(sourceResultId);
-  return getTenSecondsAward(sourceResultId);
+  if (gameId === "ten-seconds") return getTenSecondsAward(sourceResultId);
+  return getVocabularyAward(sourceResultId);
 }
 
 function mapBreakdown(value: unknown): PlatformGameBreakdown {
@@ -122,6 +153,7 @@ function emptyGameStats(): PlatformGameStats["gameStats"] {
     "word-game": { ...EMPTY_GAME_BREAKDOWN },
     "flag-memory": { ...EMPTY_GAME_BREAKDOWN },
     "ten-seconds": { ...EMPTY_GAME_BREAKDOWN },
+    vocabulary: { ...EMPTY_GAME_BREAKDOWN },
   };
 }
 
@@ -225,16 +257,18 @@ export async function rebuildAllPlatformGameXp() {
   await deleteCollectionDocuments("gameXpEvents");
   await deleteCollectionDocuments("platformGameStats");
 
-  const [wordResults, flagResults, tenResults] = await Promise.all([
+  const [wordResults, flagResults, tenResults, vocabularyResults] = await Promise.all([
     adminDb.collection("wordGameDailyResults").get(),
     adminDb.collection("flagMemoryResults").get(),
     adminDb.collection("tenSecondsChallengeDaily").get(),
+    adminDb.collection("vocabularyChallengeResults").get(),
   ]);
 
   const sources: Array<{ gameId: PlatformGameId; sourceResultId: string }> = [
     ...wordResults.docs.map((docSnap) => ({ gameId: "word-game" as const, sourceResultId: docSnap.id })),
     ...flagResults.docs.map((docSnap) => ({ gameId: "flag-memory" as const, sourceResultId: docSnap.id })),
     ...tenResults.docs.map((docSnap) => ({ gameId: "ten-seconds" as const, sourceResultId: docSnap.id })),
+    ...vocabularyResults.docs.map((docSnap) => ({ gameId: "vocabulary" as const, sourceResultId: docSnap.id })),
   ];
 
   let events = 0;

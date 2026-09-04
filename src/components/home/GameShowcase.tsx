@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Flag,
   Gamepad2,
+  Languages,
   Target,
   TimerReset,
   type LucideIcon,
@@ -14,7 +15,7 @@ import {
 import { playInteractionFeedback } from "@/lib/interactionFeedback";
 
 type Game = {
-  id: "word" | "flags" | "timer";
+  id: "vocabulary" | "word" | "flags" | "timer";
   title: string;
   shortTitle: string;
   description: string;
@@ -25,6 +26,16 @@ type Game = {
 };
 
 const GAMES: Game[] = [
+  {
+    id: "vocabulary",
+    title: "تحدي المفردات",
+    shortTitle: "المفردات",
+    description: "غيّر حرفًا واحدًا، اصنع كلمة صحيحة، وتخلّص من بطاقاتك قبل خصمك.",
+    href: "/vocabulary-challenge",
+    icon: Languages,
+    accent: "#6ee7b7",
+    background: "radial-gradient(circle at 16% 18%, rgba(110,231,183,.22), transparent 28%), linear-gradient(135deg,#064238 0%,#07533f 52%,#07322f 100%)",
+  },
   {
     id: "word",
     title: "خمن كلمة اليوم",
@@ -58,6 +69,22 @@ const GAMES: Game[] = [
 ];
 
 function GameVisual({ game }: { game: Game }) {
+  if (game.id === "vocabulary") {
+    return (
+      <div className="relative flex h-full min-h-[150px] items-center justify-center sm:min-h-[190px]" aria-hidden="true">
+        <div className="absolute h-36 w-36 rounded-full border border-emerald-100/10 sm:h-44 sm:w-44" />
+        <div className="absolute h-28 w-28 rounded-full border border-dashed border-emerald-100/15 sm:h-36 sm:w-36" />
+        <div className="relative flex items-center gap-2" dir="rtl">
+          {["م", "ي", "م"].map((letter, index) => (
+            <motion.div key={`${letter}-${index}`} animate={index === 0 ? { y: [0, -5, 0] } : undefined} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }} className={`grid h-16 w-12 place-items-center rounded-[15px] border text-2xl font-black shadow-xl ${index === 0 ? "border-emerald-100/35 bg-gradient-to-br from-emerald-400/80 to-emerald-700/90" : "border-white/12 bg-white/[0.08]"}`}>{letter}</motion.div>
+          ))}
+          <span className="mx-1 text-lg font-black text-emerald-100">←</span>
+          <motion.div animate={{ rotate: [0, -4, 0] }} transition={{ duration: 2.2, repeat: Infinity }} className="grid h-14 w-11 place-items-center rounded-[14px] border border-amber-100/40 bg-gradient-to-br from-amber-300 to-orange-600 text-xl font-black shadow-xl">ر</motion.div>
+        </div>
+      </div>
+    );
+  }
+
   if (game.id === "word") {
     return (
       <div className="relative flex h-full min-h-[150px] items-center justify-center sm:min-h-[190px]" aria-hidden="true">
@@ -115,7 +142,7 @@ function GameVisual({ game }: { game: Game }) {
 }
 
 export default function GameShowcase() {
-  const [activeId, setActiveId] = useState<Game["id"]>("word");
+  const [activeId, setActiveId] = useState<Game["id"]>("vocabulary");
   const reduceMotion = useReducedMotion();
   const active = useMemo(() => GAMES.find((game) => game.id === activeId) ?? GAMES[0], [activeId]);
 
@@ -174,7 +201,7 @@ export default function GameShowcase() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="grid grid-cols-3 gap-1.5 border-t border-white/[0.10] bg-[#04143d]/45 p-2 backdrop-blur-2xl sm:gap-2 sm:p-3">
+        <div className="grid grid-cols-2 gap-1.5 border-t border-white/[0.10] bg-[#04143d]/45 p-2 backdrop-blur-2xl sm:grid-cols-4 sm:gap-2 sm:p-3">
           {GAMES.map((game) => {
             const selected = game.id === active.id;
             const Icon = game.icon;

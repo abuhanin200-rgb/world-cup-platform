@@ -1,4 +1,4 @@
-export type PlatformGameId = "word-game" | "flag-memory" | "ten-seconds";
+export type PlatformGameId = "word-game" | "flag-memory" | "ten-seconds" | "vocabulary";
 
 export type PlatformGameBreakdown = {
   played: number;
@@ -36,6 +36,7 @@ export const PLATFORM_GAMES: ReadonlyArray<{
   { id: "word-game", title: "خمن كلمة اليوم", shortTitle: "الكلمة" },
   { id: "flag-memory", title: "تحدي الأعلام", shortTitle: "الأعلام" },
   { id: "ten-seconds", title: "تحدي العشر ثواني", shortTitle: "10 ثوانٍ" },
+  { id: "vocabulary", title: "تحدي المفردات", shortTitle: "المفردات" },
 ];
 
 export const EMPTY_GAME_BREAKDOWN: PlatformGameBreakdown = {

@@ -9,6 +9,7 @@ import {
   Flag,
   Gamepad2,
   Medal,
+  Languages,
   Sparkles,
   Target,
   TimerReset,
@@ -23,6 +24,18 @@ import { playInteractionFeedback } from "@/lib/interactionFeedback";
 import MemberProfileLink from "@/components/members/MemberProfileLink";
 
 const GAMES = [
+  {
+    id: "vocabulary",
+    title: "تحدي المفردات",
+    shortTitle: "المفردات",
+    description: "بدّل حرفًا واحدًا لتصنع كلمة صحيحة، وتخلّص من بطاقاتك قبل خصمك أو قبل انتهاء الوقت.",
+    href: "/vocabulary-challenge",
+    icon: Languages,
+    tag: "مفردات",
+    xp: "حتى 35 XP",
+    visual: "vocabulary",
+    glow: "rgba(52,211,153,.20)",
+  },
   {
     id: "word-game",
     title: "خمن كلمة اليوم",
@@ -70,6 +83,7 @@ function mapStats(id: string, data: Record<string, unknown>): PlatformGameStats 
         "word-game": { played: 0, wins: 0, xp: 0 },
         "flag-memory": { played: 0, wins: 0, xp: 0 },
         "ten-seconds": { played: 0, wins: 0, xp: 0 },
+        vocabulary: { played: 0, wins: 0, xp: 0 },
       };
 
   return {
@@ -91,6 +105,29 @@ function RankIcon({ rank }: { rank: number }) {
 }
 
 function GameVisual({ kind }: { kind: (typeof GAMES)[number]["visual"] }) {
+  if (kind === "vocabulary") {
+    return (
+      <div className="relative flex items-center justify-center" dir="rtl" aria-hidden="true">
+        <div className="absolute h-36 w-36 rounded-full border border-emerald-200/10" />
+        <div className="absolute h-28 w-28 rounded-full border border-dashed border-emerald-200/15" />
+        <div className="relative flex items-center gap-2">
+          {["م", "ي", "م"].map((letter, index) => (
+            <motion.span
+              key={`${letter}-${index}`}
+              animate={index === 0 ? { y: [0, -5, 0] } : undefined}
+              transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}
+              className={`grid h-16 w-12 place-items-center rounded-[15px] border text-2xl font-black text-white shadow-lg ${index === 0 ? "border-emerald-200/35 bg-gradient-to-br from-emerald-400/80 to-emerald-700/85" : "border-white/12 bg-white/[0.07]"}`}
+            >
+              {letter}
+            </motion.span>
+          ))}
+          <motion.span animate={{ x: [0, -4, 0] }} transition={{ duration: 1.8, repeat: Infinity }} className="mx-1 text-lg font-black text-emerald-200">←</motion.span>
+          <span className="grid h-14 w-11 place-items-center rounded-[14px] border border-amber-100/45 bg-gradient-to-br from-amber-300 to-orange-600 text-xl font-black text-white shadow-lg">ر</span>
+        </div>
+      </div>
+    );
+  }
+
   if (kind === "letters") {
     return (
       <div className="grid grid-cols-4 gap-2" dir="ltr" aria-hidden="true">
@@ -144,7 +181,7 @@ export default function GamesHub() {
   const [memberStats, setMemberStats] = useState<PlatformGameStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [activeGame, setActiveGame] = useState<GameId>("word-game");
+  const [activeGame, setActiveGame] = useState<GameId>("vocabulary");
 
   useEffect(() => {
     const leaderboardQuery = query(collection(db, "platformGameStats"), orderBy("totalXp", "desc"), limit(20));
@@ -200,7 +237,7 @@ export default function GamesHub() {
                 <Gamepad2 className="h-3.5 w-3.5" /> وقت التحدي
               </div>
               <h1 className="altahaddi-display-title mt-3 font-black">العب. اجمع XP. ارفع مستواك</h1>
-              <p className="altahaddi-body-copy mt-2 max-w-xl font-semibold text-white/48">ثلاث ألعاب سريعة، ترتيب واحد، ومستوى يتطور مع كل مشاركة.</p>
+              <p className="altahaddi-body-copy mt-2 max-w-xl font-semibold text-white/48">أربع ألعاب سريعة، ترتيب واحد، ومستوى يتطور مع كل مشاركة.</p>
 
               <div className="mt-5 grid grid-cols-3 gap-2 max-w-xl">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><div dir="ltr" className="text-lg font-black text-[var(--brand-yellow)] md:text-xl">{xp} XP</div><div className="mt-1 text-[9px] font-bold text-white/38">نقاط الخبرة</div></div>
@@ -254,7 +291,7 @@ export default function GamesHub() {
               <div className="order-1 grid min-h-[160px] place-items-center overflow-hidden rounded-[26px] border border-white/10 bg-black/15 md:order-2 md:min-h-[245px]"><GameVisual kind={selectedGame.visual} /></div>
             </div>
 
-            <div className="relative grid grid-cols-3 gap-1.5 border-t border-white/[0.07] bg-black/10 p-2 md:gap-2 md:p-3">
+            <div className="relative grid grid-cols-2 gap-1.5 border-t border-white/[0.07] bg-black/10 p-2 sm:grid-cols-4 md:gap-2 md:p-3">
               {GAMES.map((game) => {
                 const Icon = game.icon;
                 const active = game.id === activeGame;

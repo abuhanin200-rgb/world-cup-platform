@@ -23,6 +23,7 @@ const GAME_LABELS: Record<string, string> = {
   "word-game": "خمن كلمة اليوم",
   "flag-memory": "تحدي الأعلام",
   "ten-seconds": "العشر ثواني",
+  vocabulary: "تحدي المفردات",
 };
 
 type TournamentStat = {

@@ -17,6 +17,7 @@ function formatLastSeen(lastSeen: number) {
 function getPageLabel(path: string) {
   if (path === "/") return "الرئيسية";
   if (path.startsWith("/word-game")) return "خمن كلمة اليوم";
+  if (path.startsWith("/vocabulary-challenge")) return "تحدي المفردات";
   if (path.startsWith("/account")) return "حسابي";
   if (path.startsWith("/rules")) return "القوانين";
   if (path.startsWith("/login")) return "الدخول";

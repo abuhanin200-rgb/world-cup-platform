@@ -130,7 +130,7 @@ export async function GET(
       ? (games.gameStats as Record<string, unknown>)
       : {};
 
-    const gameBreakdown = ["word-game", "flag-memory", "ten-seconds"].map((gameId) => {
+    const gameBreakdown = ["word-game", "flag-memory", "ten-seconds", "vocabulary"].map((gameId) => {
       const entry = gameStats[gameId] && typeof gameStats[gameId] === "object"
         ? (gameStats[gameId] as Record<string, unknown>)
         : {};

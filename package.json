@@ -10,7 +10,8 @@
     "test:predictions": "node --test tests/predictions/*.test.mjs",
     "test:firestore-rules": "firebase emulators:exec --only firestore --project demo-altahaddi-rules \"node --test tests/firestore-rules/*.test.mjs\"",
     "test:predictions:all": "npm run test:predictions && npm run test:firestore-rules",
-    "purge:notifications": "node --env-file=.env.local scripts/purge-notifications.js"
+    "purge:notifications": "node --env-file=.env.local scripts/purge-notifications.js",
+    "test:vocabulary-dictionary": "node scripts/audit-vocabulary-dictionary.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
