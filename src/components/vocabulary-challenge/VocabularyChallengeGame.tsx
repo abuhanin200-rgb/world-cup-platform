@@ -172,13 +172,13 @@ function PlayerBadge({
 }) {
   const name = player?.userName || (me ? "أنت" : "بانتظار لاعب");
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex min-w-0 max-w-full items-center gap-2.5">
       <div className={`relative grid h-12 w-12 shrink-0 place-items-center rounded-full border-2 text-base font-black shadow-lg ${active ? "border-lime-300 bg-emerald-500 text-white shadow-emerald-300/20" : "border-white/15 bg-black/25 text-white/65"}`}>
         {player?.isBot ? <Bot className="h-5 w-5" /> : player ? initial(name) : <UserRound className="h-5 w-5" />}
         {active ? <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-emerald-950 bg-lime-300" /> : null}
       </div>
-      <div className="min-w-0">
-        <div className="max-w-[170px] truncate text-[11px] font-black text-white/85 sm:text-xs">{name}</div>
+      <div className="min-w-0 flex-1">
+        <div className="max-w-[130px] truncate sm:max-w-[170px] text-[11px] font-black text-white/85 sm:text-xs">{name}</div>
         <div className="mt-1 flex items-center gap-1.5">
           <div className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1 text-[10px] font-black text-white/75">
             <span className="grid h-4 w-4 place-items-center rounded bg-white/10 text-[9px]">▣</span>
@@ -255,11 +255,11 @@ function ModeCard({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`group min-h-[160px] rounded-[26px] border p-4 text-right transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 ${classes}`}
+      className={`group w-full min-w-0 max-w-full min-h-[152px] rounded-[26px] border p-4 text-right transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 ${classes}`}
     >
       <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-black/20">{icon}</span>
-      <h3 className="mt-4 text-lg font-black text-white">{title}</h3>
-      <p className="mt-1 text-[11px] font-semibold leading-6 text-white/52">{description}</p>
+      <h3 className="mt-4 break-words text-lg font-black leading-tight text-white">{title}</h3>
+      <p className="mt-1 break-words text-[11px] font-semibold leading-6 text-white/52">{description}</p>
     </button>
   );
 }
@@ -283,17 +283,17 @@ function LeaderboardPanel({
   const entries = data?.entries || [];
   const periodLabel = period === "daily" ? "اليوم" : period === "weekly" ? "الأسبوع" : "الموسم";
   return (
-    <div className="relative mt-5 overflow-hidden rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur-xl md:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-lime-200"><Crown className="h-4 w-4" /><span className="text-[10px] font-black">منافسة المفردات</span></div>
+    <div className="relative mt-5 w-full min-w-0 max-w-full overflow-hidden rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur-xl md:p-5">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2 text-lime-200"><Crown className="h-4 w-4" /><span className="text-[10px] font-black">منافسة المفردات</span></div>
           <h2 className="mt-1 text-lg font-black text-white">الترتيب</h2>
           <p className="mt-1 text-[10px] font-semibold text-white/42">فوز التحدي 3 نقاط · إنهاء الفردي 2 · التعادل نقطة</p>
         </div>
         <button type="button" onClick={onRefresh} disabled={loading} aria-label={`تحديث ترتيب ${periodLabel}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.045] text-white/55 transition hover:text-white disabled:opacity-40"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
       </div>
 
-      <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-2xl border border-white/[0.08] bg-black/15 p-1.5">
+      <div className="mt-3 grid w-full min-w-0 grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5 rounded-2xl border border-white/[0.08] bg-black/15 p-1.5">
         {([['daily','اليومي'],['weekly','الأسبوعي'],['season','الموسمي']] as Array<[VocabularyLeaderboardPeriod,string]>).map(([value,label]) => (
           <button key={value} type="button" onClick={() => onPeriodChange(value)} className={`min-h-10 rounded-xl px-2 text-[10px] font-black transition ${period === value ? "bg-lime-300 text-emerald-950" : "text-white/48 hover:bg-white/[0.05] hover:text-white"}`}>{label}</button>
         ))}
@@ -860,10 +860,10 @@ export default function VocabularyChallengeGame() {
   const turnOwnerLabel = isMyTurn ? "دورك" : room?.mode === "solo" ? "دور بوت التحدي" : "دور الخصم";
 
   return (
-    <main dir="rtl" className="relative mx-auto max-w-7xl overflow-hidden px-3 pb-16 pt-3 sm:px-4 md:px-6 md:pb-20 md:pt-6">
+    <main dir="rtl" className="relative mx-auto box-border w-full min-w-0 max-w-[100vw] overflow-x-hidden px-3 pb-16 pt-3 sm:max-w-7xl sm:px-4 md:px-6 md:pb-20 md:pt-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[760px] bg-[radial-gradient(circle_at_20%_10%,rgba(52,211,153,.12),transparent_28%),radial-gradient(circle_at_82%_18%,rgba(16,185,129,.10),transparent_30%)]" />
 
-      <div className="mb-3 flex items-center justify-between gap-2">
+      <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
         <Link href="/games" className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-black text-white/60 transition hover:bg-white/[0.07] hover:text-white"><ArrowRight className="h-4 w-4" /> الألعاب</Link>
         {room?.status === "waiting" ? (
           <button type="button" onClick={handleForfeit} disabled={busy || cancelled} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-red-200/10 bg-red-400/[0.055] px-3 text-[11px] font-black text-red-100/70 disabled:opacity-35"><LogOut className="h-4 w-4" /> إلغاء الغرفة</button>
@@ -873,17 +873,17 @@ export default function VocabularyChallengeGame() {
       </div>
 
       {!roomId ? (
-        <section className="relative overflow-hidden rounded-[34px] border border-emerald-200/15 bg-[linear-gradient(155deg,#073c34_0%,#075640_46%,#063a32_100%)] p-4 shadow-[0_28px_90px_rgba(0,0,0,.32)] md:p-7">
+        <section className="relative box-border w-full min-w-0 max-w-full overflow-hidden rounded-[30px] border border-emerald-200/15 bg-[linear-gradient(155deg,#073c34_0%,#075640_46%,#063a32_100%)] p-3 shadow-[0_28px_90px_rgba(0,0,0,.32)] sm:rounded-[34px] sm:p-4 md:p-7">
           <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_50%_50%,rgba(255,255,255,.10)_0_1px,transparent_1.5px),linear-gradient(30deg,transparent_48%,rgba(255,255,255,.05)_49%_51%,transparent_52%),linear-gradient(-30deg,transparent_48%,rgba(255,255,255,.045)_49%_51%,transparent_52%)] [background-size:26px_26px,52px_45px,52px_45px]" />
           <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[80%] -translate-x-1/2 rounded-[50%] border border-emerald-100/10 bg-emerald-100/[0.025]" />
 
-          <div className="relative grid gap-7 lg:grid-cols-[1fr_410px] lg:items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-lime-200/20 bg-lime-300/[0.08] px-3 py-1.5 text-[10px] font-black text-lime-100"><Languages className="h-4 w-4" /> لعبة لغوية تنافسية</div>
+          <div className="relative grid w-full min-w-0 max-w-full gap-5 sm:gap-7 lg:grid-cols-[minmax(0,1fr)_410px] lg:items-center">
+            <div className="min-w-0">
+              <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-lime-200/20 bg-lime-300/[0.08] px-3 py-1.5 text-[10px] font-black text-lime-100"><Languages className="h-4 w-4" /> لعبة لغوية تنافسية</div>
               <h1 className="mt-4 text-3xl font-black leading-[1.35] text-white md:text-5xl">تحدي المفردات</h1>
-              <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-emerald-50/58 md:text-base">غيّر حرفًا واحدًا فقط من الكلمة الموجودة في الوسط لتصنع كلمة عربية صحيحة، وتخلّص من بطاقاتك قبل انتهاء الوقت.</p>
+              <p className="mt-3 max-w-2xl break-words text-sm font-semibold leading-7 text-emerald-50/58 md:text-base">غيّر حرفًا واحدًا فقط من الكلمة الموجودة في الوسط لتصنع كلمة عربية صحيحة، وتخلّص من بطاقاتك قبل انتهاء الوقت.</p>
 
-              <div className="mt-6 flex items-center gap-2" dir="rtl" aria-label="مثال على طريقة اللعب">
+              <div className="mt-6 flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:gap-2" dir="rtl" aria-label="مثال على طريقة اللعب">
                 {Array.from("ميم").map((letter, index) => <CardFace key={`${letter}-${index}`} letter={letter} index={index} size="mini" />)}
                 <span className="mx-1 text-xl font-black text-lime-200">+</span>
                 <CardFace letter="ر" index={3} size="mini" />
@@ -891,43 +891,43 @@ export default function VocabularyChallengeGame() {
                 <div className="rounded-2xl border border-lime-200/20 bg-lime-300/[0.08] px-3 py-2 text-sm font-black text-lime-100">ريم ✓</div>
               </div>
 
-              <div className="mt-6 grid max-w-xl grid-cols-3 gap-2 text-center">
-                <div className="rounded-2xl border border-white/10 bg-black/15 p-3"><Clock3 className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">10 ثوانٍ</div><div className="mt-1 text-[9px] font-semibold text-white/38">لكل دور</div></div>
-                <div className="rounded-2xl border border-white/10 bg-black/15 p-3"><Hand className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">10 بطاقات</div><div className="mt-1 text-[9px] font-semibold text-white/38">عند البداية</div></div>
-                <div className="rounded-2xl border border-white/10 bg-black/15 p-3"><Trophy className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">أول من يخلّصها</div><div className="mt-1 text-[9px] font-semibold text-white/38">يفوز</div></div>
+              <div className="mt-6 grid w-full max-w-xl grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5 text-center sm:gap-2">
+                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-3 sm:p-3"><Clock3 className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">10 ثوانٍ</div><div className="mt-1 text-[9px] font-semibold text-white/38">لكل دور</div></div>
+                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-3 sm:p-3"><Hand className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">10 بطاقات</div><div className="mt-1 text-[9px] font-semibold text-white/38">عند البداية</div></div>
+                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-3 sm:p-3"><Trophy className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">أول من يخلّصها</div><div className="mt-1 text-[9px] font-semibold text-white/38">يفوز</div></div>
               </div>
             </div>
 
-            <div className="rounded-[30px] border border-white/10 bg-black/20 p-4 backdrop-blur-xl md:p-5">
-              <div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-black text-lime-200">اختر نمط اللعب</p><h2 className="mt-1 text-xl font-black">كيف تبي تلعب؟</h2></div><Gamepad2 className="h-6 w-6 text-lime-200" /></div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div className="w-full min-w-0 max-w-full rounded-[26px] border border-white/10 bg-black/20 p-3.5 backdrop-blur-xl sm:rounded-[30px] sm:p-4 md:p-5">
+              <div className="mb-3 flex min-w-0 items-center justify-between gap-2"><div className="min-w-0"><p className="text-[10px] font-black text-lime-200">اختر نمط اللعب</p><h2 className="mt-1 text-xl font-black">كيف تبي تلعب؟</h2></div><Gamepad2 className="h-6 w-6 text-lime-200" /></div>
+              <div className="grid w-full min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <ModeCard icon={<Bot className="h-5 w-5" />} title="العب بمفردك" description={`واجه بوت التحدي بمستوى ${botDifficulty === "easy" ? "سهل" : botDifficulty === "hard" ? "صعب" : "متوسط"} وتخلّص من بطاقاتك قبله.`} accent="emerald" onClick={() => handleCreate("solo")} disabled={busy || matchmaking || restoringRoom} />
                 <ModeCard icon={<Swords className="h-5 w-5" />} title="لاعب ضد لاعب" description="أنشئ غرفة خاصة أو واجه خصمًا أونلاين، وأول من يتخلّص من بطاقاته يفوز." accent="amber" onClick={() => handleCreate("duel")} disabled={busy || matchmaking || restoringRoom} />
               </div>
               <div className="mt-2 rounded-2xl border border-emerald-200/10 bg-black/15 p-2.5">
-                <div className="mb-2 flex items-center justify-between gap-2"><span className="text-[10px] font-black text-emerald-100/70">مستوى بوت اللعب الفردي</span>{restoringRoom ? <span className="inline-flex items-center gap-1 text-[9px] font-bold text-white/35"><LoaderCircle className="h-3 w-3 animate-spin" /> فحص مباراة سابقة…</span> : null}</div>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2"><span className="text-[10px] font-black text-emerald-100/70">مستوى بوت اللعب الفردي</span>{restoringRoom ? <span className="inline-flex items-center gap-1 text-[9px] font-bold text-white/35"><LoaderCircle className="h-3 w-3 animate-spin" /> فحص مباراة سابقة…</span> : null}</div>
+                <div className="grid w-full min-w-0 grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5">
                   {([['easy','سهل'],['normal','متوسط'],['hard','صعب']] as Array<[VocabularyBotDifficulty,string]>).map(([value,label]) => (
                     <button key={value} type="button" onClick={() => setBotDifficulty(value)} className={`min-h-10 rounded-xl text-[10px] font-black transition ${botDifficulty === value ? "bg-lime-300 text-emerald-950" : "border border-white/[0.08] bg-white/[0.035] text-white/55"}`}>{label}</button>
                   ))}
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2 rounded-[22px] border border-cyan-200/15 bg-cyan-300/[0.055] p-3">
+              <div className="mt-3 grid w-full min-w-0 grid-cols-1 items-center gap-2 rounded-[22px] border border-cyan-200/15 bg-cyan-300/[0.055] p-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <div className="min-w-0"><div className="flex items-center gap-2 text-xs font-black text-cyan-100"><Shuffle className="h-4 w-4" /> خصم عشوائي أونلاين</div><p className="mt-1 text-[10px] font-semibold leading-5 text-white/45">النظام يبحث لك عن عضو متاح ويبدأ المباراة تلقائيًا.</p></div>
-                {matchmaking ? <button type="button" onClick={() => void handleCancelMatchmaking()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-rose-200/15 bg-rose-400/[0.08] px-3 text-[10px] font-black text-rose-100"><LoaderCircle className="h-4 w-4 animate-spin" /> إلغاء</button> : <button type="button" onClick={() => void handleMatchmaking()} disabled={busy} className="min-h-11 rounded-xl bg-cyan-200 px-3 text-[10px] font-black text-cyan-950 disabled:opacity-40">ابحث الآن</button>}
+                {matchmaking ? <button type="button" onClick={() => void handleCancelMatchmaking()} className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-rose-200/15 bg-rose-400/[0.08] px-3 text-[10px] font-black text-rose-100 sm:w-auto"><LoaderCircle className="h-4 w-4 animate-spin" /> إلغاء</button> : <button type="button" onClick={() => void handleMatchmaking()} disabled={busy} className="min-h-11 w-full min-w-0 rounded-xl bg-cyan-200 px-3 text-[10px] font-black text-cyan-950 disabled:opacity-40 sm:w-auto">ابحث الآن</button>}
               </div>
 
-              <form onSubmit={handleJoin} className="mt-3 rounded-[22px] border border-white/10 bg-white/[0.035] p-3">
+              <form onSubmit={handleJoin} className="mt-3 w-full min-w-0 max-w-full rounded-[22px] border border-white/10 bg-white/[0.035] p-3">
                 <label htmlFor="vocabulary-room-code" className="flex items-center gap-1.5 text-[10px] font-black text-white/55"><Hash className="h-3.5 w-3.5" /> عندك كود غرفة؟</label>
-                <div className="mt-2 flex gap-2">
-                  <input id="vocabulary-room-code" value={joinCode} onChange={(event) => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" dir="ltr" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 text-center text-base font-black tracking-[.25em] text-white outline-none placeholder:text-white/20 focus:border-lime-300/50" />
-                  <button type="submit" disabled={busy || joinCode.length !== 6} className="min-w-[88px] rounded-xl bg-lime-300 px-3 text-xs font-black text-emerald-950 transition disabled:opacity-45">انضم</button>
+                <div className="mt-2 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_76px] gap-2 sm:grid-cols-[minmax(0,1fr)_88px]">
+                  <input id="vocabulary-room-code" value={joinCode} onChange={(event) => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" dir="ltr" className="w-full min-w-0 max-w-full rounded-xl border border-white/10 bg-black/20 px-2 text-center text-base font-black tracking-[.14em] sm:px-3 sm:tracking-[.25em] text-white outline-none placeholder:text-white/20 focus:border-lime-300/50" />
+                  <button type="submit" disabled={busy || joinCode.length !== 6} className="min-w-0 rounded-xl bg-lime-300 px-2 text-[11px] font-black text-emerald-950 transition disabled:opacity-45 sm:px-3 sm:text-xs">انضم</button>
                 </div>
               </form>
 
               <div className="mt-3 flex items-start gap-2 rounded-2xl border border-emerald-200/10 bg-emerald-300/[0.045] p-3 text-[10px] font-semibold leading-5 text-emerald-50/55"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime-200" /><span>بدّل حرفًا واحدًا ببطاقة من يدك لتصنع كلمة صحيحة من 3 أحرف. أول من يتخلّص من بطاقاته يفوز.</span></div>
-              <Link href="/vocabulary-challenge/profile" className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] text-[10px] font-black text-white/65 transition hover:bg-white/[0.07] hover:text-white"><UserCircle2 className="h-4 w-4" /> ملفي في تحدي المفردات والإنجازات</Link>
+              <Link href="/vocabulary-challenge/profile" className="mt-3 inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2 text-center text-[10px] font-black leading-5 text-white/65 transition hover:bg-white/[0.07] hover:text-white"><UserCircle2 className="h-4 w-4" /> ملفي في تحدي المفردات والإنجازات</Link>
             </div>
           </div>
 
@@ -958,15 +958,15 @@ export default function VocabularyChallengeGame() {
           </div>
         </section>
       ) : (
-        <section ref={gameArenaRef} onPointerDown={() => voiceChat.unlockAudio()} className="relative mx-auto max-w-[620px] scroll-mt-2 overflow-hidden rounded-[30px] border border-emerald-100/20 bg-[linear-gradient(180deg,#064638_0%,#0b8060_38%,#086249_64%,#043b32_100%)] shadow-[0_28px_90px_rgba(0,0,0,.40)]">
+        <section ref={gameArenaRef} onPointerDown={() => voiceChat.unlockAudio()} className="relative mx-auto box-border w-full min-w-0 max-w-[620px] scroll-mt-2 overflow-hidden rounded-[28px] sm:rounded-[30px] border border-emerald-100/20 bg-[linear-gradient(180deg,#064638_0%,#0b8060_38%,#086249_64%,#043b32_100%)] shadow-[0_28px_90px_rgba(0,0,0,.40)]">
           <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_50%_50%,rgba(255,255,255,.11)_0_1px,transparent_1.4px),linear-gradient(30deg,transparent_48%,rgba(255,255,255,.06)_49%_51%,transparent_52%),linear-gradient(-30deg,transparent_48%,rgba(255,255,255,.05)_49%_51%,transparent_52%)] [background-size:24px_24px,48px_42px,48px_42px]" />
           <div className="pointer-events-none absolute inset-x-[8%] -top-48 h-[330px] rounded-[50%] border-[2px] border-emerald-100/14 bg-black/[0.06]" />
 
-          <div className="relative min-h-[520px] px-3 pb-3 pt-2.5 sm:min-h-[590px] sm:px-4 sm:pb-4 sm:pt-3">
+          <div className="relative w-full min-w-0 max-w-full min-h-[520px] px-2.5 pb-3 pt-2.5 sm:min-h-[590px] sm:px-4 sm:pb-4 sm:pt-3">
             {!isOnline ? <div role="status" className="mb-2 flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200/20 bg-rose-500/18 px-3 text-[10px] font-black text-rose-50"><WifiOff className="h-4 w-4" /> الاتصال بالإنترنت متوقف — ستعود المباراة تلقائيًا عند رجوع الشبكة</div> : null}
-            <div className="grid grid-cols-[58px_minmax(0,1fr)_58px] items-center gap-1.5 sm:gap-2">
-              <div className={`relative grid h-[58px] w-[58px] place-items-center rounded-full border-[3px] bg-black/45 shadow-[0_8px_24px_rgba(0,0,0,.25)] ${!turnIsReady ? "border-amber-300/70" : isMyTurn ? "border-lime-300/70" : "border-white/15"}`}>
-                <svg className="absolute inset-[-4px] h-[62px] w-[62px] -rotate-90" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" /><circle cx="36" cy="36" r="31" fill="none" stroke={!turnIsReady ? "#fcd34d" : turnSeconds <= 3 ? "#fb7185" : "#bef264"} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${194.8 * (!turnIsReady ? 1 : turnProgress / 100)} 194.8`} /></svg>
+            <div className="grid w-full min-w-0 grid-cols-[54px_minmax(0,1fr)_54px] items-center gap-1.5 sm:grid-cols-[58px_minmax(0,1fr)_58px] sm:gap-2">
+              <div className={`relative grid h-[54px] w-[54px] place-items-center rounded-full sm:h-[58px] sm:w-[58px] border-[3px] bg-black/45 shadow-[0_8px_24px_rgba(0,0,0,.25)] ${!turnIsReady ? "border-amber-300/70" : isMyTurn ? "border-lime-300/70" : "border-white/15"}`}>
+                <svg className="absolute inset-[-4px] h-[58px] w-[58px] -rotate-90 sm:h-[62px] sm:w-[62px]" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" /><circle cx="36" cy="36" r="31" fill="none" stroke={!turnIsReady ? "#fcd34d" : turnSeconds <= 3 ? "#fb7185" : "#bef264"} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${194.8 * (!turnIsReady ? 1 : turnProgress / 100)} 194.8`} /></svg>
                 <div className="relative text-center">
                   <span dir="ltr" className={`block text-lg font-black ${!turnIsReady ? "text-amber-200" : turnSeconds <= 3 ? "text-rose-200" : "text-lime-200"}`}>{!turnIsReady ? transitionSeconds : turnSeconds}s</span>
                   {!turnIsReady ? <span className="block text-[6px] font-black text-amber-100/65">استعد</span> : null}
@@ -978,12 +978,12 @@ export default function VocabularyChallengeGame() {
                 <div dir="ltr" className="mt-0.5 font-mono text-2xl font-black tracking-wider text-emerald-50 sm:text-[28px]">{formatTimer(matchRemainingMs)}</div>
               </div>
 
-              <div className={`grid h-[58px] w-[58px] place-items-center rounded-2xl border text-center ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.10]" : "border-white/10 bg-black/18"}`}>
+              <div className={`grid h-[54px] w-[54px] place-items-center rounded-2xl border text-center sm:h-[58px] sm:w-[58px] ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.10]" : "border-white/10 bg-black/18"}`}>
                 <div><div className="text-base font-black text-white">{me?.cardCount ?? hand.cards.length}</div><div className="text-[8px] font-bold text-white/38">بطاقاتك</div></div>
               </div>
             </div>
 
-            <div className="mt-2 grid grid-cols-[66px_minmax(0,1fr)_66px] items-center gap-2">
+            <div className="mt-2 grid w-full min-w-0 grid-cols-[58px_minmax(0,1fr)_58px] items-center gap-1.5 sm:grid-cols-[66px_minmax(0,1fr)_66px] sm:gap-2">
               <button
                 type="button"
                 onClick={handleForfeit}
@@ -995,7 +995,7 @@ export default function VocabularyChallengeGame() {
                 <LogOut className="h-3.5 w-3.5" />
                 إنهاء
               </button>
-              <div className="flex min-h-[54px] items-center justify-center">
+              <div className="min-w-0 flex min-h-[54px] items-center justify-center overflow-hidden">
                 <PlayerBadge player={opponent} active={Boolean(opponent && room.turnPlayerId === opponent.userId && turnIsReady)} />
               </div>
               <div aria-hidden="true" />
@@ -1055,13 +1055,13 @@ export default function VocabularyChallengeGame() {
               </div>
             ) : null}
 
-            <div className="mt-2.5 flex items-end justify-between gap-3">
+            <div className="mt-2.5 flex w-full min-w-0 items-end justify-between gap-2 sm:gap-3">
               <button type="button" onClick={handleDraw} disabled={!canDraw} className="group flex w-[70px] shrink-0 flex-col items-center gap-1 disabled:opacity-35" title={hasLegalMove ? "لا يمكن السحب لأن لديك حركة صحيحة" : "اسحب بطاقة عند عدم وجود حركة صحيحة"}>
                 <div className="relative h-[52px] w-[47px]" aria-hidden="true"><div className="absolute inset-0 translate-x-2 translate-y-2 rotate-6 rounded-lg border border-white/15 bg-[#173f38]" /><div className="absolute inset-0 translate-x-1 translate-y-1 rotate-3 rounded-lg border border-white/15 bg-[#1b4b41]" /><div className="absolute inset-0 grid place-items-center rounded-lg border border-white/20 bg-[linear-gradient(145deg,#173f38,#0c2926)] shadow-[0_8px_18px_rgba(0,0,0,.3)]"><Sparkles className="h-4 w-4 text-amber-200/70" /></div></div>
                 <span className="text-[8px] font-black text-white/58">{!isMyTurn ? "انتظر دورك" : !turnIsReady ? "استعد" : hasLegalMove ? "عندك حركة" : "اسحب"}</span>
               </button>
 
-              <div className="flex-1 text-left" dir="ltr">
+              <div className="min-w-0 flex-1 text-left" dir="ltr">
                 <PlayerBadge
                   player={me}
                   active={isMyTurn}
@@ -1079,7 +1079,7 @@ export default function VocabularyChallengeGame() {
             </div>
             {room.mode === "duel" && voiceChat.error ? <div aria-live="polite" className="mx-auto mt-1 max-w-sm text-center text-[8px] font-semibold text-rose-100/75">{voiceChat.error}</div> : null}
 
-            <div className="mt-1 overflow-hidden pb-2 pt-3" dir="rtl">
+            <div className="mt-1 w-full min-w-0 max-w-full overflow-hidden pb-2 pt-3" dir="rtl">
               <div className="mx-auto flex w-full items-end justify-center px-1 pb-2">
                 {hand.cards.map((card, index) => {
                   const selected = card.id === selectedCardId;
