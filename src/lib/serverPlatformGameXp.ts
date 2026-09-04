@@ -173,9 +173,10 @@ export async function awardPlatformGameXp(award: GameXpAward) {
 
     if (eventSnap.exists) {
       const current = statsSnap.data() || {};
+      const existingEvent = eventSnap.data() || {};
       return {
         awarded: false,
-        xp: 0,
+        xp: Math.max(0, Math.floor(number(existingEvent.xp))),
         totalXp: number(current.totalXp),
         level: Math.max(1, Math.floor(number(current.level) || 1)),
       };

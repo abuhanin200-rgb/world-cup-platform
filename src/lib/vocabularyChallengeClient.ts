@@ -26,6 +26,8 @@ type ActionResponse = {
   matched?: boolean;
   rematchWaiting?: boolean;
   reported?: boolean;
+  heartbeat?: boolean;
+  at?: number;
 };
 
 type ErrorPayload = {
@@ -100,6 +102,14 @@ export function processVocabularyTimeout(roomId: string) {
 
 export function forfeitVocabularyChallenge(roomId: string) {
   return actionRequest({ action: "forfeit", roomId });
+}
+
+export function heartbeatVocabularyChallenge(roomId: string) {
+  return actionRequest({ action: "heartbeat", roomId });
+}
+
+export function claimVocabularyDisconnect(roomId: string) {
+  return actionRequest({ action: "claimDisconnect", roomId });
 }
 
 export function requestVocabularyRematch(roomId: string) {

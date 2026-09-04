@@ -50,6 +50,8 @@ import {
   getVocabularyLeaderboard,
   matchmakeVocabularyChallenge,
   forfeitVocabularyChallenge,
+  heartbeatVocabularyChallenge,
+  claimVocabularyDisconnect,
   joinVocabularyChallenge,
   playVocabularyBotTurn,
   playVocabularyCard,
@@ -351,6 +353,8 @@ export default function VocabularyChallengeGame() {
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<"success" | "error" | "info">("info");
   const [now, setNow] = useState(Date.now());
+  const [xpAward, setXpAward] = useState<{ xp: number; totalXp: number; level: number } | null>(null);
+  const [xpSyncing, setXpSyncing] = useState(false);
   const timeoutKeyRef = useRef("");
   const xpSyncKeyRef = useRef("");
   const matchStartSoundKeyRef = useRef("");
@@ -463,6 +467,30 @@ export default function VocabularyChallengeGame() {
   }, [roomId, user?.id]);
 
   useEffect(() => {
+    if (!room || room.mode !== "duel" || room.status !== "playing" || !roomId || !user?.id) return;
+    let cancelled = false;
+    const ping = () => {
+      if (cancelled || !navigator.onLine) return;
+      void heartbeatVocabularyChallenge(roomId).catch((error) => {
+        if (error instanceof VocabularyChallengeApiError && ["GAME_NOT_PLAYING", "ROOM_NOT_FOUND"].includes(error.code)) return;
+        console.warn("Vocabulary heartbeat failed:", error);
+      });
+    };
+    ping();
+    const interval = window.setInterval(ping, 8_000);
+    const onOnline = () => ping();
+    const onVisibility = () => { if (document.visibilityState === "visible") ping(); };
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [room?.id, room?.mode, room?.status, roomId, user?.id]);
+
+  useEffect(() => {
     if (!matchmaking || roomId) return;
     let cancelled = false;
     const poll = async () => {
@@ -471,6 +499,7 @@ export default function VocabularyChallengeGame() {
         if (cancelled) return;
         if (result.roomId) {
           setMatchmaking(false);
+          setXpAward(null);
           setRoomId(result.roomId);
           setMessage("");
           playVocabularySound("matchStart");
@@ -597,10 +626,17 @@ export default function VocabularyChallengeGame() {
     const key = `${room.id}:${sourceResultId}`;
     if (xpSyncKeyRef.current === key) return;
     xpSyncKeyRef.current = key;
-    void syncPlatformGameXpClient({ gameId: "vocabulary", sourceResultId }).catch((error) => {
-      xpSyncKeyRef.current = "";
-      console.warn("Vocabulary XP fallback sync failed:", error);
-    });
+    setXpSyncing(true);
+    void syncPlatformGameXpClient({ gameId: "vocabulary", sourceResultId })
+      .then((result) => {
+        if (!result) return;
+        setXpAward({ xp: result.xp, totalXp: result.totalXp, level: result.level });
+      })
+      .catch((error) => {
+        xpSyncKeyRef.current = "";
+        console.warn("Vocabulary XP fallback sync failed:", error);
+      })
+      .finally(() => setXpSyncing(false));
   }, [room, user?.id]);
 
   useEffect(() => {
@@ -642,6 +678,7 @@ export default function VocabularyChallengeGame() {
       setMessage("");
       const result = await createVocabularyChallenge(mode, botDifficulty);
       if (!result.roomId) throw new Error("تعذر إنشاء المباراة.");
+      setXpAward(null);
       setRoomId(result.roomId);
       setSelectedCardId("");
       // Match-start audio is triggered when the room enters the playing state.
@@ -681,6 +718,7 @@ export default function VocabularyChallengeGame() {
       setMessage("");
       const result = await joinVocabularyChallenge(joinCode);
       if (!result.roomId) throw new Error("تعذر الانضمام إلى الغرفة.");
+      setXpAward(null);
       setRoomId(result.roomId);
       setSelectedCardId("");
       // Match-start audio is triggered for both players when play begins.
@@ -765,6 +803,21 @@ export default function VocabularyChallengeGame() {
     }
   }
 
+  async function handleClaimDisconnect() {
+    if (!room || room.mode !== "duel" || room.status !== "playing" || busy) return;
+    try {
+      setBusy(true);
+      setFeedback("info", "جاري التحقق من اتصال الخصم…");
+      await claimVocabularyDisconnect(room.id);
+      playVocabularySound("win");
+    } catch (error) {
+      setFeedback("error", error instanceof Error ? error.message : "تعذر حسم المباراة الآن.");
+      playVocabularySound("incorrect");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleRematch() {
     if (!room || busy) return;
     try {
@@ -774,6 +827,7 @@ export default function VocabularyChallengeGame() {
       if (result.roomId) {
         setSelectedCardId("");
         setMessage("");
+        setXpAward(null);
         setRoomId(result.roomId);
         playVocabularySound("matchStart");
       } else if (result.rematchWaiting) {
@@ -804,6 +858,8 @@ export default function VocabularyChallengeGame() {
     resultSoundKeyRef.current = "";
     lastMoveSoundKeyRef.current = "";
     botTurnKeyRef.current = "";
+    setXpAward(null);
+    setXpSyncing(false);
     setNow(Date.now());
   }
 
@@ -858,6 +914,15 @@ export default function VocabularyChallengeGame() {
   const showBotMoveFx = Boolean(room?.mode === "solo" && room.lastMove?.actorId === "vocabulary-bot" && latestMoveAgeMs < 1_900);
   const botThinking = Boolean(room?.mode === "solo" && room.status === "playing" && room.turnPlayerId === "vocabulary-bot" && turnIsReady);
   const turnOwnerLabel = isMyTurn ? "دورك" : room?.mode === "solo" ? "دور بوت التحدي" : "دور الخصم";
+  const opponentLastSeenAt = room?.mode === "duel"
+    ? (opponent?.lastSeenAt || room.matchStartedAt || room.createdAt || now)
+    : now;
+  const opponentSilenceMs = room?.mode === "duel" ? Math.max(0, now - opponentLastSeenAt) : 0;
+  const opponentReconnecting = Boolean(room?.mode === "duel" && room.status === "playing" && opponent && opponentSilenceMs >= 15_000);
+  const canClaimDisconnect = opponentReconnecting && opponentSilenceMs >= 45_000;
+  const reconnectSeconds = Math.max(0, Math.ceil((45_000 - opponentSilenceMs) / 1000));
+  const earnedXp = xpAward?.xp ?? estimatedXp;
+  const finishedDurationMs = finished && room.matchStartedAt ? Math.max(0, room.updatedAt - room.matchStartedAt) : 0;
 
   return (
     <main dir="rtl" className="relative mx-auto box-border w-full min-w-0 max-w-[100vw] overflow-x-hidden px-3 pb-16 pt-3 sm:max-w-7xl sm:px-4 md:px-6 md:pb-20 md:pt-6">
@@ -964,6 +1029,13 @@ export default function VocabularyChallengeGame() {
 
           <div className="relative w-full min-w-0 max-w-full min-h-[520px] px-2.5 pb-3 pt-2.5 sm:min-h-[590px] sm:px-4 sm:pb-4 sm:pt-3">
             {!isOnline ? <div role="status" className="mb-2 flex min-h-9 items-center justify-center gap-2 rounded-xl border border-rose-200/20 bg-rose-500/18 px-3 text-[10px] font-black text-rose-50"><WifiOff className="h-4 w-4" /> الاتصال بالإنترنت متوقف — ستعود المباراة تلقائيًا عند رجوع الشبكة</div> : null}
+            {opponentReconnecting ? (
+              <div role="status" className="mb-2 flex min-h-10 flex-wrap items-center justify-center gap-2 rounded-xl border border-amber-200/20 bg-amber-400/[0.13] px-3 py-1.5 text-center text-[9px] font-black text-amber-50">
+                <WifiOff className="h-4 w-4" />
+                <span>{canClaimDisconnect ? "انقطع اتصال الخصم منذ أكثر من 45 ثانية." : `اتصال الخصم منقطع — ننتظر عودته ${reconnectSeconds}ث`}</span>
+                {canClaimDisconnect ? <button type="button" onClick={() => void handleClaimDisconnect()} disabled={busy} className="min-h-8 rounded-lg border border-amber-100/20 bg-amber-200/15 px-2.5 text-[9px] font-black text-amber-50 disabled:opacity-40">حسم المباراة</button> : null}
+              </div>
+            ) : null}
             <div className="grid w-full min-w-0 grid-cols-[54px_minmax(0,1fr)_54px] items-center gap-1.5 sm:grid-cols-[58px_minmax(0,1fr)_58px] sm:gap-2">
               <div className={`relative grid h-[54px] w-[54px] place-items-center rounded-full sm:h-[58px] sm:w-[58px] border-[3px] bg-black/45 shadow-[0_8px_24px_rgba(0,0,0,.25)] ${!turnIsReady ? "border-amber-300/70" : isMyTurn ? "border-lime-300/70" : "border-white/15"}`}>
                 <svg className="absolute inset-[-4px] h-[58px] w-[58px] -rotate-90 sm:h-[62px] sm:w-[62px]" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" /><circle cx="36" cy="36" r="31" fill="none" stroke={!turnIsReady ? "#fcd34d" : turnSeconds <= 3 ? "#fb7185" : "#bef264"} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${194.8 * (!turnIsReady ? 1 : turnProgress / 100)} 194.8`} /></svg>
@@ -1115,8 +1187,18 @@ export default function VocabularyChallengeGame() {
               <motion.div initial={reduceMotion ? false : { opacity: 0, scale: 0.94, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} className="w-full max-w-sm rounded-[30px] border border-white/12 bg-[#073f35] p-5 text-center shadow-[0_30px_90px_rgba(0,0,0,.45)]">
                 <div className={`mx-auto grid h-16 w-16 place-items-center rounded-full border ${didWin ? "border-lime-200/25 bg-lime-300/[0.13] text-lime-200" : isDraw ? "border-amber-200/25 bg-amber-300/[0.10] text-amber-200" : "border-white/12 bg-white/[0.06] text-white/55"}`}>{didWin ? <Trophy className="h-7 w-7" /> : isDraw ? <UsersRound className="h-7 w-7" /> : <Swords className="h-7 w-7" />}</div>
                 <h2 className="mt-4 text-2xl font-black">{didWin ? "فزت بالتحدي!" : isDraw ? "انتهت بالتعادل" : room.mode === "duel" && didLose ? "خسرت التحدي" : "فاز بوت التحدي"}</h2>
-                <p className="mt-2 text-xs font-semibold leading-6 text-white/50">{room.finishReason === "cards" ? (didWin ? "تخلّصت من جميع بطاقاتك أولًا." : room.mode === "duel" ? "تخلّص خصمك من بطاقاته قبلك." : "تخلّص البوت من بطاقاته قبلك.") : room.finishReason === "forfeit" ? "تم حسم المباراة بالانسحاب." : isDraw ? "انتهت الخمس دقائق بالتساوي في عدد البطاقات." : "انتهت الخمس دقائق وتم الحسم بالأقل في عدد البطاقات."}</p>
-                <div className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black text-lime-200">{me?.cardCount ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">بطاقاتك</div></div><div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black">{me?.moves ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">كلمات صحيحة</div></div><div className="rounded-2xl border border-lime-200/15 bg-lime-300/[0.08] p-3"><div className="text-xl font-black text-lime-200" dir="ltr">+{estimatedXp}</div><div className="mt-1 text-[9px] font-bold text-white/40">XP</div></div></div>{leaderboard?.me ? <div className="mt-2 rounded-2xl border border-lime-200/15 bg-lime-300/[0.07] px-3 py-2 text-[10px] font-black text-lime-100">ترتيبك {finishLeaderboardLabel}: <span dir="ltr">#{leaderboard.me.rank}</span> · {leaderboard.me.score} نقطة</div> : null}
+                <p className="mt-2 text-xs font-semibold leading-6 text-white/50">{room.finishReason === "cards" ? (didWin ? "تخلّصت من جميع بطاقاتك أولًا." : room.mode === "duel" ? "تخلّص خصمك من بطاقاته قبلك." : "تخلّص البوت من بطاقاته قبلك.") : room.finishReason === "disconnect" ? (didWin ? "تم حسم المباراة بعد انقطاع اتصال الخصم وعدم عودته." : "تم حسم المباراة بسبب انقطاع الاتصال.") : room.finishReason === "forfeit" ? "تم حسم المباراة بالانسحاب." : isDraw ? "انتهت الخمس دقائق بالتساوي في عدد البطاقات." : "انتهت الخمس دقائق وتم الحسم بالأقل في عدد البطاقات."}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black text-lime-200">{me?.moves ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">كلمات صحيحة</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black">{me?.draws ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">مرات السحب</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black" dir="ltr">{formatTimer(finishedDurationMs)}</div><div className="mt-1 text-[9px] font-bold text-white/40">مدة المباراة</div></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black">{me?.cardCount ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">بطاقات متبقية</div></div>
+                </div>
+                <div className="mt-2 rounded-2xl border border-lime-200/18 bg-lime-300/[0.10] px-3 py-3">
+                  <div className="flex items-center justify-between gap-3"><span className="text-[10px] font-black text-lime-50">XP المكتسب</span><span className="text-2xl font-black text-lime-200" dir="ltr">+{earnedXp}</span></div>
+                  <div className="mt-1 text-[8px] font-bold text-lime-100/55">{xpSyncing ? "جاري تثبيت XP…" : xpAward ? `تم الاحتساب · المستوى ${xpAward.level} · إجمالي ${xpAward.totalXp} XP` : "يتم تثبيت XP تلقائيًا على حسابك"}</div>
+                </div>
+                {leaderboard?.me ? <div className="mt-2 rounded-2xl border border-lime-200/15 bg-lime-300/[0.07] px-3 py-2 text-[10px] font-black text-lime-100">ترتيبك {finishLeaderboardLabel}: <span dir="ltr">#{leaderboard.me.rank}</span> · {leaderboard.me.score} نقطة</div> : null}
                 {room.mode === "duel" && rematchRequestedByOpponent ? <div className="mt-3 rounded-2xl border border-amber-200/20 bg-amber-300/[0.08] px-3 py-2 text-[10px] font-black text-amber-100">خصمك طلب إعادة المباراة.</div> : null}
                 <div className="mt-5 grid gap-2">
                   <button type="button" onClick={handleRematch} disabled={busy || rematchRequestedByMe} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-lime-300 px-3 text-xs font-black text-emerald-950 disabled:cursor-wait disabled:opacity-65">

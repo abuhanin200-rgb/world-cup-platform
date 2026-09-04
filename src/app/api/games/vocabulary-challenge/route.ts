@@ -35,6 +35,7 @@ const HAND_SIZE = 10;
 const TURN_DURATION_MS = 10_000;
 const TURN_TRANSITION_MS = 2_000;
 const MATCH_DURATION_MS = 5 * 60_000;
+const DISCONNECT_CLAIM_MS = 45_000;
 const BOT_ID = "vocabulary-bot";
 const BOT_NAME = "بوت التحدي";
 
@@ -153,7 +154,7 @@ function resultPayload(params: {
   userId: string;
   won: boolean;
   outcome: "win" | "loss" | "draw";
-  reason: "cards" | "time" | "forfeit";
+  reason: "cards" | "time" | "forfeit" | "disconnect";
   now: number;
 }) {
   const players = params.room.players && typeof params.room.players === "object"
@@ -189,7 +190,7 @@ function finalizeRoom(params: {
   roomId: string;
   room: Record<string, unknown>;
   winnerId: string | null;
-  reason: "cards" | "time" | "forfeit";
+  reason: "cards" | "time" | "forfeit" | "disconnect";
   now: number;
 }) {
   const ids = humanPlayerIds(params.room);
@@ -251,10 +252,10 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
   const botCards = startsNow ? createCards(createFairVocabularyLetters(startingWord, HAND_SIZE)) : [];
 
   const players: Record<string, Record<string, unknown>> = {
-    [userId]: { userId, userName, cardCount: userCards.length, moves: 0, draws: 0 },
+    [userId]: { userId, userName, cardCount: userCards.length, moves: 0, draws: 0, lastSeenAt: now },
   };
   if (startsNow) {
-    players[BOT_ID] = { userId: BOT_ID, userName: BOT_NAME, cardCount: botCards.length, moves: 0, draws: 0, isBot: true };
+    players[BOT_ID] = { userId: BOT_ID, userName: BOT_NAME, cardCount: botCards.length, moves: 0, draws: 0, isBot: true, lastSeenAt: now };
   }
 
   const room = {
@@ -329,8 +330,8 @@ function startedDuelRoomData(params: {
     guestName: params.guestName,
     playerOrder: [params.hostId, params.guestId],
     players: {
-      [params.hostId]: { userId: params.hostId, userName: params.hostName, cardCount: hostCards.length, moves: 0, draws: 0 },
-      [params.guestId]: { userId: params.guestId, userName: params.guestName, cardCount: guestCards.length, moves: 0, draws: 0 },
+      [params.hostId]: { userId: params.hostId, userName: params.hostName, cardCount: hostCards.length, moves: 0, draws: 0, lastSeenAt: params.now },
+      [params.guestId]: { userId: params.guestId, userName: params.guestName, cardCount: guestCards.length, moves: 0, draws: 0, lastSeenAt: params.now },
     },
     startingWord: params.startingWord,
     currentWord: params.startingWord,
@@ -381,7 +382,7 @@ async function joinRoom(userId: string, userName: string, rawCode: unknown) {
     const hostName = text(room.hostName) || "عضو";
     const players = {
       ...(room.players && typeof room.players === "object" ? room.players as Record<string, unknown> : {}),
-      [userId]: { userId, userName, cardCount: cards.length, moves: 0, draws: 0 },
+      [userId]: { userId, userName, cardCount: cards.length, moves: 0, draws: 0, lastSeenAt: now },
     };
     const hostPlayer = players[hostId] && typeof players[hostId] === "object"
       ? players[hostId] as Record<string, unknown>
@@ -402,6 +403,7 @@ async function joinRoom(userId: string, userName: string, rawCode: unknown) {
           ...hostPlayer,
           userId: hostId,
           userName: hostName,
+          lastSeenAt: now,
         },
       },
       turnPlayerId: firstPlayer,
@@ -991,6 +993,48 @@ async function forfeitRoom(userId: string, roomId: string) {
 }
 
 
+async function heartbeatRoom(userId: string, roomId: string) {
+  if (!roomId) throw new Error("ROOM_NOT_FOUND");
+  const roomRef = adminDb.collection(ROOM_COLLECTION).doc(roomId);
+  const now = Date.now();
+  await adminDb.runTransaction(async (transaction: Transaction) => {
+    const roomSnap = await transaction.get(roomRef);
+    if (!roomSnap.exists) throw new Error("ROOM_NOT_FOUND");
+    const room = roomSnap.data() || {};
+    if (!participant(room, userId)) throw new Error("FORBIDDEN");
+    if (text(room.status) !== "playing") return;
+    const players = updatePlayer(room, userId, { lastSeenAt: now });
+    transaction.update(roomRef, { players, updatedAt: now });
+  });
+  return { heartbeat: true, at: now };
+}
+
+async function claimDisconnectedOpponent(userId: string, roomId: string) {
+  if (!roomId) throw new Error("ROOM_NOT_FOUND");
+  const roomRef = adminDb.collection(ROOM_COLLECTION).doc(roomId);
+  const now = Date.now();
+  const result = await adminDb.runTransaction(async (transaction: Transaction) => {
+    const roomSnap = await transaction.get(roomRef);
+    if (!roomSnap.exists) throw new Error("ROOM_NOT_FOUND");
+    const room = roomSnap.data() || {};
+    if (!participant(room, userId)) throw new Error("FORBIDDEN");
+    if (text(room.mode) !== "duel" || text(room.status) !== "playing") throw new Error("GAME_NOT_PLAYING");
+    const opponentId = roomPlayerIds(room).find((id) => id !== userId) || "";
+    if (!opponentId) throw new Error("ROOM_NOT_FOUND");
+    const players = room.players && typeof room.players === "object"
+      ? room.players as Record<string, Record<string, unknown>>
+      : {};
+    const opponent = players[opponentId] || {};
+    const lastSeenAt = number(opponent.lastSeenAt) || number(room.matchStartedAt) || number(room.createdAt);
+    if (!lastSeenAt || now - lastSeenAt < DISCONNECT_CLAIM_MS) throw new Error("OPPONENT_STILL_CONNECTED");
+    const resultIds = finalizeRoom({ transaction, roomRef, roomId, room, winnerId: userId, reason: "disconnect", now });
+    return { finished: true, resultIds };
+  });
+  if (result.finished) await syncFinishedResults(result.resultIds);
+  return result;
+}
+
+
 const RIYADH_OFFSET_MS = 3 * 60 * 60_000;
 
 type LeaderboardPeriod = "daily" | "weekly" | "season";
@@ -1350,12 +1394,13 @@ function errorResponse(error: unknown) {
     INVALID_VOICE_SIGNAL: "تعذر تجهيز الاتصال الصوتي.",
     TURN_CREDENTIALS_FAILED: "تعذر إصدار بيانات TURN الآمنة الآن. حاول فتح المايك مرة أخرى.",
     REPORT_WORD_INVALID: "لا يمكن إرسال هذه الكلمة للمراجعة من هذه المباراة.",
+    OPPONENT_STILL_CONNECTED: "الخصم متصل أو عاد للمباراة. لا يمكن حسمها بالانقطاع الآن.",
   };
 
   const status = code === "UNAUTHORIZED" ? 401
     : code === "FORBIDDEN" ? 403
       : ["ROOM_NOT_FOUND"].includes(code) ? 404
-        : ["INVALID_WORD", "MOVE_AVAILABLE", "NOT_YOUR_TURN", "TURN_NOT_READY", "TURN_EXPIRED", "ROOM_NOT_AVAILABLE", "OWN_ROOM", "GAME_NOT_FINISHED", "REMATCH_CHANGED", "MATCH_CHANGED"].includes(code) ? 409
+        : ["INVALID_WORD", "MOVE_AVAILABLE", "NOT_YOUR_TURN", "TURN_NOT_READY", "TURN_EXPIRED", "ROOM_NOT_AVAILABLE", "OWN_ROOM", "GAME_NOT_FINISHED", "REMATCH_CHANGED", "MATCH_CHANGED", "OPPONENT_STILL_CONNECTED"].includes(code) ? 409
           : 400;
 
   return NextResponse.json({ error: messages[code] || "تعذر إتمام عملية تحدي المفردات الآن.", code, proposedWord }, { status });
@@ -1386,6 +1431,12 @@ export async function POST(request: NextRequest) {
     }
     if (body.action === "forfeit") {
       return NextResponse.json(await forfeitRoom(member.userId, text(body.roomId)));
+    }
+    if (body.action === "heartbeat") {
+      return NextResponse.json(await heartbeatRoom(member.userId, text(body.roomId)));
+    }
+    if (body.action === "claimDisconnect") {
+      return NextResponse.json(await claimDisconnectedOpponent(member.userId, text(body.roomId)));
     }
     if (body.action === "rematch") {
       return NextResponse.json(await requestRematch(member.userId, member.userName, text(body.roomId)));

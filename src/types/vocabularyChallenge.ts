@@ -1,7 +1,7 @@
 export type VocabularyChallengeMode = "solo" | "duel";
 export type VocabularyBotDifficulty = "easy" | "normal" | "hard";
 export type VocabularyChallengeRoomStatus = "waiting" | "playing" | "finished" | "cancelled";
-export type VocabularyChallengeFinishReason = "cards" | "time" | "forfeit" | "cancelled" | null;
+export type VocabularyChallengeFinishReason = "cards" | "time" | "forfeit" | "disconnect" | "cancelled" | null;
 export type VocabularyLeaderboardPeriod = "daily" | "weekly" | "season";
 
 export type VocabularyChallengePlayerSummary = {
@@ -11,6 +11,7 @@ export type VocabularyChallengePlayerSummary = {
   moves: number;
   draws: number;
   isBot?: boolean;
+  lastSeenAt?: number;
 };
 
 export type VocabularyChallengeMove = {
@@ -151,6 +152,8 @@ export type VocabularyChallengeAction =
   | { action: "draw"; roomId: string }
   | { action: "timeout"; roomId: string }
   | { action: "forfeit"; roomId: string }
+  | { action: "heartbeat"; roomId: string }
+  | { action: "claimDisconnect"; roomId: string }
   | { action: "rematch"; roomId: string }
   | { action: "matchmake" }
   | { action: "cancelMatchmaking" }
