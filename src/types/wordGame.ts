@@ -36,6 +36,7 @@ export type WordGameDailyResult = {
   attemptsUsed: number;
   durationMs: number | null;
   finishedAt: number;
+  categoryLabel?: string;
 };
 
 export type WordGameUserStats = {

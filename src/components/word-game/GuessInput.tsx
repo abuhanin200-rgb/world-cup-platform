@@ -26,14 +26,14 @@ export default function GuessInput({
       initial={{ opacity: 0, y: 8, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
-      className="mx-auto w-full max-w-[360px]"
+      className="mx-auto w-full max-w-[330px] sm:max-w-[350px]"
       dir="rtl"
     >
       <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 shadow-md shadow-slate-950/20">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-emerald-300/10" />
 
-        <div className="relative flex items-center gap-2 px-3 py-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300">
+        <div className="relative flex items-center gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 sm:h-9 sm:w-9">
             <Keyboard className="h-4 w-4" />
           </div>
 
@@ -46,7 +46,7 @@ export default function GuessInput({
             onFocus={(event) => event.currentTarget.blur()}
             onChange={(event) => onChange(event.target.value)}
             placeholder="اكتب كلمة"
-            className="min-w-0 flex-1 select-none bg-transparent px-1 py-2 text-center text-[20px] font-black tracking-[0.28em] text-white outline-none placeholder:tracking-normal placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-w-0 flex-1 select-none bg-transparent px-1 py-1.5 text-center text-[18px] font-black tracking-[0.24em] text-white outline-none placeholder:tracking-normal placeholder:text-slate-500 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2 sm:text-[19px]"
           />
 
           <motion.button
@@ -54,7 +54,7 @@ export default function GuessInput({
             disabled={disabled}
             onClick={onSubmit}
             whileTap={{ scale: 0.96 }}
-            className="group relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/15 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+            className="group relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/15 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50 sm:h-9 sm:w-9"
             aria-label="إرسال الكلمة"
           >
             <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/35 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />

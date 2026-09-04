@@ -372,7 +372,7 @@ export default function WordGame() {
       variants={containerMotion}
       initial="hidden"
       animate="show"
-      className="relative space-y-5"
+      className="relative space-y-4 sm:space-y-5"
       dir="rtl"
     >
       <AnimatePresence>
@@ -468,7 +468,7 @@ export default function WordGame() {
         whileInView="show"
         viewport={scrollOnceViewport}
         whileTap={{ scale: 0.995 }}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-4 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-5"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-3 shadow-lg shadow-slate-950/25 backdrop-blur-sm sm:p-4 md:p-5"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
         <div className="pointer-events-none absolute -right-24 top-10 h-44 w-44 rounded-full bg-amber-300/10 blur-2xl" />
@@ -478,9 +478,9 @@ export default function WordGame() {
         <div className="relative">
           <motion.div
             variants={smallRevealMotion}
-            className="mb-4 flex justify-center"
+            className="mb-3 flex justify-center sm:mb-4"
           >
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-4 py-2 text-[14px] font-black text-amber-100 shadow-md shadow-amber-950/10">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1.5 text-[12px] font-bold text-amber-100 shadow-md shadow-amber-950/10 sm:gap-2 sm:px-4 sm:py-2 sm:text-[13px]">
               <span>{categoryIcon}</span>
               <span>كلمة اليوم: {categoryLabel}</span>
               <Sparkles className="h-4 w-4 text-amber-300" />
@@ -491,7 +491,7 @@ export default function WordGame() {
             <GameBoard guesses={game?.guesses ?? []} currentGuess={currentGuess} />
           </motion.div>
 
-          <motion.div variants={smallRevealMotion} className="mt-5 space-y-4">
+          <motion.div variants={smallRevealMotion} className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
             <motion.div
               key={feedbackPulse.tick}
               animate={feedbackPulse.tick === 0 ? undefined : feedbackPulse.kind === "error"

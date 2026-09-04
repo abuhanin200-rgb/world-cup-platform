@@ -10,6 +10,10 @@ import {
   projectWordGameForClient,
 } from "@/lib/wordGameServerLogic";
 import type { WordGameDailyGame } from "@/types/wordGame";
+import {
+  getWordGameCategoryLabel,
+  getWordGameWordCategory,
+} from "@/lib/wordGameWords";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -85,12 +89,58 @@ async function state(userId: string, currentGame?: Game) {
     adminDb.collection("wordGameDailyResults").where("dateKey", "==", dateKey).get(),
     adminDb.collection("wordGameUserStats").doc(userId).get(),
   ]);
-  const leaderboard = results.docs.map((item) => item.data()).sort((a, b) => {
-    if (a.won !== b.won) return a.won ? -1 : 1;
-    if (number(a.durationMs) !== number(b.durationMs)) return number(a.durationMs) - number(b.durationMs);
-    return number(a.attemptsUsed) - number(b.attemptsUsed);
-  }).map((item, index) => ({ userId: text(item.userId), userName: text(item.userName) || "عضو", won: item.won === true, attemptsUsed: number(item.attemptsUsed), durationMs: item.durationMs == null ? null : number(item.durationMs), finishedAt: number(item.finishedAt), rank: index + 1, categoryLabel: "عامّة" }));
-  return { game: clientGame(game), leaderboard, stats: stats.exists ? stats.data() : null };
+
+  // النتائج القديمة لم تكن تحفظ تصنيف الكلمة داخل مستند النتيجة.
+  // نجلب لعبة العضو فقط عند غياب التصنيف حتى يظهر لكل عضو تصنيفه الحقيقي.
+  const missingCategoryDocs = results.docs.filter(
+    (item) => !text(item.data().categoryLabel)
+  );
+  const categoryByResultId = new Map<string, string>();
+
+  if (missingCategoryDocs.length > 0) {
+    const gameRefs = missingCategoryDocs.map((item) =>
+      adminDb.collection("wordGameDailyGames").doc(item.id)
+    );
+    const gameSnaps = await adminDb.getAll(...gameRefs);
+
+    gameSnaps.forEach((snap) => {
+      if (!snap.exists) return;
+      const targetWord = text(snap.data()?.targetWord);
+      categoryByResultId.set(
+        snap.id,
+        getWordGameCategoryLabel(getWordGameWordCategory(targetWord))
+      );
+    });
+  }
+
+  const leaderboard = results.docs
+    .map((item) => ({ id: item.id, data: item.data() }))
+    .sort((a, b) => {
+      if (a.data.won !== b.data.won) return a.data.won ? -1 : 1;
+      if (number(a.data.durationMs) !== number(b.data.durationMs))
+        return number(a.data.durationMs) - number(b.data.durationMs);
+      return number(a.data.attemptsUsed) - number(b.data.attemptsUsed);
+    })
+    .map((item, index) => ({
+      userId: text(item.data.userId),
+      userName: text(item.data.userName) || "عضو",
+      won: item.data.won === true,
+      attemptsUsed: number(item.data.attemptsUsed),
+      durationMs:
+        item.data.durationMs == null ? null : number(item.data.durationMs),
+      finishedAt: number(item.data.finishedAt),
+      rank: index + 1,
+      categoryLabel:
+        text(item.data.categoryLabel) ||
+        categoryByResultId.get(item.id) ||
+        "عامة",
+    }));
+
+  return {
+    game: clientGame(game),
+    leaderboard,
+    stats: stats.exists ? stats.data() : null,
+  };
 }
 
 async function guess(userId: string, rawGuess: unknown) {
@@ -108,7 +158,7 @@ async function guess(userId: string, rawGuess: unknown) {
       const [resultSnap, statsSnap, userSnap] = await Promise.all([transaction.get(resultRef), transaction.get(statsRef), transaction.get(adminDb.collection("users").doc(userId))]);
       if (!resultSnap.exists) {
         const existingStats = statsSnap.data() || {}; const played = number(existingStats.gamesPlayed) + 1; const gamesWon = number(existingStats.gamesWon) + (updated.won ? 1 : 0); const streak = updated.won ? number(existingStats.currentWinStreak) + 1 : 0;
-        transaction.create(resultRef, { id: updated.id, userId, userName: text(userSnap.data()?.fullName) || "عضو", dateKey: updated.dateKey, won: updated.won, attemptsUsed: updated.attemptsUsed, durationMs: updated.durationMs, finishedAt: now });
+        transaction.create(resultRef, { id: updated.id, userId, userName: text(userSnap.data()?.fullName) || "عضو", dateKey: updated.dateKey, won: updated.won, attemptsUsed: updated.attemptsUsed, durationMs: updated.durationMs, finishedAt: now, categoryLabel: getWordGameCategoryLabel(getWordGameWordCategory(updated.targetWord)) });
         transaction.set(statsRef, { userId, gamesPlayed: played, gamesWon, winRate: Math.round((gamesWon / played) * 100), currentWinStreak: streak, bestWinStreak: Math.max(number(existingStats.bestWinStreak), streak), lastPlayedDateKey: updated.dateKey }, { merge: true });
       }
     }

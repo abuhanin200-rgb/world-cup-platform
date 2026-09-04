@@ -66,7 +66,7 @@ export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
       variants={boardMotion}
       initial="hidden"
       animate="show"
-      className="mx-auto grid w-full max-w-xs gap-2"
+      className="mx-auto grid w-full max-w-[284px] gap-1.5 sm:max-w-[304px] sm:gap-2"
     >
       {rows.map((_, rowIndex) => {
         const savedGuess = guesses[rowIndex];
@@ -83,7 +83,7 @@ export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
           <motion.div
             key={rowIndex}
             variants={rowMotion}
-            className="grid grid-cols-5 gap-2"
+            className="grid grid-cols-5 gap-1.5 sm:gap-2"
             dir="rtl"
           >
             {letters.map((item, letterIndex) => {
@@ -130,7 +130,7 @@ export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
                         }
                   }
                   className={[
-                    "relative flex aspect-square transform-gpu items-center justify-center overflow-hidden rounded-2xl border text-[24px] font-black shadow-md transition-colors duration-200 [transform-style:preserve-3d]",
+                    "relative flex aspect-square transform-gpu items-center justify-center overflow-hidden rounded-xl border text-[21px] font-black shadow-md transition-colors duration-200 [transform-style:preserve-3d] sm:rounded-2xl sm:text-[23px]",
                     getTileClass(item.status),
                     isCurrentRow && hasLetter
                       ? "border-amber-300/45 bg-slate-950/80 shadow-amber-400/10"

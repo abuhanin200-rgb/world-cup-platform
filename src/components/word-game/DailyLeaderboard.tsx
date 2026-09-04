@@ -128,7 +128,7 @@ function StatBox({
   return (
     <motion.div
       variants={statMotion}
-      className={`relative overflow-hidden rounded-xl border p-2 text-center ${className}`}
+      className={`relative overflow-hidden rounded-xl border p-1.5 text-center sm:p-2 ${className}`}
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
 
@@ -137,9 +137,9 @@ function StatBox({
           {icon}
         </div>
 
-        <div className="text-[9px] font-bold opacity-80">{label}</div>
+        <div className="text-[9px] font-semibold opacity-80">{label}</div>
 
-        <div className="mt-0.5 text-[13px] font-black tabular-nums">
+        <div className="mt-0.5 text-[12px] font-bold tabular-nums sm:text-[13px]">
           {value}
         </div>
       </div>
@@ -187,13 +187,13 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
           لا يوجد نتائج مكتملة حتى الآن.
         </motion.div>
       ) : (
-        <motion.div variants={sectionMotion} className="relative space-y-2.5">
+        <motion.div variants={sectionMotion} className="relative space-y-2 sm:space-y-2.5">
           {items.map((item) => (
             <motion.div
               key={item.userId}
               variants={rowMotion}
               whileTap={{ scale: 0.99 }}
-              className={`relative overflow-hidden rounded-[18px] border p-3 shadow-md shadow-slate-950/20 ${getCardClass(
+              className={`relative overflow-hidden rounded-[18px] border p-2.5 shadow-md shadow-slate-950/20 sm:p-3 ${getCardClass(
                 item.rank
               )}`}
             >
@@ -206,9 +206,9 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
                 />
               )}
 
-              <div className="relative mb-3 flex items-start justify-between gap-2.5">
+              <div className="relative mb-2.5 flex items-start justify-between gap-2 sm:mb-3 sm:gap-2.5">
                 <div
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-base font-black shadow-md ${getRankClass(
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-black shadow-md sm:h-10 sm:w-10 sm:text-base ${getRankClass(
                     item.rank
                   )}`}
                 >
@@ -220,7 +220,7 @@ export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
                     العضو
                   </div>
 
-                  <div className="mt-0.5 whitespace-normal break-words text-[15px] font-black leading-5 text-white md:text-[16px]">
+                  <div className="mt-0.5 whitespace-normal break-words text-[14px] font-bold leading-5 text-white sm:text-[15px] md:text-[16px]">
                     {item.userName}
                   </div>
                 </div>
