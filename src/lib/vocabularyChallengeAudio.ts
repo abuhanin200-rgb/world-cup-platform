@@ -41,6 +41,23 @@ const SOUNDS: Record<VocabularySoundKind, SoundDefinition> = {
 const pools = new Map<VocabularySoundKind, HTMLAudioElement[]>();
 const poolIndexes = new Map<VocabularySoundKind, number>();
 let prepared = false;
+function prepareVocabularyMediaSession() {
+  if (typeof navigator === "undefined" || !("mediaSession" in navigator) || typeof MediaMetadata === "undefined") return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: "تحدي المفردات",
+      artist: "ألعاب التحدي",
+      album: "منصة التحدي",
+      artwork: [
+        { src: "/app-icon-192.png", sizes: "192x192", type: "image/png" },
+        { src: "/app-icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+    });
+  } catch {
+    // Media Session metadata is a progressive enhancement only.
+  }
+}
+
 
 function vibrate(pattern?: number | number[]) {
   if (!pattern || typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
@@ -67,6 +84,7 @@ function ensurePool(kind: VocabularySoundKind) {
 export function prepareVocabularyAudio() {
   if (typeof window === "undefined") return;
   prepareInteractionAudio();
+  prepareVocabularyMediaSession();
   if (prepared) return;
   prepared = true;
 

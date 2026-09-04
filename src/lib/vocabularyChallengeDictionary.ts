@@ -11,10 +11,18 @@ const words = Array.from(new Set(dictionaryData.words.map((word) => String(word)
 const wordSet = new Set(words);
 const startingWords = dictionaryData.startingWords.filter((word) => wordSet.has(word));
 
+export const VOCABULARY_BASE_WORDS = Object.freeze([...words]);
+export const VOCABULARY_STARTING_WORDS = Object.freeze([...startingWords]);
+
 export type VocabularyMove = {
   word: string;
   position: 0 | 1 | 2;
   letter: string;
+};
+
+export type VocabularyDictionaryOverrides = {
+  enabledWords?: readonly string[];
+  disabledWords?: readonly string[];
 };
 
 function assertDictionaryIntegrity() {
@@ -38,8 +46,23 @@ export function normalizeVocabularyWord(value: unknown) {
     .replace(/ـ/g, "");
 }
 
+export function isValidVocabularyShape(value: unknown) {
+  const clean = normalizeVocabularyWord(value);
+  const letters = Array.from(clean);
+  return letters.length === 3 && letters.every((letter) => allowedLetterSet.has(letter));
+}
+
 export function isApprovedVocabularyWord(value: unknown) {
   return wordSet.has(normalizeVocabularyWord(value));
+}
+
+export function isApprovedVocabularyWordWithOverrides(value: unknown, overrides?: VocabularyDictionaryOverrides) {
+  const clean = normalizeVocabularyWord(value);
+  if (!isValidVocabularyShape(clean)) return false;
+  const disabled = new Set((overrides?.disabledWords || []).map(normalizeVocabularyWord));
+  if (disabled.has(clean)) return false;
+  const enabled = new Set((overrides?.enabledWords || []).map(normalizeVocabularyWord));
+  return wordSet.has(clean) || enabled.has(clean);
 }
 
 export function replaceVocabularyLetter(word: string, position: number, letter: string) {
@@ -69,8 +92,40 @@ export function getVocabularyMoves(currentWord: string, handLetters?: readonly s
   return result;
 }
 
+export function getVocabularyMovesWithOverrides(
+  currentWord: string,
+  handLetters?: readonly string[],
+  overrides?: VocabularyDictionaryOverrides,
+) {
+  const cleanWord = normalizeVocabularyWord(currentWord);
+  const handSet = handLetters ? new Set(handLetters) : null;
+  const enabled = new Set((overrides?.enabledWords || []).map(normalizeVocabularyWord));
+  const disabled = new Set((overrides?.disabledWords || []).map(normalizeVocabularyWord));
+  const result: VocabularyMove[] = [];
+
+  for (let position = 0; position < 3; position += 1) {
+    for (const letter of VOCABULARY_ALLOWED_LETTERS) {
+      if (handSet && !handSet.has(letter)) continue;
+      const candidate = replaceVocabularyLetter(cleanWord, position, letter);
+      if (candidate && !disabled.has(candidate) && (wordSet.has(candidate) || enabled.has(candidate))) {
+        result.push({ word: candidate, position: position as 0 | 1 | 2, letter });
+      }
+    }
+  }
+
+  return result;
+}
+
 export function hasVocabularyMove(currentWord: string, handLetters: readonly string[]) {
   return getVocabularyMoves(currentWord, handLetters).length > 0;
+}
+
+export function hasVocabularyMoveWithOverrides(
+  currentWord: string,
+  handLetters: readonly string[],
+  overrides?: VocabularyDictionaryOverrides,
+) {
+  return getVocabularyMovesWithOverrides(currentWord, handLetters, overrides).length > 0;
 }
 
 export function randomVocabularyStartingWord() {
@@ -124,11 +179,11 @@ export function createFairVocabularyLetters(currentWord: string, size: number) {
   return shuffled(letters);
 }
 
-export function drawFairVocabularyLetter(currentWord: string, currentHandLetters: readonly string[]) {
+export function drawFairVocabularyLetter(currentWord: string, handLetters: readonly string[]) {
   const moves = getVocabularyMoves(currentWord);
-  if (moves.length && Math.random() < 0.82) {
-    const underrepresented = moves.filter((move) => currentHandLetters.filter((letter) => letter === move.letter).length < 2);
-    return (pick(underrepresented.length ? underrepresented : moves) || moves[0]).letter;
-  }
+  const handSet = new Set(handLetters);
+  const preferred = moves.filter((move) => !handSet.has(move.letter));
+  const move = pick(preferred.length ? preferred : moves);
+  if (move && Math.random() < 0.76) return move.letter;
   return pick(weightedLetterBag) || "م";
 }

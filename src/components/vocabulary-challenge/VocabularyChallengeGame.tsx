@@ -15,6 +15,7 @@ import {
   Gamepad2,
   Hand,
   Hash,
+  History,
   Languages,
   LoaderCircle,
   LogOut,
@@ -22,36 +23,43 @@ import {
   RotateCcw,
   RefreshCw,
   ShieldCheck,
+  Shuffle,
   Sparkles,
   Swords,
   Trophy,
+  UserCircle2,
   UserRound,
   UsersRound,
   XCircle,
-  Zap,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import AuthGateCard from "@/components/auth/AuthGateCard";
 import {
   VocabularyChallengeApiError,
+  cancelVocabularyMatchmaking,
   createVocabularyChallenge,
   drawVocabularyCard,
-  getVocabularyDailyLeaderboard,
+  getVocabularyDictionaryOverrides,
+  getVocabularyLeaderboard,
+  matchmakeVocabularyChallenge,
   forfeitVocabularyChallenge,
   joinVocabularyChallenge,
   playVocabularyCard,
   processVocabularyTimeout,
+  requestVocabularyRematch,
 } from "@/lib/vocabularyChallengeClient";
 import { playVocabularySound, prepareVocabularyAudio } from "@/lib/vocabularyChallengeAudio";
 import { syncPlatformGameXp as syncPlatformGameXpClient } from "@/lib/platformGameXpClient";
-import { hasVocabularyMove } from "@/lib/vocabularyChallengeDictionary";
+import { hasVocabularyMoveWithOverrides } from "@/lib/vocabularyChallengeDictionary";
 import type {
   VocabularyChallengeCard,
   VocabularyChallengeHand,
   VocabularyChallengePlayerSummary,
   VocabularyChallengeRoom,
-  VocabularyDailyLeaderboard,
+  VocabularyDictionaryClientOverrides,
+  VocabularyLeaderboard,
+  VocabularyLeaderboardPeriod,
 } from "@/types/vocabularyChallenge";
 
 const CARD_TONES = [
@@ -120,11 +128,11 @@ function CardFace({
 }) {
   const tone = cardTone(letter, index);
   const dimensions = size === "center"
-    ? "h-[116px] w-[82px] sm:h-[136px] sm:w-[96px]"
+    ? "h-[92px] w-[66px] sm:h-[108px] sm:w-[78px]"
     : size === "mini"
-      ? "h-[68px] w-[48px]"
-      : "h-[82px] w-[56px] sm:h-[92px] sm:w-[62px]";
-  const textSize = size === "center" ? "text-[38px] sm:text-[46px]" : size === "mini" ? "text-xl" : "text-2xl sm:text-[28px]";
+      ? "h-[64px] w-[46px]"
+      : "h-[68px] w-[48px] sm:h-[78px] sm:w-[54px]";
+  const textSize = size === "center" ? "text-[31px] sm:text-[37px]" : size === "mini" ? "text-xl" : "text-2xl sm:text-[27px]";
 
   return (
     <div
@@ -202,31 +210,42 @@ function ModeCard({
 }
 
 
-function DailyLeaderboardPanel({
+function LeaderboardPanel({
   data,
   loading,
   error,
+  period,
+  onPeriodChange,
   onRefresh,
 }: {
-  data: VocabularyDailyLeaderboard | null;
+  data: VocabularyLeaderboard | null;
   loading: boolean;
   error: string;
+  period: VocabularyLeaderboardPeriod;
+  onPeriodChange: (period: VocabularyLeaderboardPeriod) => void;
   onRefresh: () => void;
 }) {
   const entries = data?.entries || [];
+  const periodLabel = period === "daily" ? "اليوم" : period === "weekly" ? "الأسبوع" : "الموسم";
   return (
-    <div className="relative mt-6 overflow-hidden rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur-xl md:p-5">
-      <div className="flex items-center justify-between gap-3">
+    <div className="relative mt-5 overflow-hidden rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur-xl md:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-lime-200"><Crown className="h-4 w-4" /><span className="text-[10px] font-black">منافسة يومية</span></div>
-          <h2 className="mt-1 text-lg font-black text-white">ترتيب اليوم</h2>
-          <p className="mt-1 text-[10px] font-semibold text-white/42">يتجدد يوميًا بتوقيت السعودية · فوز التحدي 3 نقاط · إنهاء الفردي 2 نقطة</p>
+          <div className="flex items-center gap-2 text-lime-200"><Crown className="h-4 w-4" /><span className="text-[10px] font-black">منافسة المفردات</span></div>
+          <h2 className="mt-1 text-lg font-black text-white">الترتيب</h2>
+          <p className="mt-1 text-[10px] font-semibold text-white/42">فوز التحدي 3 نقاط · إنهاء الفردي 2 · التعادل نقطة</p>
         </div>
-        <button type="button" onClick={onRefresh} disabled={loading} aria-label="تحديث ترتيب اليوم" className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.045] text-white/55 transition hover:text-white disabled:opacity-40"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
+        <button type="button" onClick={onRefresh} disabled={loading} aria-label={`تحديث ترتيب ${periodLabel}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.045] text-white/55 transition hover:text-white disabled:opacity-40"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /></button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-2xl border border-white/[0.08] bg-black/15 p-1.5">
+        {([['daily','اليومي'],['weekly','الأسبوعي'],['season','الموسمي']] as Array<[VocabularyLeaderboardPeriod,string]>).map(([value,label]) => (
+          <button key={value} type="button" onClick={() => onPeriodChange(value)} className={`min-h-10 rounded-xl px-2 text-[10px] font-black transition ${period === value ? "bg-lime-300 text-emerald-950" : "text-white/48 hover:bg-white/[0.05] hover:text-white"}`}>{label}</button>
+        ))}
       </div>
 
       {loading && !data ? (
-        <div className="mt-4 flex min-h-[92px] items-center justify-center gap-2 text-xs font-black text-white/45"><LoaderCircle className="h-4 w-4 animate-spin" /> جاري تحميل ترتيب اليوم…</div>
+        <div className="mt-4 flex min-h-[92px] items-center justify-center gap-2 text-xs font-black text-white/45"><LoaderCircle className="h-4 w-4 animate-spin" /> جاري تحميل ترتيب {periodLabel}…</div>
       ) : error && !data ? (
         <div className="mt-4 rounded-2xl border border-rose-200/15 bg-rose-400/[0.06] px-3 py-5 text-center text-xs font-semibold text-rose-100/70">{error}</div>
       ) : entries.length ? (
@@ -236,7 +255,7 @@ function DailyLeaderboardPanel({
             return (
               <div key={entry.userId} className={`grid grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border px-3 py-2.5 ${isMe ? "border-lime-200/25 bg-lime-300/[0.10]" : "border-white/[0.08] bg-white/[0.025]"}`}>
                 <div className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black ${entry.rank === 1 ? "bg-amber-300 text-amber-950" : entry.rank === 2 ? "bg-white/20 text-white" : entry.rank === 3 ? "bg-orange-300/75 text-orange-950" : "bg-black/20 text-white/55"}`}>{entry.rank <= 3 ? <Medal className="h-4 w-4" /> : entry.rank}</div>
-                <div className="min-w-0"><div className="truncate text-xs font-black text-white">{entry.userName}{isMe ? <span className="mr-1 text-[9px] text-lime-200">أنت</span> : null}</div><div className="mt-0.5 text-[9px] font-semibold text-white/38">{entry.wins} فوز · {entry.words} كلمة</div></div>
+                <div className="min-w-0"><div className="truncate text-xs font-black text-white">{entry.userName}{isMe ? <span className="mr-1 text-[9px] text-lime-200">أنت</span> : null}</div><div className="mt-0.5 flex flex-wrap gap-x-2 text-[9px] font-semibold text-white/38"><span>{entry.wins} فوز</span><span>{entry.words} كلمة</span>{entry.streak > 1 ? <span className="text-orange-200">🔥 {entry.streak} متتالية</span> : null}</div></div>
                 <div className="text-left"><div className="text-base font-black text-lime-200" dir="ltr">{entry.score}</div><div className="text-[8px] font-bold text-white/35">نقطة</div></div>
               </div>
             );
@@ -250,7 +269,7 @@ function DailyLeaderboardPanel({
           ) : null}
         </div>
       ) : (
-        <div className="mt-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] px-3 py-5 text-center text-xs font-semibold text-white/42">ما فيه نتائج اليوم حتى الآن. كن أول لاعب في الترتيب.</div>
+        <div className="mt-4 rounded-2xl border border-white/[0.08] bg-white/[0.025] px-3 py-5 text-center text-xs font-semibold text-white/42">ما فيه نتائج في هذا الترتيب حتى الآن.</div>
       )}
     </div>
   );
@@ -265,9 +284,12 @@ export default function VocabularyChallengeGame() {
   const [selectedCardId, setSelectedCardId] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<VocabularyDailyLeaderboard | null>(null);
+  const [leaderboard, setLeaderboard] = useState<VocabularyLeaderboard | null>(null);
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState<VocabularyLeaderboardPeriod>("daily");
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState("");
+  const [dictionaryOverrides, setDictionaryOverrides] = useState<VocabularyDictionaryClientOverrides>({ enabledWords: [], disabledWords: [] });
+  const [matchmaking, setMatchmaking] = useState(false);
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<"success" | "error" | "info">("info");
   const [now, setNow] = useState(Date.now());
@@ -278,14 +300,14 @@ export default function VocabularyChallengeGame() {
   const countdownSoundKeyRef = useRef("");
   const resultSoundKeyRef = useRef("");
 
-  async function refreshLeaderboard() {
+  async function refreshLeaderboard(period = leaderboardPeriod) {
     if (!isLoggedIn || !user) return;
     try {
       setLeaderboardLoading(true);
       setLeaderboardError("");
-      setLeaderboard(await getVocabularyDailyLeaderboard());
+      setLeaderboard(await getVocabularyLeaderboard(period));
     } catch (error) {
-      setLeaderboardError("تعذر تحميل ترتيب اليوم الآن. حاول التحديث بعد قليل.");
+      setLeaderboardError("تعذر تحميل ترتيب المفردات الآن. حاول التحديث بعد قليل.");
       console.warn("Vocabulary leaderboard load failed:", error);
     } finally {
       setLeaderboardLoading(false);
@@ -294,8 +316,15 @@ export default function VocabularyChallengeGame() {
 
   useEffect(() => {
     if (!isLoggedIn || !user) return;
-    void refreshLeaderboard();
+    void refreshLeaderboard(leaderboardPeriod);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, user?.id, leaderboardPeriod]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !user) return;
+    void getVocabularyDictionaryOverrides().then(setDictionaryOverrides).catch((error) => {
+      console.warn("Vocabulary dictionary overrides load failed:", error);
+    });
   }, [isLoggedIn, user?.id]);
 
   useEffect(() => {
@@ -334,6 +363,41 @@ export default function VocabularyChallengeGame() {
       handUnsubscribe();
     };
   }, [roomId, user?.id]);
+
+  useEffect(() => {
+    if (!matchmaking || roomId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const result = await matchmakeVocabularyChallenge();
+        if (cancelled) return;
+        if (result.roomId) {
+          setMatchmaking(false);
+          setRoomId(result.roomId);
+          setMessage("");
+          playVocabularySound("matchStart");
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setMatchmaking(false);
+        setFeedback("error", error instanceof Error ? error.message : "تعذر البحث عن منافس.");
+        playVocabularySound("incorrect");
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => void poll(), 2200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [matchmaking, roomId]);
+
+  useEffect(() => {
+    if (!room?.rematchRoomId || room.rematchRoomId === roomId) return;
+    setSelectedCardId("");
+    setMessage("");
+    setRoomId(room.rematchRoomId);
+  }, [room?.rematchRoomId, roomId]);
 
   useEffect(() => {
     if (room?.status !== "playing") return;
@@ -432,7 +496,7 @@ export default function VocabularyChallengeGame() {
   const turnProgress = room?.turnDurationMs ? Math.min(100, Math.max(0, (turnRemainingMs / room.turnDurationMs) * 100)) : 0;
   const selectedCard = hand?.cards.find((card) => card.id === selectedCardId) || null;
   const canPlay = Boolean(room?.status === "playing" && isMyTurn && hand && !busy && turnRemainingMs > 0);
-  const hasLegalMove = Boolean(room && hand && hasVocabularyMove(room.currentWord, hand.cards.map((card) => card.letter)));
+  const hasLegalMove = Boolean(room && hand && hasVocabularyMoveWithOverrides(room.currentWord, hand.cards.map((card) => card.letter), dictionaryOverrides));
   const canDraw = canPlay && !hasLegalMove;
 
   function setFeedback(kind: "success" | "error" | "info", text: string) {
@@ -457,6 +521,19 @@ export default function VocabularyChallengeGame() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleMatchmaking() {
+    prepareVocabularyAudio();
+    setMessage("");
+    setMatchmaking(true);
+    playVocabularySound("cardSelect");
+  }
+
+  async function handleCancelMatchmaking() {
+    setMatchmaking(false);
+    await cancelVocabularyMatchmaking().catch(() => undefined);
+    setFeedback("info", "تم إيقاف البحث عن منافس.");
   }
 
   async function handleJoin(event: FormEvent) {
@@ -543,6 +620,29 @@ export default function VocabularyChallengeGame() {
     }
   }
 
+  async function handleRematch() {
+    if (!room || busy) return;
+    try {
+      prepareVocabularyAudio();
+      setBusy(true);
+      const result = await requestVocabularyRematch(room.id);
+      if (result.roomId) {
+        setSelectedCardId("");
+        setMessage("");
+        setRoomId(result.roomId);
+        playVocabularySound("matchStart");
+      } else if (result.rematchWaiting) {
+        setFeedback("info", "تم إرسال طلب الإعادة للخصم. بانتظار موافقته.");
+        playVocabularySound("cardSelect", { vibrate: false });
+      }
+    } catch (error) {
+      setFeedback("error", error instanceof Error ? error.message : "تعذر بدء إعادة المباراة.");
+      playVocabularySound("incorrect");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function resetToMenu() {
     setRoomId("");
     setRoom(null);
@@ -550,6 +650,7 @@ export default function VocabularyChallengeGame() {
     setSelectedCardId("");
     setMessage("");
     setJoinCode("");
+    setMatchmaking(false);
     timeoutKeyRef.current = "";
     xpSyncKeyRef.current = "";
     matchStartSoundKeyRef.current = "";
@@ -596,6 +697,9 @@ export default function VocabularyChallengeGame() {
   const finished = room?.status === "finished";
   const didWin = Boolean(finished && room?.winnerId === user.id);
   const isDraw = Boolean(finished && room?.mode === "duel" && !room?.winnerId);
+  const finishLeaderboardLabel = leaderboardPeriod === "daily" ? "اليومي" : leaderboardPeriod === "weekly" ? "الأسبوعي" : "الموسمي";
+  const rematchRequestedByMe = Boolean(room?.mode === "duel" && room?.rematchRequestedBy === user.id);
+  const rematchRequestedByOpponent = Boolean(room?.mode === "duel" && room?.rematchRequestedBy && room.rematchRequestedBy !== user.id);
 
   return (
     <main dir="rtl" className="relative mx-auto max-w-7xl overflow-hidden px-3 pb-16 pt-3 sm:px-4 md:px-6 md:pb-20 md:pt-6">
@@ -639,8 +743,13 @@ export default function VocabularyChallengeGame() {
             <div className="rounded-[30px] border border-white/10 bg-black/20 p-4 backdrop-blur-xl md:p-5">
               <div className="mb-3 flex items-center justify-between"><div><p className="text-[10px] font-black text-lime-200">اختر نمط اللعب</p><h2 className="mt-1 text-xl font-black">كيف تبي تلعب؟</h2></div><Gamepad2 className="h-6 w-6 text-lime-200" /></div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <ModeCard icon={<UserRound className="h-5 w-5" />} title="العب بمفردك" description="تخلّص من بطاقاتك خلال 5 دقائق، وبدّل حرفًا واحدًا في كل حركة." accent="emerald" onClick={() => handleCreate("solo")} disabled={busy} />
-                <ModeCard icon={<Swords className="h-5 w-5" />} title="تحدَّ لاعبًا" description="أنشئ غرفة خاصة، شارك الكود مع صديق، وأول من يتخلّص من بطاقاته يفوز." accent="amber" onClick={() => handleCreate("duel")} disabled={busy} />
+                <ModeCard icon={<UserRound className="h-5 w-5" />} title="العب بمفردك" description="تخلّص من بطاقاتك خلال 5 دقائق، وبدّل حرفًا واحدًا في كل حركة." accent="emerald" onClick={() => handleCreate("solo")} disabled={busy || matchmaking} />
+                <ModeCard icon={<Swords className="h-5 w-5" />} title="تحدَّ لاعبًا" description="أنشئ غرفة خاصة، شارك الكود مع صديق، وأول من يتخلّص من بطاقاته يفوز." accent="amber" onClick={() => handleCreate("duel")} disabled={busy || matchmaking} />
+              </div>
+
+              <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-2 rounded-[22px] border border-cyan-200/15 bg-cyan-300/[0.055] p-3">
+                <div className="min-w-0"><div className="flex items-center gap-2 text-xs font-black text-cyan-100"><Shuffle className="h-4 w-4" /> خصم عشوائي أونلاين</div><p className="mt-1 text-[10px] font-semibold leading-5 text-white/45">النظام يبحث لك عن عضو متاح ويبدأ المباراة تلقائيًا.</p></div>
+                {matchmaking ? <button type="button" onClick={() => void handleCancelMatchmaking()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-rose-200/15 bg-rose-400/[0.08] px-3 text-[10px] font-black text-rose-100"><LoaderCircle className="h-4 w-4 animate-spin" /> إلغاء</button> : <button type="button" onClick={() => void handleMatchmaking()} disabled={busy} className="min-h-11 rounded-xl bg-cyan-200 px-3 text-[10px] font-black text-cyan-950 disabled:opacity-40">ابحث الآن</button>}
               </div>
 
               <form onSubmit={handleJoin} className="mt-3 rounded-[22px] border border-white/10 bg-white/[0.035] p-3">
@@ -652,10 +761,11 @@ export default function VocabularyChallengeGame() {
               </form>
 
               <div className="mt-3 flex items-start gap-2 rounded-2xl border border-emerald-200/10 bg-emerald-300/[0.045] p-3 text-[10px] font-semibold leading-5 text-emerald-50/55"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime-200" /><span>بدّل حرفًا واحدًا ببطاقة من يدك لتصنع كلمة صحيحة من 3 أحرف. أول من يتخلّص من بطاقاته يفوز.</span></div>
+              <Link href="/vocabulary-challenge/profile" className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] text-[10px] font-black text-white/65 transition hover:bg-white/[0.07] hover:text-white"><UserCircle2 className="h-4 w-4" /> ملفي في تحدي المفردات والإنجازات</Link>
             </div>
           </div>
 
-          <DailyLeaderboardPanel data={leaderboard} loading={leaderboardLoading} error={leaderboardError} onRefresh={() => void refreshLeaderboard()} />
+          <LeaderboardPanel data={leaderboard} loading={leaderboardLoading} error={leaderboardError} period={leaderboardPeriod} onPeriodChange={setLeaderboardPeriod} onRefresh={() => void refreshLeaderboard(leaderboardPeriod)} />
 
           {message ? <div role="alert" className={`relative mt-4 rounded-2xl border px-3 py-2.5 text-xs font-bold ${messageKind === "error" ? "border-red-300/20 bg-red-400/[0.08] text-red-100" : messageKind === "success" ? "border-lime-300/20 bg-lime-300/[0.08] text-lime-100" : "border-white/10 bg-white/[0.04] text-white/70"}`}>{message}</div> : null}
         </section>
@@ -682,32 +792,36 @@ export default function VocabularyChallengeGame() {
           </div>
         </section>
       ) : (
-        <section className="relative mx-auto max-w-[820px] overflow-hidden rounded-[38px] border border-emerald-100/20 bg-[linear-gradient(180deg,#064638_0%,#0b8060_38%,#086249_64%,#043b32_100%)] shadow-[0_34px_110px_rgba(0,0,0,.42)]">
+        <section className="relative mx-auto max-w-[640px] overflow-hidden rounded-[34px] border border-emerald-100/20 bg-[linear-gradient(180deg,#064638_0%,#0b8060_38%,#086249_64%,#043b32_100%)] shadow-[0_28px_90px_rgba(0,0,0,.40)]">
           <div className="pointer-events-none absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_50%_50%,rgba(255,255,255,.11)_0_1px,transparent_1.4px),linear-gradient(30deg,transparent_48%,rgba(255,255,255,.06)_49%_51%,transparent_52%),linear-gradient(-30deg,transparent_48%,rgba(255,255,255,.05)_49%_51%,transparent_52%)] [background-size:24px_24px,48px_42px,48px_42px]" />
-          <div className="pointer-events-none absolute inset-x-[8%] -top-44 h-[330px] rounded-[50%] border-[2px] border-emerald-100/14 bg-black/[0.06] shadow-[inset_0_-20px_50px_rgba(255,255,255,.025)]" />
-          <div className="pointer-events-none absolute left-[8%] top-28 h-24 w-24 -translate-x-1/2 rounded-full border border-emerald-100/10" />
-          <div className="pointer-events-none absolute right-[8%] top-28 h-24 w-24 translate-x-1/2 rounded-full border border-emerald-100/10" />
+          <div className="pointer-events-none absolute inset-x-[8%] -top-48 h-[330px] rounded-[50%] border-[2px] border-emerald-100/14 bg-black/[0.06]" />
 
-          <div className="relative min-h-[760px] px-3 pb-5 pt-4 sm:min-h-[820px] sm:px-5 sm:pb-7">
-            <div className="mx-auto flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-black/18 px-3 py-1.5 shadow-inner">
-              <Clock3 className="h-4 w-4 text-lime-200" /><span dir="ltr" className="font-mono text-xl font-black tracking-wider text-emerald-50 sm:text-2xl">{formatTimer(matchRemainingMs)}</span>
+          <div className="relative min-h-[560px] px-3 pb-3 pt-2.5 sm:min-h-[630px] sm:px-4 sm:pb-4 sm:pt-3">
+            <div className="grid grid-cols-[62px_minmax(0,1fr)_62px] items-center gap-2">
+              <div className={`relative grid h-[58px] w-[58px] place-items-center rounded-full border-[3px] bg-black/45 shadow-[0_8px_24px_rgba(0,0,0,.25)] ${isMyTurn ? "border-lime-300/70" : "border-white/15"}`}>
+                <svg className="absolute inset-[-4px] h-[62px] w-[62px] -rotate-90" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" /><circle cx="36" cy="36" r="31" fill="none" stroke={turnSeconds <= 3 ? "#fb7185" : "#bef264"} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${194.8 * turnProgress / 100} 194.8`} /></svg>
+                <span dir="ltr" className={`relative text-lg font-black ${turnSeconds <= 3 ? "text-rose-200" : "text-lime-200"}`}>{turnSeconds}s</span>
+              </div>
+
+              <div className="mx-auto min-w-0 rounded-2xl border border-white/12 bg-black/22 px-5 py-2 text-center shadow-inner">
+                <div className="text-[8px] font-black text-white/38">وقت المباراة</div>
+                <div dir="ltr" className="mt-0.5 font-mono text-2xl font-black tracking-wider text-emerald-50 sm:text-[28px]">{formatTimer(matchRemainingMs)}</div>
+              </div>
+
+              <div className={`grid h-[58px] w-[58px] place-items-center rounded-2xl border text-center ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.10]" : "border-white/10 bg-black/18"}`}>
+                <div><div className="text-base font-black text-white">{me?.cardCount ?? hand.cards.length}</div><div className="text-[8px] font-bold text-white/38">بطاقاتك</div></div>
+              </div>
             </div>
 
-            <div className="mt-5 flex min-h-[72px] items-center justify-center">
+            <div className="mt-2 flex min-h-[54px] items-center justify-center">
               {room.mode === "duel" ? <PlayerBadge player={opponent} active={Boolean(opponent && room.turnPlayerId === opponent.userId)} /> : (
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/18 px-4 py-2 text-[11px] font-black text-white/65"><Sparkles className="h-4 w-4 text-lime-200" /> الوضع الفردي</div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/18 px-4 py-2 text-[10px] font-black text-white/65"><Sparkles className="h-4 w-4 text-lime-200" /> الوضع الفردي</div>
               )}
             </div>
 
-            <div className="mt-1 grid place-items-center">
-              <div className={`relative grid h-16 w-16 place-items-center rounded-full border-[3px] bg-black/45 shadow-[0_10px_30px_rgba(0,0,0,.28)] ${isMyTurn ? "border-lime-300/70" : "border-white/15"}`}>
-                <svg className="absolute inset-[-5px] h-[70px] w-[70px] -rotate-90" viewBox="0 0 72 72" aria-hidden="true"><circle cx="36" cy="36" r="31" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="4" /><circle cx="36" cy="36" r="31" fill="none" stroke={turnSeconds <= 3 ? "#fb7185" : "#bef264"} strokeWidth="4" strokeLinecap="round" strokeDasharray={`${194.8 * turnProgress / 100} 194.8`} /></svg>
-                <span dir="ltr" className={`relative text-xl font-black ${turnSeconds <= 3 ? "text-rose-200" : "text-lime-200"}`}>{turnSeconds}s</span>
-              </div>
-              <div className={`mt-2 rounded-full border px-3 py-1 text-[10px] font-black ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.11] text-lime-100" : "border-white/10 bg-black/15 text-white/52"}`}>{isMyTurn ? "حان دورك الآن" : room.mode === "duel" ? "دور الخصم" : "استعد"}</div>
-            </div>
+            <div className={`mx-auto mt-1 w-fit rounded-full border px-3 py-1 text-[9px] font-black ${isMyTurn ? "border-lime-200/20 bg-lime-300/[0.11] text-lime-100" : "border-white/10 bg-black/15 text-white/52"}`}>{isMyTurn ? "حان دورك الآن" : room.mode === "duel" ? "دور الخصم" : "استعد"}</div>
 
-            <div className="mt-7 flex items-center justify-center gap-2.5 sm:gap-4" dir="rtl">
+            <div className="mt-2.5 flex items-center justify-center gap-2.5 sm:gap-3.5" dir="rtl">
               {Array.from(room.currentWord).map((letter, index) => (
                 <button key={`${room.currentWord}-${index}`} type="button" disabled={!canPlay || !selectedCard} onClick={() => handlePosition(index)} aria-label={selectedCard ? `استبدال الحرف ${letter} بالحرف ${selectedCard.letter}` : `الحرف ${letter}`} className="relative min-h-0 min-w-0 rounded-[17px] disabled:cursor-default">
                   <CardFace letter={letter} index={index} size="center" />
@@ -717,29 +831,36 @@ export default function VocabularyChallengeGame() {
             </div>
 
             <AnimatePresence mode="wait">
-              <motion.div key={`${messageKind}-${message || room.lastMove?.at || "idle"}`} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} exit={reduceMotion ? undefined : { opacity: 0, y: -5 }} className="mx-auto mt-5 min-h-[42px] max-w-md">
+              <motion.div key={`${messageKind}-${message || room.lastMove?.at || "idle"}`} initial={reduceMotion ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={reduceMotion ? undefined : { opacity: 0, y: -4 }} className="mx-auto mt-2.5 min-h-[36px] max-w-md">
                 {message ? (
-                  <div aria-live="polite" className={`flex min-h-[42px] items-center justify-center gap-2 rounded-xl border px-3 text-center text-xs font-black shadow-lg ${messageKind === "success" ? "border-lime-200/25 bg-lime-300/20 text-lime-50" : messageKind === "error" ? "border-rose-200/25 bg-rose-500/28 text-rose-50" : "border-white/10 bg-black/22 text-white/70"}`}>
+                  <div aria-live="polite" className={`flex min-h-[36px] items-center justify-center gap-2 rounded-xl border px-3 text-center text-[11px] font-black shadow-lg ${messageKind === "success" ? "border-lime-200/25 bg-lime-300/20 text-lime-50" : messageKind === "error" ? "border-rose-200/25 bg-rose-500/28 text-rose-50" : "border-white/10 bg-black/22 text-white/70"}`}>
                     {messageKind === "success" ? <CheckCircle2 className="h-4 w-4" /> : messageKind === "error" ? <XCircle className="h-4 w-4" /> : <CircleHelp className="h-4 w-4" />}{message}
                   </div>
                 ) : room.lastMove ? (
-                  <div className="flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-lime-200/18 bg-lime-300/[0.13] px-3 text-xs font-black text-lime-50"><CheckCircle2 className="h-4 w-4" /> {room.lastMove.afterWord}</div>
+                  <div className="flex min-h-[36px] items-center justify-center gap-2 rounded-xl border border-lime-200/18 bg-lime-300/[0.13] px-3 text-[11px] font-black text-lime-50"><CheckCircle2 className="h-4 w-4" /> {room.lastMove.afterWord}</div>
                 ) : (
-                  <div className="flex min-h-[42px] items-center justify-center text-[10px] font-semibold text-white/38">اختر بطاقة من يدك ثم اضغط على الحرف الذي تريد استبداله.</div>
+                  <div className="flex min-h-[36px] items-center justify-center text-[9px] font-semibold text-white/38">اختر بطاقة ثم اضغط على الحرف الذي تريد استبداله.</div>
                 )}
               </motion.div>
             </AnimatePresence>
 
-            <div className="mt-6 flex items-end justify-between gap-3">
-              <button type="button" onClick={handleDraw} disabled={!canDraw} className="group flex w-[74px] shrink-0 flex-col items-center gap-1.5 disabled:opacity-35">
-                <div className="relative h-[58px] w-[52px]" aria-hidden="true"><div className="absolute inset-0 translate-x-2 translate-y-2 rotate-6 rounded-lg border border-white/15 bg-[#173f38]" /><div className="absolute inset-0 translate-x-1 translate-y-1 rotate-3 rounded-lg border border-white/15 bg-[#1b4b41]" /><div className="absolute inset-0 grid place-items-center rounded-lg border border-white/20 bg-[linear-gradient(145deg,#173f38,#0c2926)] shadow-[0_10px_22px_rgba(0,0,0,.3)]"><Sparkles className="h-5 w-5 text-amber-200/70" /></div></div>
-                <span className="text-[9px] font-black text-white/58">{!isMyTurn ? "انتظر دورك" : hasLegalMove ? "عندك حركة صحيحة" : "اسحب عند التعذر"}</span>
+            {room.recentMoves?.length ? (
+              <div className="mx-auto mt-2 flex max-w-full items-center justify-center gap-1.5 overflow-x-auto px-1 pb-1 hidden-scrollbar" dir="rtl" aria-label="آخر الكلمات">
+                <History className="h-3.5 w-3.5 shrink-0 text-white/35" />
+                {room.recentMoves.slice(-5).map((move, index) => <span key={`${move.at}-${index}`} className={`shrink-0 rounded-lg border px-2 py-1 text-[9px] font-black ${index === room.recentMoves!.slice(-5).length - 1 ? "border-lime-200/20 bg-lime-300/[0.10] text-lime-100" : "border-white/[0.08] bg-black/14 text-white/42"}`}>{move.afterWord}</span>)}
+              </div>
+            ) : null}
+
+            <div className="mt-2.5 flex items-end justify-between gap-3">
+              <button type="button" onClick={handleDraw} disabled={!canDraw} className="group flex w-[70px] shrink-0 flex-col items-center gap-1 disabled:opacity-35" title={hasLegalMove ? "لا يمكن السحب لأن لديك حركة صحيحة" : "اسحب بطاقة عند عدم وجود حركة صحيحة"}>
+                <div className="relative h-[52px] w-[47px]" aria-hidden="true"><div className="absolute inset-0 translate-x-2 translate-y-2 rotate-6 rounded-lg border border-white/15 bg-[#173f38]" /><div className="absolute inset-0 translate-x-1 translate-y-1 rotate-3 rounded-lg border border-white/15 bg-[#1b4b41]" /><div className="absolute inset-0 grid place-items-center rounded-lg border border-white/20 bg-[linear-gradient(145deg,#173f38,#0c2926)] shadow-[0_8px_18px_rgba(0,0,0,.3)]"><Sparkles className="h-4 w-4 text-amber-200/70" /></div></div>
+                <span className="text-[8px] font-black text-white/58">{!isMyTurn ? "انتظر دورك" : hasLegalMove ? "عندك حركة" : "اسحب"}</span>
               </button>
 
               <div className="flex-1 text-left" dir="ltr"><PlayerBadge player={me} active={isMyTurn} me /></div>
             </div>
 
-            <div className="mt-4 overflow-x-auto pb-3 pt-4 hidden-scrollbar" dir="rtl">
+            <div className="mt-1 overflow-x-auto pb-2 pt-3 hidden-scrollbar" dir="rtl">
               <div className="mx-auto flex min-w-max items-end justify-center px-2 pb-2">
                 {hand.cards.map((card, index) => {
                   const selected = card.id === selectedCardId;
@@ -758,7 +879,7 @@ export default function VocabularyChallengeGame() {
                       aria-pressed={selected}
                       aria-label={`بطاقة الحرف ${card.letter}`}
                       className="relative min-h-0 min-w-0 rounded-[15px] transition disabled:cursor-default"
-                      style={{ marginInlineStart: index === 0 ? 0 : -13, zIndex: selected ? 50 : index + 1 }}
+                      style={{ marginInlineStart: index === 0 ? 0 : -12, zIndex: selected ? 50 : index + 1 }}
                     >
                       <CardFace letter={card.letter} index={index} selected={selected} disabled={!canPlay} />
                     </button>
@@ -767,11 +888,7 @@ export default function VocabularyChallengeGame() {
               </div>
             </div>
 
-            <div className="mt-1 grid grid-cols-3 gap-2 text-center text-[9px] font-bold text-white/42">
-              <div className="rounded-xl border border-white/[0.08] bg-black/12 px-2 py-2"><Zap className="mx-auto mb-1 h-3.5 w-3.5 text-lime-200" />غيّر حرفًا واحدًا</div>
-              <div className="rounded-xl border border-white/[0.08] bg-black/12 px-2 py-2"><ShieldCheck className="mx-auto mb-1 h-3.5 w-3.5 text-lime-200" />كلمة معتمدة فقط</div>
-              <div className="rounded-xl border border-white/[0.08] bg-black/12 px-2 py-2"><Trophy className="mx-auto mb-1 h-3.5 w-3.5 text-lime-200" />تخلّص من البطاقات</div>
-            </div>
+            <div className="mx-auto mt-0 flex w-fit items-center gap-2 rounded-full border border-white/[0.07] bg-black/12 px-3 py-1.5 text-[8px] font-bold text-white/35"><ShieldCheck className="h-3 w-3 text-lime-200" /> السحب يتوقف تلقائيًا إذا كانت لديك حركة صحيحة</div>
           </div>
 
           {finished ? (
@@ -780,8 +897,15 @@ export default function VocabularyChallengeGame() {
                 <div className={`mx-auto grid h-16 w-16 place-items-center rounded-full border ${didWin ? "border-lime-200/25 bg-lime-300/[0.13] text-lime-200" : isDraw ? "border-amber-200/25 bg-amber-300/[0.10] text-amber-200" : "border-white/12 bg-white/[0.06] text-white/55"}`}>{didWin ? <Trophy className="h-7 w-7" /> : isDraw ? <UsersRound className="h-7 w-7" /> : <Swords className="h-7 w-7" />}</div>
                 <h2 className="mt-4 text-2xl font-black">{didWin ? "فزت بالتحدي!" : isDraw ? "انتهت بالتعادل" : room.mode === "solo" ? "انتهى الوقت" : "انتهت المباراة"}</h2>
                 <p className="mt-2 text-xs font-semibold leading-6 text-white/50">{room.finishReason === "cards" ? "تم حسم المباراة بعد التخلص من جميع البطاقات." : room.finishReason === "forfeit" ? "تم حسم المباراة بالانسحاب." : "انتهت الخمس دقائق وتم الحسم بعدد البطاقات المتبقية."}</p>
-                <div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black text-lime-200">{me?.cardCount ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">بطاقاتك المتبقية</div></div><div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black">{me?.moves ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">كلمات صحيحة</div></div></div>{leaderboard?.me ? <div className="mt-2 rounded-2xl border border-lime-200/15 bg-lime-300/[0.07] px-3 py-2 text-[10px] font-black text-lime-100">ترتيبك اليوم: <span dir="ltr">#{leaderboard.me.rank}</span> · {leaderboard.me.score} نقطة</div> : null}
-                <div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={resetToMenu} className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl bg-lime-300 px-3 text-xs font-black text-emerald-950"><RotateCcw className="h-4 w-4" /> تحدٍ جديد</button><Link href="/games" className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3 text-xs font-black text-white/70"><ArrowRight className="h-4 w-4" /> الألعاب</Link></div>
+                <div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black text-lime-200">{me?.cardCount ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">بطاقاتك المتبقية</div></div><div className="rounded-2xl border border-white/10 bg-black/15 p-3"><div className="text-xl font-black">{me?.moves ?? 0}</div><div className="mt-1 text-[9px] font-bold text-white/40">كلمات صحيحة</div></div></div>{leaderboard?.me ? <div className="mt-2 rounded-2xl border border-lime-200/15 bg-lime-300/[0.07] px-3 py-2 text-[10px] font-black text-lime-100">ترتيبك {finishLeaderboardLabel}: <span dir="ltr">#{leaderboard.me.rank}</span> · {leaderboard.me.score} نقطة</div> : null}
+                {room.mode === "duel" && rematchRequestedByOpponent ? <div className="mt-3 rounded-2xl border border-amber-200/20 bg-amber-300/[0.08] px-3 py-2 text-[10px] font-black text-amber-100">خصمك طلب إعادة المباراة.</div> : null}
+                <div className="mt-5 grid gap-2">
+                  <button type="button" onClick={handleRematch} disabled={busy || rematchRequestedByMe} className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-lime-300 px-3 text-xs font-black text-emerald-950 disabled:cursor-wait disabled:opacity-65">
+                    {busy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                    {room.mode === "solo" ? "العب مرة أخرى" : rematchRequestedByMe ? "بانتظار موافقة الخصم…" : rematchRequestedByOpponent ? "قبول إعادة المباراة" : "إعادة المباراة"}
+                  </button>
+                  <div className="grid grid-cols-2 gap-2"><button type="button" onClick={resetToMenu} className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3 text-xs font-black text-white/72"><Gamepad2 className="h-4 w-4" /> القائمة</button><Link href="/games" className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.05] px-3 text-xs font-black text-white/70"><ArrowRight className="h-4 w-4" /> الألعاب</Link></div>
+                </div>
               </motion.div>
             </div>
           ) : null}

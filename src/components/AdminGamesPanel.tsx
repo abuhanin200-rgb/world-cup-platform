@@ -5,8 +5,9 @@ import AdminWordGamePanel from "@/components/AdminWordGamePanel";
 import AdminFlagMemoryPanel from "@/components/AdminFlagMemoryPanel";
 import AdminTenSecondsChallengePanel from "./AdminTenSecondsChallengePanel";
 import AdminPlatformGamesXpPanel from "@/components/AdminPlatformGamesXpPanel";
+import AdminVocabularyDictionaryPanel from "@/components/AdminVocabularyDictionaryPanel";
 
-type GamesAdminTab = "platformXp" | "wordGame" | "flagMemory" | "tenSeconds";
+type GamesAdminTab = "platformXp" | "wordGame" | "flagMemory" | "tenSeconds" | "vocabulary";
 
 export default function AdminGamesPanel() {
   const [activeGameTab, setActiveGameTab] =
@@ -62,6 +63,18 @@ export default function AdminGamesPanel() {
 
           <button
             type="button"
+            onClick={() => setActiveGameTab("vocabulary")}
+            className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+              activeGameTab === "vocabulary"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            🟩 تحدي المفردات
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveGameTab("tenSeconds")}
             className={`rounded-xl px-4 py-2 text-sm font-black transition ${
               activeGameTab === "tenSeconds"
@@ -81,6 +94,8 @@ export default function AdminGamesPanel() {
       {activeGameTab === "flagMemory" && <AdminFlagMemoryPanel />}
 
       {activeGameTab === "tenSeconds" && <AdminTenSecondsChallengePanel />}
+
+      {activeGameTab === "vocabulary" && <AdminVocabularyDictionaryPanel />}
     </section>
   );
 }

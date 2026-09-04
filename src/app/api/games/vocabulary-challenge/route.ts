@@ -5,11 +5,14 @@ import {
   VOCABULARY_DICTIONARY_VERSION,
   createFairVocabularyLetters,
   drawFairVocabularyLetter,
-  getVocabularyMoves,
-  isApprovedVocabularyWord,
-  randomVocabularyStartingWord,
   replaceVocabularyLetter,
 } from "@/lib/vocabularyChallengeDictionary";
+import {
+  getVocabularyDictionaryOverrides,
+  hasVocabularyMoveServer,
+  isApprovedVocabularyWordServer,
+  randomActiveStartingWord,
+} from "@/lib/serverVocabularyDictionary";
 import { syncPlatformGameXp } from "@/lib/serverPlatformGameXp";
 import type {
   VocabularyChallengeAction,
@@ -23,6 +26,7 @@ export const revalidate = 0;
 
 const ROOM_COLLECTION = "vocabularyChallengeRooms";
 const RESULT_COLLECTION = "vocabularyChallengeResults";
+const MATCHMAKING_COLLECTION = "vocabularyChallengeMatchmaking";
 const HAND_SIZE = 10;
 const TURN_DURATION_MS = 10_000;
 const MATCH_DURATION_MS = 5 * 60_000;
@@ -209,7 +213,7 @@ async function syncFinishedResults(resultIds: Record<string, string> | undefined
 
 async function createRoom(userId: string, userName: string, mode: VocabularyChallengeMode) {
   const now = Date.now();
-  const startingWord = randomVocabularyStartingWord();
+  const startingWord = await randomActiveStartingWord();
   const roomRef = adminDb.collection(ROOM_COLLECTION).doc();
   const cards = createCards(createFairVocabularyLetters(startingWord, HAND_SIZE));
   const roomCode = mode === "duel" ? await uniqueRoomCode() : null;
@@ -243,7 +247,10 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
     winnerId: null,
     finishReason: null,
     lastMove: null,
+    recentMoves: [],
     resultIds: {},
+    rematchRequestedBy: null,
+    rematchRoomId: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -254,6 +261,56 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
   await batch.commit();
 
   return { roomId: roomRef.id, roomCode, status: room.status };
+}
+
+function startedDuelRoomData(params: {
+  roomId: string;
+  hostId: string;
+  hostName: string;
+  guestId: string;
+  guestName: string;
+  startingWord: string;
+  now: number;
+}) {
+  const hostCards = createCards(createFairVocabularyLetters(params.startingWord, HAND_SIZE));
+  const guestCards = createCards(createFairVocabularyLetters(params.startingWord, HAND_SIZE));
+  const firstPlayer = Math.random() < 0.5 ? params.hostId : params.guestId;
+  const matchEndsAt = params.now + MATCH_DURATION_MS;
+  const room = {
+    id: params.roomId,
+    dictionaryVersion: VOCABULARY_DICTIONARY_VERSION,
+    mode: "duel" as const,
+    status: "playing" as const,
+    roomCode: null,
+    hostId: params.hostId,
+    hostName: params.hostName,
+    guestId: params.guestId,
+    guestName: params.guestName,
+    playerOrder: [params.hostId, params.guestId],
+    players: {
+      [params.hostId]: { userId: params.hostId, userName: params.hostName, cardCount: hostCards.length, moves: 0, draws: 0 },
+      [params.guestId]: { userId: params.guestId, userName: params.guestName, cardCount: guestCards.length, moves: 0, draws: 0 },
+    },
+    startingWord: params.startingWord,
+    currentWord: params.startingWord,
+    turnPlayerId: firstPlayer,
+    turnStartedAt: params.now,
+    turnEndsAt: Math.min(params.now + TURN_DURATION_MS, matchEndsAt),
+    turnDurationMs: TURN_DURATION_MS,
+    matchStartedAt: params.now,
+    matchEndsAt,
+    matchDurationMs: MATCH_DURATION_MS,
+    winnerId: null,
+    finishReason: null,
+    lastMove: null,
+    recentMoves: [],
+    resultIds: {},
+    rematchRequestedBy: null,
+    rematchRoomId: null,
+    createdAt: params.now,
+    updatedAt: params.now,
+  };
+  return { room, hostCards, guestCards };
 }
 
 async function joinRoom(userId: string, userName: string, rawCode: unknown) {
@@ -315,6 +372,152 @@ async function joinRoom(userId: string, userName: string, rawCode: unknown) {
   return result;
 }
 
+async function matchmakeRoom(userId: string, userName: string) {
+  const now = Date.now();
+  const queueRef = adminDb.collection(MATCHMAKING_COLLECTION).doc(userId);
+  const ownSnap = await queueRef.get();
+  const own = ownSnap.exists ? ownSnap.data() || {} : {};
+  if (text(own.status) === "matched" && text(own.roomId)) {
+    const previousRoomId = text(own.roomId);
+    const previousRoomSnap = await adminDb.collection(ROOM_COLLECTION).doc(previousRoomId).get();
+    const previousRoom = previousRoomSnap.exists ? previousRoomSnap.data() || {} : {};
+    const previousStatus = text(previousRoom.status);
+    if (previousRoomSnap.exists && (previousStatus === "waiting" || previousStatus === "playing")) {
+      return { matched: true, searching: false, roomId: previousRoomId };
+    }
+    await queueRef.delete().catch(() => undefined);
+  }
+
+  const waiting = await adminDb.collection(MATCHMAKING_COLLECTION).where("status", "==", "waiting").limit(30).get();
+  const candidate = waiting.docs.find((docSnap) => {
+    const data = docSnap.data() || {};
+    return docSnap.id !== userId && number(data.expiresAt) > now && text(data.userId);
+  });
+
+  if (!candidate) {
+    await queueRef.set({
+      userId,
+      userName,
+      status: "waiting",
+      roomId: null,
+      createdAt: text(own.status) === "waiting" && number(own.createdAt) ? number(own.createdAt) : now,
+      updatedAt: now,
+      expiresAt: now + 70_000,
+    }, { merge: true });
+    return { matched: false, searching: true };
+  }
+
+  const candidateData = candidate.data() || {};
+  const opponentId = text(candidateData.userId) || candidate.id;
+  const opponentName = text(candidateData.userName) || "عضو";
+  const roomRef = adminDb.collection(ROOM_COLLECTION).doc();
+  const startingWord = await randomActiveStartingWord();
+  const duel = startedDuelRoomData({
+    roomId: roomRef.id,
+    hostId: opponentId,
+    hostName: opponentName,
+    guestId: userId,
+    guestName: userName,
+    startingWord,
+    now,
+  });
+
+  try {
+    const matchedRoomId = await adminDb.runTransaction(async (transaction: Transaction) => {
+      const [candidateSnap, latestOwnSnap] = await Promise.all([
+        transaction.get(candidate.ref),
+        transaction.get(queueRef),
+      ]);
+      const latestCandidate = candidateSnap.data() || {};
+      const latestOwn = latestOwnSnap.exists ? latestOwnSnap.data() || {} : {};
+      if (!candidateSnap.exists || text(latestCandidate.status) !== "waiting" || number(latestCandidate.expiresAt) <= now) {
+        throw new Error("MATCH_CHANGED");
+      }
+      if (text(latestOwn.status) === "matched" && text(latestOwn.roomId)) return text(latestOwn.roomId);
+
+      transaction.set(roomRef, duel.room);
+      transaction.set(roomRef.collection("hands").doc(opponentId), { userId: opponentId, cards: duel.hostCards, updatedAt: now });
+      transaction.set(roomRef.collection("hands").doc(userId), { userId, cards: duel.guestCards, updatedAt: now });
+      transaction.set(candidate.ref, { ...latestCandidate, status: "matched", roomId: roomRef.id, updatedAt: now, expiresAt: now + 5 * 60_000 }, { merge: true });
+      transaction.set(queueRef, { userId, userName, status: "matched", roomId: roomRef.id, createdAt: number(latestOwn.createdAt) || now, updatedAt: now, expiresAt: now + 5 * 60_000 }, { merge: true });
+      return roomRef.id;
+    });
+    return { matched: true, searching: false, roomId: matchedRoomId || roomRef.id };
+  } catch (error) {
+    if (error instanceof Error && error.message === "MATCH_CHANGED") {
+      await queueRef.set({ userId, userName, status: "waiting", roomId: null, createdAt: now, updatedAt: now, expiresAt: now + 70_000 }, { merge: true });
+      return { matched: false, searching: true };
+    }
+    throw error;
+  }
+}
+
+async function cancelMatchmaking(userId: string) {
+  await adminDb.collection(MATCHMAKING_COLLECTION).doc(userId).delete().catch(() => undefined);
+  return { cancelled: true };
+}
+
+async function requestRematch(userId: string, userName: string, roomId: string) {
+  if (!roomId) throw new Error("ROOM_NOT_FOUND");
+  const roomRef = adminDb.collection(ROOM_COLLECTION).doc(roomId);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new Error("ROOM_NOT_FOUND");
+  const room = roomSnap.data() || {};
+  if (!participant(room, userId)) throw new Error("FORBIDDEN");
+  if (text(room.status) !== "finished") throw new Error("GAME_NOT_FINISHED");
+
+  if (text(room.mode) === "solo") {
+    return createRoom(userId, userName, "solo");
+  }
+
+  if (text(room.rematchRoomId)) {
+    return { roomId: text(room.rematchRoomId), matched: true, rematchWaiting: false };
+  }
+
+  const requestedBy = text(room.rematchRequestedBy);
+  if (!requestedBy || requestedBy === userId) {
+    await roomRef.set({ rematchRequestedBy: userId, updatedAt: Date.now() }, { merge: true });
+    return { rematchWaiting: true, matched: false };
+  }
+
+  const hostId = text(room.hostId);
+  const guestId = text(room.guestId);
+  if (!hostId || !guestId) throw new Error("ROOM_NOT_AVAILABLE");
+  const newRoomRef = adminDb.collection(ROOM_COLLECTION).doc();
+  const now = Date.now();
+  const startingWord = await randomActiveStartingWord();
+  const duel = startedDuelRoomData({
+    roomId: newRoomRef.id,
+    hostId,
+    hostName: playerName(room, hostId),
+    guestId,
+    guestName: playerName(room, guestId),
+    startingWord,
+    now,
+  });
+
+  const rematchRoomId = await adminDb.runTransaction(async (transaction: Transaction) => {
+    const latestSnap = await transaction.get(roomRef);
+    if (!latestSnap.exists) throw new Error("ROOM_NOT_FOUND");
+    const latest = latestSnap.data() || {};
+    if (text(latest.rematchRoomId)) return text(latest.rematchRoomId);
+    if (text(latest.status) !== "finished" || text(latest.rematchRequestedBy) !== requestedBy) throw new Error("REMATCH_CHANGED");
+
+    transaction.set(newRoomRef, duel.room);
+    transaction.set(newRoomRef.collection("hands").doc(hostId), { userId: hostId, cards: duel.hostCards, updatedAt: now });
+    transaction.set(newRoomRef.collection("hands").doc(guestId), { userId: guestId, cards: duel.guestCards, updatedAt: now });
+    transaction.update(roomRef, {
+      rematchRequestedBy: null,
+      rematchRoomId: newRoomRef.id,
+      rematchAcceptedAt: now,
+      updatedAt: now,
+    });
+    return newRoomRef.id;
+  });
+
+  return { roomId: rematchRoomId || newRoomRef.id, matched: true, rematchWaiting: false };
+}
+
 async function makeMove(userId: string, roomId: string, cardId: string, rawPosition: unknown) {
   const position = Math.floor(number(rawPosition));
   if (!roomId || !cardId || position < 0 || position > 2) throw new Error("INVALID_MOVE");
@@ -353,7 +556,7 @@ async function makeMove(userId: string, roomId: string, cardId: string, rawPosit
     const beforeWord = text(room.currentWord);
     const afterWord = replaceVocabularyLetter(beforeWord, position, text(card.letter));
 
-    if (!afterWord || !isApprovedVocabularyWord(afterWord)) {
+    if (!afterWord || !(await isApprovedVocabularyWordServer(afterWord, transaction))) {
       const error = new Error("INVALID_WORD") as Error & { proposedWord?: string };
       error.proposedWord = afterWord;
       throw error;
@@ -368,7 +571,18 @@ async function makeMove(userId: string, roomId: string, cardId: string, rawPosit
       cardCount: nextCards.length,
       moves: Math.max(0, Math.floor(number(currentSummary.moves))) + 1,
     });
-    const nextRoom = { ...room, players, currentWord: afterWord };
+    const move = {
+      actorId: userId,
+      actorName: playerName(room, userId),
+      beforeWord,
+      afterWord,
+      letter: text(card.letter),
+      position,
+      at: now,
+    };
+    const previousMoves = Array.isArray(room.recentMoves) ? room.recentMoves.slice(-7) : [];
+    const recentMoves = [...previousMoves, move];
+    const nextRoom = { ...room, players, currentWord: afterWord, lastMove: move, recentMoves };
 
     transaction.set(handRef, { userId, cards: nextCards, updatedAt: now }, { merge: true });
 
@@ -385,15 +599,8 @@ async function makeMove(userId: string, roomId: string, cardId: string, rawPosit
       transaction.update(roomRef, {
         players,
         currentWord: afterWord,
-        lastMove: {
-          actorId: userId,
-          actorName: playerName(room, userId),
-          beforeWord,
-          afterWord,
-          letter: text(card.letter),
-          position,
-          at: now,
-        },
+        lastMove: move,
+        recentMoves,
       });
       return { finished: true, validWord: afterWord, resultIds };
     }
@@ -406,15 +613,8 @@ async function makeMove(userId: string, roomId: string, cardId: string, rawPosit
       turnPlayerId: nextTurn,
       turnStartedAt: now,
       turnEndsAt: matchEndsAt ? Math.min(now + TURN_DURATION_MS, matchEndsAt) : now + TURN_DURATION_MS,
-      lastMove: {
-        actorId: userId,
-        actorName: playerName(room, userId),
-        beforeWord,
-        afterWord,
-        letter: text(card.letter),
-        position,
-        at: now,
-      },
+      lastMove: move,
+      recentMoves,
       updatedAt: now,
     });
 
@@ -444,7 +644,7 @@ async function drawCard(userId: string, roomId: string) {
     const handData = handSnap.data() || {};
     const cards = Array.isArray(handData.cards) ? (handData.cards as VocabularyChallengeCard[]) : [];
     const letters = cards.map((card) => text(card.letter));
-    if (getVocabularyMoves(text(room.currentWord), letters).length > 0) throw new Error("MOVE_AVAILABLE");
+    if (await hasVocabularyMoveServer(text(room.currentWord), letters, transaction)) throw new Error("MOVE_AVAILABLE");
 
     const newCard = createCards([drawFairVocabularyLetter(text(room.currentWord), letters)])[0];
     const nextCards = [...cards, newCard];
@@ -569,24 +769,50 @@ async function forfeitRoom(userId: string, roomId: string) {
 
 const RIYADH_OFFSET_MS = 3 * 60 * 60_000;
 
-function riyadhDayWindow(now = Date.now()) {
+type LeaderboardPeriod = "daily" | "weekly" | "season";
+
+function riyadhPeriodWindow(period: LeaderboardPeriod, now = Date.now()) {
   const shifted = new Date(now + RIYADH_OFFSET_MS);
   const year = shifted.getUTCFullYear();
   const month = shifted.getUTCMonth();
   const day = shifted.getUTCDate();
+
+  if (period === "season") {
+    const start = Date.UTC(year, month, 1) - RIYADH_OFFSET_MS;
+    const end = Date.UTC(year, month + 1, 1) - RIYADH_OFFSET_MS;
+    return { start, end, periodKey: `${year}-${String(month + 1).padStart(2, "0")}` };
+  }
+
+  if (period === "weekly") {
+    const dayOfWeek = shifted.getUTCDay();
+    const start = Date.UTC(year, month, day - dayOfWeek) - RIYADH_OFFSET_MS;
+    const end = start + 7 * 24 * 60 * 60_000;
+    const startShifted = new Date(start + RIYADH_OFFSET_MS);
+    const periodKey = `${startShifted.getUTCFullYear()}-${String(startShifted.getUTCMonth() + 1).padStart(2, "0")}-${String(startShifted.getUTCDate()).padStart(2, "0")}`;
+    return { start, end, periodKey };
+  }
+
   const start = Date.UTC(year, month, day) - RIYADH_OFFSET_MS;
   const end = start + 24 * 60 * 60_000;
-  const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  return { start, end, dateKey };
+  const periodKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return { start, end, periodKey };
 }
 
-async function dailyLeaderboard(userId: string) {
-  const { start, end, dateKey } = riyadhDayWindow();
+function calculateWinStreak(events: Array<{ at: number; won: boolean }>) {
+  let streak = 0;
+  for (const event of [...events].sort((a, b) => a.at - b.at)) {
+    streak = event.won ? streak + 1 : 0;
+  }
+  return streak;
+}
+
+async function leaderboard(userId: string, period: LeaderboardPeriod) {
+  const { start, end, periodKey } = riyadhPeriodWindow(period);
   const snapshot = await adminDb
     .collection(RESULT_COLLECTION)
     .where("finishedAt", ">=", start)
     .where("finishedAt", "<", end)
-    .limit(2000)
+    .limit(period === "season" ? 5000 : 3000)
     .get();
 
   const aggregate = new Map<string, {
@@ -599,6 +825,7 @@ async function dailyLeaderboard(userId: string) {
     games: number;
     words: number;
     bestDurationMs: number | null;
+    events: Array<{ at: number; won: boolean }>;
   }>();
 
   for (const docSnap of snapshot.docs) {
@@ -620,10 +847,12 @@ async function dailyLeaderboard(userId: string) {
       games: 0,
       words: 0,
       bestDurationMs: null,
+      events: [],
     };
 
     current.games += 1;
     current.words += Math.max(0, Math.floor(number(result.moves)));
+    current.events.push({ at: number(result.finishedAt), won });
     if (won) {
       current.wins += 1;
       if (mode === "duel") {
@@ -644,6 +873,7 @@ async function dailyLeaderboard(userId: string) {
   }
 
   const ranked = Array.from(aggregate.values())
+    .map(({ events, ...entry }) => ({ ...entry, streak: calculateWinStreak(events) }))
     .sort((a, b) =>
       b.score - a.score
       || b.duelWins - a.duelWins
@@ -655,7 +885,8 @@ async function dailyLeaderboard(userId: string) {
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
   return {
-    dateKey,
+    period,
+    periodKey,
     timezone: "Asia/Riyadh" as const,
     totalPlayers: ranked.length,
     entries: ranked.slice(0, 10),
@@ -663,12 +894,96 @@ async function dailyLeaderboard(userId: string) {
   };
 }
 
+async function vocabularyProfile(userId: string) {
+  const snapshot = await adminDb.collection(RESULT_COLLECTION).where("userId", "==", userId).limit(1500).get();
+  const results = snapshot.docs
+    .map((docSnap) => docSnap.data() || {})
+    .filter((result) => Boolean(result.completed))
+    .sort((a, b) => number(a.finishedAt) - number(b.finishedAt));
+
+  let wins = 0;
+  let losses = 0;
+  let draws = 0;
+  let duelWins = 0;
+  let soloWins = 0;
+  let words = 0;
+  let cardsDrawn = 0;
+  let bestDurationMs: number | null = null;
+  let currentStreak = 0;
+  let bestWinStreak = 0;
+  let noDrawWins = 0;
+  let fastWins = 0;
+
+  const todayWindow = riyadhPeriodWindow("daily");
+  let todayWinStreak = 0;
+  for (const result of results) {
+    const won = Boolean(result.won);
+    const outcome = text(result.outcome);
+    const mode = text(result.mode);
+    const finishedAt = number(result.finishedAt);
+    const durationMs = Math.max(0, number(result.durationMs));
+    words += Math.max(0, Math.floor(number(result.moves)));
+    cardsDrawn += Math.max(0, Math.floor(number(result.draws)));
+
+    if (won) {
+      wins += 1;
+      currentStreak += 1;
+      bestWinStreak = Math.max(bestWinStreak, currentStreak);
+      if (mode === "duel") duelWins += 1;
+      else soloWins += 1;
+      if (number(result.draws) === 0) noDrawWins += 1;
+      if (durationMs > 0 && durationMs <= 60_000) fastWins += 1;
+      if (durationMs > 0 && (bestDurationMs === null || durationMs < bestDurationMs)) bestDurationMs = durationMs;
+    } else {
+      currentStreak = 0;
+      if (outcome === "draw") draws += 1;
+      else losses += 1;
+    }
+
+    if (finishedAt >= todayWindow.start && finishedAt < todayWindow.end) {
+      todayWinStreak = won ? todayWinStreak + 1 : 0;
+    }
+  }
+
+  const games = results.length;
+  const achievements = [
+    { id: "first-win", title: "أول انتصار", description: "حقق أول فوز في تحدي المفردات.", progress: wins, target: 1 },
+    { id: "ten-wins", title: "منافس ثابت", description: "حقق 10 انتصارات.", progress: wins, target: 10 },
+    { id: "streak-3", title: "ثلاثية ساخنة", description: "حقق 3 انتصارات متتالية.", progress: bestWinStreak, target: 3 },
+    { id: "words-100", title: "رصيد لغوي", description: "استخدم 100 كلمة صحيحة.", progress: words, target: 100 },
+    { id: "clean-win", title: "فوز نظيف", description: "افز بدون سحب أي بطاقة.", progress: noDrawWins, target: 1 },
+    { id: "fast-win", title: "خاطف الجولة", description: "احسم مباراة خلال 60 ثانية.", progress: fastWins, target: 1 },
+    { id: "duel-25", title: "سيّد المواجهات", description: "حقق 25 فوزًا ضد لاعبين.", progress: duelWins, target: 25 },
+  ].map((achievement) => ({ ...achievement, unlocked: achievement.progress >= achievement.target }));
+
+  return {
+    games,
+    wins,
+    losses,
+    draws,
+    duelWins,
+    soloWins,
+    words,
+    cardsDrawn,
+    winRate: games ? Math.round((wins / games) * 100) : 0,
+    bestDurationMs,
+    todayWinStreak,
+    bestWinStreak,
+    achievements,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const member = await verifiedMember(request);
-    return NextResponse.json(await dailyLeaderboard(member.userId));
+    const view = request.nextUrl.searchParams.get("view") || "leaderboard";
+    if (view === "overrides") return NextResponse.json(await getVocabularyDictionaryOverrides());
+    if (view === "profile") return NextResponse.json(await vocabularyProfile(member.userId));
+    const rawPeriod = request.nextUrl.searchParams.get("period");
+    const period: LeaderboardPeriod = rawPeriod === "weekly" || rawPeriod === "season" ? rawPeriod : "daily";
+    return NextResponse.json(await leaderboard(member.userId, period));
   } catch (error) {
-    console.error("Vocabulary challenge leaderboard error:", error);
+    console.error("Vocabulary challenge GET error:", error);
     return errorResponse(error);
   }
 }
@@ -693,13 +1008,16 @@ function errorResponse(error: unknown) {
     INVALID_WORD: proposedWord ? `«${proposedWord}» ليست كلمة معتمدة في قاموس اللعبة.` : "الكلمة الناتجة غير معتمدة.",
     MOVE_AVAILABLE: "لديك حركة صحيحة؛ استخدم إحدى بطاقاتك بدل السحب.",
     GAME_NOT_PLAYING: "المباراة ليست في حالة لعب الآن.",
+    GAME_NOT_FINISHED: "انتظر حتى تنتهي المباراة قبل طلب الإعادة.",
+    REMATCH_CHANGED: "تغيرت حالة طلب الإعادة. حاول مرة أخرى.",
+    MATCH_CHANGED: "تم حجز الخصم قبل لحظات. جاري البحث عن منافس آخر.",
     ROOM_CODE_FAILED: "تعذر إنشاء كود الغرفة. حاول مرة أخرى.",
   };
 
   const status = code === "UNAUTHORIZED" ? 401
     : code === "FORBIDDEN" ? 403
       : ["ROOM_NOT_FOUND"].includes(code) ? 404
-        : ["INVALID_WORD", "MOVE_AVAILABLE", "NOT_YOUR_TURN", "TURN_EXPIRED", "ROOM_NOT_AVAILABLE", "OWN_ROOM"].includes(code) ? 409
+        : ["INVALID_WORD", "MOVE_AVAILABLE", "NOT_YOUR_TURN", "TURN_EXPIRED", "ROOM_NOT_AVAILABLE", "OWN_ROOM", "GAME_NOT_FINISHED", "REMATCH_CHANGED", "MATCH_CHANGED"].includes(code) ? 409
           : 400;
 
   return NextResponse.json({ error: messages[code] || "تعذر إتمام عملية تحدي المفردات الآن.", code, proposedWord }, { status });
@@ -729,6 +1047,15 @@ export async function POST(request: NextRequest) {
     }
     if (body.action === "forfeit") {
       return NextResponse.json(await forfeitRoom(member.userId, text(body.roomId)));
+    }
+    if (body.action === "rematch") {
+      return NextResponse.json(await requestRematch(member.userId, member.userName, text(body.roomId)));
+    }
+    if (body.action === "matchmake") {
+      return NextResponse.json(await matchmakeRoom(member.userId, member.userName));
+    }
+    if (body.action === "cancelMatchmaking") {
+      return NextResponse.json(await cancelMatchmaking(member.userId));
     }
 
     throw new Error("INVALID_MOVE");

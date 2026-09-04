@@ -1,6 +1,7 @@
 export type VocabularyChallengeMode = "solo" | "duel";
 export type VocabularyChallengeRoomStatus = "waiting" | "playing" | "finished" | "cancelled";
 export type VocabularyChallengeFinishReason = "cards" | "time" | "forfeit" | "cancelled" | null;
+export type VocabularyLeaderboardPeriod = "daily" | "weekly" | "season";
 
 export type VocabularyChallengePlayerSummary = {
   userId: string;
@@ -10,7 +11,7 @@ export type VocabularyChallengePlayerSummary = {
   draws: number;
 };
 
-export type VocabularyChallengeLastMove = {
+export type VocabularyChallengeMove = {
   actorId: string;
   actorName: string;
   beforeWord: string;
@@ -18,7 +19,9 @@ export type VocabularyChallengeLastMove = {
   letter: string;
   position: number;
   at: number;
-} | null;
+};
+
+export type VocabularyChallengeLastMove = VocabularyChallengeMove | null;
 
 export type VocabularyChallengeRoom = {
   id: string;
@@ -44,7 +47,10 @@ export type VocabularyChallengeRoom = {
   winnerId: string | null;
   finishReason: VocabularyChallengeFinishReason;
   lastMove: VocabularyChallengeLastMove;
+  recentMoves?: VocabularyChallengeMove[];
   resultIds: Record<string, string>;
+  rematchRequestedBy?: string | null;
+  rematchRoomId?: string | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -60,8 +66,7 @@ export type VocabularyChallengeHand = {
   updatedAt: number;
 };
 
-
-export type VocabularyDailyLeaderboardEntry = {
+export type VocabularyLeaderboardEntry = {
   rank: number;
   userId: string;
   userName: string;
@@ -71,15 +76,50 @@ export type VocabularyDailyLeaderboardEntry = {
   soloWins: number;
   games: number;
   words: number;
+  streak: number;
   bestDurationMs: number | null;
 };
 
-export type VocabularyDailyLeaderboard = {
-  dateKey: string;
+export type VocabularyLeaderboard = {
+  period: VocabularyLeaderboardPeriod;
+  periodKey: string;
   timezone: "Asia/Riyadh";
   totalPlayers: number;
-  entries: VocabularyDailyLeaderboardEntry[];
-  me: VocabularyDailyLeaderboardEntry | null;
+  entries: VocabularyLeaderboardEntry[];
+  me: VocabularyLeaderboardEntry | null;
+};
+
+export type VocabularyDailyLeaderboardEntry = VocabularyLeaderboardEntry;
+export type VocabularyDailyLeaderboard = VocabularyLeaderboard;
+
+export type VocabularyAchievement = {
+  id: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  progress: number;
+  target: number;
+};
+
+export type VocabularyProfile = {
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  duelWins: number;
+  soloWins: number;
+  words: number;
+  cardsDrawn: number;
+  winRate: number;
+  bestDurationMs: number | null;
+  todayWinStreak: number;
+  bestWinStreak: number;
+  achievements: VocabularyAchievement[];
+};
+
+export type VocabularyDictionaryClientOverrides = {
+  enabledWords: string[];
+  disabledWords: string[];
 };
 
 export type VocabularyChallengeAction =
@@ -88,4 +128,7 @@ export type VocabularyChallengeAction =
   | { action: "move"; roomId: string; cardId: string; position: number }
   | { action: "draw"; roomId: string }
   | { action: "timeout"; roomId: string }
-  | { action: "forfeit"; roomId: string };
+  | { action: "forfeit"; roomId: string }
+  | { action: "rematch"; roomId: string }
+  | { action: "matchmake" }
+  | { action: "cancelMatchmaking" };
