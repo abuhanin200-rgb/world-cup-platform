@@ -17,7 +17,7 @@ export type WordGameAdminGameItem = {
   won: boolean;
 };
 
-type WordGameState = {
+export type WordGameState = {
   game: WordGameClientGame;
   leaderboard: WordGameLeaderboardItem[];
   stats: WordGameUserStats | null;
@@ -39,6 +39,14 @@ async function authenticatedRequest(path: string, init: RequestInit = {}) {
   const data = (await response.json().catch(() => null)) as { error?: string } | null;
   if (!response.ok) throw new Error(data?.error || "تعذر إتمام عملية لعبة الكلمات الآن.");
   return data;
+}
+
+export async function getTodayWordGameState(params: { userId: string }): Promise<WordGameState> {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser || firebaseUser.uid !== params.userId) {
+    throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+  }
+  return authenticatedRequest("/api/games/word-game") as Promise<WordGameState>;
 }
 
 export async function getOrCreateTodayWordGame(params: { userId: string }): Promise<WordGameClientGame> {

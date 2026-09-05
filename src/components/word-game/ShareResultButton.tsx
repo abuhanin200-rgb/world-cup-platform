@@ -18,26 +18,12 @@ function getShareSquare(status: string) {
   return "⬜";
 }
 
-export default function ShareResultButton({
-  won,
-  attemptsUsed,
-  maxAttempts,
-  durationMs,
-  guesses,
-  disabled = false,
-}: ShareResultButtonProps) {
-  const guessSquares = guesses
-    .map((guess) =>
-      guess.letters.map((letter) => getShareSquare(letter.status)).join("")
-    )
-    .join("\n");
-
+export default function ShareResultButton({ won, attemptsUsed, maxAttempts, durationMs, guesses, disabled = false }: ShareResultButtonProps) {
+  const guessSquares = guesses.map((guess) => guess.letters.map((letter) => getShareSquare(letter.status)).join("")).join("\n");
   const shareText = [
     "🎮 خمن كلمة اليوم",
     "",
-    won
-      ? `✅ النتيجة: ${attemptsUsed}/${maxAttempts}`
-      : `❌ النتيجة: ${attemptsUsed}/${maxAttempts}`,
+    won ? `✅ النتيجة: ${attemptsUsed}/${maxAttempts}` : `❌ النتيجة: ${attemptsUsed}/${maxAttempts}`,
     `⏱️ الوقت: ${formatDurationMs(durationMs)}`,
     "",
     guessSquares,
@@ -48,12 +34,7 @@ export default function ShareResultButton({
 
   function handleShare() {
     if (disabled) return;
-
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(shareText)}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -61,29 +42,18 @@ export default function ShareResultButton({
       type="button"
       disabled={disabled}
       onClick={handleShare}
-      initial={{ opacity: 0, y: 14, scale: 0.94 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      whileTap={disabled ? undefined : { scale: 0.94, y: 2 }}
-      transition={{ duration: 0.34, ease: "easeOut" }}
-      className={`group relative mx-auto inline-flex min-h-[48px] w-full max-w-[300px] items-center justify-center gap-2 overflow-hidden rounded-2xl px-4 py-3 text-sm font-black shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileTap={disabled ? undefined : { scale: 0.96 }}
+      className={`mx-auto inline-flex min-h-[48px] w-full max-w-[320px] items-center justify-center gap-2 rounded-[16px] px-4 py-3 text-sm font-black shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
         won
-          ? "bg-emerald-500 text-white shadow-emerald-500/20 hover:bg-emerald-400"
-          : "bg-slate-700 text-white shadow-slate-950/20 hover:bg-slate-600"
+          ? "bg-gradient-to-l from-violet-500 to-cyan-400 text-white shadow-violet-500/15"
+          : "border border-white/10 bg-white/[0.07] text-white shadow-black/15"
       }`}
     >
-      <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/35 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />
-
-      <span className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-white/15">
-        {won ? (
-          <Trophy className="h-4 w-4 text-amber-200" />
-        ) : (
-          <Share2 className="h-4 w-4 text-slate-100" />
-        )}
-      </span>
-
-      <span className="relative">مشاركة النتيجة واتساب</span>
-
-      <Share2 className="relative h-4 w-4" />
+      {won ? <Trophy className="h-4 w-4 text-amber-100" /> : <Share2 className="h-4 w-4 text-violet-100" />}
+      <span>مشاركة النتيجة واتساب</span>
+      <Share2 className="h-4 w-4" />
     </motion.button>
   );
 }

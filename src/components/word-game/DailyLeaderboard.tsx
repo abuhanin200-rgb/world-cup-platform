@@ -1,69 +1,9 @@
-import type { ReactNode } from "react";
-import { motion, type Variants } from "framer-motion";
-import { Clock3, Flame, ListChecks, Medal, Trophy } from "lucide-react";
+import { memo } from "react";
+import { Clock3, ListChecks, Medal, Trophy } from "lucide-react";
 import type { WordGameLeaderboardItem } from "@/types/wordGame";
 import { formatDurationMs } from "@/lib/wordGameLogic";
 
-type DailyLeaderboardProps = {
-  items: WordGameLeaderboardItem[];
-};
-
-const scrollOnceViewport = {
-  once: true,
-  amount: 0.18,
-} as const;
-
-const sectionMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 14,
-    scale: 0.99,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.32,
-      ease: "easeOut",
-    },
-  },
-};
-
-const rowMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 10,
-    scale: 0.99,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.24,
-      ease: "easeOut",
-      staggerChildren: 0.025,
-    },
-  },
-};
-
-const statMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 6,
-    scale: 0.99,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.2,
-      ease: "easeOut",
-    },
-  },
-};
+type DailyLeaderboardProps = { items: WordGameLeaderboardItem[] };
 
 function getRankLabel(rank: number) {
   if (rank === 1) return "🥇";
@@ -73,201 +13,52 @@ function getRankLabel(rank: number) {
 }
 
 function getRankClass(rank: number) {
-  if (rank === 1) {
-    return "border-amber-300/45 bg-gradient-to-br from-amber-300 to-yellow-500 text-slate-950 shadow-amber-400/20";
-  }
-
-  if (rank === 2) {
-    return "border-slate-100/40 bg-gradient-to-br from-slate-100 to-slate-400 text-slate-950 shadow-slate-300/15";
-  }
-
-  if (rank === 3) {
-    return "border-orange-300/40 bg-gradient-to-br from-orange-300 to-orange-600 text-slate-950 shadow-orange-400/15";
-  }
-
-  return "border-amber-400/30 bg-amber-400/10 text-white shadow-slate-950/15";
+  if (rank === 1) return "border-amber-200/35 bg-amber-300/12 text-amber-100";
+  if (rank === 2) return "border-slate-200/20 bg-white/[0.07] text-slate-100";
+  if (rank === 3) return "border-orange-200/25 bg-orange-300/[0.08] text-orange-100";
+  return "border-violet-300/15 bg-violet-400/[0.07] text-violet-100";
 }
 
-function getCardClass(rank: number) {
-  if (rank === 1) {
-    return "border-amber-300/30 bg-gradient-to-br from-amber-400/16 via-slate-950/45 to-yellow-500/10";
-  }
-
-  if (rank === 2) {
-    return "border-slate-200/20 bg-gradient-to-br from-slate-200/12 via-slate-950/45 to-white/5";
-  }
-
-  if (rank === 3) {
-    return "border-orange-300/20 bg-gradient-to-br from-orange-400/14 via-slate-950/45 to-orange-500/8";
-  }
-
-  return "border-white/10 bg-slate-950/45";
-}
-
-function getStatusLabel(won: boolean) {
-  return won ? "فاز" : "خسر";
-}
-
-function getStatusClass(won: boolean) {
-  return won
-    ? "border-amber-300/35 bg-gradient-to-br from-emerald-500/20 to-amber-400/15 text-amber-200"
-    : "border-red-400/45 bg-red-500/20 text-red-200";
-}
-
-function StatBox({
-  label,
-  value,
-  icon,
-  className,
-}: {
-  label: string;
-  value: string;
-  icon: ReactNode;
-  className: string;
-}) {
+function DailyLeaderboard({ items }: DailyLeaderboardProps) {
   return (
-    <motion.div
-      variants={statMotion}
-      className={`relative overflow-hidden rounded-xl border p-1.5 text-center sm:p-2 ${className}`}
-    >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
-
-      <div className="relative">
-        <div className="mx-auto mb-0.5 flex h-5 w-5 items-center justify-center rounded-lg bg-white/10">
-          {icon}
+    <section className="relative overflow-hidden rounded-[24px] border border-violet-300/12 bg-[#111537]/90 p-3.5 shadow-[0_16px_44px_rgba(4,6,27,.22)] md:p-4">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(34,211,238,.10),transparent_28%),radial-gradient(circle_at_10%_88%,rgba(236,72,153,.07),transparent_26%)]" />
+      <div className="relative mb-4 flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black text-cyan-200">سباق اليوم</p>
+          <h2 className="mt-1 text-[clamp(1.1rem,5vw,1.45rem)] font-black text-white">ترتيب خمن كلمة اليوم</h2>
+          <p className="mt-1 text-[10px] font-semibold leading-5 text-white/35">الفوز أولًا، ثم الأسرع، ثم الأقل محاولات.</p>
         </div>
-
-        <div className="text-[9px] font-semibold opacity-80">{label}</div>
-
-        <div className="mt-0.5 text-[12px] font-bold tabular-nums sm:text-[13px]">
-          {value}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-export default function DailyLeaderboard({ items }: DailyLeaderboardProps) {
-  return (
-    <motion.section
-      variants={sectionMotion}
-      initial="hidden"
-      whileInView="show"
-      viewport={scrollOnceViewport}
-      className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.09] p-3 shadow-lg shadow-slate-950/25 backdrop-blur-sm md:p-4"
-    >
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-      <div className="pointer-events-none absolute -right-20 top-8 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
-      <div className="pointer-events-none absolute -left-20 bottom-8 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
-      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-
-      <div className="relative mb-4 text-center">
-        <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/10">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] border border-cyan-300/15 bg-cyan-300/[0.07] text-cyan-100">
           <Trophy className="h-5 w-5" />
         </div>
-
-        <h2 className="altahaddi-section-title font-black text-white">
-          ترتيب تحدي خمن كلمة اليوم
-        </h2>
-
-        <p className="altahaddi-body-copy mt-1.5 font-semibold text-slate-300">
-          حسب الفوز ثم الأسرع وقتًا، ثم الأقل محاولات.
-        </p>
       </div>
 
       {items.length === 0 ? (
-        <motion.div
-          variants={rowMotion}
-          className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-[14px] font-bold text-slate-300 shadow-inner"
-        >
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-            <Medal className="h-5 w-5 text-slate-300" />
-          </div>
-
-          لا يوجد نتائج مكتملة حتى الآن.
-        </motion.div>
+        <div className="relative rounded-[18px] border border-white/[0.07] bg-black/15 p-5 text-center text-[13px] font-bold text-white/45">
+          <Medal className="mx-auto mb-2 h-6 w-6 text-violet-200/55" />
+          لا توجد نتائج مكتملة حتى الآن.
+        </div>
       ) : (
-        <motion.div variants={sectionMotion} className="relative space-y-2 sm:space-y-2.5">
+        <div className="relative space-y-2">
           {items.map((item) => (
-            <motion.div
-              key={item.userId}
-              variants={rowMotion}
-              whileTap={{ scale: 0.99 }}
-              className={`relative overflow-hidden rounded-[18px] border p-2.5 shadow-md shadow-slate-950/20 sm:p-3 ${getCardClass(
-                item.rank
-              )}`}
-            >
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
-
-              {item.rank <= 3 && (
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -left-10 -top-10 h-24 w-24 rounded-full bg-amber-300/10 blur-2xl"
-                />
-              )}
-
-              <div className="relative mb-2.5 flex items-start justify-between gap-2 sm:mb-3 sm:gap-2.5">
-                <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-black shadow-md sm:h-10 sm:w-10 sm:text-base ${getRankClass(
-                    item.rank
-                  )}`}
-                >
-                  {getRankLabel(item.rank)}
-                </div>
-
-                <div className="min-w-0 flex-1 text-right">
-                  <div className="text-[10px] font-bold text-slate-400">
-                    العضو
-                  </div>
-
-                  <div className="mt-0.5 whitespace-normal break-words text-[14px] font-bold leading-5 text-white sm:text-[15px] md:text-[16px]">
-                    {item.userName}
-                  </div>
+            <div key={item.userId} className="grid min-w-0 grid-cols-[42px_1fr_auto] items-center gap-2 rounded-[17px] border border-white/[0.07] bg-black/15 p-2.5 sm:gap-3 sm:p-3">
+              <div className={`grid h-9 w-9 place-items-center rounded-[12px] border text-xs font-black ${getRankClass(item.rank)}`}>{getRankLabel(item.rank)}</div>
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-black text-white sm:text-sm">{item.userName}</div>
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[9px] font-bold text-white/38">
+                  <span className={item.won ? "text-emerald-200" : "text-rose-200"}>{item.won ? "فاز" : "خسر"}</span>
+                  <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" />{formatDurationMs(item.durationMs)}</span>
+                  <span className="inline-flex items-center gap-1"><ListChecks className="h-3 w-3" />{item.attemptsUsed}/6</span>
                 </div>
               </div>
-
-              <motion.div
-                variants={sectionMotion}
-                className="relative grid grid-cols-4 gap-1.5"
-              >
-                <StatBox
-                  label="النتيجة"
-                  value={getStatusLabel(item.won)}
-                  icon={
-                    item.won ? (
-                      <Trophy className="h-3.5 w-3.5" />
-                    ) : (
-                      <Medal className="h-3.5 w-3.5" />
-                    )
-                  }
-                  className={getStatusClass(item.won)}
-                />
-
-                <StatBox
-                  label="الوقت"
-                  value={formatDurationMs(item.durationMs)}
-                  icon={<Clock3 className="h-3.5 w-3.5" />}
-                  className="border-white/10 bg-white/5 text-white"
-                />
-
-                <StatBox
-                  label="المحاولات"
-                  value={`${item.attemptsUsed}/6`}
-                  icon={<ListChecks className="h-3.5 w-3.5" />}
-                  className="border-white/10 bg-white/5 text-white"
-                />
-
-                <StatBox
-                  label="التصنيف"
-                  value={item.categoryLabel ?? "عامّة"}
-                  icon={<Flame className="h-3.5 w-3.5" />}
-                  className="border-emerald-300/15 bg-emerald-400/10 text-emerald-200"
-                />
-              </motion.div>
-            </motion.div>
+              <div className="max-w-[76px] truncate rounded-full border border-violet-300/12 bg-violet-400/[0.06] px-2 py-1 text-[9px] font-black text-violet-100/80">{item.categoryLabel ?? "عامّة"}</div>
+            </div>
           ))}
-        </motion.div>
+        </div>
       )}
-    </motion.section>
+    </section>
   );
 }
+
+export default memo(DailyLeaderboard);

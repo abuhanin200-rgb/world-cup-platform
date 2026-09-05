@@ -1,4 +1,7 @@
-import { motion, type Variants } from "framer-motion";
+"use client";
+
+import { memo } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import type { WordGameGuess } from "@/types/wordGame";
 import {
   WORD_GAME_MAX_ATTEMPTS,
@@ -10,68 +13,28 @@ type GameBoardProps = {
   currentGuess: string;
 };
 
-const boardMotion: Variants = {
-  hidden: {
-    opacity: 0,
-  },
-  show: {
-    opacity: 1,
-    transition: {
-      duration: 0.18,
-      ease: "easeOut",
-      staggerChildren: 0.025,
-    },
-  },
-};
-
-const rowMotion: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 8,
-    scale: 0.99,
-  },
-  show: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.22,
-      ease: "easeOut",
-      staggerChildren: 0.02,
-    },
-  },
-};
-
 function getTileClass(status: WordGameGuess["letters"][number]["status"]) {
   if (status === "correct") {
-    return "border-emerald-400 bg-emerald-500 text-white shadow-emerald-500/15";
+    return "border-emerald-300/80 bg-emerald-500 text-white shadow-[0_10px_26px_rgba(16,185,129,.18)]";
   }
-
   if (status === "present") {
-    return "border-amber-300 bg-amber-400 text-slate-950 shadow-amber-400/15";
+    return "border-amber-200/80 bg-amber-400 text-[#17142f] shadow-[0_10px_26px_rgba(251,191,36,.17)]";
   }
-
   if (status === "absent") {
-    return "border-slate-500 bg-slate-600 text-white shadow-slate-700/15";
+    return "border-slate-500/70 bg-slate-600/95 text-white shadow-[0_8px_22px_rgba(15,23,42,.18)]";
   }
-
-  return "border-white/10 bg-slate-950/60 text-white shadow-slate-950/20";
+  return "border-violet-300/15 bg-[#171b43]/92 text-white shadow-[0_8px_24px_rgba(6,9,31,.28)]";
 }
 
-export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
+function GameBoard({ guesses, currentGuess }: GameBoardProps) {
+  const reduceMotion = useReducedMotion();
   const rows = Array.from({ length: WORD_GAME_MAX_ATTEMPTS });
 
   return (
-    <motion.div
-      variants={boardMotion}
-      initial="hidden"
-      animate="show"
-      className="mx-auto grid w-full max-w-[284px] gap-1.5 sm:max-w-[304px] sm:gap-2"
-    >
+    <div className="mx-auto grid w-[min(100%,318px)] gap-1.5 sm:gap-2" aria-label="لوحة محاولات خمن كلمة اليوم">
       {rows.map((_, rowIndex) => {
         const savedGuess = guesses[rowIndex];
         const isCurrentRow = rowIndex === guesses.length;
-
         const letters = savedGuess
           ? savedGuess.letters
           : Array.from({ length: WORD_GAME_WORD_LENGTH }).map((__, index) => ({
@@ -80,79 +43,52 @@ export default function GameBoard({ guesses, currentGuess }: GameBoardProps) {
             }));
 
         return (
-          <motion.div
-            key={rowIndex}
-            variants={rowMotion}
-            className="grid grid-cols-5 gap-1.5 sm:gap-2"
-            dir="rtl"
-          >
+          <div key={rowIndex} className="grid min-w-0 grid-cols-5 gap-1.5 sm:gap-2" dir="rtl">
             {letters.map((item, letterIndex) => {
               const hasLetter = Boolean(item.letter);
               const isSavedTile = Boolean(savedGuess);
-
               return (
                 <motion.div
                   key={`${rowIndex}-${letterIndex}-${item.letter}-${item.status}`}
-                  initial={
-                    isSavedTile
-                      ? {
-                          rotateX: -72,
-                          scale: 0.98,
-                          opacity: 0.75,
-                        }
-                      : false
-                  }
+                  initial={reduceMotion || !isSavedTile ? false : { rotateX: -70, opacity: 0.78 }}
                   animate={
-                    isSavedTile
-                      ? {
-                          rotateX: 0,
-                          scale: 1,
-                          opacity: 1,
-                        }
-                      : hasLetter
-                        ? {
-                            scale: [1, 1.06, 1],
-                          }
-                        : {
-                            scale: 1,
-                          }
+                    reduceMotion
+                      ? undefined
+                      : isSavedTile
+                        ? { rotateX: 0, opacity: 1 }
+                        : hasLetter
+                          ? { scale: [1, 1.055, 1] }
+                          : { scale: 1 }
                   }
-                  transition={
-                    isSavedTile
-                      ? {
-                          delay: letterIndex * 0.075,
-                          duration: 0.28,
-                          ease: "easeOut",
-                        }
-                      : {
-                          duration: 0.14,
-                          ease: "easeOut",
-                        }
-                  }
+                  transition={{
+                    delay: isSavedTile ? letterIndex * 0.055 : 0,
+                    duration: isSavedTile ? 0.24 : 0.13,
+                    ease: "easeOut",
+                  }}
                   className={[
-                    "relative flex aspect-square transform-gpu items-center justify-center overflow-hidden rounded-xl border text-[21px] font-black shadow-md transition-colors duration-200 [transform-style:preserve-3d] sm:rounded-2xl sm:text-[23px]",
+                    "relative flex aspect-square min-w-0 transform-gpu items-center justify-center overflow-hidden rounded-[14px] border text-[clamp(1.1rem,6.2vw,1.48rem)] font-black shadow-md [transform-style:preserve-3d] sm:rounded-[18px]",
                     getTileClass(item.status),
                     isCurrentRow && hasLetter
-                      ? "border-amber-300/45 bg-slate-950/80 shadow-amber-400/10"
+                      ? "border-cyan-300/55 bg-[#171b43] shadow-[0_0_0_1px_rgba(34,211,238,.10),0_10px_24px_rgba(34,211,238,.08)]"
                       : "",
                   ].join(" ")}
                 >
-                  <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent" />
-
+                  <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,.14),transparent_45%)]" />
                   {item.status === "correct" && (
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-1 rounded-2xl border border-white/25"
-                    />
+                    <span aria-hidden="true" className="pointer-events-none absolute inset-1 rounded-[11px] border border-white/22 sm:rounded-[15px]" />
                   )}
-
-                  <span className="relative">{item.letter}</span>
+                  {isCurrentRow && hasLetter && (
+                    <span aria-hidden="true" className="pointer-events-none absolute inset-x-3 bottom-1.5 h-px bg-cyan-200/55" />
+                  )}
+                  <span className="relative leading-none">{item.letter}</span>
                 </motion.div>
               );
             })}
-          </motion.div>
+          </div>
         );
       })}
-    </motion.div>
+    </div>
   );
 }
+
+export default memo(GameBoard);
