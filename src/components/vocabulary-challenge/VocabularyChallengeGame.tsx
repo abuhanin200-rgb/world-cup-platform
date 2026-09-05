@@ -257,11 +257,11 @@ function ModeCard({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`group w-full min-w-0 max-w-full min-h-[152px] rounded-[26px] border p-4 text-right transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 ${classes}`}
+      className={`group w-full min-w-0 max-w-full min-h-[126px] rounded-[22px] border p-3.5 text-right transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 sm:min-h-[138px] sm:rounded-[24px] sm:p-4 ${classes}`}
     >
-      <span className="grid h-12 w-12 place-items-center rounded-2xl border border-white/10 bg-black/20">{icon}</span>
-      <h3 className="mt-4 break-words text-lg font-black leading-tight text-white">{title}</h3>
-      <p className="mt-1 break-words text-[11px] font-semibold leading-6 text-white/52">{description}</p>
+      <span className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-black/20 sm:h-11 sm:w-11 sm:rounded-2xl">{icon}</span>
+      <h3 className="mt-3 break-words text-[clamp(16px,4.3vw,18px)] font-black leading-[1.35] text-white sm:mt-3.5">{title}</h3>
+      <p className="mt-1 break-words text-[clamp(10px,2.8vw,11px)] font-semibold leading-[1.8] text-white/52">{description}</p>
     </button>
   );
 }
@@ -925,7 +925,11 @@ export default function VocabularyChallengeGame() {
   const finishedDurationMs = finished && room.matchStartedAt ? Math.max(0, room.updatedAt - room.matchStartedAt) : 0;
 
   return (
-    <main dir="rtl" className="relative mx-auto box-border w-full min-w-0 max-w-[100vw] overflow-x-hidden px-3 pb-16 pt-3 sm:max-w-7xl sm:px-4 md:px-6 md:pb-20 md:pt-6">
+    <main
+      dir="rtl"
+      style={{ WebkitTextSizeAdjust: "100%", textSizeAdjust: "100%" }}
+      className="relative mx-auto box-border w-full min-w-0 max-w-[100vw] overflow-x-hidden px-[clamp(10px,3vw,24px)] pb-[calc(9.5rem+env(safe-area-inset-bottom))] pt-3 sm:max-w-7xl md:pb-20 md:pt-6"
+    >
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[760px] bg-[radial-gradient(circle_at_20%_10%,rgba(52,211,153,.12),transparent_28%),radial-gradient(circle_at_82%_18%,rgba(16,185,129,.10),transparent_30%)]" />
 
       <div className="mb-3 flex min-w-0 items-center justify-between gap-2">
@@ -938,17 +942,17 @@ export default function VocabularyChallengeGame() {
       </div>
 
       {!roomId ? (
-        <section className="relative box-border w-full min-w-0 max-w-full overflow-hidden rounded-[30px] border border-emerald-200/15 bg-[linear-gradient(155deg,#073c34_0%,#075640_46%,#063a32_100%)] p-3 shadow-[0_28px_90px_rgba(0,0,0,.32)] sm:rounded-[34px] sm:p-4 md:p-7">
+        <section className="relative mx-auto box-border w-full min-w-0 max-w-[1180px] overflow-hidden rounded-[26px] border border-emerald-200/15 bg-[linear-gradient(155deg,#073c34_0%,#075640_46%,#063a32_100%)] p-[clamp(10px,2.8vw,16px)] shadow-[0_28px_90px_rgba(0,0,0,.32)] sm:rounded-[32px] md:p-6">
           <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_50%_50%,rgba(255,255,255,.10)_0_1px,transparent_1.5px),linear-gradient(30deg,transparent_48%,rgba(255,255,255,.05)_49%_51%,transparent_52%),linear-gradient(-30deg,transparent_48%,rgba(255,255,255,.045)_49%_51%,transparent_52%)] [background-size:26px_26px,52px_45px,52px_45px]" />
           <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[80%] -translate-x-1/2 rounded-[50%] border border-emerald-100/10 bg-emerald-100/[0.025]" />
 
-          <div className="relative grid w-full min-w-0 max-w-full gap-5 sm:gap-7 lg:grid-cols-[minmax(0,1fr)_410px] lg:items-center">
+          <div className="relative grid w-full min-w-0 max-w-full gap-[clamp(16px,4vw,28px)] lg:grid-cols-[minmax(0,1fr)_minmax(360px,410px)] lg:items-center">
             <div className="min-w-0">
               <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-lime-200/20 bg-lime-300/[0.08] px-3 py-1.5 text-[10px] font-black text-lime-100"><Languages className="h-4 w-4" /> لعبة لغوية تنافسية</div>
-              <h1 className="mt-4 text-3xl font-black leading-[1.35] text-white md:text-5xl">تحدي المفردات</h1>
-              <p className="mt-3 max-w-2xl break-words text-sm font-semibold leading-7 text-emerald-50/58 md:text-base">غيّر حرفًا واحدًا فقط من الكلمة الموجودة في الوسط لتصنع كلمة عربية صحيحة، وتخلّص من بطاقاتك قبل انتهاء الوقت.</p>
+              <h1 className="mt-3 text-[clamp(28px,8vw,44px)] font-black leading-[1.28] text-white md:mt-4 md:text-5xl">تحدي المفردات</h1>
+              <p className="mt-2.5 max-w-2xl break-words text-[clamp(11px,3.2vw,14px)] font-semibold leading-[1.9] text-emerald-50/58 md:mt-3 md:text-base">غيّر حرفًا واحدًا فقط من الكلمة الموجودة في الوسط لتصنع كلمة عربية صحيحة، وتخلّص من بطاقاتك قبل انتهاء الوقت.</p>
 
-              <div className="mt-6 flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:gap-2" dir="rtl" aria-label="مثال على طريقة اللعب">
+              <div className="mt-4 flex min-w-0 max-w-full flex-wrap items-center gap-1.5 sm:mt-6 sm:gap-2" dir="rtl" aria-label="مثال على طريقة اللعب">
                 {Array.from("ميم").map((letter, index) => <CardFace key={`${letter}-${index}`} letter={letter} index={index} size="mini" />)}
                 <span className="mx-1 text-xl font-black text-lime-200">+</span>
                 <CardFace letter="ر" index={3} size="mini" />
@@ -956,21 +960,21 @@ export default function VocabularyChallengeGame() {
                 <div className="rounded-2xl border border-lime-200/20 bg-lime-300/[0.08] px-3 py-2 text-sm font-black text-lime-100">ريم ✓</div>
               </div>
 
-              <div className="mt-6 grid w-full max-w-xl grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5 text-center sm:gap-2">
-                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-3 sm:p-3"><Clock3 className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">10 ثوانٍ</div><div className="mt-1 text-[9px] font-semibold text-white/38">لكل دور</div></div>
-                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-3 sm:p-3"><Hand className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">10 بطاقات</div><div className="mt-1 text-[9px] font-semibold text-white/38">عند البداية</div></div>
-                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-3 sm:p-3"><Trophy className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 text-sm font-black">أول من يخلّصها</div><div className="mt-1 text-[9px] font-semibold text-white/38">يفوز</div></div>
+              <div className="mt-4 grid w-full max-w-xl grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5 text-center sm:mt-6 sm:gap-2">
+                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-2.5 sm:p-3"><Clock3 className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 flex min-h-[34px] items-center justify-center text-[clamp(11px,3.2vw,14px)] font-black leading-[1.35]">10 ثوانٍ</div><div className="mt-1 text-[clamp(8px,2.2vw,9px)] font-semibold text-white/38">لكل دور</div></div>
+                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-2.5 sm:p-3"><Hand className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 flex min-h-[34px] items-center justify-center text-[clamp(11px,3.2vw,14px)] font-black leading-[1.35]">10 بطاقات</div><div className="mt-1 text-[clamp(8px,2.2vw,9px)] font-semibold text-white/38">عند البداية</div></div>
+                <div className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-1.5 py-2.5 sm:p-3"><Trophy className="mx-auto h-4 w-4 text-lime-200" /><div className="mt-2 flex min-h-[34px] items-center justify-center text-[clamp(10px,3vw,14px)] font-black leading-[1.3]">أول من يخلّصها</div><div className="mt-1 text-[clamp(8px,2.2vw,9px)] font-semibold text-white/38">يفوز</div></div>
               </div>
             </div>
 
-            <div className="w-full min-w-0 max-w-full rounded-[26px] border border-white/10 bg-black/20 p-3.5 backdrop-blur-xl sm:rounded-[30px] sm:p-4 md:p-5">
-              <div className="mb-3 flex min-w-0 items-center justify-between gap-2"><div className="min-w-0"><p className="text-[10px] font-black text-lime-200">اختر نمط اللعب</p><h2 className="mt-1 text-xl font-black">كيف تبي تلعب؟</h2></div><Gamepad2 className="h-6 w-6 text-lime-200" /></div>
-              <div className="grid w-full min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div className="w-full min-w-0 max-w-full rounded-[22px] border border-white/10 bg-black/20 p-[clamp(10px,3vw,16px)] backdrop-blur-xl sm:rounded-[28px] md:p-5">
+              <div className="mb-2.5 flex min-w-0 items-center justify-between gap-2 sm:mb-3"><div className="min-w-0"><p className="text-[clamp(9px,2.5vw,10px)] font-black text-lime-200">اختر نمط اللعب</p><h2 className="mt-1 text-[clamp(20px,5.8vw,24px)] font-black leading-[1.35]">كيف تبي تلعب؟</h2></div><Gamepad2 className="h-5 w-5 shrink-0 text-lime-200 sm:h-6 sm:w-6" /></div>
+              <div className="grid w-full min-w-0 gap-2.5 min-[560px]:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <ModeCard icon={<Bot className="h-5 w-5" />} title="العب بمفردك" description={`واجه بوت التحدي بمستوى ${botDifficulty === "easy" ? "سهل" : botDifficulty === "hard" ? "صعب" : "متوسط"} وتخلّص من بطاقاتك قبله.`} accent="emerald" onClick={() => handleCreate("solo")} disabled={busy || matchmaking || restoringRoom} />
                 <ModeCard icon={<Swords className="h-5 w-5" />} title="لاعب ضد لاعب" description="أنشئ غرفة خاصة أو واجه خصمًا أونلاين، وأول من يتخلّص من بطاقاته يفوز." accent="amber" onClick={() => handleCreate("duel")} disabled={busy || matchmaking || restoringRoom} />
               </div>
               <div className="mt-2 rounded-2xl border border-emerald-200/10 bg-black/15 p-2.5">
-                <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2"><span className="text-[10px] font-black text-emerald-100/70">مستوى بوت اللعب الفردي</span>{restoringRoom ? <span className="inline-flex items-center gap-1 text-[9px] font-bold text-white/35"><LoaderCircle className="h-3 w-3 animate-spin" /> فحص مباراة سابقة…</span> : null}</div>
+                <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2"><span className="text-[clamp(9px,2.7vw,10px)] font-black text-emerald-100/70">مستوى بوت اللعب الفردي</span>{restoringRoom ? <span className="inline-flex items-center gap-1 text-[9px] font-bold text-white/35"><LoaderCircle className="h-3 w-3 animate-spin" /> فحص مباراة سابقة…</span> : null}</div>
                 <div className="grid w-full min-w-0 grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5">
                   {([['easy','سهل'],['normal','متوسط'],['hard','صعب']] as Array<[VocabularyBotDifficulty,string]>).map(([value,label]) => (
                     <button key={value} type="button" onClick={() => setBotDifficulty(value)} className={`min-h-10 rounded-xl text-[10px] font-black transition ${botDifficulty === value ? "bg-lime-300 text-emerald-950" : "border border-white/[0.08] bg-white/[0.035] text-white/55"}`}>{label}</button>
@@ -978,12 +982,12 @@ export default function VocabularyChallengeGame() {
                 </div>
               </div>
 
-              <div className="mt-3 grid w-full min-w-0 grid-cols-1 items-center gap-2 rounded-[22px] border border-cyan-200/15 bg-cyan-300/[0.055] p-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-                <div className="min-w-0"><div className="flex items-center gap-2 text-xs font-black text-cyan-100"><Shuffle className="h-4 w-4" /> خصم عشوائي أونلاين</div><p className="mt-1 text-[10px] font-semibold leading-5 text-white/45">النظام يبحث لك عن عضو متاح ويبدأ المباراة تلقائيًا.</p></div>
-                {matchmaking ? <button type="button" onClick={() => void handleCancelMatchmaking()} className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-rose-200/15 bg-rose-400/[0.08] px-3 text-[10px] font-black text-rose-100 sm:w-auto"><LoaderCircle className="h-4 w-4 animate-spin" /> إلغاء</button> : <button type="button" onClick={() => void handleMatchmaking()} disabled={busy} className="min-h-11 w-full min-w-0 rounded-xl bg-cyan-200 px-3 text-[10px] font-black text-cyan-950 disabled:opacity-40 sm:w-auto">ابحث الآن</button>}
+              <div className="mt-2.5 grid w-full min-w-0 grid-cols-1 items-center gap-2 rounded-[20px] border border-cyan-200/15 bg-cyan-300/[0.055] p-2.5 min-[520px]:grid-cols-[minmax(0,1fr)_auto] sm:p-3">
+                <div className="min-w-0"><div className="flex items-center gap-2 text-[clamp(11px,3vw,12px)] font-black text-cyan-100"><Shuffle className="h-4 w-4 shrink-0" /> خصم عشوائي أونلاين</div><p className="mt-1 text-[clamp(9px,2.5vw,10px)] font-semibold leading-[1.75] text-white/45">النظام يبحث لك عن عضو متاح ويبدأ المباراة تلقائيًا.</p></div>
+                {matchmaking ? <button type="button" onClick={() => void handleCancelMatchmaking()} className="inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-rose-200/15 bg-rose-400/[0.08] px-3 text-[10px] font-black text-rose-100 min-[520px]:w-auto"><LoaderCircle className="h-4 w-4 animate-spin" /> إلغاء</button> : <button type="button" onClick={() => void handleMatchmaking()} disabled={busy} className="min-h-11 w-full min-w-0 rounded-xl bg-cyan-200 px-3 text-[10px] font-black text-cyan-950 disabled:opacity-40 min-[520px]:w-auto">ابحث الآن</button>}
               </div>
 
-              <form onSubmit={handleJoin} className="mt-3 w-full min-w-0 max-w-full rounded-[22px] border border-white/10 bg-white/[0.035] p-3">
+              <form onSubmit={handleJoin} className="mt-2.5 w-full min-w-0 max-w-full rounded-[20px] border border-white/10 bg-white/[0.035] p-2.5 sm:p-3">
                 <label htmlFor="vocabulary-room-code" className="flex items-center gap-1.5 text-[10px] font-black text-white/55"><Hash className="h-3.5 w-3.5" /> عندك كود غرفة؟</label>
                 <div className="mt-2 grid w-full min-w-0 grid-cols-[minmax(0,1fr)_76px] gap-2 sm:grid-cols-[minmax(0,1fr)_88px]">
                   <input id="vocabulary-room-code" value={joinCode} onChange={(event) => setJoinCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" dir="ltr" className="w-full min-w-0 max-w-full rounded-xl border border-white/10 bg-black/20 px-2 text-center text-base font-black tracking-[.14em] sm:px-3 sm:tracking-[.25em] text-white outline-none placeholder:text-white/20 focus:border-lime-300/50" />
@@ -991,8 +995,8 @@ export default function VocabularyChallengeGame() {
                 </div>
               </form>
 
-              <div className="mt-3 flex items-start gap-2 rounded-2xl border border-emerald-200/10 bg-emerald-300/[0.045] p-3 text-[10px] font-semibold leading-5 text-emerald-50/55"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime-200" /><span>بدّل حرفًا واحدًا ببطاقة من يدك لتصنع كلمة صحيحة من 3 أحرف. أول من يتخلّص من بطاقاته يفوز.</span></div>
-              <Link href="/vocabulary-challenge/profile" className="mt-3 inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2 text-center text-[10px] font-black leading-5 text-white/65 transition hover:bg-white/[0.07] hover:text-white"><UserCircle2 className="h-4 w-4" /> ملفي في تحدي المفردات والإنجازات</Link>
+              <div className="mt-2.5 flex items-start gap-2 rounded-2xl border border-emerald-200/10 bg-emerald-300/[0.045] p-2.5 text-[clamp(9px,2.5vw,10px)] font-semibold leading-[1.8] text-emerald-50/55 sm:p-3"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lime-200" /><span>بدّل حرفًا واحدًا ببطاقة من يدك لتصنع كلمة صحيحة من 3 أحرف. أول من يتخلّص من بطاقاته يفوز.</span></div>
+              <Link href="/vocabulary-challenge/profile" className="mt-2.5 inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2 text-center text-[clamp(9px,2.5vw,10px)] font-black leading-5 text-white/65 transition hover:bg-white/[0.07] hover:text-white"><UserCircle2 className="h-4 w-4" /> ملفي في تحدي المفردات والإنجازات</Link>
             </div>
           </div>
 
