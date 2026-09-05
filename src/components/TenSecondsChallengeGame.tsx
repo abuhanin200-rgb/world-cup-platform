@@ -21,7 +21,7 @@ import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import AuthGateCard from "@/components/auth/AuthGateCard";
 import { db } from "@/lib/firebase";
-import { playInteractionFeedback } from "@/lib/interactionFeedback";
+import { playTenSecondsSound, prepareTenSecondsAudio } from "@/lib/tenSecondsAudio";
 import {
   DEFAULT_TEN_SECONDS_SETTINGS,
   formatTenSecondsTime,
@@ -107,7 +107,7 @@ function getRankClass(rank: number) {
     return "border-orange-300/40 bg-gradient-to-br from-orange-300 to-orange-600 text-slate-950 shadow-orange-400/20";
   }
 
-  return "border-amber-400/20 bg-amber-400/10 text-amber-200 shadow-slate-950/20";
+  return "border-lime-400/20 bg-lime-400/10 text-amber-200 shadow-slate-950/20";
 }
 
 function getSecondsUntilNextMakkahMidnight() {
@@ -215,7 +215,7 @@ function StatCard({
     <motion.div
       variants={itemMotion}
       whileTap={{ scale: 0.98 }}
-      className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center shadow-md shadow-slate-950/20 md:p-3"
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#05090a]/80 p-2 text-center shadow-md shadow-slate-950/20 md:p-3"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-white/5" />
 
@@ -322,6 +322,12 @@ export default function TenSecondsChallengeGame() {
   const startTimeRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
   const stopLockedRef = useRef(false);
+  const lastCueSecondRef = useRef(-1);
+  const lastRenderedMsRef = useRef(-100);
+
+  useEffect(() => {
+    prepareTenSecondsAudio();
+  }, []);
 
   const sortedLeaderboard = useMemo(
     () => sortTenSecondsResults(leaderboard),
@@ -461,8 +467,10 @@ export default function TenSecondsChallengeGame() {
       window.cancelAnimationFrame(animationFrameRef.current);
     }
 
-    playInteractionFeedback("selection");
+    playTenSecondsSound("start");
     stopLockedRef.current = false;
+    lastCueSecondRef.current = -1;
+    lastRenderedMsRef.current = -100;
     startTimeRef.current = performance.now();
     setDisplayMs(0);
     setLastAttempt(null);
@@ -471,7 +479,17 @@ export default function TenSecondsChallengeGame() {
 
     function tick() {
       const elapsedMs = performance.now() - startTimeRef.current;
-      setDisplayMs(elapsedMs);
+      if (elapsedMs - lastRenderedMsRef.current >= 32) {
+        lastRenderedMsRef.current = elapsedMs;
+        setDisplayMs(elapsedMs);
+      }
+
+      const cueSecond = Math.floor(elapsedMs / 1000);
+      if (cueSecond >= 8 && cueSecond <= 10 && cueSecond !== lastCueSecondRef.current) {
+        lastCueSecondRef.current = cueSecond;
+        playTenSecondsSound("tick");
+      }
+
       animationFrameRef.current = window.requestAnimationFrame(tick);
     }
 
@@ -491,6 +509,7 @@ export default function TenSecondsChallengeGame() {
       animationFrameRef.current = null;
     }
 
+    playTenSecondsSound("stop");
     setDisplayMs(elapsedMs);
     setStatus("saving");
 
@@ -513,13 +532,13 @@ export default function TenSecondsChallengeGame() {
         });
 
         if (latestAttempt.won) {
-          playInteractionFeedback("success");
+          playTenSecondsSound("exact");
           setMessage(
             `00:10.000 ✅ جابها بالملي — XP تم احتسابه في ترتيب الألعاب`
           );
           await refreshUser();
         } else {
-          playInteractionFeedback(latestAttempt.diffMs <= 500 ? "warning" : "error");
+          playTenSecondsSound(latestAttempt.diffMs <= 500 ? "near" : "miss");
           setMessage("");
         }
       }
@@ -534,7 +553,7 @@ export default function TenSecondsChallengeGame() {
 
       setStatus("finished");
     } catch (error) {
-      playInteractionFeedback("error");
+      playTenSecondsSound("miss");
       console.error("Save ten seconds attempt error:", error);
       setMessage(getFriendlyErrorMessage(error));
       setStatus("ready");
@@ -553,12 +572,12 @@ export default function TenSecondsChallengeGame() {
         variants={sectionMotion}
         initial="hidden"
         animate="show"
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-6 text-center text-[14px] text-slate-200 shadow-md shadow-slate-950/20 backdrop-blur-sm"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a1112]/90 p-6 text-center text-[14px] text-slate-200 shadow-md shadow-slate-950/20 backdrop-blur-sm"
       >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-lime-300/10" />
 
         <div className="relative inline-flex items-center justify-center gap-2 font-black">
-          <Loader2 className="h-5 w-5 animate-spin text-amber-300" />
+          <Loader2 className="h-5 w-5 animate-spin text-lime-200" />
           <span>جاري تحميل تحدي العشر ثواني...</span>
         </div>
       </motion.section>
@@ -570,17 +589,17 @@ export default function TenSecondsChallengeGame() {
   }
 
   return (
-    <section dir="rtl" className="space-y-5">
+    <section dir="rtl" className="ten-seconds-game min-w-0 space-y-4 overflow-x-hidden md:space-y-5">
       <motion.div
         variants={sectionMotion}
         initial="hidden"
         whileInView="show"
         viewport={scrollOnceViewport}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a1112]/90 p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
       >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-        <div className="pointer-events-none absolute -right-24 top-20 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
-        <div className="pointer-events-none absolute -left-24 bottom-20 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-lime-300/10" />
+        <div className="pointer-events-none absolute -right-24 top-20 h-40 w-40 rounded-full bg-lime-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-24 bottom-20 h-40 w-40 rounded-full bg-orange-300/10 blur-2xl" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
         <div className="relative">
@@ -592,7 +611,7 @@ export default function TenSecondsChallengeGame() {
                 : !settings.enabled
                   ? "border-red-400/30 bg-red-500/10 text-red-100 shadow-red-950/10"
                   : attemptsLeft > 0
-                    ? "border-amber-400/30 bg-amber-400/10 text-amber-100 shadow-amber-950/10"
+                    ? "border-lime-400/30 bg-lime-400/10 text-lime-100 shadow-lime-950/10"
                     : "border-red-400/30 bg-red-500/10 text-red-100 shadow-red-950/10"
             }`}
           >
@@ -621,15 +640,15 @@ export default function TenSecondsChallengeGame() {
 
           <motion.div
             variants={itemMotion}
-            className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-center shadow-md shadow-cyan-950/10"
+            className="mb-4 rounded-2xl border border-orange-400/20 bg-orange-400/10 p-3 text-center shadow-md shadow-orange-950/10"
           >
-            <div className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-cyan-100/80">
+            <div className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-orange-100/80">
               <Clock3 className="h-4 w-4" />
               <span>تحدي جديد بعد</span>
             </div>
 
             <div
-              className="mt-1 text-[24px] font-black text-cyan-100 tabular-nums"
+              className="mt-1 text-[24px] font-black text-orange-100 tabular-nums"
               dir="ltr"
             >
               {formatCountdown(nextChallengeSeconds)}
@@ -639,7 +658,7 @@ export default function TenSecondsChallengeGame() {
           {settings.memberNotice && (
             <motion.div
               variants={itemMotion}
-              className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-center text-[12px] font-bold leading-6 text-amber-100 shadow-md shadow-amber-950/10 md:text-sm"
+              className="mb-4 rounded-2xl border border-lime-400/20 bg-lime-400/10 p-3 text-center text-[12px] font-bold leading-6 text-lime-100 shadow-md shadow-lime-950/10 md:text-sm"
             >
               {settings.memberNotice}
             </motion.div>
@@ -652,8 +671,8 @@ export default function TenSecondsChallengeGame() {
             <StatCard
               label="محاولاتك"
               value={`${attemptsUsed}/${settings.dailyAttempts}`}
-              icon={<MousePointer2 className="h-4 w-4 text-amber-300" />}
-              valueClassName="text-amber-200"
+              icon={<MousePointer2 className="h-4 w-4 text-lime-200" />}
+              valueClassName="text-lime-200"
             />
 
             <StatCard
@@ -664,8 +683,8 @@ export default function TenSecondsChallengeGame() {
                   ? "-"
                   : `${todayResult.bestDiffMs}ms`
               }
-              icon={<Gauge className="h-4 w-4 text-cyan-300" />}
-              valueClassName="text-cyan-100"
+              icon={<Gauge className="h-4 w-4 text-orange-300" />}
+              valueClassName="text-orange-100"
             />
 
             <StatCard
@@ -678,8 +697,10 @@ export default function TenSecondsChallengeGame() {
 
           <motion.div
             variants={itemMotion}
-            className="mb-5 rounded-[2rem] border border-white/10 bg-slate-950/60 p-5 text-center shadow-xl shadow-slate-950/25 md:p-7"
+            className="ten-seconds-dial relative mb-5 overflow-hidden rounded-[2rem] border border-lime-300/15 bg-[#05090a]/90 p-5 text-center shadow-xl shadow-black/30 md:p-7"
           >
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(163,230,53,.08),transparent_34%),linear-gradient(90deg,transparent,rgba(255,255,255,.025),transparent)]" />
+            <div className={`pointer-events-none absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed ${status === "running" ? "animate-spin border-lime-300/20" : "border-white/5"}`} style={{ animationDuration: "9s" }} />
             <div
               className={`mx-auto mb-4 inline-flex items-center justify-center rounded-full border px-4 py-1.5 text-[11px] font-black md:text-xs ${
                 status === "running"
@@ -703,7 +724,7 @@ export default function TenSecondsChallengeGame() {
                   : lastAttempt?.won
                     ? "text-emerald-200"
                     : lastAttempt
-                      ? "text-amber-100"
+                      ? "text-orange-100"
                       : "text-white"
               }`}
               dir="ltr"
@@ -750,23 +771,23 @@ export default function TenSecondsChallengeGame() {
                   initial="hidden"
                   animate="show"
                   exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                  className="mx-auto mt-4 max-w-lg rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-[14px] font-bold leading-6 text-cyan-100 shadow-md shadow-cyan-950/10"
+                  className="mx-auto mt-4 max-w-lg rounded-2xl border border-orange-400/20 bg-orange-400/10 p-3 text-[14px] font-bold leading-6 text-orange-100 shadow-md shadow-orange-950/10"
                 >
                   <span className="inline-flex items-center justify-center gap-2">
-                    <Sparkles className="h-4 w-4 text-cyan-200" />
+                    <Sparkles className="h-4 w-4 text-orange-200" />
                     <span>{message}</span>
                   </span>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <div className="mt-5 grid grid-cols-1 gap-2 md:grid-cols-2">
+            <div className="mt-5 grid grid-cols-2 gap-2 max-[350px]:grid-cols-1">
               <motion.button
                 type="button"
                 onClick={startTimer}
                 disabled={!canStart}
                 whileTap={!canStart ? undefined : { scale: 0.96, y: 2 }}
-                className="group relative inline-flex min-h-[54px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-amber-400 px-5 py-3 text-[15px] font-black text-slate-950 shadow-md shadow-amber-500/15 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                className="group relative inline-flex min-h-[54px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-lime-300 px-5 py-3 text-[15px] font-black text-[#101705] shadow-md shadow-lime-500/15 transition hover:bg-lime-200 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />
                 <Play className="relative h-5 w-5" />
@@ -784,7 +805,7 @@ export default function TenSecondsChallengeGame() {
                   status === "running" ? { scale: 0.94, y: 2 } : undefined
                 }
                 style={{ touchAction: "manipulation" }}
-                className="group relative inline-flex min-h-[54px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-red-500 px-5 py-3 text-[15px] font-black text-white shadow-md shadow-red-950/20 transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-45"
+                className="group relative inline-flex min-h-[54px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-orange-500 px-5 py-3 text-[15px] font-black text-white shadow-md shadow-red-950/20 transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />
                 <Zap className="relative h-5 w-5" />
@@ -800,15 +821,15 @@ export default function TenSecondsChallengeGame() {
         initial="hidden"
         whileInView="show"
         viewport={scrollOnceViewport}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0a1112]/90 p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
       >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-        <div className="pointer-events-none absolute -right-20 top-8 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
-        <div className="pointer-events-none absolute -left-20 bottom-8 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-lime-300/10" />
+        <div className="pointer-events-none absolute -right-20 top-8 h-40 w-40 rounded-full bg-lime-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-8 h-40 w-40 rounded-full bg-orange-300/10 blur-2xl" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
         <div className="relative mb-4 text-center">
-          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/10">
+          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-lime-300/25 bg-lime-300/10 text-lime-100 shadow-md shadow-lime-950/10">
             <Trophy className="h-5 w-5" />
           </div>
 
@@ -824,7 +845,7 @@ export default function TenSecondsChallengeGame() {
         {sortedLeaderboard.length === 0 ? (
           <motion.div
             variants={itemMotion}
-            className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/50 p-5 text-center text-[14px] font-bold text-slate-300 shadow-inner"
+            className="relative rounded-2xl border border-dashed border-white/10 bg-[#05090a]/80 p-5 text-center text-[14px] font-bold text-slate-300 shadow-inner"
           >
             <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
               <Medal className="h-5 w-5 text-slate-300" />
@@ -848,7 +869,7 @@ export default function TenSecondsChallengeGame() {
                   key={result.id}
                   variants={leaderboardRowMotion}
                   whileTap={{ scale: 0.985 }}
-                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/55 p-2.5 shadow-md shadow-slate-950/20"
+                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#05090a]/80 p-2.5 shadow-md shadow-slate-950/20"
                 >
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-transparent" />
 
@@ -898,7 +919,7 @@ export default function TenSecondsChallengeGame() {
                     <LeaderboardStat
                       label="المحاولات"
                       value={result.attemptsCount}
-                      className="border-amber-400/15 bg-amber-400/10 text-amber-300"
+                      className="border-amber-400/15 bg-amber-400/10 text-lime-200"
                     />
                   </div>
                 </motion.article>
@@ -907,6 +928,18 @@ export default function TenSecondsChallengeGame() {
           </motion.div>
         )}
       </motion.div>
+
+      <style>{`
+        .ten-seconds-game, .ten-seconds-game * { box-sizing: border-box; }
+        .ten-seconds-game { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+        .ten-seconds-dial { isolation: isolate; }
+        @media (max-width: 390px) {
+          .ten-seconds-game { font-size: 0.96rem; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .ten-seconds-dial .animate-spin { animation: none !important; }
+        }
+      `}</style>
     </section>
   );
 } 

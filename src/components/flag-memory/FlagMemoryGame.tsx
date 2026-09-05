@@ -29,7 +29,7 @@ import {
   type FlagMemorySettings,
 } from "@/lib/flagMemory";
 import { getFlagMemoryTeams, type FlagMemoryTeam } from "@/lib/flagMemoryTeams";
-import { playInteractionFeedback } from "@/lib/interactionFeedback";
+import { playFlagMemorySound, prepareFlagMemoryAudio } from "@/lib/flagMemoryAudio";
 
 type MemoryCard = {
   cardId: string;
@@ -302,7 +302,7 @@ function StatusBox({
       variants={itemMotion}
       className={`mb-4 rounded-2xl border px-4 py-3 text-center text-[14px] font-black shadow-lg md:text-base ${
         enabled
-          ? "border-amber-400/30 bg-amber-400/10 text-amber-100 shadow-amber-950/10"
+          ? "border-sky-400/30 bg-sky-400/10 text-sky-100 shadow-sky-950/10"
           : "border-red-400/30 bg-red-500/10 text-red-100 shadow-red-950/10"
       }`}
     >
@@ -329,7 +329,7 @@ function StatCard({
     <motion.div
       variants={itemMotion}
       whileTap={{ scale: 0.98 }}
-      className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-2 text-center shadow-md shadow-slate-950/20 md:p-3"
+      className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#051525]/80 p-2 text-center shadow-md shadow-slate-950/20 md:p-3"
     >
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-white/5" />
 
@@ -405,6 +405,10 @@ export default function FlagMemoryGame() {
 
   const lockRef = useRef(false);
   const autoSaveRef = useRef(false);
+
+  useEffect(() => {
+    prepareFlagMemoryAudio();
+  }, []);
 
   const pairsCount = settings.pairsCount;
   const totalCards = pairsCount * 2;
@@ -486,7 +490,7 @@ export default function FlagMemoryGame() {
     if (autoSaveRef.current) return;
 
     autoSaveRef.current = true;
-    playInteractionFeedback("success");
+    playFlagMemorySound("finish");
     setStatus("finished");
     setMessage(
       "أحسنت! أنهيت تحدي الأعلام بنجاح. جاري اعتماد نتيجتك تلقائيًا..."
@@ -554,7 +558,7 @@ export default function FlagMemoryGame() {
       return;
     }
 
-    playInteractionFeedback("selection");
+    playFlagMemorySound("start");
     setCards(buildCards(settings.pairsCount));
     setSelectedCards([]);
     setStatus("playing");
@@ -576,7 +580,7 @@ export default function FlagMemoryGame() {
     }
     if (selectedCards.length >= 2) return;
 
-    playInteractionFeedback("selection");
+    playFlagMemorySound("flip");
     const nextSelected = [...selectedCards, card];
     setSelectedCards(nextSelected);
 
@@ -588,7 +592,7 @@ export default function FlagMemoryGame() {
     const isMatch = firstCard.pairId === secondCard.pairId;
 
     if (isMatch) {
-      playInteractionFeedback("success");
+      playFlagMemorySound("match");
       setCards((items) =>
         items.map((item) =>
           item.pairId === firstCard.pairId ? { ...item, matched: true } : item
@@ -598,7 +602,7 @@ export default function FlagMemoryGame() {
       return;
     }
 
-    playInteractionFeedback("error");
+    playFlagMemorySound("mismatch");
     setMistakes((value) => value + 1);
     lockRef.current = true;
 
@@ -629,12 +633,12 @@ export default function FlagMemoryGame() {
         variants={sectionMotion}
         initial="hidden"
         animate="show"
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-6 text-center text-[14px] text-slate-200 shadow-md shadow-slate-950/20 backdrop-blur-sm"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#071a33]/90 p-6 text-center text-[14px] text-slate-200 shadow-md shadow-slate-950/20 backdrop-blur-sm"
       >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-sky-300/10" />
 
         <div className="relative inline-flex items-center justify-center gap-2 font-black">
-          <Loader2 className="h-5 w-5 animate-spin text-amber-300" />
+          <Loader2 className="h-5 w-5 animate-spin text-rose-200" />
           <span>جاري تحميل تحدي الأعلام...</span>
         </div>
       </motion.section>
@@ -646,17 +650,17 @@ export default function FlagMemoryGame() {
   }
 
   return (
-    <section dir="rtl" className="space-y-5">
+    <section dir="rtl" className="flag-memory-game min-w-0 space-y-4 overflow-x-hidden md:space-y-5">
       <motion.div
         variants={sectionMotion}
         initial="hidden"
         whileInView="show"
         viewport={scrollOnceViewport}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#071a33]/90 p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
       >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-        <div className="pointer-events-none absolute -right-24 top-20 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
-        <div className="pointer-events-none absolute -left-24 bottom-20 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-sky-300/10" />
+        <div className="pointer-events-none absolute -right-24 top-20 h-40 w-40 rounded-full bg-sky-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-24 bottom-20 h-40 w-40 rounded-full bg-rose-300/10 blur-2xl" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
         <div className="relative">
@@ -670,15 +674,15 @@ export default function FlagMemoryGame() {
 
           <motion.div
             variants={itemMotion}
-            className="mb-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-center shadow-md shadow-cyan-950/10"
+            className="mb-4 rounded-2xl border border-sky-400/20 bg-sky-400/10 p-3 text-center shadow-md shadow-sky-950/10"
           >
-            <div className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-cyan-100/80">
+            <div className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-sky-100/80">
               <Clock3 className="h-4 w-4" />
               <span>تحدي جديد بعد</span>
             </div>
 
             <div
-              className="mt-1 text-[24px] font-black text-cyan-100 tabular-nums"
+              className="mt-1 text-[24px] font-black text-sky-100 tabular-nums"
               dir="ltr"
             >
               {formatCountdown(nextChallengeSeconds)}
@@ -687,17 +691,17 @@ export default function FlagMemoryGame() {
 
           <motion.div
             variants={itemMotion}
-            className="mb-5 rounded-2xl border border-white/10 bg-slate-950/55 p-3 text-center shadow-md shadow-slate-950/15"
+            className="mb-5 rounded-2xl border border-white/10 bg-[#051525]/80 p-3 text-center shadow-md shadow-slate-950/15"
           >
             <div className="mb-2 inline-flex items-center justify-center gap-2 text-[14px] font-black text-white">
-              <Target className="h-4 w-4 text-amber-300" />
+              <Target className="h-4 w-4 text-rose-200" />
               <span>شرح XP</span>
             </div>
 
             <div className="space-y-1 text-[11px] font-bold leading-5 text-slate-300 md:text-xs">
               <p>
                 كل زوج أعلام ={" "}
-                <span className="text-amber-300">20 XP</span>، ومكافأة
+                <span className="text-rose-200">20 XP</span>، ومكافأة
                 السرعة تصل إلى <span className="text-emerald-300">+50</span>.
               </p>
 
@@ -716,14 +720,14 @@ export default function FlagMemoryGame() {
             <StatCard
               label="الوقت"
               value={formatTime(seconds)}
-              icon={<Clock3 className="h-4 w-4 text-cyan-300" />}
-              valueClassName="text-cyan-100"
+              icon={<Clock3 className="h-4 w-4 text-sky-300" />}
+              valueClassName="text-sky-100"
             />
 
             <StatCard
               label="المحاولات"
               value={moves}
-              icon={<MousePointer2 className="h-4 w-4 text-amber-300" />}
+              icon={<MousePointer2 className="h-4 w-4 text-rose-200" />}
               valueClassName="text-amber-200"
             />
 
@@ -771,10 +775,10 @@ export default function FlagMemoryGame() {
                 initial="hidden"
                 animate="show"
                 exit={{ opacity: 0, y: -10, scale: 0.97 }}
-                className="mb-5 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-[14px] font-bold leading-6 text-cyan-100 shadow-md shadow-cyan-950/10"
+                className="mb-5 rounded-2xl border border-sky-400/20 bg-sky-400/10 p-3 text-[14px] font-bold leading-6 text-sky-100 shadow-md shadow-sky-950/10"
               >
                 <span className="inline-flex items-center justify-center gap-2">
-                  <Sparkles className="h-4 w-4 text-cyan-200" />
+                  <Sparkles className="h-4 w-4 text-sky-200" />
                   <span>{message}</span>
                 </span>
               </motion.div>
@@ -790,7 +794,7 @@ export default function FlagMemoryGame() {
               onClick={startGame}
               disabled={startButtonDisabled}
               whileTap={startButtonDisabled ? undefined : { scale: 0.96, y: 2 }}
-              className="group relative inline-flex min-h-[48px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-amber-400 px-5 py-3 text-[14px] font-black text-slate-950 shadow-md shadow-amber-500/15 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="group relative inline-flex min-h-[48px] items-center justify-center gap-2 overflow-hidden rounded-2xl bg-sky-300 px-5 py-3 text-[14px] font-black text-[#041827] shadow-md shadow-sky-500/15 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="pointer-events-none absolute inset-0 translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition duration-700 group-hover:translate-x-[-120%]" />
 
@@ -814,10 +818,10 @@ export default function FlagMemoryGame() {
 
           <motion.div
             variants={itemMotion}
-            className="mb-4 rounded-2xl border border-white/10 bg-slate-950/50 p-3 text-center text-[14px] font-black text-slate-200 shadow-md shadow-slate-950/15"
+            className="mb-4 rounded-2xl border border-white/10 bg-[#051525]/70 p-3 text-center text-[14px] font-black text-slate-200 shadow-md shadow-slate-950/15"
           >
             <span className="inline-flex items-center justify-center gap-2">
-              <Flag className="h-4 w-4 text-amber-300" />
+              <Flag className="h-4 w-4 text-rose-200" />
               <span>
                 المتطابق: {matchedCount} / {pairsCount} — عدد البطاقات:{" "}
                 {totalCards}
@@ -830,7 +834,7 @@ export default function FlagMemoryGame() {
             initial="hidden"
             animate="show"
             key={`${status}-${cards.length}`}
-            className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 md:gap-2"
+            className="grid min-w-0 grid-cols-4 gap-1.5 max-[350px]:grid-cols-3 sm:grid-cols-6 md:gap-2"
           >
             {cards.map((card, index) => {
               const visible = isCardVisible(card);
@@ -861,10 +865,10 @@ export default function FlagMemoryGame() {
                       ease: "easeOut",
                     },
                   }}
-                  className={`relative aspect-[5/4] overflow-hidden rounded-xl border p-1 shadow-lg transition [transform-style:preserve-3d] md:rounded-2xl ${
+                  className={`relative min-w-0 aspect-[5/4] overflow-hidden rounded-xl border p-1 shadow-lg transition [transform-style:preserve-3d] md:rounded-2xl ${
                     visible
                       ? "border-emerald-400/40 bg-white text-slate-950 shadow-emerald-500/15"
-                      : "border-white/10 bg-slate-950/70 text-white shadow-slate-950/25 hover:bg-slate-900"
+                      : "border-sky-300/15 bg-gradient-to-br from-[#09233d] via-[#06182b] to-[#101a31] text-white shadow-sky-950/25 hover:border-sky-300/30"
                   } disabled:cursor-default`}
                   aria-label={
                     visible ? card.team.nameAr : `بطاقة رقم ${index + 1}`
@@ -897,8 +901,8 @@ export default function FlagMemoryGame() {
                       </div>
                     ) : (
                       <div className="flex h-full flex-col items-center justify-center gap-0.5">
-                        <span className="text-lg leading-none md:text-2xl">
-                          ?
+                        <span className="text-lg font-black leading-none text-sky-100 md:text-2xl">
+                          ✦
                         </span>
 
                         <span className="text-[9px] font-black leading-none text-slate-300 md:text-[10px]">
@@ -919,15 +923,15 @@ export default function FlagMemoryGame() {
         initial="hidden"
         whileInView="show"
         viewport={scrollOnceViewport}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.09] p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#071a33]/90 p-4 shadow-md shadow-slate-950/20 backdrop-blur-sm md:p-5"
       >
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-300/10" />
-        <div className="pointer-events-none absolute -right-20 top-8 h-40 w-40 rounded-full bg-amber-300/10 blur-2xl" />
-        <div className="pointer-events-none absolute -left-20 bottom-8 h-40 w-40 rounded-full bg-cyan-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-sky-300/10" />
+        <div className="pointer-events-none absolute -right-20 top-8 h-40 w-40 rounded-full bg-sky-300/10 blur-2xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-8 h-40 w-40 rounded-full bg-rose-300/10 blur-2xl" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
 
         <div className="relative mb-4 text-center">
-          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/10 text-amber-100 shadow-md shadow-amber-950/10">
+          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-300/25 bg-sky-300/10 text-sky-100 shadow-md shadow-sky-950/10">
             <Trophy className="h-5 w-5" />
           </div>
 
@@ -943,7 +947,7 @@ export default function FlagMemoryGame() {
         {leaderboard.length === 0 ? (
           <motion.div
             variants={itemMotion}
-            className="relative rounded-2xl border border-dashed border-white/10 bg-slate-950/50 p-5 text-center text-[14px] font-bold text-slate-300 shadow-inner"
+            className="relative rounded-2xl border border-dashed border-white/10 bg-[#051525]/70 p-5 text-center text-[14px] font-bold text-slate-300 shadow-inner"
           >
             <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
               <Medal className="h-5 w-5 text-slate-300" />
@@ -960,7 +964,7 @@ export default function FlagMemoryGame() {
                   key={result.id}
                   variants={leaderboardRowMotion}
                   whileTap={{ scale: 0.985 }}
-                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/55 p-2.5 shadow-md shadow-slate-950/20"
+                  className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#051525]/80 p-2.5 shadow-md shadow-slate-950/20"
                 >
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/8 via-transparent to-transparent" />
 
@@ -988,7 +992,7 @@ export default function FlagMemoryGame() {
                     <LeaderboardStat
                       label="XP"
                       value={result.score}
-                      className="border-amber-400/15 bg-amber-400/10 text-amber-300"
+                      className="border-amber-400/15 bg-amber-400/10 text-rose-200"
                     />
 
                     <LeaderboardStat
@@ -1015,6 +1019,14 @@ export default function FlagMemoryGame() {
           </motion.div>
         )}
       </motion.div>
+
+      <style>{`
+        .flag-memory-game, .flag-memory-game * { box-sizing: border-box; }
+        .flag-memory-game { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+        @media (max-width: 390px) {
+          .flag-memory-game { font-size: 0.96rem; }
+        }
+      `}</style>
     </section>
   );
 }
