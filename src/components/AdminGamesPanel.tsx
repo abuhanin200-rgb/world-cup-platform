@@ -6,8 +6,9 @@ import AdminFlagMemoryPanel from "@/components/AdminFlagMemoryPanel";
 import AdminTenSecondsChallengePanel from "./AdminTenSecondsChallengePanel";
 import AdminPlatformGamesXpPanel from "@/components/AdminPlatformGamesXpPanel";
 import AdminVocabularyDictionaryPanel from "@/components/AdminVocabularyDictionaryPanel";
+import AdminMajlisGamePanel from "@/components/AdminMajlisGamePanel";
 
-type GamesAdminTab = "platformXp" | "wordGame" | "flagMemory" | "tenSeconds" | "vocabulary";
+type GamesAdminTab = "platformXp" | "wordGame" | "flagMemory" | "tenSeconds" | "vocabulary" | "majlis";
 
 export default function AdminGamesPanel() {
   const [activeGameTab, setActiveGameTab] =
@@ -75,6 +76,18 @@ export default function AdminGamesPanel() {
 
           <button
             type="button"
+            onClick={() => setActiveGameTab("majlis")}
+            className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+              activeGameTab === "majlis"
+                ? "bg-amber-400 text-slate-950"
+                : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
+            }`}
+          >
+            ☕ مجلس التحدي
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveGameTab("tenSeconds")}
             className={`rounded-xl px-4 py-2 text-sm font-black transition ${
               activeGameTab === "tenSeconds"
@@ -96,6 +109,8 @@ export default function AdminGamesPanel() {
       {activeGameTab === "tenSeconds" && <AdminTenSecondsChallengePanel />}
 
       {activeGameTab === "vocabulary" && <AdminVocabularyDictionaryPanel />}
+
+      {activeGameTab === "majlis" && <AdminMajlisGamePanel />}
     </section>
   );
 }

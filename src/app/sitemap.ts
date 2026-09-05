@@ -16,6 +16,7 @@ const routes = [
   "/flag-memory",
   "/ten-seconds-challenge",
   "/vocabulary-challenge",
+  "/majlis",
   "/rules",
 ];
 

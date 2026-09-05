@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
+  Coffee,
   Flag,
   Gamepad2,
   Languages,
@@ -15,7 +16,7 @@ import {
 import { playInteractionFeedback } from "@/lib/interactionFeedback";
 
 type Game = {
-  id: "vocabulary" | "word" | "flags" | "timer";
+  id: "vocabulary" | "word" | "flags" | "timer" | "majlis";
   title: string;
   shortTitle: string;
   description: string;
@@ -65,6 +66,16 @@ const GAMES: Game[] = [
     icon: TimerReset,
     accent: "#ffc210",
     background: "radial-gradient(circle at 16% 18%, rgba(255,194,16,.22), transparent 28%), linear-gradient(135deg,#2c2744 0%,#15245a 48%,#071946 100%)",
+  },
+  {
+    id: "majlis",
+    title: "مجلس التحدي",
+    shortTitle: "المجلس",
+    description: "جلسة جماعية بطابع المجلس السعودي: فرق، فئات، أسئلة، فزعة ومساعدات تكتيكية.",
+    href: "/majlis",
+    icon: Coffee,
+    accent: "#f1cf89",
+    background: "radial-gradient(circle at 16% 18%, rgba(214,177,107,.22), transparent 28%), linear-gradient(135deg,#173a34 0%,#0f302d 52%,#5b2f26 120%)",
   },
 ];
 
@@ -123,6 +134,20 @@ function GameVisual({ game }: { game: Game }) {
             </motion.div>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (game.id === "majlis") {
+    return (
+      <div className="relative flex h-full min-h-[150px] items-center justify-center overflow-hidden sm:min-h-[190px]" aria-hidden="true">
+        <div className="absolute inset-x-[12%] bottom-[16%] h-12 rounded-[22px] border border-[#f1cf89]/20 bg-[#7b3f2e]/35" />
+        <div className="absolute inset-x-[20%] bottom-[35%] h-12 rounded-t-[28px] border border-[#f1cf89]/18 bg-[#214f45]/75" />
+        <motion.div animate={{ y: [0,-4,0] }} transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }} className="relative grid h-20 w-20 place-items-center rounded-[24px] border border-[#f1cf89]/30 bg-[#102f2d]/90 shadow-xl">
+          <Coffee className="h-9 w-9 text-[#f1cf89]" />
+        </motion.div>
+        <span className="absolute bottom-[19%] right-[14%] rounded-full border border-[#f1cf89]/20 bg-[#102f2d]/90 px-2.5 py-1 text-[9px] font-black text-[#f4e5c4]">فريق أ</span>
+        <span className="absolute bottom-[19%] left-[14%] rounded-full border border-[#f1cf89]/20 bg-[#102f2d]/90 px-2.5 py-1 text-[9px] font-black text-[#f4e5c4]">فريق ب</span>
       </div>
     );
   }
@@ -201,7 +226,7 @@ export default function GameShowcase() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="grid grid-cols-2 gap-1.5 border-t border-white/[0.10] bg-[#04143d]/45 p-2 backdrop-blur-2xl sm:grid-cols-4 sm:gap-2 sm:p-3">
+        <div className="grid grid-cols-2 gap-1.5 border-t border-white/[0.10] bg-[#04143d]/45 p-2 backdrop-blur-2xl sm:grid-cols-5 sm:gap-2 sm:p-3">
           {GAMES.map((game) => {
             const selected = game.id === active.id;
             const Icon = game.icon;

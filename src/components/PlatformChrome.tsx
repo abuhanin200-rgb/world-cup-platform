@@ -25,7 +25,7 @@ function isActive(pathname: string, href: string) {
   if (href === "/tournaments/gulf-cup-27/leaderboard") return pathname.endsWith("/leaderboard");
   if (href === "/tournaments") return pathname.startsWith("/tournaments") && !pathname.endsWith("/leaderboard");
   if (href === "/games") {
-    return pathname === "/games" || pathname === "/word-game" || pathname === "/flag-memory" || pathname === "/ten-seconds-challenge" || pathname === "/vocabulary-challenge";
+    return pathname === "/games" || pathname === "/word-game" || pathname === "/flag-memory" || pathname === "/ten-seconds-challenge" || pathname === "/vocabulary-challenge" || pathname === "/majlis";
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

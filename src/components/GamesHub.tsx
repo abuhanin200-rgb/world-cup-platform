@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
+  Coffee,
   Crown,
   Flag,
   Gamepad2,
@@ -71,6 +72,18 @@ const GAMES = [
     xp: "XP عند الفوز",
     visual: "timer",
     glow: "rgba(255,194,16,.18)",
+  },
+  {
+    id: "majlis",
+    title: "مجلس التحدي",
+    shortTitle: "المجلس",
+    description: "لعبة مجلس جماعية لفريقين أو أكثر: اختر الفئات، واجه الأسئلة، استخدم المساعدات، واجمع أعلى رصيد.",
+    href: "/majlis",
+    icon: Coffee,
+    tag: "جماعي",
+    xp: "2–4 فرق",
+    visual: "majlis",
+    glow: "rgba(214,177,107,.20)",
   },
 ] as const;
 
@@ -162,6 +175,21 @@ function GameVisual({ kind }: { kind: (typeof GAMES)[number]["visual"] }) {
     );
   }
 
+  if (kind === "majlis") {
+    return (
+      <div className="relative flex min-h-[170px] w-full items-center justify-center overflow-hidden" aria-hidden="true">
+        <div className="absolute inset-x-4 bottom-5 h-12 rounded-[22px] border border-[#d6b16b]/20 bg-[#7b3f2e]/35" />
+        <div className="absolute inset-x-10 bottom-12 h-12 rounded-t-[26px] border border-[#d6b16b]/18 bg-[#214f45]/75" />
+        <div className="absolute top-4 h-24 w-24 rounded-full border border-dashed border-[#d6b16b]/25" />
+        <motion.div animate={{ y: [0,-4,0] }} transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }} className="relative grid h-20 w-20 place-items-center rounded-[24px] border border-[#d6b16b]/30 bg-[#102f2d]/90 shadow-[0_18px_40px_rgba(0,0,0,.25)]">
+          <Coffee className="h-9 w-9 text-[#f1cf89]" />
+        </motion.div>
+        <span className="absolute bottom-7 right-10 rounded-full border border-[#d6b16b]/20 bg-[#102f2d]/90 px-3 py-1 text-[10px] font-black text-[#f4e5c4]">فريق أ</span>
+        <span className="absolute bottom-7 left-10 rounded-full border border-[#d6b16b]/20 bg-[#102f2d]/90 px-3 py-1 text-[10px] font-black text-[#f4e5c4]">فريق ب</span>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       animate={{ scale: [1, 1.025, 1] }}
@@ -237,7 +265,7 @@ export default function GamesHub() {
                 <Gamepad2 className="h-3.5 w-3.5" /> وقت التحدي
               </div>
               <h1 className="altahaddi-display-title mt-3 font-black">العب. اجمع XP. ارفع مستواك</h1>
-              <p className="altahaddi-body-copy mt-2 max-w-xl font-semibold text-white/48">أربع ألعاب سريعة، ترتيب واحد، ومستوى يتطور مع كل مشاركة.</p>
+              <p className="altahaddi-body-copy mt-2 max-w-xl font-semibold text-white/48">أربع ألعاب XP سريعة، ومعها مجلس جماعي للمجالس والأصدقاء.</p>
 
               <div className="mt-5 grid grid-cols-3 gap-2 max-w-xl">
                 <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"><div dir="ltr" className="text-lg font-black text-[var(--brand-yellow)] md:text-xl">{xp} XP</div><div className="mt-1 text-[9px] font-bold text-white/38">نقاط الخبرة</div></div>
@@ -291,7 +319,7 @@ export default function GamesHub() {
               <div className="order-1 grid min-h-[160px] place-items-center overflow-hidden rounded-[26px] border border-white/10 bg-black/15 md:order-2 md:min-h-[245px]"><GameVisual kind={selectedGame.visual} /></div>
             </div>
 
-            <div className="relative grid grid-cols-2 gap-1.5 border-t border-white/[0.07] bg-black/10 p-2 sm:grid-cols-4 md:gap-2 md:p-3">
+            <div className="relative grid grid-cols-2 gap-1.5 border-t border-white/[0.07] bg-black/10 p-2 sm:grid-cols-5 md:gap-2 md:p-3">
               {GAMES.map((game) => {
                 const Icon = game.icon;
                 const active = game.id === activeGame;
