@@ -120,9 +120,16 @@ function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
     }
   }
 
+  const isReciter = question.categoryId === "reciter";
+  const isHumanLanguage = question.categoryId === "dialects" || question.categoryId === "languages";
+  const mediaCaption = isReciter
+    ? "مقطع تلاوة بشري يصل إلى 15 ثانية"
+    : isHumanLanguage
+      ? "تسجيل بشري حقيقي من Wikimedia Commons / Lingua Libre — بدون صوت مولّد"
+      : "مقطع صوتي للسؤال";
   return <div className={styles.mediaPlayer}>
     <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-[#d6b16b]/25 bg-[#d6b16b]/10 text-[#ead8ad]"><AudioLines className="h-6 w-6"/></div>
-    <p className="mt-2 text-[11px] font-black text-[#f7efdc]/60">15 ثانية من التلاوة — يبدأ المقطع بعد المقدمة قدر الإمكان</p>
+    <p className="mt-2 text-[11px] font-black text-[#f7efdc]/60">{mediaCaption}</p>
     <button type="button" onClick={toggle} className="mx-auto mt-3 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-[#d6b16b] px-5 text-sm font-black text-[#173b35]">{playing?<Pause className="h-4 w-4"/>:<Play className="h-4 w-4"/>}{playing?"إيقاف":"تشغيل المقطع"}</button>
     {error?<p role="alert" className="mt-2 text-[11px] font-bold text-rose-200">{error}</p>:null}
   </div>;

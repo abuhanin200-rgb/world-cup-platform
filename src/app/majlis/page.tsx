@@ -40,7 +40,7 @@ export default function MajlisPage() {
             <div className="mt-4 grid max-w-2xl grid-cols-3 gap-1.5 sm:gap-2">
               <div className="rounded-2xl border border-[#ead8ad]/10 bg-black/15 p-2.5 text-center sm:p-3"><UsersRound className="mx-auto h-4 w-4 text-[#d6b16b]" /><div className="mt-1 text-sm font-black text-[#f7efdc]">2–4 فرق</div><div className="mt-0.5 text-[9px] font-bold text-[#f7efdc]/35">للجمعات</div></div>
               <div className="rounded-2xl border border-[#ead8ad]/10 bg-black/15 p-2.5 text-center sm:p-3"><Gamepad2 className="mx-auto h-4 w-4 text-[#7fb3a8]" /><div className="mt-1 text-sm font-black text-[#f7efdc]">6 فئات</div><div className="mt-0.5 text-[9px] font-bold text-[#f7efdc]/35">في كل جلسة</div></div>
-              <div className="rounded-2xl border border-[#ead8ad]/10 bg-black/15 p-2.5 text-center sm:p-3"><Crown className="mx-auto h-4 w-4 text-[#c77a62]" /><div className="mt-1 text-sm font-black text-[#f7efdc]">3 مساعدات</div><div className="mt-0.5 text-[9px] font-bold text-[#f7efdc]/35">لكل فريق</div></div>
+              <div className="rounded-2xl border border-[#ead8ad]/10 bg-black/15 p-2.5 text-center sm:p-3"><Crown className="mx-auto h-4 w-4 text-[#c77a62]" /><div className="mt-1 text-sm font-black text-[#f7efdc]">4 مساعدات</div><div className="mt-0.5 text-[9px] font-bold text-[#f7efdc]/35">لكل فريق</div></div>
             </div>
           </div>
 

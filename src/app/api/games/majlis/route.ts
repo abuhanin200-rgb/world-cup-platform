@@ -47,6 +47,7 @@ function safeQuestion(question: Awaited<ReturnType<typeof getEffectiveMajlisBank
     id: question.id,
     categoryId: question.categoryId,
     groupKey: question.groupKey,
+    family: question.family,
     prompt: cleanPrompt(question.prompt),
     options: question.options,
     difficulty: question.difficulty,
@@ -54,8 +55,8 @@ function safeQuestion(question: Awaited<ReturnType<typeof getEffectiveMajlisBank
     hint: question.hint,
     type: question.type,
     quoteText: question.quoteText,
-    audioUrl: question.audioUrl,
-    audioFallbackUrl: question.audioFallbackUrl,
+    audioUrl: question.audioSourceKey ? `/api/games/majlis/human-audio?questionId=${encodeURIComponent(question.id)}` : question.audioUrl,
+    audioFallbackUrl: question.audioSourceKey ? `/api/games/majlis/human-audio?questionId=${encodeURIComponent(question.id)}&retry=1` : question.audioFallbackUrl,
     audioStartSeconds: question.audioStartSeconds,
     audioMaxSeconds: question.audioMaxSeconds,
     speechText: question.speechText,
@@ -87,29 +88,38 @@ function pickGroupKeys(
   distinctAnswers = false,
 ) {
   const keys = shuffle(candidates.filter((key) => !excluded.has(key)));
-  const difficultyFor = (key: string) => groupMap.get(key)?.[0]?.difficulty || "medium";
-  const answerFor = (key: string) => groupMap.get(key)?.[0]?.answer || "";
+  const qFor = (key: string) => groupMap.get(key)?.[0];
+  const difficultyFor = (key: string) => qFor(key)?.difficulty || "medium";
+  const answerFor = (key: string) => qFor(key)?.answer || "";
+  const familyFor = (key: string) => qFor(key)?.family || `${qFor(key)?.categoryId || "general"}-general`;
   const hard = keys.filter((key) => difficultyFor(key) === "hard");
   const medium = keys.filter((key) => difficultyFor(key) === "medium");
   const result: string[] = [];
   const usedAnswers = new Set<string>();
+  const usedFamilies = new Map<string, number>();
 
-  const push = (pool: string[], wanted: number, preferDistinct = distinctAnswers) => {
-    const passes = preferDistinct ? [true, false] : [false];
-    for (const requireDistinct of passes) {
-      for (const key of pool) {
-        if (result.includes(key)) continue;
-        const answer = answerFor(key);
-        if (requireDistinct && answer && usedAnswers.has(answer)) continue;
-        result.push(key);
-        if (answer) usedAnswers.add(answer);
-        if (result.length >= wanted) return;
+  const push = (pool: string[], wanted: number, preferDistinctAnswer = distinctAnswers) => {
+    // Pass 1: new family + new answer. Pass 2: family may repeat once. Pass 3: any remaining.
+    for (const familyLimit of [0, 1, 99]) {
+      for (const requireDistinctAnswer of preferDistinctAnswer ? [true, false] : [false]) {
+        for (const key of pool) {
+          if (result.includes(key)) continue;
+          const answer = answerFor(key);
+          const family = familyFor(key);
+          const usedFamilyCount = usedFamilies.get(family) || 0;
+          if (familyLimit < 99 && usedFamilyCount > familyLimit) continue;
+          if (requireDistinctAnswer && answer && usedAnswers.has(answer)) continue;
+          result.push(key);
+          if (answer) usedAnswers.add(answer);
+          usedFamilies.set(family, usedFamilyCount + 1);
+          if (result.length >= wanted) return;
+        }
       }
     }
   };
 
-  // مجلس التحدي V15: 4 أسئلة صعبة + سؤالان متوسطان متى ما سمح البنك بذلك.
-  push(hard, Math.min(count, 4));
+  // V16: السؤال الصعب هو الغالب، مع منع تكتل نفس قالب السؤال قدر الإمكان.
+  push(hard, Math.min(count, 5));
   push(medium, Math.min(count, 6));
   push(keys, count);
   return result.slice(0, count);
@@ -158,7 +168,7 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
       let resetOccurred = false;
 
       const remaining = allKeys.filter((key) => !usedKeys.has(key));
-      const first = pickGroupKeys(groupMap, remaining, Math.min(6, remaining.length), new Set<string>(), category.id === "reciter");
+      const first = pickGroupKeys(groupMap, remaining, Math.min(6, remaining.length), new Set<string>(), ["reciter", "dialects", "languages"].includes(category.id));
       selectedKeys.push(...first);
 
       if (selectedKeys.length < 6) {
@@ -166,7 +176,7 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
         cycle += 1;
         resetOccurred = true;
         usedKeys = new Set<string>();
-        const fill = pickGroupKeys(groupMap, allKeys, 6 - selectedKeys.length, new Set(selectedKeys), category.id === "reciter");
+        const fill = pickGroupKeys(groupMap, allKeys, 6 - selectedKeys.length, new Set(selectedKeys), ["reciter", "dialects", "languages"].includes(category.id));
         selectedKeys.push(...fill);
       }
       if (selectedKeys.length < 6) throw new Error(`الفئة «${category.title}» لا تحتوي ست معلومات مستقلة.`);

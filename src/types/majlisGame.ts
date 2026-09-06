@@ -18,6 +18,7 @@ export type MajlisQuestion = {
   id: string;
   categoryId: string;
   groupKey: string;
+  family?: string;
   prompt: string;
   answer: string;
   options?: string[];
@@ -32,6 +33,7 @@ export type MajlisQuestion = {
   audioFallbackUrl?: string;
   audioStartSeconds?: number;
   audioMaxSeconds?: number;
+  audioSourceKey?: string;
   reciterName?: string;
   speechText?: string;
   speechLang?: string;

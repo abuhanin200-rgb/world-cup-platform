@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
       await adminDb.collection(collection).doc(id).set({
         categoryId,
         groupKey: text(raw.groupKey) || id,
+        family: text(raw.family),
         prompt,
         answer,
         options: optionList.slice(0, 6),
@@ -173,6 +174,7 @@ export async function POST(request: NextRequest) {
         audioFallbackUrl: text(raw.audioFallbackUrl),
         audioStartSeconds: Math.max(0, Math.min(3600, number(raw.audioStartSeconds, 0))),
         audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 15)))),
+        audioSourceKey: text(raw.audioSourceKey),
         reciterName: text(raw.reciterName),
         enabled: raw.enabled !== false,
         updatedAt: now,

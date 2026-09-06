@@ -46,16 +46,25 @@ for (const question of bank.questions || []) {
 
   if (question.type === "audio") {
     const url = String(question.audioUrl || "");
-    if (!url.startsWith("https://")) errors.push(`${question.id}: رابط الصوت يجب أن يكون HTTPS`);
-    if (!(url.includes("cdn.islamic.network") || /server\d+\.mp3quran\.net/.test(url))) errors.push(`${question.id}: مصدر الصوت غير معتمد في بنك مجلس التحدي`);
+    const isHumanCommons = ["dialects","languages"].includes(question.categoryId);
+    if (isHumanCommons) {
+      if (!url.startsWith("/api/games/majlis/human-audio?questionId=")) errors.push(`${question.id}: صوت اللهجات/اللغات يجب أن يمر عبر human-audio`);
+      if (!String(question.audioSourceKey || "").startsWith("commons:")) errors.push(`${question.id}: audioSourceKey البشري مفقود`);
+      if (question.speechText || question.speechLang) errors.push(`${question.id}: لا يسمح باستخدام TTS في اللهجات/اللغات`);
+      if (Number(question.audioMaxSeconds || 0) < 4 || Number(question.audioMaxSeconds || 0) > 8) errors.push(`${question.id}: مدة الصوت البشري غير مناسبة`);
+    } else {
+      if (!url.startsWith("https://")) errors.push(`${question.id}: رابط الصوت يجب أن يكون HTTPS`);
+      if (!(url.includes("cdn.islamic.network") || /server\d+\.mp3quran\.net/.test(url))) errors.push(`${question.id}: مصدر صوت القارئ غير معتمد`);
+      if (!String(question.reciterName || "").trim()) errors.push(`${question.id}: اسم القارئ الإداري مفقود`);
+      if (Number(question.audioMaxSeconds || 0) !== 15) errors.push(`${question.id}: مقطع القارئ يجب أن يكون 15 ثانية`);
+    }
     if (!Array.isArray(question.options) || question.options.length < 3) errors.push(`${question.id}: السؤال الصوتي يحتاج 3 خيارات على الأقل لاستخدام وسيلة «عرض اختيارات»`);
     if (Array.isArray(question.options) && !question.options.includes(question.answer)) errors.push(`${question.id}: الإجابة غير موجودة ضمن خيارات السؤال الصوتي`);
-    if (!String(question.reciterName || "").trim()) errors.push(`${question.id}: اسم القارئ الإداري مفقود`);
-    if (Number(question.audioMaxSeconds || 0) !== 15) errors.push(`${question.id}: مقطع القارئ يجب أن يكون 15 ثانية`);
     if (Number(question.audioStartSeconds || 0) < 0) errors.push(`${question.id}: بداية المقطع غير صالحة`);
   }
 
   if (question.type === "speech") {
+    if (["dialects","languages"].includes(question.categoryId)) errors.push(`${question.id}: اللهجات واللغات يجب ألا تستخدم speechSynthesis`);
     if (!String(question.speechText || "").trim()) errors.push(`${question.id}: سؤال النطق يفتقد speechText`);
     if (!String(question.speechLang || "").trim()) errors.push(`${question.id}: سؤال النطق يفتقد speechLang`);
     if (!Array.isArray(question.options) || question.options.length < 3) errors.push(`${question.id}: سؤال النطق يحتاج خيارات مخفية للمساعدة`);
@@ -84,9 +93,16 @@ for (const category of bank.categories || []) {
   if (!["quran","dialects","languages","reciter"].includes(category.id) && groups.size < 25) warnings.push(`${category.title}: فيها ${groups.size} معلومة أساسية فقط مع صياغات متعددة؛ يوصى بتوسيعها لاحقًا.`);
 }
 
-const uniqueNew = ["quran","dialects","languages"].reduce((sum, id) => sum + new Set((bank.questions || []).filter((item) => item.categoryId === id && item.enabled !== false).map((item) => item.groupKey)).size, 0);
-console.log(`New unique information/challenges (quran+dialects+languages): ${uniqueNew}`);
-if (uniqueNew < 300) errors.push(`الإضافات الجديدة أقل من 300 معلومة/تحدٍ فريد (${uniqueNew})`);
+const v16New = (bank.questions || []).filter((item) => String(item.id || "").startsWith("v16-") && item.enabled !== false);
+const v16Groups = new Set(v16New.map((item) => `${item.categoryId}:${item.groupKey}`));
+console.log(`V16 new unique facts: ${v16Groups.size}`);
+if (v16Groups.size < 300) errors.push(`إضافات V16 أقل من 300 معلومة فريدة (${v16Groups.size})`);
+for (const id of ["quran","dialects","languages"]) {
+  const items=(bank.questions||[]).filter((item)=>item.categoryId===id&&item.enabled!==false);
+  const families=new Set(items.map((item)=>item.family).filter(Boolean));
+  console.log(`${id} families: ${families.size}`);
+  if (id==="quran" && families.size < 8) errors.push(`القرآن يحتاج 8 عائلات أسئلة على الأقل (${families.size})`);
+}
 
 const reciter = (bank.questions || []).filter((item) => item.categoryId === "reciter" && item.enabled !== false);
 const reciters = new Set(reciter.map((item) => item.reciterName || item.answer).filter(Boolean));
