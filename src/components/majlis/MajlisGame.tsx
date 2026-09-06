@@ -69,68 +69,124 @@ function LoadingBlock() {
 
 function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [usingFallback, setUsingFallback] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [duration, setDuration] = useState(Math.max(1, question.audioMaxSeconds || 15));
 
-  useEffect(() => () => {
-    if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
-    audioRef.current?.pause();
-  }, []);
+  const isHumanDataset = question.categoryId === "dialects" || question.categoryId === "languages";
+  const isReciter = question.categoryId === "reciter";
+  const maxSeconds = Math.max(8, Math.min(15, question.audioMaxSeconds || 15));
+  const minSeconds = isHumanDataset ? Math.max(6, question.audioMinSeconds || 8) : 0;
 
-  function createAudio(url: string) {
-    const audio = new Audio(url);
-    audio.preload = "auto";
-    audio.setAttribute("playsinline", "true");
-    audio.onended = () => setPlaying(false);
-    audio.onerror = () => setPlaying(false);
-    return audio;
+  function sourceForRetry(attempt: number) {
+    const raw = attempt === 1 && question.audioFallbackUrl ? question.audioFallbackUrl : question.audioUrl;
+    if (!raw) return "";
+    if (!raw.startsWith("/api/games/majlis/human-audio")) return raw;
+    const [path, query = ""] = raw.split("?");
+    const params = new URLSearchParams(query);
+    if (attempt > 0) params.set("retry", String(attempt));
+    return `${path}?${params.toString()}`;
   }
 
-  async function playFrom(url: string) {
-    const audio = createAudio(url);
+  const clearAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.src = "";
+    audio.load();
+    audioRef.current = null;
+  }, []);
+
+  useEffect(() => () => clearAudio(), [clearAudio]);
+  useEffect(() => { clearAudio(); setPlaying(false); setLoading(false); setError(""); setRetry(0); setElapsed(0); setDuration(maxSeconds); }, [question.id, clearAudio, maxSeconds]);
+
+  async function loadAndPlay(attempt: number): Promise<void> {
+    const url = sourceForRetry(attempt);
+    if (!url) throw new Error("AUDIO_URL_MISSING");
+    clearAudio();
+    setLoading(true);
+    setRetry(attempt);
+    const audio = new Audio(url);
     audioRef.current = audio;
-    const startAt = Math.max(0, question.audioStartSeconds || 0);
-    await new Promise<void>((resolve) => {
+    audio.preload = "metadata";
+    audio.setAttribute("playsinline", "true");
+
+    await new Promise<void>((resolve, reject) => {
+      const done = () => { cleanup(); resolve(); };
+      const fail = () => { cleanup(); reject(new Error("AUDIO_LOAD_FAILED")); };
+      const cleanup = () => { audio.removeEventListener("loadedmetadata", done); audio.removeEventListener("error", fail); };
       if (audio.readyState >= 1) return resolve();
-      const done = () => { audio.removeEventListener("loadedmetadata", done); resolve(); };
       audio.addEventListener("loadedmetadata", done, { once: true });
-      window.setTimeout(done, 2500);
+      audio.addEventListener("error", fail, { once: true });
+      window.setTimeout(() => { if (audio.readyState >= 1) done(); }, 4500);
     });
-    try { if (startAt > 0 && Number.isFinite(audio.duration) && audio.duration > startAt + 2) audio.currentTime = startAt; } catch {}
+
+    const startAt = Math.max(0, question.audioStartSeconds || 0);
+    const nativeDuration = Number.isFinite(audio.duration) ? audio.duration : 0;
+    const playableDuration = nativeDuration > 0 ? Math.max(0, nativeDuration - startAt) : maxSeconds;
+    if (isHumanDataset && nativeDuration > 0 && playableDuration < minSeconds && attempt < 6) {
+      return loadAndPlay(attempt + 1);
+    }
+
+    const cappedDuration = Math.max(1, Math.min(maxSeconds, playableDuration || maxSeconds));
+    setDuration(cappedDuration);
+    setElapsed(0);
+    if (startAt > 0 && nativeDuration > startAt + 1) audio.currentTime = startAt;
+
+    audio.ontimeupdate = () => {
+      const relative = Math.max(0, audio.currentTime - startAt);
+      setElapsed(Math.min(cappedDuration, relative));
+      if (relative >= cappedDuration) { audio.pause(); setPlaying(false); }
+    };
+    audio.onended = () => { setElapsed(cappedDuration); setPlaying(false); };
+    audio.onerror = () => setPlaying(false);
     await audio.play();
+    setLoading(false);
     setPlaying(true);
-    if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
-    stopTimerRef.current = setTimeout(() => { audio.pause(); setPlaying(false); }, Math.max(8, question.audioMaxSeconds || 15) * 1000);
   }
 
   async function toggle() {
-    if (!question.audioUrl) return;
     setError("");
-    if (playing && audioRef.current) { audioRef.current.pause(); setPlaying(false); return; }
+    const current = audioRef.current;
+    if (current && playing) { current.pause(); setPlaying(false); return; }
+    if (current && !playing && elapsed > 0 && elapsed < duration) {
+      try { await current.play(); setPlaying(true); return; } catch {}
+    }
     try {
-      await playFrom(usingFallback && question.audioFallbackUrl ? question.audioFallbackUrl : question.audioUrl);
+      await loadAndPlay(retry);
     } catch {
-      if (!usingFallback && question.audioFallbackUrl) {
-        try { setUsingFallback(true); await playFrom(question.audioFallbackUrl); return; } catch {}
+      for (let attempt = Math.max(1, retry + 1); attempt <= 6; attempt += 1) {
+        try { await loadAndPlay(attempt); return; } catch {}
       }
-      setError("تعذر تشغيل هذا المقطع. جرّب مرة أخرى أو اختر سؤالًا آخر.");
-      setPlaying(false);
+      setLoading(false); setPlaying(false);
+      setError("تعذر تشغيل التسجيل البشري بعد تجربة المقاطع البديلة.");
     }
   }
 
-  const isReciter = question.categoryId === "reciter";
-  const isHumanLanguage = question.categoryId === "dialects" || question.categoryId === "languages";
+  function formatAudioTime(value: number) {
+    const seconds = Math.max(0, Math.floor(value));
+    return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  }
+
+  const progress = Math.max(0, Math.min(100, (elapsed / Math.max(1, duration)) * 100));
   const mediaCaption = isReciter
-    ? "مقطع تلاوة بشري يصل إلى 15 ثانية"
-    : isHumanLanguage
-      ? "تسجيل بشري حقيقي من Wikimedia Commons / Lingua Libre — بدون صوت مولّد"
+    ? "تلاوة بشرية حقيقية · رابط القارئ مخفي حتى كشف الإجابة"
+    : isHumanDataset
+      ? "جملة بشرية حقيقية من مصدر بيانات مفتوح · حتى 15 ثانية · بدون TTS"
       : "مقطع صوتي للسؤال";
+
   return <div className={styles.mediaPlayer}>
     <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-[#d6b16b]/25 bg-[#d6b16b]/10 text-[#ead8ad]"><AudioLines className="h-6 w-6"/></div>
     <p className="mt-2 text-[11px] font-black text-[#f7efdc]/60">{mediaCaption}</p>
-    <button type="button" onClick={toggle} className="mx-auto mt-3 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-[#d6b16b] px-5 text-sm font-black text-[#173b35]">{playing?<Pause className="h-4 w-4"/>:<Play className="h-4 w-4"/>}{playing?"إيقاف":"تشغيل المقطع"}</button>
+    <button type="button" onClick={()=>void toggle()} disabled={loading} className="mx-auto mt-3 inline-flex min-h-[48px] items-center gap-2 rounded-2xl bg-[#d6b16b] px-5 text-sm font-black text-[#173b35] disabled:opacity-60">{loading?<LoaderCircle className="h-4 w-4 animate-spin"/>:playing?<Pause className="h-4 w-4"/>:<Play className="h-4 w-4"/>}{loading?"جاري تحميل التسجيل…":playing?"إيقاف مؤقت":"تشغيل / استكمال"}</button>
+    <div className="mx-auto mt-4 max-w-md" dir="ltr">
+      <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#d6b16b] transition-[width] duration-150" style={{width:`${progress}%`}}/></div>
+      <div className="mt-1.5 flex items-center justify-between text-[10px] font-black tabular-nums text-[#f7efdc]/45"><span>{formatAudioTime(elapsed)}</span><span>{formatAudioTime(duration)}</span></div>
+    </div>
+    {retry>0?<p className="mt-1 text-[9px] font-bold text-[#f7efdc]/30">تم اختيار مقطع بديل تلقائيًا لضمان مدة ووضوح أفضل.</p>:null}
     {error?<p role="alert" className="mt-2 text-[11px] font-bold text-rose-200">{error}</p>:null}
   </div>;
 }
@@ -300,7 +356,11 @@ export default function MajlisGame() {
 
         {(playMode==="local"||onlineHost)?<div className="grid gap-3 lg:grid-cols-[.8fr_1.2fr]">
           <div className="rounded-[28px] border border-[#ead8ad]/12 bg-black/15 p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black text-[#d6b16b]">أهل المجلس</p><h2 className="mt-1 text-xl font-black text-[#f7efdc]">جهّز الفرق</h2></div><Swords className="h-6 w-6 text-[#ead8ad]/70"/></div><div className="mt-4 grid grid-cols-3 gap-2">{[2,3,4].map(count=><button key={count} type="button" onClick={()=>{setTeamCount(count);playMajlisSound("tap");}} className={cn("min-h-11 rounded-2xl border text-xs font-black",teamCount===count?"border-[#d6b16b]/45 bg-[#d6b16b] text-[#173b35]":"border-[#ead8ad]/10 bg-white/[0.035] text-[#f7efdc]/55")}>{count} فرق</button>)}</div><div className="mt-3 space-y-2">{Array.from({length:teamCount},(_,index)=><label key={index} className="flex items-center gap-2 rounded-2xl border border-[#ead8ad]/10 bg-black/15 p-2"><span className="h-8 w-1.5 rounded-full" style={{background:TEAM_COLORS[index]}}/><input value={teamNames[index]} onChange={e=>setTeamNames(current=>current.map((name,i)=>i===index?e.target.value.slice(0,24):name))} className="h-10 min-w-0 flex-1 bg-transparent px-2 text-sm font-black text-[#f7efdc] outline-none" aria-label={`اسم الفريق ${index+1}`}/></label>)}</div><div className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">{[{icon:Lightbulb,label:"مشورة",text:"تلميح"},{icon:Hourglass,label:"مهلة",text:"+15ث"},{icon:Crown,label:"الدبل",text:"×2"},{icon:ListChecks,label:"اختيارات",text:"مرة واحدة"}].map(item=><div key={item.label} className="rounded-2xl border border-[#ead8ad]/10 bg-white/[0.035] p-2.5"><item.icon className="mx-auto h-4 w-4 text-[#d6b16b]"/><div className="mt-1 text-[10px] font-black text-[#f7efdc]">{item.label}</div><div className="text-[9px] font-bold text-[#f7efdc]/35">{item.text} مرة</div></div>)}</div></div>
-          <div className="rounded-[28px] border border-[#ead8ad]/12 bg-black/15 p-4 sm:p-5"><div className="flex flex-wrap items-end justify-between gap-2"><div><p className="text-[10px] font-black text-[#d6b16b]">مجالات المجلس</p><h2 className="mt-1 text-xl font-black text-[#f7efdc]">اختر {settings?.categoriesPerGame||6} فئات</h2></div><div className="rounded-full border border-[#ead8ad]/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-black text-[#ead8ad]">{selectedCategoryIds.length}/{settings?.categoriesPerGame||6}</div></div><div className="mt-4 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">{categories.map(category=>{const selected=selectedCategoryIds.includes(category.id);return <button key={category.id} type="button" onClick={()=>toggleCategory(category.id)} aria-pressed={selected} className={cn("relative min-h-[112px] min-w-0 overflow-hidden rounded-[22px] border p-3 text-right active:scale-[.985]",selected?"border-[#d6b16b]/45 bg-[#d6b16b]/[0.10]":"border-[#ead8ad]/10 bg-white/[0.03]")}><div className="flex items-start justify-between gap-2"><span className="text-2xl">{category.icon}</span>{selected?<span className="grid h-6 w-6 place-items-center rounded-full bg-[#d6b16b] text-[#173b35]"><Check className="h-3.5 w-3.5"/></span>:null}</div><div className="mt-2 truncate text-xs font-black text-[#f7efdc] sm:text-sm">{category.title}</div><div className="mt-1 text-[9px] font-bold text-[#f7efdc]/36" dir="ltr">{category.activeQuestions}+ سؤال</div></button>})}</div><button type="button" onClick={startGame} disabled={starting||!settings||selectedCategoryIds.length!==settings.categoriesPerGame} className="mt-4 inline-flex min-h-[54px] w-full items-center justify-center gap-2 rounded-[20px] bg-[#d6b16b] px-5 text-sm font-black text-[#173b35] disabled:opacity-40">{starting?<LoaderCircle className="h-5 w-5 animate-spin"/>:<Dices className="h-5 w-5"/>}{starting?"جاري تجهيز الأسئلة…":"ابدأ مجلس التحدي"}</button></div>
+          <div className="rounded-[28px] border border-[#ead8ad]/12 bg-black/15 p-4 sm:p-5"><div className="flex flex-wrap items-end justify-between gap-2"><div><p className="text-[10px] font-black text-[#d6b16b]">مجالات المجلس</p><h2 className="mt-1 text-xl font-black text-[#f7efdc]">اختر {settings?.categoriesPerGame||6} فئات</h2></div><div className="rounded-full border border-[#ead8ad]/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-black text-[#ead8ad]">{selectedCategoryIds.length}/{settings?.categoriesPerGame||6}</div></div><div className="mt-4 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">{categories.map(category=>{const selected=selectedCategoryIds.includes(category.id);return <button key={category.id} type="button" onClick={()=>toggleCategory(category.id)} aria-pressed={selected} className={cn("group relative min-h-[126px] min-w-0 overflow-hidden rounded-[22px] border text-right active:scale-[.985]",selected?"border-[#d6b16b]/60":"border-[#ead8ad]/10")}>
+            {category.imageUrl?<img src={category.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" loading="lazy"/>:<div className="absolute inset-0 bg-[#173b35]"/>}
+            <div className={cn("absolute inset-0 bg-gradient-to-t from-[#081b1a] via-[#0d2927]/70 to-black/15",selected&&"ring-2 ring-inset ring-[#d6b16b]/45")}/>
+            <div className="relative z-10 flex min-h-[126px] flex-col justify-between p-3"><div className="flex justify-end">{selected?<span className="grid h-7 w-7 place-items-center rounded-full bg-[#d6b16b] text-[#173b35] shadow-lg"><Check className="h-4 w-4"/></span>:null}</div><div><div className="truncate text-sm font-black text-white drop-shadow-sm">{category.title}</div><div className="mt-1 text-[9px] font-bold text-white/55" dir="ltr">{category.activeQuestions}+ سؤال</div></div></div>
+          </button>})}</div><button type="button" onClick={startGame} disabled={starting||!settings||selectedCategoryIds.length!==settings.categoriesPerGame} className="mt-4 inline-flex min-h-[54px] w-full items-center justify-center gap-2 rounded-[20px] bg-[#d6b16b] px-5 text-sm font-black text-[#173b35] disabled:opacity-40">{starting?<LoaderCircle className="h-5 w-5 animate-spin"/>:<Dices className="h-5 w-5"/>}{starting?"جاري تجهيز الأسئلة…":"ابدأ مجلس التحدي"}</button></div>
         </div>:null}
       </div>:null}
 
@@ -312,7 +372,7 @@ export default function MajlisGame() {
           <div className={styles.hudActions}><button type="button" onClick={toggleSound} aria-label={soundOn?"إيقاف الصوت":"تشغيل الصوت"}>{soundOn?<Volume2/>:<VolumeX/>}</button>{canControl?<button type="button" onClick={()=>void finishNow()} className={styles.endButton}><X/> <span>إنهاء</span></button>:null}</div>
         </div>
         {playMode==="online"&&onlineRoom?<div className={styles.voiceDock}><VoiceControls room={onlineRoom} userId={user?.id} compact/></div>:null}
-        <div className={styles.boardGrid}>{session.categories.map(category=>{const questions=session.board[category.id]||[];const remaining=questions.filter(q=>!usedSet.has(q.id)).length;return <article key={category.id} className={styles.boardCategory} style={{"--category":category.accent} as CSSProperties}><div className={styles.categoryHead}><span>{category.icon}</span><div><h3>{category.title}</h3><small>باقي {remaining}</small></div></div><div className={styles.questionTiles}>{questions.map(question=>{const used=usedSet.has(question.id);return <button key={question.id} type="button" disabled={used||!canControl} onClick={()=>openQuestion(question)} className={cn(styles.questionTile,question.difficulty==="hard"&&styles.questionTileHard,used&&styles.questionTileUsed)}>{used?<Check className="h-4 w-4"/>:<span dir="ltr">{formatNumber(question.points)}</span>}</button>})}</div></article>})}</div>
+        <div className={styles.boardGrid}>{session.categories.map(category=>{const questions=session.board[category.id]||[];const remaining=questions.filter(q=>!usedSet.has(q.id)).length;return <article key={category.id} className={styles.boardCategory} style={{"--category":category.accent,backgroundImage:category.imageUrl?`linear-gradient(180deg,rgba(8,27,26,.32),rgba(8,27,26,.92)),url(${category.imageUrl})`:undefined,backgroundSize:"cover",backgroundPosition:"center"} as CSSProperties}><div className={styles.categoryHead}><div><h3>{category.title}</h3><small>باقي {remaining}</small></div></div><div className={styles.questionTiles}>{questions.map(question=>{const used=usedSet.has(question.id);return <button key={question.id} type="button" disabled={used||!canControl} onClick={()=>openQuestion(question)} className={cn(styles.questionTile,question.difficulty==="hard"&&styles.questionTileHard,used&&styles.questionTileUsed)}>{used?<Check className="h-4 w-4"/>:<span dir="ltr">{formatNumber(question.points)}</span>}</button>})}</div></article>})}</div>
         <div className={styles.progressLine}><span style={{width:`${progress}%`}}/></div>
       </div>:null}
 
@@ -324,6 +384,7 @@ export default function MajlisGame() {
       <div className={styles.questionBody}>
         <h2 className={styles.questionTitle}>{activeQuestion.prompt}</h2>
         {activeQuestion.quoteText?<blockquote className={styles.quranQuote}>{activeQuestion.quoteText}</blockquote>:null}
+        {activeQuestion.imageUrl?<figure className="mx-auto mt-3 max-w-2xl overflow-hidden rounded-[22px] border border-[#ead8ad]/12 bg-black/20"><img src={activeQuestion.imageUrl} alt={activeQuestion.imageAlt||"صورة السؤال"} className="max-h-[38vh] w-full object-contain"/>{activeQuestion.imageSourceName?<figcaption className="px-3 py-2 text-center text-[9px] font-bold text-[#f7efdc]/35">{activeQuestion.imageSourceName}</figcaption>:null}</figure>:null}
         {activeQuestion.type==="audio"?<div className="mt-3"><AudioQuestionPlayer question={activeQuestion}/></div>:null}
         {activeQuestion.type==="speech"?<div className="mt-3"><SpeechQuestionPlayer question={activeQuestion}/></div>:null}
         {optionsVisible&&activeQuestion.options?.length?<div className={styles.optionsGrid}>{activeQuestion.options.map((option,index)=><div key={`${option}-${index}`} className={styles.optionCard}><span dir="ltr">{index+1}</span>{option}</div>)}</div>:null}
@@ -331,7 +392,9 @@ export default function MajlisGame() {
       </div>
       {!canControl&&!reveal?<div className="mt-3 rounded-[18px] border border-[#7fb3a8]/15 bg-[#7fb3a8]/[.06] p-3 text-center text-[10px] font-black text-[#bfe2d8]">المضيف يدير السؤال والمؤقت. تشاور مع فريقك بالمايك «فريقي» بدون أن يسمعكم الفريق المقابل.</div>:null}
       {canControl&&!reveal?<><div className="mt-3 grid grid-cols-4 gap-2">{[{key:"hint" as const,icon:Lightbulb,label:"مشورة",disabled:!answeringTeam?.assists.hint||!activeQuestion.hint},{key:"time" as const,icon:Hourglass,label:"+15 ثانية",disabled:!answeringTeam?.assists.time},{key:"double" as const,icon:Crown,label:"دبل",disabled:!answeringTeam?.assists.double||doubleActive},{key:"options" as const,icon:ListChecks,label:"اختيارات",disabled:!answeringTeam?.assists.options||!activeQuestion.options?.length||optionsVisible}].map(assist=><button key={assist.key} type="button" disabled={assist.disabled||stealMode} onClick={()=>useAssist(assist.key)} className="min-h-[50px] rounded-[16px] border border-[#ead8ad]/10 bg-white/[0.035] px-2 text-[10px] font-black text-[#f7efdc]/65 disabled:opacity-25"><assist.icon className="mx-auto mb-1 h-4 w-4 text-[#d6b16b]"/>{assist.label}</button>)}</div><div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={revealAnswer} disabled={revealing} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] bg-[#d6b16b] px-4 text-sm font-black text-[#173b35]">{revealing?<LoaderCircle className="h-4 w-4 animate-spin"/>:<Eye className="h-4 w-4"/>} إظهار الإجابة</button>{session.settings.allowSteal&&teams.length>1&&!stealMode?<button type="button" onClick={offerSteal} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] border border-[#7fb3a8]/22 bg-[#7fb3a8]/[0.08] px-4 text-sm font-black text-[#bfe2d8]"><HandHelping className="h-4 w-4"/> فزعة للفريق التالي</button>:null}</div><button type="button" onClick={toggleTimerPause} className="mx-auto mt-2 flex min-h-10 items-center gap-1.5 px-3 text-[10px] font-black text-[#f7efdc]/38">{timerPaused?<Play className="h-3.5 w-3.5"/>:<Pause className="h-3.5 w-3.5"/>}{timerPaused?"استئناف المؤقت":"إيقاف المؤقت مؤقتًا"}</button></>:null}
-      {reveal?<div className="mt-4"><div className="rounded-[24px] border border-[#d6b16b]/24 bg-[#d6b16b]/[0.08] p-4 sm:p-5"><div className="flex items-center gap-2 text-[10px] font-black text-[#d6b16b]"><EyeOff className="h-4 w-4"/> الإجابة</div><div className="mt-2 text-xl font-black text-[#f7efdc] sm:text-2xl">{reveal.answer}</div>{session.settings.showExplanations&&reveal.explanation?<p className="mt-2 text-xs font-semibold leading-6 text-[#f7efdc]/52">{reveal.explanation}</p>:null}{reveal.sourceLabel?<p className="mt-2 text-[9px] font-bold text-[#f7efdc]/28">المصدر: {reveal.sourceLabel}</p>:null}</div>{canControl?<div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>closeQuestionAfterResult(true)} className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[18px] bg-[#7fb3a8] px-4 text-sm font-black text-[#102d2b]"><Check className="h-5 w-5"/> إجابة صحيحة</button><button type="button" onClick={()=>closeQuestionAfterResult(false)} className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[18px] bg-[#8d4939] px-4 text-sm font-black text-[#f7efdc]"><X className="h-5 w-5"/> إجابة خاطئة</button></div>:null}</div>:null}
+      {reveal?<div className="mt-4"><div className="rounded-[24px] border border-[#d6b16b]/24 bg-[#d6b16b]/[0.08] p-4 sm:p-5"><div className="flex items-center gap-2 text-[10px] font-black text-[#d6b16b]"><EyeOff className="h-4 w-4"/> الإجابة</div><div className="mt-2 text-xl font-black text-[#f7efdc] sm:text-2xl">{reveal.answer}</div>
+            {activeQuestion.categoryId==="quran"&&reveal.quranText?<div className="mx-auto mt-4 max-w-3xl overflow-hidden rounded-[26px] border border-[#c9aa67]/35 bg-[#f4ead1] p-1 text-[#1c3a31] shadow-[0_18px_45px_rgba(0,0,0,.18)]"><div className="rounded-[22px] border border-[#a98746]/35 px-5 py-5 sm:px-8"><div className="text-center text-[10px] font-black tracking-wide text-[#725f36]">مصحف المدينة · الرسم العثماني</div><div dir="rtl" className="mt-3 text-center text-[clamp(1.35rem,3vw,2rem)] font-semibold leading-[2.15]">﴿ {reveal.quranText} ﴾</div><div className="mt-3 flex items-center justify-center gap-2 text-[11px] font-black text-[#725f36]"><span>{reveal.quranSurah?`سورة ${reveal.quranSurah}`:"القرآن الكريم"}</span>{reveal.quranAyah?<span dir="ltr">• {reveal.quranAyah}</span>:null}</div><a href="https://publications-img.qurancomplex.gov.sa" target="_blank" rel="noreferrer" className="mx-auto mt-3 block w-fit text-[9px] font-black text-[#5c744f] underline decoration-dotted underline-offset-4">صور مصحف المدينة الرسمية — مجمع الملك فهد</a></div></div>:null}
+            {session.settings.showExplanations&&reveal.explanation?<p className="mt-2 text-xs font-semibold leading-6 text-[#f7efdc]/52">{reveal.explanation}</p>:null}{reveal.sourceLabel?<p className="mt-2 text-[9px] font-bold text-[#f7efdc]/28">المصدر: {reveal.sourceLabel}</p>:null}</div>{canControl?<div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>closeQuestionAfterResult(true)} className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[18px] bg-[#7fb3a8] px-4 text-sm font-black text-[#102d2b]"><Check className="h-5 w-5"/> إجابة صحيحة</button><button type="button" onClick={()=>closeQuestionAfterResult(false)} className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[18px] bg-[#8d4939] px-4 text-sm font-black text-[#f7efdc]"><X className="h-5 w-5"/> إجابة خاطئة</button></div>:null}</div>:null}
     </div></motion.div></motion.div>:null}</AnimatePresence>
   </section>;
 }

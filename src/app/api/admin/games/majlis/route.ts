@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { openai } from "@/lib/openai";
 import { requireAdminRequest } from "@/lib/serverAdminAuth";
 import {
   MAJLIS_CATEGORY_OVERRIDE_COLLECTION,
@@ -21,7 +22,7 @@ export const revalidate = 0;
 function text(value: unknown) { return String(value ?? "").trim(); }
 function number(value: unknown, fallback = 0) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; }
 function difficulty(value: unknown): MajlisDifficulty { return value === "hard" ? "hard" : value === "medium" ? "medium" : "easy"; }
-function type(value: unknown): MajlisQuestionType { return value === "speech" ? "speech" : value === "audio" ? "audio" : value === "multiple_choice" ? "multiple_choice" : "text"; }
+function type(value: unknown): MajlisQuestionType { return value === "speech" ? "speech" : value === "audio" ? "audio" : value === "image" ? "image" : value === "multiple_choice" ? "multiple_choice" : "text"; }
 function options(value: unknown) { return Array.isArray(value) ? value.map(text).filter(Boolean).slice(0, 6) : []; }
 function slug(value: unknown) {
   const cleaned = text(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -35,6 +36,7 @@ async function listPayload(request: NextRequest) {
   const category = text(request.nextUrl.searchParams.get("category"));
   const diff = text(request.nextUrl.searchParams.get("difficulty"));
   const kind = text(request.nextUrl.searchParams.get("type"));
+  const family = text(request.nextUrl.searchParams.get("questionFamily"));
   const status = text(request.nextUrl.searchParams.get("status"));
   const page = Math.max(1, Math.floor(number(request.nextUrl.searchParams.get("page"), 1)));
   const pageSize = Math.max(20, Math.min(100, Math.floor(number(request.nextUrl.searchParams.get("pageSize"), 50))));
@@ -43,10 +45,11 @@ async function listPayload(request: NextRequest) {
     if (category && item.categoryId !== category) return false;
     if (diff && item.difficulty !== diff) return false;
     if (kind && item.type !== kind) return false;
+    if (family && item.questionFamily !== family) return false;
     if (status === "enabled" && !item.enabled) return false;
     if (status === "disabled" && item.enabled) return false;
     if (q) {
-      const haystack = [item.prompt, item.answer, item.hint, item.explanation, item.sourceLabel, item.reciterName, item.id].join(" ").toLocaleLowerCase("ar");
+      const haystack = [item.prompt, item.answer, item.hint, item.explanation, item.sourceLabel, item.sourceName, item.groupKey, item.questionFamily, item.reciterName, item.dialect, item.speechLanguage, item.id].join(" ").toLocaleLowerCase("ar");
       if (!haystack.includes(q)) return false;
     }
     return true;
@@ -116,6 +119,10 @@ export async function POST(request: NextRequest) {
         description: text(raw.description),
         icon: text(raw.icon) || "🧠",
         accent: text(raw.accent) || "#d6b16b",
+        imageUrl: text(raw.imageUrl),
+        imageSourceName: text(raw.imageSourceName),
+        imageSourceUrl: text(raw.imageSourceUrl),
+        imageLicense: text(raw.imageLicense),
         sortOrder: Math.floor(number(raw.sortOrder, 500)),
         enabled: raw.enabled !== false,
         updatedAt: now,
@@ -157,7 +164,8 @@ export async function POST(request: NextRequest) {
       await adminDb.collection(collection).doc(id).set({
         categoryId,
         groupKey: text(raw.groupKey) || id,
-        family: text(raw.family),
+        questionFamily: text(raw.questionFamily) || text(raw.family) || `${categoryId}-general`,
+        family: text(raw.questionFamily) || text(raw.family) || `${categoryId}-general`,
         prompt,
         answer,
         options: optionList.slice(0, 6),
@@ -166,16 +174,34 @@ export async function POST(request: NextRequest) {
         hint: text(raw.hint),
         explanation: text(raw.explanation),
         sourceLabel: text(raw.sourceLabel),
+        sourceName: text(raw.sourceName),
+        sourceUrl: text(raw.sourceUrl),
+        license: text(raw.license),
         type: questionType,
         quoteText: text(raw.quoteText),
+        imageUrl: text(raw.imageUrl),
+        imageAlt: text(raw.imageAlt),
+        imageSourceName: text(raw.imageSourceName),
+        imageSourceUrl: text(raw.imageSourceUrl),
+        imageLicense: text(raw.imageLicense),
         speechText: text(raw.speechText),
         speechLang: text(raw.speechLang),
         audioUrl: text(raw.audioUrl),
         audioFallbackUrl: text(raw.audioFallbackUrl),
         audioStartSeconds: Math.max(0, Math.min(3600, number(raw.audioStartSeconds, 0))),
         audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 15)))),
+        audioMinSeconds: Math.max(0, Math.min(20, number(raw.audioMinSeconds, 0))),
+        audioDuration: Math.max(0, number(raw.audioDuration, 0)),
         audioSourceKey: text(raw.audioSourceKey),
         reciterName: text(raw.reciterName),
+        speakerCountry: text(raw.speakerCountry),
+        dialect: text(raw.dialect),
+        speechLanguage: text(raw.speechLanguage),
+        quranSurah: text(raw.quranSurah),
+        quranAyah: raw.quranAyah == null ? null : Math.max(1, Math.floor(number(raw.quranAyah, 1))),
+        quranText: text(raw.quranText),
+        quranPage: raw.quranPage == null ? null : Math.max(1, Math.floor(number(raw.quranPage, 1))),
+        quranImageUrl: text(raw.quranImageUrl),
         enabled: raw.enabled !== false,
         updatedAt: now,
         updatedBy: admin.uid,
@@ -195,6 +221,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    if (action === "ai_review_question") {
+      if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: "OPENAI_API_KEY غير مهيأ للمراجع الذكي." }, { status: 503 });
+      const raw = body.question && typeof body.question === "object" ? body.question as Record<string, unknown> : {};
+      const bank = await getEffectiveMajlisBank();
+      const prompt = text(raw.prompt);
+      const answer = text(raw.answer);
+      const categoryId = text(raw.categoryId);
+      if (!prompt || !answer || !categoryId) return NextResponse.json({ error: "الفئة والسؤال والإجابة مطلوبة للمراجعة الذكية." }, { status: 400 });
+      const nearby = bank.questions
+        .filter((item) => item.categoryId === categoryId)
+        .slice(0, 250)
+        .map((item) => ({ id: item.id, groupKey: item.groupKey, questionFamily: item.questionFamily, prompt: item.prompt, answer: item.answer }));
+      const response = await openai.chat.completions.create({
+        model: process.env.OPENAI_MAJLIS_MODEL || "gpt-5-mini",
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: "أنت مراجع محتوى لمسابقات عربية. لا تخترع مصدرًا. راجع الوضوح، الغموض، احتمال الخطأ، صعوبة المعلومة، questionFamily، groupKey، والتشابه الدلالي. أعد JSON فقط بالمفاتيح: verdict(pass|warn|reject), confidence(0-100), clarityIssues[], factualRisk[], suggestedQuestionFamily, suggestedGroupKey, duplicateCandidates[], suggestedPrompt, notes[]. إذا تعذر التحقق الخارجي قل ذلك صراحة في factualRisk." },
+          { role: "user", content: JSON.stringify({ question: { categoryId, prompt, answer, questionFamily: text(raw.questionFamily) || text(raw.family), groupKey: text(raw.groupKey), sourceName: text(raw.sourceName), sourceUrl: text(raw.sourceUrl) }, nearby }) },
+        ],
+      });
+      const content = response.choices[0]?.message?.content || "{}";
+      let review: unknown = {};
+      try { review = JSON.parse(content); } catch { review = { verdict: "warn", notes: [content] }; }
+      return NextResponse.json({ ok: true, review, model: process.env.OPENAI_MAJLIS_MODEL || "gpt-5-mini" });
+    }
+
     if (action === "bulk_import") {
       const rows = Array.isArray(body.questions) ? body.questions.slice(0, 500) : [];
       if (!rows.length) return NextResponse.json({ error: "لا توجد أسئلة للاستيراد." }, { status: 400 });
@@ -212,15 +264,18 @@ export async function POST(request: NextRequest) {
         batch.set(adminDb.collection(MAJLIS_CUSTOM_QUESTION_COLLECTION).doc(id), {
           categoryId,
           groupKey: text(raw.groupKey) || id,
+          questionFamily: text(raw.questionFamily) || text(raw.family) || `${categoryId}-general`,
+          family: text(raw.questionFamily) || text(raw.family) || `${categoryId}-general`,
           prompt,
           answer,
           options: options(raw.options),
           difficulty: diff,
           points: Math.max(50, Math.min(1000, Math.floor(number(raw.points, diff === "hard" ? 300 : diff === "medium" ? 200 : 100)))),
-          hint: text(raw.hint), explanation: text(raw.explanation), sourceLabel: text(raw.sourceLabel),
-          type: type(raw.type), quoteText: text(raw.quoteText), speechText: text(raw.speechText), speechLang: text(raw.speechLang),
+          hint: text(raw.hint), explanation: text(raw.explanation), sourceLabel: text(raw.sourceLabel), sourceName: text(raw.sourceName), sourceUrl: text(raw.sourceUrl), license: text(raw.license),
+          type: type(raw.type), quoteText: text(raw.quoteText), imageUrl: text(raw.imageUrl), imageAlt: text(raw.imageAlt), imageSourceName: text(raw.imageSourceName), imageSourceUrl: text(raw.imageSourceUrl), imageLicense: text(raw.imageLicense), speechText: text(raw.speechText), speechLang: text(raw.speechLang),
           audioUrl: text(raw.audioUrl), audioFallbackUrl: text(raw.audioFallbackUrl), audioStartSeconds: Math.max(0, Math.min(3600, number(raw.audioStartSeconds, 0))),
-          audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 15)))), reciterName: text(raw.reciterName),
+          audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 15)))), audioMinSeconds: Math.max(0, Math.min(20, number(raw.audioMinSeconds, 0))), audioSourceKey: text(raw.audioSourceKey), reciterName: text(raw.reciterName), speakerCountry: text(raw.speakerCountry), dialect: text(raw.dialect), speechLanguage: text(raw.speechLanguage),
+          quranSurah: text(raw.quranSurah), quranAyah: raw.quranAyah == null ? null : Math.max(1, Math.floor(number(raw.quranAyah, 1))), quranText: text(raw.quranText), quranPage: raw.quranPage == null ? null : Math.max(1, Math.floor(number(raw.quranPage, 1))), quranImageUrl: text(raw.quranImageUrl),
           enabled: raw.enabled !== false, updatedAt: now, updatedBy: admin.uid,
         }, { merge: true });
         imported += 1;

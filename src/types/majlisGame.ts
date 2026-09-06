@@ -1,5 +1,5 @@
 export type MajlisDifficulty = "easy" | "medium" | "hard";
-export type MajlisQuestionType = "text" | "multiple_choice" | "audio" | "speech";
+export type MajlisQuestionType = "text" | "multiple_choice" | "audio" | "speech" | "image";
 
 export type MajlisCategory = {
   id: string;
@@ -8,6 +8,10 @@ export type MajlisCategory = {
   description: string;
   icon: string;
   accent: string;
+  imageUrl?: string;
+  imageSourceName?: string;
+  imageSourceUrl?: string;
+  imageLicense?: string;
   sortOrder: number;
   enabled: boolean;
   custom?: boolean;
@@ -18,6 +22,9 @@ export type MajlisQuestion = {
   id: string;
   categoryId: string;
   groupKey: string;
+  /** Canonical diversity family used by the V17 selection agent. */
+  questionFamily: string;
+  /** Backward-compatible alias for V15/V16/admin overrides. */
   family?: string;
   prompt: string;
   answer: string;
@@ -27,28 +34,75 @@ export type MajlisQuestion = {
   hint?: string;
   explanation?: string;
   sourceLabel?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  license?: string;
   type: MajlisQuestionType;
   quoteText?: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  imageSourceName?: string;
+  imageSourceUrl?: string;
+  imageLicense?: string;
   audioUrl?: string;
   audioFallbackUrl?: string;
   audioStartSeconds?: number;
   audioMaxSeconds?: number;
+  audioMinSeconds?: number;
   audioSourceKey?: string;
+  audioDuration?: number;
   reciterName?: string;
+  speakerCountry?: string;
+  dialect?: string;
+  speechLanguage?: string;
   speechText?: string;
   speechLang?: string;
+  quranSurah?: string;
+  quranAyah?: number;
+  quranText?: string;
+  quranPage?: number;
+  quranImageUrl?: string;
   enabled: boolean;
   custom?: boolean;
   overridden?: boolean;
 };
 
-export type MajlisClientQuestion = Omit<MajlisQuestion, "answer" | "explanation" | "sourceLabel" | "reciterName" | "enabled" | "custom" | "overridden">;
+type MajlisHiddenBeforeReveal =
+  | "answer"
+  | "explanation"
+  | "sourceLabel"
+  | "sourceName"
+  | "sourceUrl"
+  | "license"
+  | "audioSourceKey"
+  | "reciterName"
+  | "speakerCountry"
+  | "dialect"
+  | "speechLanguage"
+  | "quranSurah"
+  | "quranAyah"
+  | "quranText"
+  | "quranPage"
+  | "quranImageUrl"
+  | "enabled"
+  | "custom"
+  | "overridden";
+
+export type MajlisClientQuestion = Omit<MajlisQuestion, MajlisHiddenBeforeReveal>;
 
 export type MajlisReveal = {
   questionId: string;
   answer: string;
   explanation: string;
   sourceLabel: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  license?: string;
+  quranSurah?: string;
+  quranAyah?: number;
+  quranText?: string;
+  quranPage?: number;
+  quranImageUrl?: string;
 };
 
 export type MajlisSettings = {

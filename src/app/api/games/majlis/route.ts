@@ -43,11 +43,13 @@ function cleanPrompt(value: string) {
 }
 
 function safeQuestion(question: Awaited<ReturnType<typeof getEffectiveMajlisBank>>["questions"][number], points: number): MajlisClientQuestion {
+  const mustProxyAudio = question.type === "audio" && ["reciter", "dialects", "languages"].includes(question.categoryId);
   return {
     id: question.id,
     categoryId: question.categoryId,
     groupKey: question.groupKey,
-    family: question.family,
+    questionFamily: question.questionFamily,
+    family: question.questionFamily,
     prompt: cleanPrompt(question.prompt),
     options: question.options,
     difficulty: question.difficulty,
@@ -55,10 +57,17 @@ function safeQuestion(question: Awaited<ReturnType<typeof getEffectiveMajlisBank
     hint: question.hint,
     type: question.type,
     quoteText: question.quoteText,
-    audioUrl: question.audioSourceKey ? `/api/games/majlis/human-audio?questionId=${encodeURIComponent(question.id)}` : question.audioUrl,
-    audioFallbackUrl: question.audioSourceKey ? `/api/games/majlis/human-audio?questionId=${encodeURIComponent(question.id)}&retry=1` : question.audioFallbackUrl,
+    imageUrl: question.imageUrl,
+    imageAlt: question.imageAlt,
+    imageSourceName: question.imageSourceName,
+    imageSourceUrl: question.imageSourceUrl,
+    imageLicense: question.imageLicense,
+    audioUrl: mustProxyAudio ? `/api/games/majlis/human-audio?questionId=${encodeURIComponent(question.id)}` : question.audioUrl,
+    audioFallbackUrl: mustProxyAudio ? `/api/games/majlis/human-audio?questionId=${encodeURIComponent(question.id)}&retry=1` : question.audioFallbackUrl,
     audioStartSeconds: question.audioStartSeconds,
     audioMaxSeconds: question.audioMaxSeconds,
+    audioMinSeconds: question.audioMinSeconds,
+    audioDuration: question.audioDuration,
     speechText: question.speechText,
     speechLang: question.speechLang,
   };
@@ -80,49 +89,67 @@ function representativeGroups(items: BankQuestion[]) {
   return map;
 }
 
+function diversityAxis(question: BankQuestion | undefined) {
+  if (!question) return "unknown";
+  if (["reciter", "dialects", "languages"].includes(question.categoryId)) return `answer:${question.answer}`;
+  return `family:${question.questionFamily || question.family || `${question.categoryId}-general`}`;
+}
+
 function pickGroupKeys(
   groupMap: Map<string, BankQuestion[]>,
   candidates: string[],
   count: number,
   excluded = new Set<string>(),
-  distinctAnswers = false,
+  excludedAxes = new Set<string>(),
 ) {
-  const keys = shuffle(candidates.filter((key) => !excluded.has(key)));
+  const keys = candidates.filter((key) => !excluded.has(key));
   const qFor = (key: string) => groupMap.get(key)?.[0];
-  const difficultyFor = (key: string) => qFor(key)?.difficulty || "medium";
-  const answerFor = (key: string) => qFor(key)?.answer || "";
-  const familyFor = (key: string) => qFor(key)?.family || `${qFor(key)?.categoryId || "general"}-general`;
-  const hard = keys.filter((key) => difficultyFor(key) === "hard");
-  const medium = keys.filter((key) => difficultyFor(key) === "medium");
-  const result: string[] = [];
-  const usedAnswers = new Set<string>();
-  const usedFamilies = new Map<string, number>();
+  const axisBuckets = new Map<string, string[]>();
+  for (const key of keys) {
+    const axis = diversityAxis(qFor(key));
+    if (excludedAxes.has(axis)) continue;
+    const bucket = axisBuckets.get(axis) || [];
+    bucket.push(key);
+    axisBuckets.set(axis, bucket);
+  }
 
-  const push = (pool: string[], wanted: number, preferDistinctAnswer = distinctAnswers) => {
-    // Pass 1: new family + new answer. Pass 2: family may repeat once. Pass 3: any remaining.
-    for (const familyLimit of [0, 1, 99]) {
-      for (const requireDistinctAnswer of preferDistinctAnswer ? [true, false] : [false]) {
-        for (const key of pool) {
-          if (result.includes(key)) continue;
-          const answer = answerFor(key);
-          const family = familyFor(key);
-          const usedFamilyCount = usedFamilies.get(family) || 0;
-          if (familyLimit < 99 && usedFamilyCount > familyLimit) continue;
-          if (requireDistinctAnswer && answer && usedAnswers.has(answer)) continue;
-          result.push(key);
-          if (answer) usedAnswers.add(answer);
-          usedFamilies.set(family, usedFamilyCount + 1);
-          if (result.length >= wanted) return;
-        }
-      }
+  // Pick from the most populated diversity axes first. This keeps the end of a Global Cycle
+  // balanced, so a six-question session can keep six distinct patterns all the way to the tail.
+  const axes = shuffle([...axisBuckets.entries()])
+    .sort((a, b) => b[1].length - a[1].length);
+  const selected: string[] = [];
+  const targetHard = Math.min(5, count);
+  let hardCount = 0;
+
+  const chooseFromBucket = (bucket: string[], preferHard: boolean) => {
+    const shuffled = shuffle(bucket);
+    if (preferHard) {
+      const hard = shuffled.find((key) => qFor(key)?.difficulty === "hard");
+      if (hard) return hard;
     }
+    return shuffled.find((key) => qFor(key)?.difficulty === "medium") || shuffled[0];
   };
 
-  // V16: السؤال الصعب هو الغالب، مع منع تكتل نفس قالب السؤال قدر الإمكان.
-  push(hard, Math.min(count, 5));
-  push(medium, Math.min(count, 6));
-  push(keys, count);
-  return result.slice(0, count);
+  // First pass targets 4–5 Hard while maintaining unique axes.
+  for (const [, bucket] of axes) {
+    if (selected.length >= count) break;
+    const preferHard = hardCount < targetHard;
+    const key = chooseFromBucket(bucket, preferHard);
+    if (!key) continue;
+    selected.push(key);
+    if (qFor(key)?.difficulty === "hard") hardCount += 1;
+  }
+
+  // If hard ratio is still low, swap medium selections with hard candidates from the same axis.
+  if (hardCount < Math.min(4, count)) {
+    for (let i = 0; i < selected.length && hardCount < Math.min(4, count); i += 1) {
+      if (qFor(selected[i]!)?.difficulty === "hard") continue;
+      const axis = diversityAxis(qFor(selected[i]!));
+      const hard = axisBuckets.get(axis)?.find((key) => qFor(key)?.difficulty === "hard");
+      if (hard && !selected.includes(hard)) { selected[i] = hard; hardCount += 1; }
+    }
+  }
+  return selected.slice(0, count);
 }
 
 async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse> {
@@ -164,19 +191,27 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
       const raw = snap.data() || {};
       let cycle = Math.max(1, Math.floor(number(raw.cycle, 1)));
       let usedKeys = new Set(Array.isArray(raw.usedGroupKeys) ? raw.usedGroupKeys.map(String).filter((key) => groupMap.has(key)) : []);
+      // V17 changed fact/family composition substantially. Reset old V15/V16 cycle state once,
+      // otherwise a legacy tail can be mathematically impossible to distribute without repeats.
+      if (text(raw.bankVersion) !== "17") {
+        cycle += 1;
+        usedKeys = new Set<string>();
+      }
       const selectedKeys: string[] = [];
       let resetOccurred = false;
 
       const remaining = allKeys.filter((key) => !usedKeys.has(key));
-      const first = pickGroupKeys(groupMap, remaining, Math.min(6, remaining.length), new Set<string>(), ["reciter", "dialects", "languages"].includes(category.id));
+      const first = pickGroupKeys(groupMap, remaining, Math.min(6, remaining.length));
       selectedKeys.push(...first);
 
+      const selectedAxes = new Set(selectedKeys.map((key) => diversityAxis(groupMap.get(key)?.[0])));
       if (selectedKeys.length < 6) {
-        // Every still-unseen fact is consumed before a new cycle begins.
+        // Every remaining unseen fact is used first. The new cycle only fills the empty seats and
+        // excludes the patterns already present in this session.
         cycle += 1;
         resetOccurred = true;
         usedKeys = new Set<string>();
-        const fill = pickGroupKeys(groupMap, allKeys, 6 - selectedKeys.length, new Set(selectedKeys), ["reciter", "dialects", "languages"].includes(category.id));
+        const fill = pickGroupKeys(groupMap, allKeys, 6 - selectedKeys.length, new Set(selectedKeys), selectedAxes);
         selectedKeys.push(...fill);
       }
       if (selectedKeys.length < 6) throw new Error(`الفئة «${category.title}» لا تحتوي ست معلومات مستقلة.`);
@@ -189,6 +224,7 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
         cycle,
         usedGroupKeys: Array.from(new Set(nextUsed)),
         totalGroups: allKeys.length,
+        bankVersion: "17",
         updatedAt: createdAt,
       }, { merge: true });
 
@@ -200,13 +236,21 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
       selectedByCategory.set(category.id, shuffle(rows));
     }
 
-    const revealRows: Array<{ questionId: string; answer: string; explanation: string; sourceLabel: string }> = [];
+    const revealRows = [] as Array<Record<string, unknown>>;
     for (const rows of selectedByCategory.values()) {
       rows.forEach((question) => revealRows.push({
         questionId: question.id,
         answer: question.answer,
         explanation: question.explanation || "",
         sourceLabel: question.sourceLabel || "",
+        sourceName: question.sourceName || "",
+        sourceUrl: question.sourceUrl || "",
+        license: question.license || "",
+        quranSurah: question.quranSurah || "",
+        quranAyah: question.quranAyah || null,
+        quranText: question.quranText || "",
+        quranPage: question.quranPage || null,
+        quranImageUrl: question.quranImageUrl || "",
       }));
     }
     transaction.set(sessionRef, {
@@ -241,7 +285,20 @@ async function revealQuestion(sessionId: string, questionId: string) {
     if (!row) throw new Error("هذا السؤال لا ينتمي إلى الجلسة الحالية.");
     const used = Array.isArray(data.usedQuestionIds) ? data.usedQuestionIds.map(String) : [];
     if (!used.includes(questionId)) transaction.set(ref, { usedQuestionIds: [...used, questionId], lastRevealAt: Date.now() }, { merge: true });
-    return { questionId, answer: text(row.answer), explanation: text(row.explanation), sourceLabel: text(row.sourceLabel) };
+    return {
+      questionId,
+      answer: text(row.answer),
+      explanation: text(row.explanation),
+      sourceLabel: text(row.sourceLabel),
+      sourceName: text(row.sourceName) || undefined,
+      sourceUrl: text(row.sourceUrl) || undefined,
+      license: text(row.license) || undefined,
+      quranSurah: text(row.quranSurah) || undefined,
+      quranAyah: row.quranAyah == null ? undefined : Math.max(1, Math.floor(number(row.quranAyah, 1))),
+      quranText: text(row.quranText) || undefined,
+      quranPage: row.quranPage == null ? undefined : Math.max(1, Math.floor(number(row.quranPage, 1))),
+      quranImageUrl: text(row.quranImageUrl) || undefined,
+    };
   });
 }
 

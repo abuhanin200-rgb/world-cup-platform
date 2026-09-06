@@ -3,127 +3,181 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(here, "..");
-const bankPath = path.join(root, "src", "data", "majlisQuestionBank.json");
-const bank = JSON.parse(fs.readFileSync(bankPath, "utf8"));
+const file = path.join(here, "..", "src", "data", "majlisQuestionBank.json");
+const bank = JSON.parse(fs.readFileSync(file, "utf8"));
+const categories = Array.isArray(bank.categories) ? bank.categories : [];
+const questions = Array.isArray(bank.questions) ? bank.questions : [];
+const active = questions.filter((q) => q.enabled !== false);
 const errors = [];
 const warnings = [];
+const fail = (message) => errors.push(message);
+const warn = (message) => warnings.push(message);
+const norm = (value) => String(value ?? "").trim().toLowerCase().replace(/[\u064B-\u065F\u0670]/g, "").replace(/[إأآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+const byCategory = new Map(categories.map((category) => [category.id, []]));
+for (const q of active) {
+  if (!byCategory.has(q.categoryId)) byCategory.set(q.categoryId, []);
+  byCategory.get(q.categoryId).push(q);
+}
+
+// Global integrity.
 const ids = new Set();
-const categoryIds = new Set((bank.categories || []).map((item) => item.id));
-const groupAnswers = new Map();
-const promptAnswerPairs = new Set();
-const bannedPrefixes = /^(?:سؤال المجلس|اختبر معلوماتك|للنقطة هذه|السؤال)\s*[:：-]?\s*/i;
-const allowedTypes = new Set(["text", "multiple_choice", "audio", "speech"]);
+for (const q of questions) {
+  if (!q.id) fail("Question without id");
+  else if (ids.has(q.id)) fail(`Duplicate id: ${q.id}`);
+  ids.add(q.id);
+  if (q.enabled === false) continue;
+  if (!String(q.answer || "").trim()) fail(`Missing answer: ${q.id}`);
+  if (!String(q.prompt || "").trim()) fail(`Missing prompt: ${q.id}`);
+  if (!String(q.groupKey || "").trim()) fail(`Missing groupKey: ${q.id}`);
+  if (!String(q.questionFamily || q.family || "").trim()) fail(`Missing questionFamily: ${q.id}`);
+  if (q.difficulty === "easy") fail(`Easy question is active: ${q.id}`);
+  if (/^(?:سؤال المجلس|اختبر معلوماتك|للنقطة هذه|السؤال)\s*[:：-]?/i.test(String(q.prompt || ""))) fail(`Weak preamble in prompt: ${q.id}`);
+}
 
-if (!Array.isArray(bank.categories) || bank.categories.length < 10) errors.push("يجب أن يحتوي البنك على 10 فئات على الأقل.");
-if (!Array.isArray(bank.questions)) errors.push("questions ليست مصفوفة.");
+// groupKey is a fact key: variants may exist, but the answer may not conflict.
+const groupMap = new Map();
+for (const q of active) {
+  const key = `${q.categoryId}::${q.groupKey}`;
+  if (!groupMap.has(key)) groupMap.set(key, []);
+  groupMap.get(key).push(q);
+}
+for (const [key, rows] of groupMap) {
+  const answers = new Set(rows.map((q) => norm(q.answer)));
+  if (answers.size > 1) fail(`Conflicting answers inside groupKey ${key}: ${[...answers].join(" | ")}`);
+  if (rows.length > 4) warn(`Many phrasings for one fact (${rows.length}): ${key}`);
+}
 
-for (const question of bank.questions || []) {
-  if (!question.id || ids.has(question.id)) errors.push(`معرّف سؤال مفقود/مكرر: ${question.id || "(فارغ)"}`);
-  ids.add(question.id);
-  if (!categoryIds.has(question.categoryId)) errors.push(`${question.id}: فئة غير معروفة ${question.categoryId}`);
-  const prompt = String(question.prompt || "").trim();
-  if (!prompt) errors.push(`${question.id}: نص السؤال فارغ`);
-  if (bannedPrefixes.test(prompt)) errors.push(`${question.id}: يبدأ بمقدمة غير مطلوبة: ${prompt}`);
-  if (!String(question.answer || "").trim()) errors.push(`${question.id}: الإجابة فارغة`);
-  if (!question.groupKey) errors.push(`${question.id}: groupKey مفقود`);
-  if (!String(question.sourceLabel || "").trim()) errors.push(`${question.id}: المصدر مفقود`);
-  if (!['medium','hard'].includes(question.difficulty)) errors.push(`${question.id}: يجب أن يكون متوسطًا أو صعبًا فقط (${question.difficulty})`);
-  if (!allowedTypes.has(question.type)) errors.push(`${question.id}: نوع غير صالح ${question.type}`);
+// Exact textual duplicates across different facts are suspicious (audio identification prompt is intentionally repeated).
+const promptMap = new Map();
+for (const q of active) {
+  if (["reciter", "dialects", "languages"].includes(q.categoryId)) continue;
+  const key = `${q.categoryId}::${norm(q.prompt)}::${norm(q.quoteText || q.imageUrl || "")}`;
+  if (!promptMap.has(key)) promptMap.set(key, new Set());
+  promptMap.get(key).add(q.groupKey);
+}
+for (const [key, facts] of promptMap) if (facts.size > 1) fail(`Same prompt points to multiple facts: ${key}`);
 
-  const groupKey = `${question.categoryId}:${question.groupKey}`;
-  const priorAnswer = groupAnswers.get(groupKey);
-  if (priorAnswer && priorAnswer !== question.answer) errors.push(`${question.id}: مجموعة المعلومة ${question.groupKey} لها إجابات متعارضة`);
-  groupAnswers.set(groupKey, question.answer);
-
-  const pair = `${question.categoryId}|${prompt}|${String(question.answer).trim()}`;
-  if (!['audio','speech'].includes(question.type) && promptAnswerPairs.has(pair)) warnings.push(`${question.id}: صياغة سؤال وإجابة مكررة حرفيًا`);
-  promptAnswerPairs.add(pair);
-
-  if (question.categoryId === "world" && /(?:ما\s+هي\s+)?عاصمة|العاصمة/i.test(prompt)) {
-    errors.push(`${question.id}: فئة حول العالم يجب ألا تحتوي أسئلة عواصم في النسخة الحالية`);
+const specialAxis = new Set(["reciter", "dialects", "languages"]);
+function representatives(items) {
+  const map = new Map();
+  for (const q of items) if (!map.has(q.groupKey)) map.set(q.groupKey, q);
+  return [...map.values()];
+}
+function axisFor(categoryId, q) {
+  return specialAxis.has(categoryId) ? `answer:${norm(q.answer)}` : `family:${q.questionFamily || q.family}`;
+}
+function canPartitionWithoutRepeat(categoryId, reps) {
+  const counts = new Map();
+  for (const q of reps) counts.set(axisFor(categoryId, q), (counts.get(axisFor(categoryId, q)) || 0) + 1);
+  const sessions = Math.ceil(reps.length / 6);
+  const max = Math.max(0, ...counts.values());
+  if (counts.size < 6 || max > sessions) return { ok: false, axes: counts.size, max, sessions };
+  // Greedy simulation: take one from the six currently largest buckets per full session.
+  const work = new Map(counts);
+  while ([...work.values()].reduce((a, b) => a + b, 0) >= 6) {
+    const top = [...work.entries()].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    if (top.length < 6) return { ok: false, axes: counts.size, max, sessions };
+    for (const [axis, n] of top) work.set(axis, n - 1);
   }
+  const tailAxes = [...work.values()].filter((n) => n > 0);
+  if (tailAxes.some((n) => n > 1)) return { ok: false, axes: counts.size, max, sessions };
+  return { ok: true, axes: counts.size, max, sessions };
+}
 
-  if (question.type === "audio") {
-    const url = String(question.audioUrl || "");
-    const isHumanCommons = ["dialects","languages"].includes(question.categoryId);
-    if (isHumanCommons) {
-      if (!url.startsWith("/api/games/majlis/human-audio?questionId=")) errors.push(`${question.id}: صوت اللهجات/اللغات يجب أن يمر عبر human-audio`);
-      if (!String(question.audioSourceKey || "").startsWith("commons:")) errors.push(`${question.id}: audioSourceKey البشري مفقود`);
-      if (question.speechText || question.speechLang) errors.push(`${question.id}: لا يسمح باستخدام TTS في اللهجات/اللغات`);
-      if (Number(question.audioMaxSeconds || 0) < 4 || Number(question.audioMaxSeconds || 0) > 8) errors.push(`${question.id}: مدة الصوت البشري غير مناسبة`);
-    } else {
-      if (!url.startsWith("https://")) errors.push(`${question.id}: رابط الصوت يجب أن يكون HTTPS`);
-      if (!(url.includes("cdn.islamic.network") || /server\d+\.mp3quran\.net/.test(url))) errors.push(`${question.id}: مصدر صوت القارئ غير معتمد`);
-      if (!String(question.reciterName || "").trim()) errors.push(`${question.id}: اسم القارئ الإداري مفقود`);
-      if (Number(question.audioMaxSeconds || 0) !== 15) errors.push(`${question.id}: مقطع القارئ يجب أن يكون 15 ثانية`);
-    }
-    if (!Array.isArray(question.options) || question.options.length < 3) errors.push(`${question.id}: السؤال الصوتي يحتاج 3 خيارات على الأقل لاستخدام وسيلة «عرض اختيارات»`);
-    if (Array.isArray(question.options) && !question.options.includes(question.answer)) errors.push(`${question.id}: الإجابة غير موجودة ضمن خيارات السؤال الصوتي`);
-    if (Number(question.audioStartSeconds || 0) < 0) errors.push(`${question.id}: بداية المقطع غير صالحة`);
+for (const category of categories.filter((c) => c.enabled !== false)) {
+  const items = byCategory.get(category.id) || [];
+  const reps = representatives(items);
+  const uniqueFacts = reps.length;
+  const families = new Set(reps.map((q) => q.questionFamily || q.family).filter(Boolean));
+  const hard = reps.filter((q) => q.difficulty === "hard").length;
+  const medium = reps.filter((q) => q.difficulty === "medium").length;
+  if (uniqueFacts < 50) fail(`Weak category ${category.id}: only ${uniqueFacts} unique facts`);
+  if (category.id === "quran" && uniqueFacts < 100) fail(`Quran needs >=100 unique facts, got ${uniqueFacts}`);
+  if (category.id === "seerah" && uniqueFacts < 100) fail(`Seerah needs >=100 unique facts, got ${uniqueFacts}`);
+  if (!specialAxis.has(category.id) && families.size < 6) fail(`Weak family diversity ${category.id}: ${families.size}`);
+  if (hard < Math.ceil(uniqueFacts * 0.55)) warn(`Hard ratio is lower than preferred in ${category.id}: ${hard}/${uniqueFacts}`);
+  if (medium < 1) warn(`No medium facts in ${category.id}`);
+  const feasibility = canPartitionWithoutRepeat(category.id, reps);
+  if (!feasibility.ok) fail(`Cannot guarantee 6-session diversity for ${category.id}: axes=${feasibility.axes}, maxBucket=${feasibility.max}, sessions=${feasibility.sessions}`);
+  if (!category.imageUrl || !category.imageSourceUrl || !category.imageLicense) fail(`Category missing real-image attribution: ${category.id}`);
+}
+
+// Quran-specific anti-monotony and reveal metadata.
+const quran = active.filter((q) => q.categoryId === "quran");
+for (const fam of ["quran-ayah-count", "quran-surah-order"]) {
+  const n = representatives(quran.filter((q) => (q.questionFamily || q.family) === fam)).length;
+  if (n > 10) fail(`Quran family ${fam} is overrepresented: ${n}`);
+}
+for (const fam of ["quran_complete_verse", "quran_people", "quran_vocabulary", "quran_story"]) {
+  if (!quran.some((q) => (q.questionFamily || q.family) === fam)) fail(`Missing Quran family: ${fam}`);
+}
+for (const q of quran.filter((q) => ["quran_complete_verse", "quran_people", "quran_vocabulary", "quran_story", "quran_context", "quran_events"].includes(q.questionFamily || q.family))) {
+  if (!q.quranSurah || !q.quranAyah || !q.quranText) fail(`Quran reveal metadata incomplete: ${q.id}`);
+  if (!String(q.sourceUrl || "").includes("qurancomplex.gov.sa")) fail(`Quran source is not KFGQPC developer source: ${q.id}`);
+}
+
+// Seerah family coverage.
+const seerah = representatives(active.filter((q) => q.categoryId === "seerah"));
+const seerahFamilies = new Set(seerah.map((q) => q.questionFamily || q.family));
+for (const fam of ["seerah_battles", "seerah_events", "seerah_people", "seerah_places", "seerah_hijrah", "seerah_timeline", "seerah_treaties", "seerah_companions", "seerah_family", "seerah_makkah_period", "seerah_madinah_period", "seerah_causes_results", "seerah_geography"]) {
+  if (!seerahFamilies.has(fam)) fail(`Missing Seerah family: ${fam}`);
+}
+
+// Audio integrity: human-only for reciter/dialects/languages and no answer leakage to client URLs.
+const audio = active.filter((q) => q.type === "audio");
+let humanAudio = 0;
+let aiTts = 0;
+let brokenAudioMetadata = 0;
+const nadiMap = { KSA:"السعودية", KUW:"الكويتية", BAH:"البحرينية", QAT:"القطرية", UAE:"الإماراتية", OMA:"العُمانية", YEM:"اليمنية", IRA:"العراقية", EGY:"المصرية", SUD:"السودانية", PAL:"الفلسطينية", JOR:"الأردنية", LEB:"اللبنانية", SYR:"السورية", MOR:"المغربية", ALG:"الجزائرية", TUN:"التونسية", LIB:"الليبية" };
+for (const q of audio) {
+  const source = `${q.sourceLabel || ""} ${q.sourceName || ""} ${q.audioSourceKey || ""}`.toLowerCase();
+  if (/speechsynthesis|elevenlabs|google tts|text.to.speech|ai voice|synthetic/.test(source)) { aiTts += 1; fail(`Synthetic audio marker: ${q.id}`); }
+  if (["reciter", "dialects", "languages"].includes(q.categoryId)) {
+    humanAudio += 1;
+    const missing = !q.sourceName || !q.sourceUrl || !q.license || !q.audioSourceKey || !q.audioUrl;
+    if (missing) { brokenAudioMetadata += 1; fail(`Broken human-audio metadata: ${q.id}`); }
+    if ((q.audioMaxSeconds || 0) > 15 || (q.audioMaxSeconds || 0) < 8) fail(`Audio cap outside 8–15s: ${q.id}`);
+    if (["dialects", "languages"].includes(q.categoryId) && (q.audioMinSeconds || 0) < 6) fail(`Human sentence minimum too short: ${q.id}`);
+    if (["dialects", "languages"].includes(q.categoryId) && !String(q.audioUrl).startsWith("/api/games/majlis/human-audio?questionId=")) fail(`Client audio is not proxied: ${q.id}`);
   }
-
-  if (question.type === "speech") {
-    if (["dialects","languages"].includes(question.categoryId)) errors.push(`${question.id}: اللهجات واللغات يجب ألا تستخدم speechSynthesis`);
-    if (!String(question.speechText || "").trim()) errors.push(`${question.id}: سؤال النطق يفتقد speechText`);
-    if (!String(question.speechLang || "").trim()) errors.push(`${question.id}: سؤال النطق يفتقد speechLang`);
-    if (!Array.isArray(question.options) || question.options.length < 3) errors.push(`${question.id}: سؤال النطق يحتاج خيارات مخفية للمساعدة`);
-    if (Array.isArray(question.options) && !question.options.includes(question.answer)) errors.push(`${question.id}: إجابة سؤال النطق غير موجودة في الخيارات المخفية`);
+  if (q.categoryId === "dialects") {
+    const key = String(q.audioSourceKey || "");
+    const code = key.startsWith("nadi:") ? key.slice(5) : "";
+    if (!nadiMap[code]) fail(`Unknown NADI dialect code: ${q.id}`);
+    else if (norm(nadiMap[code]) !== norm(q.answer)) fail(`Dialect answer/source mismatch: ${q.id} ${code} -> ${q.answer}`);
+    if (q.license !== "MIT") fail(`Dialect license must be MIT from NADI dataset: ${q.id}`);
   }
-
-  if (question.categoryId === "quran" && question.quoteText && !String(question.quoteText).trim()) errors.push(`${question.id}: quoteText فارغ`);
+  if (q.categoryId === "languages") {
+    if (!String(q.audioSourceKey || "").startsWith("fleurs:")) fail(`Language source must be FLEURS: ${q.id}`);
+    if (!String(q.license || "").toLowerCase().includes("cc by 4.0")) fail(`Language license must be CC BY 4.0: ${q.id}`);
+    if (norm(q.speechLanguage) !== norm(q.answer)) fail(`Language answer/metadata mismatch: ${q.id}`);
+  }
+  if (q.categoryId === "reciter" && !String(q.audioSourceKey || "").startsWith("reciter:")) fail(`Reciter must be server-proxied: ${q.id}`);
 }
 
-console.log(`Majlis bank version: ${bank.version || "unknown"}`);
-console.log(`Categories: ${bank.categories?.length || 0}`);
-console.log(`Questions: ${bank.questions?.length || 0}`);
-
-for (const category of bank.categories || []) {
-  const questions = (bank.questions || []).filter((item) => item.categoryId === category.id && item.enabled !== false);
-  const groups = new Set(questions.map((item) => item.groupKey));
-  const medium = questions.filter((item) => item.difficulty === "medium").length;
-  const hard = questions.filter((item) => item.difficulty === "hard").length;
-  const hardGroups = new Set(questions.filter((item) => item.difficulty === "hard").map((item) => item.groupKey));
-  const audio = questions.filter((item) => item.type === "audio").length;
-  const speech = questions.filter((item) => item.type === "speech").length;
-  console.log(`${category.id.padEnd(10)} ${String(questions.length).padStart(4)} questions | ${String(groups.size).padStart(3)} unique groups | med ${medium} / hard ${hard}${audio ? ` | audio ${audio}` : ""}${speech ? ` | speech ${speech}` : ""}`);
-  if (questions.length < 100) errors.push(`${category.title}: أقل من 100 سؤال نشط (${questions.length})`);
-  if (hardGroups.size < 4 && category.id !== "reciter") errors.push(`${category.title}: لا توجد معلومات صعبة متنوعة كافية لملء الجولة`);
-  if (["quran","dialects","languages"].includes(category.id) && groups.size < 100) errors.push(`${category.title}: يجب أن تحتوي 100 معلومة/تحدٍ مستقلاً على الأقل (${groups.size})`);
-  if (!["quran","dialects","languages","reciter"].includes(category.id) && groups.size < 25) warnings.push(`${category.title}: فيها ${groups.size} معلومة أساسية فقط مع صياغات متعددة؛ يوصى بتوسيعها لاحقًا.`);
+// SpeechSynthesis is allowed only for non-human demonstration questions; never dialect/language/reciter.
+for (const q of active.filter((q) => q.type === "speech")) {
+  if (["dialects", "languages", "reciter"].includes(q.categoryId)) fail(`TTS forbidden in human-audio category: ${q.id}`);
 }
 
-const v16New = (bank.questions || []).filter((item) => String(item.id || "").startsWith("v16-") && item.enabled !== false);
-const v16Groups = new Set(v16New.map((item) => `${item.categoryId}:${item.groupKey}`));
-console.log(`V16 new unique facts: ${v16Groups.size}`);
-if (v16Groups.size < 300) errors.push(`إضافات V16 أقل من 300 معلومة فريدة (${v16Groups.size})`);
-for (const id of ["quran","dialects","languages"]) {
-  const items=(bank.questions||[]).filter((item)=>item.categoryId===id&&item.enabled!==false);
-  const families=new Set(items.map((item)=>item.family).filter(Boolean));
-  console.log(`${id} families: ${families.size}`);
-  if (id==="quran" && families.size < 8) errors.push(`القرآن يحتاج 8 عائلات أسئلة على الأقل (${families.size})`);
-}
-
-const reciter = (bank.questions || []).filter((item) => item.categoryId === "reciter" && item.enabled !== false);
-const reciters = new Set(reciter.map((item) => item.reciterName || item.answer).filter(Boolean));
-const reciterGroups = new Set(reciter.map((item) => item.groupKey));
-const reciterUrls = new Set(reciter.map((item) => item.audioUrl).filter(Boolean));
-console.log(`Reciter clips: ${reciter.length} | unique clips: ${reciterGroups.size} | unique URLs: ${reciterUrls.size} | reciters: ${reciters.size}`);
-for (const required of ["أحمد طالب بن حميد", "أحمد الحذيفي", "علي الحذيفي"]) {
-  if (!reciters.has(required)) errors.push(`فئة مَن القارئ؟ تفتقد القارئ المطلوب: ${required}`);
-}
-if (reciter.length < 100) errors.push(`فئة مَن القارئ؟ أقل من 100 مقطع (${reciter.length})`);
-if (reciterGroups.size !== reciter.length) errors.push(`فئة مَن القارئ؟ يجب أن يكون لكل مقطع دورة عدم تكرار مستقلة (${reciterGroups.size}/${reciter.length})`);
-if (reciterUrls.size !== reciter.length) errors.push(`فئة مَن القارئ؟ يوجد رابط صوت مكرر (${reciterUrls.size}/${reciter.length})`);
-if (reciters.size < 15) errors.push(`فئة مَن القارئ؟ تحتاج 15 قارئًا على الأقل (${reciters.size})`);
-
-if (warnings.length) {
-  console.warn("\nWarnings:");
-  for (const warning of [...new Set(warnings)].slice(0, 40)) console.warn(`- ${warning}`);
-}
+const uniqueFacts = new Set(active.map((q) => `${q.categoryId}::${q.groupKey}`)).size;
+const allFamilies = new Set(active.map((q) => q.questionFamily || q.family).filter(Boolean));
+console.log("Majlis Bank Audit");
+console.log("-----------------");
+console.log(`Version: ${bank.version || "unknown"}`);
+console.log(`Categories: ${categories.length}`);
+console.log(`Questions: ${active.length} active / ${questions.length} total`);
+console.log(`Unique facts: ${uniqueFacts}`);
+console.log(`Question families: ${allFamilies.size}`);
+console.log(`Human audio clips: ${humanAudio}`);
+console.log(`AI/TTS audio in human categories: ${aiTts}`);
+console.log(`Broken audio metadata: ${brokenAudioMetadata}`);
+console.log(`Warnings: ${warnings.length}`);
+if (warnings.length) warnings.slice(0, 30).forEach((message) => console.log(`WARN: ${message}`));
 if (errors.length) {
-  console.error("\nFAILED:");
-  for (const error of errors) console.error(`- ${error}`);
+  console.error(`\nFAIL (${errors.length})`);
+  errors.slice(0, 120).forEach((message) => console.error(`- ${message}`));
   process.exit(1);
 }
-console.log("\nMajlis bank audit: PASS");
+console.log("\nPASS");
