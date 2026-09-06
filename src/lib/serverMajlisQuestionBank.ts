@@ -34,7 +34,14 @@ function difficulty(value: unknown): MajlisDifficulty {
 }
 
 function questionType(value: unknown): MajlisQuestionType {
-  return value === "audio" ? "audio" : value === "multiple_choice" ? "multiple_choice" : "text";
+  return value === "speech" ? "speech" : value === "audio" ? "audio" : value === "multiple_choice" ? "multiple_choice" : "text";
+}
+
+
+function cleanPrompt(value: unknown) {
+  return text(value)
+    .replace(/^(?:سؤال المجلس|اختبر معلوماتك|للنقطة هذه|السؤال)\s*[:：-]?\s*/i, "")
+    .trim();
 }
 
 function cleanOptions(value: unknown) {
@@ -63,7 +70,7 @@ function baseQuestions(): MajlisQuestion[] {
     id: text(item.id),
     categoryId: text(item.categoryId),
     groupKey: text(item.groupKey, text(item.id)),
-    prompt: text(item.prompt),
+    prompt: cleanPrompt(item.prompt),
     answer: text(item.answer),
     options: cleanOptions(item.options),
     difficulty: difficulty(item.difficulty),
@@ -72,7 +79,12 @@ function baseQuestions(): MajlisQuestion[] {
     explanation: text(item.explanation),
     sourceLabel: text(item.sourceLabel),
     type: questionType(item.type),
+    quoteText: text(item.quoteText) || undefined,
+    speechText: text(item.speechText) || undefined,
+    speechLang: text(item.speechLang) || undefined,
     audioUrl: text(item.audioUrl) || undefined,
+    audioFallbackUrl: text(item.audioFallbackUrl) || undefined,
+    audioStartSeconds: item.audioStartSeconds == null ? undefined : Math.max(0, Math.min(3600, number(item.audioStartSeconds, 0))),
     audioMaxSeconds: item.audioMaxSeconds == null ? undefined : Math.max(4, Math.min(20, Math.floor(number(item.audioMaxSeconds, 12)))),
     reciterName: text(item.reciterName) || undefined,
     enabled: item.enabled !== false,
@@ -117,7 +129,7 @@ function mergeQuestion(base: MajlisQuestion, override: Record<string, unknown> |
     ...base,
     categoryId: text(override.categoryId, base.categoryId),
     groupKey: text(override.groupKey, base.groupKey),
-    prompt: text(override.prompt, base.prompt),
+    prompt: override.prompt == null ? base.prompt : cleanPrompt(override.prompt),
     answer: text(override.answer, base.answer),
     options: override.options == null ? base.options : cleanOptions(override.options),
     difficulty: override.difficulty == null ? base.difficulty : difficulty(override.difficulty),
@@ -126,7 +138,12 @@ function mergeQuestion(base: MajlisQuestion, override: Record<string, unknown> |
     explanation: override.explanation == null ? base.explanation : text(override.explanation),
     sourceLabel: override.sourceLabel == null ? base.sourceLabel : text(override.sourceLabel),
     type: override.type == null ? base.type : questionType(override.type),
+    quoteText: override.quoteText == null ? base.quoteText : (text(override.quoteText) || undefined),
+    speechText: override.speechText == null ? base.speechText : (text(override.speechText) || undefined),
+    speechLang: override.speechLang == null ? base.speechLang : (text(override.speechLang) || undefined),
     audioUrl: override.audioUrl == null ? base.audioUrl : (text(override.audioUrl) || undefined),
+    audioFallbackUrl: override.audioFallbackUrl == null ? base.audioFallbackUrl : (text(override.audioFallbackUrl) || undefined),
+    audioStartSeconds: override.audioStartSeconds == null ? base.audioStartSeconds : Math.max(0, Math.min(3600, number(override.audioStartSeconds, 0))),
     audioMaxSeconds: override.audioMaxSeconds == null ? base.audioMaxSeconds : Math.max(4, Math.min(20, Math.floor(number(override.audioMaxSeconds, 12)))),
     reciterName: override.reciterName == null ? base.reciterName : (text(override.reciterName) || undefined),
     enabled: bool(override.enabled, base.enabled),
@@ -140,7 +157,7 @@ function mapCustomQuestion(id: string, data: Record<string, unknown>): MajlisQue
     id,
     categoryId: text(data.categoryId),
     groupKey: text(data.groupKey, id),
-    prompt: text(data.prompt),
+    prompt: cleanPrompt(data.prompt),
     answer: text(data.answer),
     options: cleanOptions(data.options),
     difficulty: diff,
@@ -149,7 +166,12 @@ function mapCustomQuestion(id: string, data: Record<string, unknown>): MajlisQue
     explanation: text(data.explanation),
     sourceLabel: text(data.sourceLabel),
     type: questionType(data.type),
+    quoteText: text(data.quoteText) || undefined,
+    speechText: text(data.speechText) || undefined,
+    speechLang: text(data.speechLang) || undefined,
     audioUrl: text(data.audioUrl) || undefined,
+    audioFallbackUrl: text(data.audioFallbackUrl) || undefined,
+    audioStartSeconds: data.audioStartSeconds == null ? undefined : Math.max(0, Math.min(3600, number(data.audioStartSeconds, 0))),
     audioMaxSeconds: data.audioMaxSeconds == null ? undefined : Math.max(4, Math.min(20, Math.floor(number(data.audioMaxSeconds, 12)))),
     reciterName: text(data.reciterName) || undefined,
     enabled: bool(data.enabled, true),
@@ -181,8 +203,8 @@ export async function getEffectiveMajlisBank() {
     adminDb.collection(MAJLIS_CUSTOM_QUESTION_COLLECTION).get(),
   ]);
 
-  const categoryOverrides = new Map(categoryOverridesSnap.docs.map((doc) => [doc.id, doc.data()]));
-  const questionOverrides = new Map(questionOverridesSnap.docs.map((doc) => [doc.id, doc.data()]));
+  const categoryOverrides = new Map<string, Record<string, unknown>>(categoryOverridesSnap.docs.map((doc) => [doc.id, doc.data() as Record<string, unknown>]));
+  const questionOverrides = new Map<string, Record<string, unknown>>(questionOverridesSnap.docs.map((doc) => [doc.id, doc.data() as Record<string, unknown>]));
 
   const categories = [
     ...baseCategories().map((item) => mergeCategory(item, categoryOverrides.get(item.id))),
@@ -208,7 +230,7 @@ export function majlisBankSummary(categories: MajlisCategory[], questions: Majli
       easy: active.filter((question) => question.difficulty === "easy").length,
       medium: active.filter((question) => question.difficulty === "medium").length,
       hard: active.filter((question) => question.difficulty === "hard").length,
-      audio: active.filter((question) => question.type === "audio").length,
+      audio: active.filter((question) => question.type === "audio" || question.type === "speech").length,
     };
   });
 }

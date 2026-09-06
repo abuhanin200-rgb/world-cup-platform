@@ -1,5 +1,5 @@
 export type MajlisDifficulty = "easy" | "medium" | "hard";
-export type MajlisQuestionType = "text" | "multiple_choice" | "audio";
+export type MajlisQuestionType = "text" | "multiple_choice" | "audio" | "speech";
 
 export type MajlisCategory = {
   id: string;
@@ -27,9 +27,14 @@ export type MajlisQuestion = {
   explanation?: string;
   sourceLabel?: string;
   type: MajlisQuestionType;
+  quoteText?: string;
   audioUrl?: string;
+  audioFallbackUrl?: string;
+  audioStartSeconds?: number;
   audioMaxSeconds?: number;
   reciterName?: string;
+  speechText?: string;
+  speechLang?: string;
   enabled: boolean;
   custom?: boolean;
   overridden?: boolean;
@@ -76,6 +81,7 @@ export type MajlisGameStartResponse = {
 
 export type MajlisPlayMode = "local" | "online";
 export type MajlisVoiceMode = "off" | "team" | "all";
+export type MajlisAssistKey = "hint" | "time" | "double" | "options";
 
 export type MajlisOnlinePlayer = {
   userId: string;
@@ -91,7 +97,7 @@ export type MajlisOnlineTeamState = {
   name: string;
   score: number;
   accent: string;
-  assists: { hint: boolean; time: boolean; double: boolean };
+  assists: { hint: boolean; time: boolean; double: boolean; options: boolean };
 };
 
 export type MajlisOnlinePublicState = {
@@ -107,6 +113,7 @@ export type MajlisOnlinePublicState = {
   questionDeadlineAt: number | null;
   reveal: MajlisReveal | null;
   hintVisible: boolean;
+  optionsVisible: boolean;
   doubleActive: boolean;
   timeBonusActive: boolean;
   stealMode: boolean;

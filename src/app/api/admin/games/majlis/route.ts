@@ -21,7 +21,7 @@ export const revalidate = 0;
 function text(value: unknown) { return String(value ?? "").trim(); }
 function number(value: unknown, fallback = 0) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; }
 function difficulty(value: unknown): MajlisDifficulty { return value === "hard" ? "hard" : value === "medium" ? "medium" : "easy"; }
-function type(value: unknown): MajlisQuestionType { return value === "audio" ? "audio" : value === "multiple_choice" ? "multiple_choice" : "text"; }
+function type(value: unknown): MajlisQuestionType { return value === "speech" ? "speech" : value === "audio" ? "audio" : value === "multiple_choice" ? "multiple_choice" : "text"; }
 function options(value: unknown) { return Array.isArray(value) ? value.map(text).filter(Boolean).slice(0, 6) : []; }
 function slug(value: unknown) {
   const cleaned = text(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "الفئة والسؤال والإجابة حقول مطلوبة." }, { status: 400 });
       }
       const optionList = options(raw.options);
-      if ((questionType === "multiple_choice" || questionType === "audio") && optionList.length > 0 && !optionList.includes(answer)) {
+      if ((questionType === "multiple_choice" || questionType === "audio" || questionType === "speech") && optionList.length > 0 && !optionList.includes(answer)) {
         optionList.unshift(answer);
       }
       await adminDb.collection(collection).doc(id).set({
@@ -166,8 +166,13 @@ export async function POST(request: NextRequest) {
         explanation: text(raw.explanation),
         sourceLabel: text(raw.sourceLabel),
         type: questionType,
+        quoteText: text(raw.quoteText),
+        speechText: text(raw.speechText),
+        speechLang: text(raw.speechLang),
         audioUrl: text(raw.audioUrl),
-        audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 12)))),
+        audioFallbackUrl: text(raw.audioFallbackUrl),
+        audioStartSeconds: Math.max(0, Math.min(3600, number(raw.audioStartSeconds, 0))),
+        audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 15)))),
         reciterName: text(raw.reciterName),
         enabled: raw.enabled !== false,
         updatedAt: now,
@@ -211,7 +216,9 @@ export async function POST(request: NextRequest) {
           difficulty: diff,
           points: Math.max(50, Math.min(1000, Math.floor(number(raw.points, diff === "hard" ? 300 : diff === "medium" ? 200 : 100)))),
           hint: text(raw.hint), explanation: text(raw.explanation), sourceLabel: text(raw.sourceLabel),
-          type: type(raw.type), audioUrl: text(raw.audioUrl), audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 12)))), reciterName: text(raw.reciterName),
+          type: type(raw.type), quoteText: text(raw.quoteText), speechText: text(raw.speechText), speechLang: text(raw.speechLang),
+          audioUrl: text(raw.audioUrl), audioFallbackUrl: text(raw.audioFallbackUrl), audioStartSeconds: Math.max(0, Math.min(3600, number(raw.audioStartSeconds, 0))),
+          audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 15)))), reciterName: text(raw.reciterName),
           enabled: raw.enabled !== false, updatedAt: now, updatedBy: admin.uid,
         }, { merge: true });
         imported += 1;

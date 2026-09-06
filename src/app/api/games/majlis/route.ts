@@ -21,6 +21,7 @@ export const revalidate = 0;
 
 const SESSION_COLLECTION = "majlisGameSessions";
 const ONLINE_ROOM_COLLECTION = "majlisOnlineRooms";
+const GLOBAL_CYCLE_COLLECTION = "majlisGlobalQuestionCycles";
 const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 const ONLINE_ROOM_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 const ONLINE_PLAYER_LIMIT = 16;
@@ -37,19 +38,28 @@ function shuffle<T>(items: T[]) {
   return list;
 }
 
+function cleanPrompt(value: string) {
+  return value.replace(/^(?:سؤال المجلس|اختبر معلوماتك|للنقطة هذه|السؤال)\s*[:：-]?\s*/i, "").trim();
+}
+
 function safeQuestion(question: Awaited<ReturnType<typeof getEffectiveMajlisBank>>["questions"][number], points: number): MajlisClientQuestion {
   return {
     id: question.id,
     categoryId: question.categoryId,
     groupKey: question.groupKey,
-    prompt: question.prompt,
+    prompt: cleanPrompt(question.prompt),
     options: question.options,
     difficulty: question.difficulty,
     points,
     hint: question.hint,
     type: question.type,
+    quoteText: question.quoteText,
     audioUrl: question.audioUrl,
+    audioFallbackUrl: question.audioFallbackUrl,
+    audioStartSeconds: question.audioStartSeconds,
     audioMaxSeconds: question.audioMaxSeconds,
+    speechText: question.speechText,
+    speechLang: question.speechLang,
   };
 }
 
@@ -57,29 +67,52 @@ function pointsFor(difficulty: MajlisDifficulty, settings: Awaited<ReturnType<ty
   return difficulty === "hard" ? settings.hardPoints : difficulty === "medium" ? settings.mediumPoints : settings.easyPoints;
 }
 
-function takeDistinct<T extends { groupKey: string }>(pool: T[], count: number, usedGroups: Set<string>) {
-  const result: T[] = [];
-  for (const question of shuffle(pool)) {
-    if (usedGroups.has(question.groupKey)) continue;
-    usedGroups.add(question.groupKey);
-    result.push(question);
-    if (result.length >= count) break;
+type BankQuestion = Awaited<ReturnType<typeof getEffectiveMajlisBank>>["questions"][number];
+
+function representativeGroups(items: BankQuestion[]) {
+  const map = new Map<string, BankQuestion[]>();
+  for (const item of items.filter((question) => question.enabled && question.difficulty !== "easy")) {
+    const list = map.get(item.groupKey) || [];
+    list.push(item);
+    map.set(item.groupKey, list);
   }
-  return result;
+  return map;
 }
 
-function chooseCategoryQuestions(items: Awaited<ReturnType<typeof getEffectiveMajlisBank>>["questions"]) {
-  const active = items.filter((question) => question.enabled);
-  const usedGroups = new Set<string>();
-  // مجلس التحدي يعتمد أسئلة متوسطة إلى صعبة: 4 متوسطة + سؤالان صعبان.
-  const medium = takeDistinct(active.filter((question) => question.difficulty === "medium"), 4, usedGroups);
-  const hard = takeDistinct(active.filter((question) => question.difficulty === "hard"), 2, usedGroups);
-  const selected = [...medium, ...hard];
-  if (selected.length < 6) {
-    selected.push(...takeDistinct(active.filter((question) => question.difficulty !== "easy"), 6 - selected.length, usedGroups));
-  }
-  if (selected.length < 6) selected.push(...takeDistinct(active, 6 - selected.length, usedGroups));
-  return shuffle(selected.slice(0, 6));
+function pickGroupKeys(
+  groupMap: Map<string, BankQuestion[]>,
+  candidates: string[],
+  count: number,
+  excluded = new Set<string>(),
+  distinctAnswers = false,
+) {
+  const keys = shuffle(candidates.filter((key) => !excluded.has(key)));
+  const difficultyFor = (key: string) => groupMap.get(key)?.[0]?.difficulty || "medium";
+  const answerFor = (key: string) => groupMap.get(key)?.[0]?.answer || "";
+  const hard = keys.filter((key) => difficultyFor(key) === "hard");
+  const medium = keys.filter((key) => difficultyFor(key) === "medium");
+  const result: string[] = [];
+  const usedAnswers = new Set<string>();
+
+  const push = (pool: string[], wanted: number, preferDistinct = distinctAnswers) => {
+    const passes = preferDistinct ? [true, false] : [false];
+    for (const requireDistinct of passes) {
+      for (const key of pool) {
+        if (result.includes(key)) continue;
+        const answer = answerFor(key);
+        if (requireDistinct && answer && usedAnswers.has(answer)) continue;
+        result.push(key);
+        if (answer) usedAnswers.add(answer);
+        if (result.length >= wanted) return;
+      }
+    }
+  };
+
+  // مجلس التحدي V15: 4 أسئلة صعبة + سؤالان متوسطان متى ما سمح البنك بذلك.
+  push(hard, Math.min(count, 4));
+  push(medium, Math.min(count, 6));
+  push(keys, count);
+  return result.slice(0, count);
 }
 
 async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse> {
@@ -94,30 +127,94 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
     .filter((category): category is NonNullable<typeof category> => Boolean(category));
   if (categories.length !== wantedCount) throw new Error("إحدى الفئات المختارة غير متاحة الآن.");
 
-  const board: Record<string, MajlisClientQuestion[]> = {};
-  const revealRows: Array<{ questionId: string; answer: string; explanation: string; sourceLabel: string }> = [];
+  const groupMaps = new Map<string, Map<string, BankQuestion[]>>();
   for (const category of categories) {
-    const selected = chooseCategoryQuestions(bank.questions.filter((question) => question.categoryId === category.id));
-    if (selected.length < 6) throw new Error(`الفئة «${category.title}» لا تحتوي أسئلة نشطة كافية لبدء جولة كاملة.`);
-    board[category.id] = selected.map((question) => safeQuestion(question, pointsFor(question.difficulty, settings)));
-    selected.forEach((question) => revealRows.push({
-      questionId: question.id,
-      answer: question.answer,
-      explanation: question.explanation || "",
-      sourceLabel: question.sourceLabel || "",
-    }));
+    const map = representativeGroups(bank.questions.filter((question) => question.categoryId === category.id));
+    if (map.size < 6) throw new Error(`الفئة «${category.title}» لا تحتوي معلومات مستقلة كافية لبدء جولة كاملة.`);
+    groupMaps.set(category.id, map);
   }
 
   const sessionId = randomUUID();
   const createdAt = Date.now();
-  await adminDb.collection(SESSION_COLLECTION).doc(sessionId).set({
-    sessionId,
-    createdAt,
-    expiresAt: createdAt + SESSION_MAX_AGE_MS,
-    categoryIds: categories.map((category) => category.id),
-    reveals: revealRows,
-    usedQuestionIds: [],
+  const sessionRef = adminDb.collection(SESSION_COLLECTION).doc(sessionId);
+
+  const allocated = await adminDb.runTransaction(async (transaction) => {
+    // Firestore requires transaction reads before writes. Read every category cycle first.
+    const cycleSnaps = new Map<string, unknown>();
+    for (const category of categories) {
+      const cycleRef = adminDb.collection(GLOBAL_CYCLE_COLLECTION).doc(category.id);
+      cycleSnaps.set(category.id, await transaction.get(cycleRef));
+    }
+
+    const selectedByCategory = new Map<string, BankQuestion[]>();
+    for (const category of categories) {
+      const groupMap = groupMaps.get(category.id)!;
+      const allKeys = [...groupMap.keys()];
+      const snap = cycleSnaps.get(category.id) as { data(): Record<string, unknown> | undefined };
+      const raw = snap.data() || {};
+      let cycle = Math.max(1, Math.floor(number(raw.cycle, 1)));
+      let usedKeys = new Set(Array.isArray(raw.usedGroupKeys) ? raw.usedGroupKeys.map(String).filter((key) => groupMap.has(key)) : []);
+      const selectedKeys: string[] = [];
+      let resetOccurred = false;
+
+      const remaining = allKeys.filter((key) => !usedKeys.has(key));
+      const first = pickGroupKeys(groupMap, remaining, Math.min(6, remaining.length), new Set<string>(), category.id === "reciter");
+      selectedKeys.push(...first);
+
+      if (selectedKeys.length < 6) {
+        // Every still-unseen fact is consumed before a new cycle begins.
+        cycle += 1;
+        resetOccurred = true;
+        usedKeys = new Set<string>();
+        const fill = pickGroupKeys(groupMap, allKeys, 6 - selectedKeys.length, new Set(selectedKeys), category.id === "reciter");
+        selectedKeys.push(...fill);
+      }
+      if (selectedKeys.length < 6) throw new Error(`الفئة «${category.title}» لا تحتوي ست معلومات مستقلة.`);
+
+      const nextUsed = resetOccurred
+        ? selectedKeys.slice(first.length)
+        : [...usedKeys, ...selectedKeys];
+      transaction.set(adminDb.collection(GLOBAL_CYCLE_COLLECTION).doc(category.id), {
+        categoryId: category.id,
+        cycle,
+        usedGroupKeys: Array.from(new Set(nextUsed)),
+        totalGroups: allKeys.length,
+        updatedAt: createdAt,
+      }, { merge: true });
+
+      const rows = selectedKeys.map((key) => {
+        const variants = groupMap.get(key) || [];
+        // عند وجود عدة صياغات للمعلومة نفسها نستخدم الصياغة الأساسية المباشرة.
+        return [...variants].sort((a, b) => a.id.localeCompare(b.id))[0];
+      }).filter(Boolean) as BankQuestion[];
+      selectedByCategory.set(category.id, shuffle(rows));
+    }
+
+    const revealRows: Array<{ questionId: string; answer: string; explanation: string; sourceLabel: string }> = [];
+    for (const rows of selectedByCategory.values()) {
+      rows.forEach((question) => revealRows.push({
+        questionId: question.id,
+        answer: question.answer,
+        explanation: question.explanation || "",
+        sourceLabel: question.sourceLabel || "",
+      }));
+    }
+    transaction.set(sessionRef, {
+      sessionId,
+      createdAt,
+      expiresAt: createdAt + SESSION_MAX_AGE_MS,
+      categoryIds: categories.map((category) => category.id),
+      reveals: revealRows,
+      usedQuestionIds: [],
+    });
+    return selectedByCategory;
   });
+
+  const board: Record<string, MajlisClientQuestion[]> = {};
+  for (const category of categories) {
+    const rows = allocated.get(category.id) || [];
+    board[category.id] = rows.map((question) => safeQuestion(question, pointsFor(question.difficulty, settings)));
+  }
   return { sessionId, createdAt, settings, categories, board };
 }
 
@@ -262,7 +359,7 @@ function sanitizePublicState(value: unknown): MajlisOnlinePublicState {
       name: text(team.name) || `الفريق ${index + 1}`,
       score: Math.max(0, Math.floor(number(team.score))),
       accent: text(team.accent) || "#d6b16b",
-      assists: { hint: assists.hint !== false, time: assists.time !== false, double: assists.double !== false },
+      assists: { hint: assists.hint !== false, time: assists.time !== false, double: assists.double !== false, options: assists.options !== false },
     };
   });
   const active = data.activeQuestion && typeof data.activeQuestion === "object" ? data.activeQuestion as MajlisClientQuestion : null;
@@ -280,6 +377,7 @@ function sanitizePublicState(value: unknown): MajlisOnlinePublicState {
     questionDeadlineAt: data.questionDeadlineAt == null ? null : number(data.questionDeadlineAt),
     reveal,
     hintVisible: data.hintVisible === true,
+    optionsVisible: data.optionsVisible === true,
     doubleActive: data.doubleActive === true,
     timeBonusActive: data.timeBonusActive === true,
     stealMode: data.stealMode === true,
@@ -323,7 +421,7 @@ export async function GET(request: NextRequest) {
     if (!view) {
       const [bank, settings] = await Promise.all([getEffectiveMajlisBank(), getMajlisSettings()]);
       const categories = majlisBankSummary(bank.categories, bank.questions).filter((category) => category.enabled && category.activeQuestions >= 6);
-      return NextResponse.json({ categories, settings, bankVersion: "1.1.0", totalQuestions: bank.questions.filter((question) => question.enabled).length }, { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ categories, settings, bankVersion: "1.5.0", totalQuestions: bank.questions.filter((question) => question.enabled).length }, { headers: { "Cache-Control": "no-store" } });
     }
 
     const member = await verifiedMember(request);
@@ -369,6 +467,12 @@ export async function POST(request: NextRequest) {
       if (!sessionId || !questionId) throw new Error("طلب إظهار الإجابة غير مكتمل.");
       return NextResponse.json(await revealQuestion(sessionId, questionId), { headers: { "Cache-Control": "no-store" } });
     }
+    if (action === "closeSession") {
+      const sessionId = text(body.sessionId);
+      if (!sessionId) throw new Error("جلسة المجلس غير مكتملة.");
+      await adminDb.collection(SESSION_COLLECTION).doc(sessionId).delete().catch(() => undefined);
+      return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+    }
 
     const member = await verifiedMember(request);
     if (action === "onlineCreate") {
@@ -394,7 +498,12 @@ export async function POST(request: NextRequest) {
       const players = structuredClone(room.players);
       delete players[member.userId];
       if (member.userId === room.hostId || Object.keys(players).length === 0) {
-        await ref.set({ players, status: "closed", updatedAt: now }, { merge: true });
+        const signals = await ref.collection("voiceSignals").get();
+        const batch = adminDb.batch();
+        signals.docs.slice(0, 400).forEach((doc) => batch.delete(doc.ref));
+        batch.delete(ref);
+        await batch.commit();
+        if (room.session?.sessionId) await adminDb.collection(SESSION_COLLECTION).doc(room.session.sessionId).delete().catch(() => undefined);
       } else {
         await ref.set({ players, updatedAt: now }, { merge: true });
       }
@@ -438,8 +547,8 @@ export async function POST(request: NextRequest) {
       const teamNames = normalizeTeamNames(body.teamNames, teamCount);
       const categoryIds = Array.isArray(body.categoryIds) ? body.categoryIds.map(String) : [];
       const session = await startGame(categoryIds);
-      const teams = Array.from({ length: teamCount }, (_, index) => ({ id: `team-${index + 1}`, name: teamNames[index], score: 0, accent: ["#d6b16b", "#7fb3a8", "#c77a62", "#8f9fc9"][index] || "#d6b16b", assists: { hint: true, time: true, double: true } }));
-      const publicState: MajlisOnlinePublicState = { phase: "board", teams, currentTeamIndex: 0, usedQuestionIds: [], activeQuestion: null, questionOwnerIndex: 0, answeringTeamIndex: 0, secondsLeft: 0, timerPaused: false, questionDeadlineAt: null, reveal: null, hintVisible: false, doubleActive: false, timeBonusActive: false, stealMode: false, finishReason: "complete", updatedAt: now };
+      const teams = Array.from({ length: teamCount }, (_, index) => ({ id: `team-${index + 1}`, name: teamNames[index], score: 0, accent: ["#d6b16b", "#7fb3a8", "#c77a62", "#8f9fc9"][index] || "#d6b16b", assists: { hint: true, time: true, double: true, options: true } }));
+      const publicState: MajlisOnlinePublicState = { phase: "board", teams, currentTeamIndex: 0, usedQuestionIds: [], activeQuestion: null, questionOwnerIndex: 0, answeringTeamIndex: 0, secondsLeft: 0, timerPaused: false, questionDeadlineAt: null, reveal: null, hintVisible: false, optionsVisible: false, doubleActive: false, timeBonusActive: false, stealMode: false, finishReason: "complete", updatedAt: now };
       await ref.set({ status: "playing", teamCount, teamNames, selectedCategoryIds: categoryIds, session, publicState, updatedAt: now }, { merge: true });
       const snap = await ref.get();
       return NextResponse.json({ room: mapOnlineRoom(ref.id, snap.data() || {}), session });
@@ -452,7 +561,15 @@ export async function POST(request: NextRequest) {
     }
     if (action === "onlineClose") {
       if (member.userId !== room.hostId) throw new Error("إنهاء المجلس متاح للمضيف فقط.");
-      await ref.set({ status: "closed", updatedAt: now }, { merge: true });
+      const signals = await ref.collection("voiceSignals").get();
+      for (let start = 0; start < signals.docs.length; start += 400) {
+        const batch = adminDb.batch();
+        signals.docs.slice(start, start + 400).forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+      }
+      const sessionId = room.session?.sessionId;
+      if (sessionId) await adminDb.collection(SESSION_COLLECTION).doc(sessionId).delete().catch(() => undefined);
+      await ref.delete();
       return NextResponse.json({ ok: true });
     }
     if (action === "onlineVoiceSignal") {

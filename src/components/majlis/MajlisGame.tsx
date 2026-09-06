@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   AudioLines, Check, ChevronLeft, Clock3, Coffee, Copy, Crown, Dices, DoorOpen, Eye, EyeOff,
-  HandHelping, Hourglass, Lightbulb, LoaderCircle, Medal, Mic, MicOff, Pause, Play, Radio,
-  RefreshCw, RotateCcw, ShieldCheck, Sparkles, Swords, Trophy, UsersRound, Volume2, VolumeX, Wifi, X,
+  HandHelping, Hourglass, Lightbulb, ListChecks, LoaderCircle, Medal, Mic, MicOff, Pause, Play, Radio,
+  RefreshCw, RotateCcw, RotateCw, ShieldCheck, Sparkles, Swords, Trophy, UsersRound, Volume2, VolumeX, Wifi, X,
 } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import styles from "./MajlisGame.module.css";
@@ -24,7 +24,7 @@ import type {
 } from "@/types/majlisGame";
 
 type CategorySummary = MajlisCategory & { totalQuestions: number; activeQuestions: number; easy: number; medium: number; hard: number; audio: number };
-type Team = { id: string; name: string; score: number; accent: string; assists: { hint: boolean; time: boolean; double: boolean } };
+type Team = { id: string; name: string; score: number; accent: string; assists: { hint: boolean; time: boolean; double: boolean; options: boolean } };
 type PersistedState = { savedAt: number; session: MajlisGameStartResponse; teams: Team[]; currentTeamIndex: number; usedQuestionIds: string[]; phase: "board" | "finished" };
 
 const STORAGE_KEY = "altahaddi_majlis_session_v2";
@@ -38,6 +38,31 @@ function sameTeam(room: MajlisOnlineRoom, a?: string | null, b?: string | null) 
   return Boolean(room.players[a]?.teamId && room.players[a]?.teamId === room.players[b]?.teamId);
 }
 
+async function enterGamePresentation() {
+  if (typeof window === "undefined") return;
+  try {
+    const root = document.documentElement as HTMLElement & { requestFullscreen?: () => Promise<void> };
+    if (!document.fullscreenElement && root.requestFullscreen) {
+      await root.requestFullscreen().catch(() => undefined);
+    }
+  } catch {}
+  try {
+    const orientation = (screen as Screen & { orientation?: ScreenOrientation & { lock?: (value: string) => Promise<void> } }).orientation;
+    await orientation?.lock?.("landscape").catch(() => undefined);
+  } catch {}
+}
+
+async function exitGamePresentation() {
+  if (typeof window === "undefined") return;
+  try {
+    const orientation = (screen as Screen & { orientation?: ScreenOrientation & { unlock?: () => void } }).orientation;
+    orientation?.unlock?.();
+  } catch {}
+  try {
+    if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen().catch(() => undefined);
+  } catch {}
+}
+
 function LoadingBlock() {
   return <div className="grid min-h-[320px] place-items-center p-6 text-center"><div><LoaderCircle className="mx-auto h-8 w-8 animate-spin text-[#d6b16b]"/><p className="mt-3 text-sm font-black text-[#f7efdc]/70">نجهّز مجلس التحدي وبنك الأسئلة…</p></div></div>;
 }
@@ -47,29 +72,85 @@ function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => () => { if (stopTimerRef.current) clearTimeout(stopTimerRef.current); audioRef.current?.pause(); }, []);
+  const [usingFallback, setUsingFallback] = useState(false);
+
+  useEffect(() => () => {
+    if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+    audioRef.current?.pause();
+  }, []);
+
+  function createAudio(url: string) {
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    audio.setAttribute("playsinline", "true");
+    audio.onended = () => setPlaying(false);
+    audio.onerror = () => setPlaying(false);
+    return audio;
+  }
+
+  async function playFrom(url: string) {
+    const audio = createAudio(url);
+    audioRef.current = audio;
+    const startAt = Math.max(0, question.audioStartSeconds || 0);
+    await new Promise<void>((resolve) => {
+      if (audio.readyState >= 1) return resolve();
+      const done = () => { audio.removeEventListener("loadedmetadata", done); resolve(); };
+      audio.addEventListener("loadedmetadata", done, { once: true });
+      window.setTimeout(done, 2500);
+    });
+    try { if (startAt > 0 && Number.isFinite(audio.duration) && audio.duration > startAt + 2) audio.currentTime = startAt; } catch {}
+    await audio.play();
+    setPlaying(true);
+    if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+    stopTimerRef.current = setTimeout(() => { audio.pause(); setPlaying(false); }, Math.max(8, question.audioMaxSeconds || 15) * 1000);
+  }
+
   async function toggle() {
     if (!question.audioUrl) return;
     setError("");
-    if (!audioRef.current) {
-      const audio = new Audio(question.audioUrl); audio.preload = "metadata"; audio.setAttribute("playsinline", "true");
-      audio.onended = () => setPlaying(false);
-      audio.onerror = () => { setPlaying(false); setError("تعذر تشغيل المقطع. جرّب مرة أخرى."); };
-      audioRef.current = audio;
-    }
-    const audio = audioRef.current;
-    if (playing) { audio.pause(); setPlaying(false); return; }
+    if (playing && audioRef.current) { audioRef.current.pause(); setPlaying(false); return; }
     try {
-      audio.currentTime = 0; await audio.play(); setPlaying(true);
-      if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
-      stopTimerRef.current = setTimeout(() => { audio.pause(); setPlaying(false); }, Math.max(4, question.audioMaxSeconds || 12) * 1000);
-    } catch { setError("المتصفح منع التشغيل. اضغط تشغيل مرة أخرى."); setPlaying(false); }
+      await playFrom(usingFallback && question.audioFallbackUrl ? question.audioFallbackUrl : question.audioUrl);
+    } catch {
+      if (!usingFallback && question.audioFallbackUrl) {
+        try { setUsingFallback(true); await playFrom(question.audioFallbackUrl); return; } catch {}
+      }
+      setError("تعذر تشغيل هذا المقطع. جرّب مرة أخرى أو اختر سؤالًا آخر.");
+      setPlaying(false);
+    }
   }
-  return <div className="rounded-[24px] border border-[#d6b16b]/25 bg-black/20 p-4 text-center">
-    <div className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-[#d6b16b]/25 bg-[#d6b16b]/10 text-[#ead8ad]"><AudioLines className="h-7 w-7"/></div>
-    <p className="mt-2 text-xs font-black text-[#f7efdc]/60">مقطع صوتي قصير — ركّز في نبرة القارئ وأسلوبه</p>
-    <button type="button" onClick={toggle} className="mx-auto mt-3 inline-flex min-h-[48px] items-center gap-2 rounded-2xl bg-[#d6b16b] px-5 text-sm font-black text-[#173b35]">{playing?<Pause className="h-4 w-4"/>:<Play className="h-4 w-4"/>}{playing?"إيقاف المقطع":"تشغيل المقطع"}</button>
+
+  return <div className={styles.mediaPlayer}>
+    <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-[#d6b16b]/25 bg-[#d6b16b]/10 text-[#ead8ad]"><AudioLines className="h-6 w-6"/></div>
+    <p className="mt-2 text-[11px] font-black text-[#f7efdc]/60">15 ثانية من التلاوة — يبدأ المقطع بعد المقدمة قدر الإمكان</p>
+    <button type="button" onClick={toggle} className="mx-auto mt-3 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-[#d6b16b] px-5 text-sm font-black text-[#173b35]">{playing?<Pause className="h-4 w-4"/>:<Play className="h-4 w-4"/>}{playing?"إيقاف":"تشغيل المقطع"}</button>
     {error?<p role="alert" className="mt-2 text-[11px] font-bold text-rose-200">{error}</p>:null}
+  </div>;
+}
+
+function SpeechQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState("");
+  function speak() {
+    if (!question.speechText || typeof window === "undefined" || !("speechSynthesis" in window)) { setError("هذا الجهاز لا يدعم تشغيل النطق الآلي."); return; }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(question.speechText);
+    utterance.lang = question.speechLang || "ar";
+    utterance.rate = .88;
+    const voices = window.speechSynthesis.getVoices();
+    const base = utterance.lang.toLowerCase().split("-")[0];
+    const voice = voices.find((item) => item.lang.toLowerCase() === utterance.lang.toLowerCase()) || voices.find((item) => item.lang.toLowerCase().startsWith(base));
+    if (voice) utterance.voice = voice;
+    utterance.onstart = () => { setPlaying(true); setError(""); };
+    utterance.onend = () => setPlaying(false);
+    utterance.onerror = () => { setPlaying(false); setError("تعذر تشغيل النطق على هذا الجهاز."); };
+    window.speechSynthesis.speak(utterance);
+  }
+  return <div className={styles.mediaPlayer}>
+    <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-[#7fb3a8]/25 bg-[#7fb3a8]/10 text-[#bfe2d8]"><Volume2 className="h-6 w-6"/></div>
+    <p className="mt-2 text-[11px] font-black text-[#f7efdc]/60">استمع أولًا، ثم جاوب بدون ظهور الاختيارات</p>
+    <button type="button" onClick={speak} className="mx-auto mt-3 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-[#7fb3a8] px-5 text-sm font-black text-[#102d2b]">{playing?<Volume2 className="h-4 w-4"/>:<Play className="h-4 w-4"/>}{playing?"جاري التشغيل":"تشغيل الصوت"}</button>
+    {error?<p role="alert" className="mt-2 text-[11px] font-bold text-amber-100">{error}</p>:null}
   </div>;
 }
 
@@ -78,7 +159,8 @@ function VoiceControls({ room, userId, compact = false }: { room: MajlisOnlineRo
   const modes: Array<{ mode: MajlisVoiceMode; label: string; icon: typeof Mic }> = [
     { mode: "off", label: "مغلق", icon: MicOff }, { mode: "team", label: "فريقي", icon: UsersRound }, { mode: "all", label: "عام", icon: Radio },
   ];
-  return <div className={cn("rounded-[22px] border border-[#ead8ad]/10 bg-black/18", compact?"p-2.5":"p-3.5")}>
+  if(compact)return <div className={styles.voiceCompact} aria-label="التحكم بصوت المجلس">{modes.map(({mode,label,icon:Icon})=><button key={mode} type="button" title={label} aria-label={`المايك: ${label}`} aria-pressed={voice.micMode===mode} onClick={()=>void voice.setMode(mode)} className={voice.micMode===mode?styles.voiceCompactActive:""}><Icon/></button>)}{voice.needsAudioUnlock?<button type="button" title="تشغيل الصوت" onClick={()=>void voice.unlockAudio()}><Volume2/></button>:null}</div>;
+  return <div className={cn("rounded-[22px] border border-[#ead8ad]/10 bg-black/18", "p-3.5")}>
     <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
       <div className="min-w-0"><div className="flex items-center gap-1.5 text-[10px] font-black text-[#ead8ad]"><Mic className="h-3.5 w-3.5"/> صوت المجلس</div>{!compact?<p className="mt-1 text-[9px] font-bold leading-5 text-[#f7efdc]/38">«فريقي» يسمعه أعضاء فريقك فقط، و«عام» يسمعه جميع الموجودين.</p>:null}</div>
       <div className="flex items-center gap-1 text-[9px] font-black text-[#f7efdc]/40"><Wifi className="h-3.5 w-3.5"/>{voice.turnEnabled?"TURN متصل":"اتصال مباشر"}</div>
@@ -88,7 +170,7 @@ function VoiceControls({ room, userId, compact = false }: { room: MajlisOnlineRo
     </div>
     {voice.needsAudioUnlock?<button type="button" onClick={()=>void voice.unlockAudio()} className="mt-2 min-h-10 w-full rounded-xl bg-[#7fb3a8] text-[10px] font-black text-[#102d2b]">تشغيل صوت اللاعبين</button>:null}
     {voice.error?<p role="alert" className="mt-2 text-[9px] font-bold leading-5 text-rose-200">{voice.error}</p>:null}
-    {!compact?<div className="mt-2 flex flex-wrap gap-1.5">{Object.values(room.players).map(player=><span key={player.userId} className={cn("rounded-full border px-2 py-1 text-[9px] font-black", player.userId===userId?"border-[#d6b16b]/25 bg-[#d6b16b]/8 text-[#ead8ad]":"border-white/8 bg-white/[.025] text-[#f7efdc]/42")}><span className="ml-1">{player.micMode==="all"?"📢":player.micMode==="team"?"🎙️":"🔇"}</span>{player.userName}</span>)}</div>:null}
+    {!compact?<div className="mt-2 flex flex-wrap gap-1.5">{(Object.values(room.players) as Array<MajlisOnlineRoom["players"][string]>).map(player=><span key={player.userId} className={cn("rounded-full border px-2 py-1 text-[9px] font-black", player.userId===userId?"border-[#d6b16b]/25 bg-[#d6b16b]/8 text-[#ead8ad]":"border-white/8 bg-white/[.025] text-[#f7efdc]/42")}><span className="ml-1">{player.micMode==="all"?"📢":player.micMode==="team"?"🎙️":"🔇"}</span>{player.userName}</span>)}</div>:null}
   </div>;
 }
 
@@ -100,11 +182,11 @@ export default function MajlisGame() {
   const [phase,setPhase]=useState<"setup"|"board"|"finished">("setup"); const [teamCount,setTeamCount]=useState(2); const [teamNames,setTeamNames]=useState(["الفريق الأول","الفريق الثاني","الفريق الثالث","الفريق الرابع"]); const [selectedCategoryIds,setSelectedCategoryIds]=useState<string[]>([]);
   const [session,setSession]=useState<MajlisGameStartResponse|null>(null); const [teams,setTeams]=useState<Team[]>([]); const [currentTeamIndex,setCurrentTeamIndex]=useState(0); const [usedQuestionIds,setUsedQuestionIds]=useState<string[]>([]);
   const [activeQuestion,setActiveQuestion]=useState<MajlisClientQuestion|null>(null); const [questionOwnerIndex,setQuestionOwnerIndex]=useState(0); const [answeringTeamIndex,setAnsweringTeamIndex]=useState(0); const [secondsLeft,setSecondsLeft]=useState(0); const [timerPaused,setTimerPaused]=useState(false); const [questionDeadlineAt,setQuestionDeadlineAt]=useState<number|null>(null);
-  const [revealing,setRevealing]=useState(false); const [reveal,setReveal]=useState<MajlisReveal|null>(null); const [hintVisible,setHintVisible]=useState(false); const [doubleActive,setDoubleActive]=useState(false); const [timeBonusActive,setTimeBonusActive]=useState(false); const [stealMode,setStealMode]=useState(false); const [soundOn,setSoundOn]=useState(true); const [starting,setStarting]=useState(false); const [finishReason,setFinishReason]=useState<"complete"|"manual">("complete");
+  const [revealing,setRevealing]=useState(false); const [reveal,setReveal]=useState<MajlisReveal|null>(null); const [hintVisible,setHintVisible]=useState(false); const [optionsVisible,setOptionsVisible]=useState(false); const [doubleActive,setDoubleActive]=useState(false); const [timeBonusActive,setTimeBonusActive]=useState(false); const [stealMode,setStealMode]=useState(false); const [soundOn,setSoundOn]=useState(true); const [starting,setStarting]=useState(false); const [isLandscape,setIsLandscape]=useState(true); const [finishReason,setFinishReason]=useState<"complete"|"manual">("complete");
 
   const onlineHost = Boolean(user?.id && onlineRoom?.hostId === user.id);
   const canControl = playMode === "local" || onlineHost;
-  const totalBoardQuestions=useMemo(()=>session?Object.values(session.board).reduce((sum,list)=>sum+list.length,0):0,[session]);
+  const totalBoardQuestions=useMemo(()=>session?(Object.values(session.board) as MajlisClientQuestion[][]).reduce((sum,list)=>sum+list.length,0):0,[session]);
   const currentTeam=teams[currentTeamIndex]||null; const answeringTeam=teams[answeringTeamIndex]||null; const usedSet=useMemo(()=>new Set(usedQuestionIds),[usedQuestionIds]);
 
   const loadCatalog=useCallback(async()=>{try{setLoading(true);setError("");const response=await fetch("/api/games/majlis",{cache:"no-store"});const payload=await response.json().catch(()=>({})) as {categories?:CategorySummary[];settings?:MajlisSettings;totalQuestions?:number;error?:string};if(!response.ok)throw new Error(payload.error||"تعذر تحميل اللعبة.");const list=payload.categories||[];setCategories(list);setSettings(payload.settings||null);setTotalQuestions(payload.totalQuestions||0);const count=payload.settings?.categoriesPerGame||6;setSelectedCategoryIds(current=>current.length?current:list.slice(0,count).map(item=>item.id));}catch(e){setError(e instanceof Error?e.message:"تعذر تحميل اللعبة.");}finally{setLoading(false);}},[]);
@@ -112,15 +194,29 @@ export default function MajlisGame() {
   useEffect(()=>{preloadMajlisSounds();setSoundOn(isMajlisSoundEnabled());void loadCatalog();try{const saved=localStorage.getItem(STORAGE_KEY);if(!saved)return;const parsed=JSON.parse(saved) as PersistedState;if(!parsed?.session||Date.now()-Number(parsed.savedAt||0)>8*60*60*1000){localStorage.removeItem(STORAGE_KEY);return;}setSession(parsed.session);setTeams(parsed.teams||[]);setCurrentTeamIndex(parsed.currentTeamIndex||0);setUsedQuestionIds(parsed.usedQuestionIds||[]);setPhase(parsed.phase||"board");}catch{localStorage.removeItem(STORAGE_KEY);}},[loadCatalog]);
   useEffect(()=>{if(playMode!=="local"||!session||!teams.length||phase==="setup")return;localStorage.setItem(STORAGE_KEY,JSON.stringify({savedAt:Date.now(),session,teams,currentTeamIndex,usedQuestionIds,phase} satisfies PersistedState));},[playMode,session,teams,currentTeamIndex,usedQuestionIds,phase]);
 
+  useEffect(()=>{
+    if(typeof window==="undefined")return;
+    const media=window.matchMedia("(orientation: landscape)");
+    const update=()=>setIsLandscape(media.matches||window.innerWidth>=768);
+    update(); media.addEventListener?.("change",update); window.addEventListener("resize",update);
+    if(phase!=="setup"){
+      const orientation=(screen as Screen & {orientation?:ScreenOrientation & {lock?:(value:string)=>Promise<void>}}).orientation;
+      void orientation?.lock?.("landscape").catch(()=>undefined);
+    }
+    return()=>{media.removeEventListener?.("change",update);window.removeEventListener("resize",update);};
+  },[phase]);
+
   // Accurate shared timer: a deadline is synced instead of writing once every second.
+  useEffect(()=>{if(phase==="finished")void exitGamePresentation();},[phase]);
+
   useEffect(()=>{if(!activeQuestion||timerPaused||reveal||!questionDeadlineAt)return;const tick=()=>setSecondsLeft(Math.max(0,Math.ceil((questionDeadlineAt-Date.now())/1000)));tick();const timer=setInterval(tick,250);return()=>clearInterval(timer);},[activeQuestion,timerPaused,reveal,questionDeadlineAt]);
   useEffect(()=>{if(!activeQuestion||timerPaused||reveal)return;if(secondsLeft>0&&secondsLeft<=5)playMajlisSound("timer");},[secondsLeft,activeQuestion,timerPaused,reveal]);
 
   // Online room polling + heartbeat.
-  useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!user?.id)return;let cancelled=false;let pollTimer:ReturnType<typeof setTimeout>|null=null;let heartbeatTimer:ReturnType<typeof setInterval>|null=null;const poll=async()=>{try{const {room}=await getMajlisOnlineRoom(onlineRoom.id);if(cancelled)return;setOnlineRoom(room);setTeamCount(room.teamCount);setTeamNames(current=>current.map((name,i)=>room.teamNames[i]||name));if(!onlineHost)setSelectedCategoryIds(room.selectedCategoryIds);if(!onlineHost&&room.session&&room.publicState){const ps=room.publicState;setSession(room.session);setTeams(ps.teams);setCurrentTeamIndex(ps.currentTeamIndex);setUsedQuestionIds(ps.usedQuestionIds);setActiveQuestion(ps.activeQuestion);setQuestionOwnerIndex(ps.questionOwnerIndex);setAnsweringTeamIndex(ps.answeringTeamIndex);setSecondsLeft(ps.secondsLeft);setTimerPaused(ps.timerPaused);setQuestionDeadlineAt(ps.questionDeadlineAt);setReveal(ps.reveal);setHintVisible(ps.hintVisible);setDoubleActive(ps.doubleActive);setTimeBonusActive(ps.timeBonusActive);setStealMode(ps.stealMode);setFinishReason(ps.finishReason);setPhase(ps.phase);}if(room.status==="closed"){setError("تم إغلاق المجلس من المضيف.");}}catch(e){if(!cancelled)console.warn("Majlis room poll",e);}finally{if(!cancelled)pollTimer=setTimeout(poll,900);}};void poll();heartbeatTimer=setInterval(()=>void heartbeatMajlisOnlineRoom(onlineRoom.id).catch(()=>{}),12000);return()=>{cancelled=true;if(pollTimer)clearTimeout(pollTimer);if(heartbeatTimer)clearInterval(heartbeatTimer);};},[playMode,onlineRoom?.id,user?.id,onlineHost]);
+  useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!user?.id)return;let cancelled=false;let pollTimer:ReturnType<typeof setTimeout>|null=null;let heartbeatTimer:ReturnType<typeof setInterval>|null=null;const roomId=onlineRoom.id;const poll=async()=>{try{const {room}=await getMajlisOnlineRoom(roomId);if(cancelled)return;setOnlineRoom(room);setTeamCount(room.teamCount);setTeamNames(current=>current.map((name,i)=>room.teamNames[i]||name));if(!onlineHost)setSelectedCategoryIds(room.selectedCategoryIds);if(!onlineHost&&room.session&&room.publicState){const ps=room.publicState;setSession(room.session);setTeams(ps.teams);setCurrentTeamIndex(ps.currentTeamIndex);setUsedQuestionIds(ps.usedQuestionIds);setActiveQuestion(ps.activeQuestion);setQuestionOwnerIndex(ps.questionOwnerIndex);setAnsweringTeamIndex(ps.answeringTeamIndex);setSecondsLeft(ps.secondsLeft);setTimerPaused(ps.timerPaused);setQuestionDeadlineAt(ps.questionDeadlineAt);setReveal(ps.reveal);setHintVisible(ps.hintVisible);setOptionsVisible(ps.optionsVisible);setDoubleActive(ps.doubleActive);setTimeBonusActive(ps.timeBonusActive);setStealMode(ps.stealMode);setFinishReason(ps.finishReason);setPhase(ps.phase);}if(room.status==="closed"){cancelled=true;void exitGamePresentation();setOnlineRoom(null);setSession(null);setTeams([]);setPhase("setup");setError("انتهى المجلس.");return;}}catch(e){const message=e instanceof Error?e.message:"";if(!cancelled&&/(غير موجود|انتهى|صلاحية|إغلاق|closed)/i.test(message)){cancelled=true;void exitGamePresentation();setOnlineRoom(null);setSession(null);setTeams([]);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setPhase("setup");setError("انتهى المجلس. ابدأ مجلسًا جديدًا.");return;}if(!cancelled)console.warn("Majlis room poll",e);}finally{if(!cancelled)pollTimer=setTimeout(poll,900);}};void poll();heartbeatTimer=setInterval(()=>void heartbeatMajlisOnlineRoom(roomId).catch(()=>{}),12000);return()=>{cancelled=true;if(pollTimer)clearTimeout(pollTimer);if(heartbeatTimer)clearInterval(heartbeatTimer);};},[playMode,onlineRoom?.id,user?.id,onlineHost]);
 
   // Host publishes only authoritative state. Debounced; the deadline makes timers deterministic on all devices.
-  useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!onlineHost||!session||phase==="setup"||onlineRoom.status!=="playing")return;const publicState:MajlisOnlinePublicState={phase:phase==="finished"?"finished":"board",teams,currentTeamIndex,usedQuestionIds,activeQuestion,questionOwnerIndex,answeringTeamIndex,secondsLeft,timerPaused,questionDeadlineAt,reveal,hintVisible,doubleActive,timeBonusActive,stealMode,finishReason,updatedAt:Date.now()};const timer=setTimeout(()=>void syncMajlisOnlineState(onlineRoom.id,publicState).catch(e=>console.warn("Majlis state sync",e)),180);return()=>clearTimeout(timer);},[playMode,onlineRoom?.id,onlineRoom?.status,onlineHost,session,phase,teams,currentTeamIndex,usedQuestionIds,activeQuestion,questionOwnerIndex,answeringTeamIndex,timerPaused,questionDeadlineAt,reveal,hintVisible,doubleActive,timeBonusActive,stealMode,finishReason]);
+  useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!onlineHost||!session||phase==="setup"||onlineRoom.status!=="playing")return;const publicState:MajlisOnlinePublicState={phase:phase==="finished"?"finished":"board",teams,currentTeamIndex,usedQuestionIds,activeQuestion,questionOwnerIndex,answeringTeamIndex,secondsLeft,timerPaused,questionDeadlineAt,reveal,hintVisible,optionsVisible,doubleActive,timeBonusActive,stealMode,finishReason,updatedAt:Date.now()};const timer=setTimeout(()=>void syncMajlisOnlineState(onlineRoom.id,publicState).catch(e=>console.warn("Majlis state sync",e)),180);return()=>clearTimeout(timer);},[playMode,onlineRoom?.id,onlineRoom?.status,onlineHost,session,phase,teams,currentTeamIndex,usedQuestionIds,activeQuestion,questionOwnerIndex,answeringTeamIndex,timerPaused,questionDeadlineAt,reveal,hintVisible,optionsVisible,doubleActive,timeBonusActive,stealMode,finishReason]);
 
   // Keep online lobby settings visible to everyone before the host starts.
   useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!onlineHost||onlineRoom.status!=="lobby")return;const timer=setTimeout(()=>void updateMajlisOnlineLobby(onlineRoom.id,teamCount,teamNames.slice(0,teamCount),selectedCategoryIds).catch(()=>{}),450);return()=>clearTimeout(timer);},[playMode,onlineRoom?.id,onlineRoom?.status,onlineHost,teamCount,teamNames,selectedCategoryIds]);
@@ -131,23 +227,39 @@ export default function MajlisGame() {
 
   async function createOnline(){if(!isLoggedIn||!secureSession){setError("سجّل الدخول بحسابك أولًا لاستخدام مجلس التحدي أونلاين.");return;}try{setOnlineBusy(true);setError("");const {room}=await createMajlisOnlineRoom(teamCount,teamNames.slice(0,teamCount));setOnlineRoom(room);setSelectedCategoryIds(current=>current.slice(0,settings?.categoriesPerGame||6));playMajlisSound("start");}catch(e){setError(e instanceof Error?e.message:"تعذر إنشاء المجلس.");}finally{setOnlineBusy(false);}}
   async function joinOnline(){if(!isLoggedIn||!secureSession){setError("سجّل الدخول بحسابك أولًا للانضمام إلى مجلس أونلاين.");return;}const code=roomCodeInput.replace(/\D/g,"").slice(0,6);if(code.length!==6){setError("اكتب كود المجلس المكوّن من 6 أرقام.");return;}try{setOnlineBusy(true);setError("");const {room}=await joinMajlisOnlineRoom(code);setOnlineRoom(room);setTeamCount(room.teamCount);setTeamNames(current=>current.map((name,i)=>room.teamNames[i]||name));setSelectedCategoryIds(room.selectedCategoryIds);if(room.session&&room.publicState){setSession(room.session);setPhase(room.publicState.phase);}playMajlisSound("start");}catch(e){setError(e instanceof Error?e.message:"تعذر دخول المجلس.");}finally{setOnlineBusy(false);}}
-  async function leaveOnline(){if(!onlineRoom)return;try{if(onlineHost)await closeMajlisOnlineRoom(onlineRoom.id);else await leaveMajlisOnlineRoom(onlineRoom.id);}catch{}setOnlineRoom(null);setSession(null);setTeams([]);setPhase("setup");setError("");}
+  async function leaveOnline(){if(!onlineRoom)return;try{if(onlineHost)await closeMajlisOnlineRoom(onlineRoom.id);else await leaveMajlisOnlineRoom(onlineRoom.id);}catch{}void exitGamePresentation();setOnlineRoom(null);setSession(null);setTeams([]);setPhase("setup");setError("");}
   async function chooseOnlineTeam(teamId:string){if(!onlineRoom)return;try{const {room}=await setMajlisOnlineTeam(onlineRoom.id,teamId);setOnlineRoom(room);playMajlisSound("tap");}catch(e){setError(e instanceof Error?e.message:"تعذر تغيير الفريق.");}}
 
-  function createdTeamsFor(count=teamCount,names=teamNames):Team[]{return Array.from({length:count},(_,index)=>({id:`team-${index+1}`,name:names[index]?.trim()||`الفريق ${index+1}`,score:0,accent:TEAM_COLORS[index],assists:{hint:true,time:true,double:true}}));}
-  async function startGame(){if(!settings||selectedCategoryIds.length!==settings.categoriesPerGame)return;try{setStarting(true);setError("");let payload:MajlisGameStartResponse;if(playMode==="online"){if(!onlineRoom||!onlineHost)throw new Error("بدء المجلس متاح للمضيف فقط.");const result=await startMajlisOnlineGame(onlineRoom.id,selectedCategoryIds,teamCount,teamNames.slice(0,teamCount));payload=result.session;setOnlineRoom(result.room);setTeams(result.room.publicState?.teams||createdTeamsFor());}else{const response=await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start",categoryIds:selectedCategoryIds})});const result=await response.json().catch(()=>({})) as MajlisGameStartResponse&{error?:string};if(!response.ok)throw new Error(result.error||"تعذر بدء المجلس.");payload=result;setTeams(createdTeamsFor());}setSession(payload);setCurrentTeamIndex(0);setUsedQuestionIds([]);setPhase("board");setFinishReason("complete");playMajlisSound("start");majlisHaptic("success");window.setTimeout(()=>document.getElementById("majlis-board")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),80);}catch(e){setError(e instanceof Error?e.message:"تعذر بدء المجلس.");}finally{setStarting(false);}}
+  function createdTeamsFor(count=teamCount,names=teamNames):Team[]{return Array.from({length:count},(_,index)=>({id:`team-${index+1}`,name:names[index]?.trim()||`الفريق ${index+1}`,score:0,accent:TEAM_COLORS[index],assists:{hint:true,time:true,double:true,options:true}}));}
+  async function startGame(){if(!settings||selectedCategoryIds.length!==settings.categoriesPerGame)return;const presentationPromise=enterGamePresentation();try{setStarting(true);setError("");let payload:MajlisGameStartResponse;if(playMode==="online"){if(!onlineRoom||!onlineHost)throw new Error("بدء المجلس متاح للمضيف فقط.");const result=await startMajlisOnlineGame(onlineRoom.id,selectedCategoryIds,teamCount,teamNames.slice(0,teamCount));payload=result.session;setOnlineRoom(result.room);setTeams(result.room.publicState?.teams||createdTeamsFor());}else{const response=await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start",categoryIds:selectedCategoryIds})});const result=await response.json().catch(()=>({})) as MajlisGameStartResponse&{error?:string};if(!response.ok)throw new Error(result.error||"تعذر بدء المجلس.");payload=result;setTeams(createdTeamsFor());}setSession(payload);setCurrentTeamIndex(0);setUsedQuestionIds([]);setPhase("board");setFinishReason("complete");playMajlisSound("start");majlisHaptic("success");void presentationPromise;window.setTimeout(()=>document.getElementById("majlis-board")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),80);}catch(e){void exitGamePresentation();setError(e instanceof Error?e.message:"تعذر بدء المجلس.");}finally{setStarting(false);}}
 
-  function openQuestion(question:MajlisClientQuestion){if(!canControl||!session||usedSet.has(question.id)||!currentTeam)return;playMajlisSound("question");majlisHaptic();const seconds=session.settings.questionSeconds;setQuestionOwnerIndex(currentTeamIndex);setAnsweringTeamIndex(currentTeamIndex);setActiveQuestion(question);setSecondsLeft(seconds);setTimerPaused(false);setQuestionDeadlineAt(Date.now()+seconds*1000);setReveal(null);setHintVisible(false);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);}
+  function openQuestion(question:MajlisClientQuestion){if(!canControl||!session||usedSet.has(question.id)||!currentTeam)return;playMajlisSound("question");majlisHaptic();const seconds=session.settings.questionSeconds;setQuestionOwnerIndex(currentTeamIndex);setAnsweringTeamIndex(currentTeamIndex);setActiveQuestion(question);setSecondsLeft(seconds);setTimerPaused(false);setQuestionDeadlineAt(Date.now()+seconds*1000);setReveal(null);setHintVisible(false);setOptionsVisible(false);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);}
   async function revealAnswer(){if(!canControl||!activeQuestion||!session||reveal)return;try{setRevealing(true);setTimerPaused(true);setQuestionDeadlineAt(null);const response=await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"reveal",sessionId:session.sessionId,questionId:activeQuestion.id})});const payload=await response.json().catch(()=>({})) as MajlisReveal&{error?:string};if(!response.ok)throw new Error(payload.error||"تعذر إظهار الإجابة.");setReveal(payload);playMajlisSound("reveal");}catch(e){setError(e instanceof Error?e.message:"تعذر إظهار الإجابة.");}finally{setRevealing(false);}}
   function toggleTimerPause(){if(!canControl||!activeQuestion||reveal)return;if(timerPaused){setQuestionDeadlineAt(Date.now()+secondsLeft*1000);setTimerPaused(false);}else{setQuestionDeadlineAt(null);setTimerPaused(true);}}
-  function useAssist(type:keyof Team["assists"]){if(!canControl||!activeQuestion||!answeringTeam||reveal||stealMode||!answeringTeam.assists[type])return;playMajlisSound("tap");majlisHaptic();setTeams(current=>current.map((team,index)=>index===answeringTeamIndex?{...team,assists:{...team.assists,[type]:false}}:team));if(type==="hint")setHintVisible(true);if(type==="time"){setTimeBonusActive(true);setSecondsLeft(value=>value+15);setQuestionDeadlineAt(deadline=>deadline?deadline+15000:Date.now()+(secondsLeft+15)*1000);}if(type==="double")setDoubleActive(true);}
-  function offerSteal(){if(!canControl||!activeQuestion||!session?.settings.allowSteal||reveal||teams.length<2)return;const next=(answeringTeamIndex+1)%teams.length;const secs=session.settings.stealSeconds;setAnsweringTeamIndex(next);setStealMode(true);setDoubleActive(false);setTimeBonusActive(false);setHintVisible(false);setSecondsLeft(secs);setTimerPaused(false);setQuestionDeadlineAt(Date.now()+secs*1000);playMajlisSound("steal");majlisHaptic();}
-  function closeQuestionAfterResult(correct:boolean){if(!canControl||!activeQuestion)return;const award=correct?activeQuestion.points*(doubleActive?2:1):0;if(award>0){setTeams(current=>current.map((team,index)=>index===answeringTeamIndex?{...team,score:team.score+award}:team));playMajlisSound("correct");majlisHaptic("success");}else{playMajlisSound("wrong");majlisHaptic("error");}const nextUsed=[...usedQuestionIds,activeQuestion.id];setUsedQuestionIds(nextUsed);setCurrentTeamIndex((questionOwnerIndex+1)%teams.length);setActiveQuestion(null);setReveal(null);setHintVisible(false);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);setTimerPaused(false);setQuestionDeadlineAt(null);if(nextUsed.length>=totalBoardQuestions){setFinishReason("complete");setPhase("finished");playMajlisSound("finish");}}
-  function finishNow(){if(!canControl)return;if(!window.confirm("إنهاء مجلس التحدي وعرض النتيجة الحالية؟"))return;setFinishReason("manual");setPhase("finished");setActiveQuestion(null);setQuestionDeadlineAt(null);playMajlisSound("finish");}
-  function resetSession(){localStorage.removeItem(STORAGE_KEY);setSession(null);setTeams([]);setUsedQuestionIds([]);setCurrentTeamIndex(0);setActiveQuestion(null);setReveal(null);setPhase("setup");setFinishReason("complete");if(playMode==="online")void leaveOnline();playMajlisSound("tap");window.setTimeout(()=>document.getElementById("majlis-setup")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),50);}
+  function useAssist(type:keyof Team["assists"]){if(!canControl||!activeQuestion||!answeringTeam||reveal||stealMode||!answeringTeam.assists[type])return;playMajlisSound("tap");majlisHaptic();setTeams(current=>current.map((team,index)=>index===answeringTeamIndex?{...team,assists:{...team.assists,[type]:false}}:team));if(type==="hint")setHintVisible(true);if(type==="options")setOptionsVisible(true);if(type==="time"){setTimeBonusActive(true);setSecondsLeft(value=>value+15);setQuestionDeadlineAt(deadline=>deadline?deadline+15000:Date.now()+(secondsLeft+15)*1000);}if(type==="double")setDoubleActive(true);}
+  function offerSteal(){if(!canControl||!activeQuestion||!session?.settings.allowSteal||reveal||teams.length<2)return;const next=(answeringTeamIndex+1)%teams.length;const secs=session.settings.stealSeconds;setAnsweringTeamIndex(next);setStealMode(true);setDoubleActive(false);setTimeBonusActive(false);setHintVisible(false);setOptionsVisible(false);setSecondsLeft(secs);setTimerPaused(false);setQuestionDeadlineAt(Date.now()+secs*1000);playMajlisSound("steal");majlisHaptic();}
+  function closeQuestionAfterResult(correct:boolean){if(!canControl||!activeQuestion)return;const award=correct?activeQuestion.points*(doubleActive?2:1):0;if(award>0){setTeams(current=>current.map((team,index)=>index===answeringTeamIndex?{...team,score:team.score+award}:team));playMajlisSound("correct");majlisHaptic("success");}else{playMajlisSound("wrong");majlisHaptic("error");}const nextUsed=[...usedQuestionIds,activeQuestion.id];setUsedQuestionIds(nextUsed);setCurrentTeamIndex((questionOwnerIndex+1)%teams.length);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);setTimerPaused(false);setQuestionDeadlineAt(null);if(nextUsed.length>=totalBoardQuestions){setFinishReason("complete");setPhase("finished");playMajlisSound("finish");}}
+  async function closeLocalServerSession(sessionId?: string | null){if(!sessionId)return;await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"closeSession",sessionId})}).catch(()=>undefined);}
+  async function finishNow(){
+    if(!canControl)return;
+    if(!window.confirm("إنهاء مجلس التحدي؟ ستُحذف الجلسة الحالية وتعود مباشرة لإعداد مجلس جديد."))return;
+    try{
+      if(playMode==="online"&&onlineRoom&&onlineHost)await closeMajlisOnlineRoom(onlineRoom.id);
+      else if(playMode==="local")await closeLocalServerSession(session?.sessionId);
+    }catch{}
+    await exitGamePresentation();
+    localStorage.removeItem(STORAGE_KEY);setOnlineRoom(null);setSession(null);setTeams([]);setUsedQuestionIds([]);setCurrentTeamIndex(0);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setPhase("setup");setFinishReason("complete");setQuestionDeadlineAt(null);playMajlisSound("tap");
+    window.setTimeout(()=>document.getElementById("majlis-setup")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),50);
+  }
+  async function resetSession(){
+    if(playMode==="local")await closeLocalServerSession(session?.sessionId);
+    else if(playMode==="online"&&onlineRoom)await leaveOnline();
+    await exitGamePresentation();
+    localStorage.removeItem(STORAGE_KEY);setSession(null);setTeams([]);setUsedQuestionIds([]);setCurrentTeamIndex(0);setActiveQuestion(null);setQuestionOwnerIndex(0);setAnsweringTeamIndex(0);setSecondsLeft(0);setTimerPaused(false);setQuestionDeadlineAt(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);setPhase("setup");setFinishReason("complete");playMajlisSound("tap");window.setTimeout(()=>document.getElementById("majlis-setup")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),50);
+  }
 
   const sortedTeams=useMemo(()=>[...teams].sort((a,b)=>b.score-a.score),[teams]); const topScore=sortedTeams[0]?.score??0; const winners=sortedTeams.filter(team=>team.score===topScore); const progress=totalBoardQuestions?Math.round((usedQuestionIds.length/totalBoardQuestions)*100):0;
-  const onlinePlayers=onlineRoom?Object.values(onlineRoom.players):[]; const myOnlinePlayer=user?.id&&onlineRoom?onlineRoom.players[user.id]:null;
+  const onlinePlayers: Array<MajlisOnlineRoom["players"][string]> = onlineRoom ? Object.values(onlineRoom.players) as Array<MajlisOnlineRoom["players"][string]> : []; const myOnlinePlayer=user?.id&&onlineRoom?onlineRoom.players[user.id]:null;
 
   if(loading&&!categories.length&&!session)return <section className={styles.shell}><LoadingBlock/></section>;
   return <section className={styles.shell} dir="rtl">
@@ -180,26 +292,38 @@ export default function MajlisGame() {
         </div>:null}
 
         {(playMode==="local"||onlineHost)?<div className="grid gap-3 lg:grid-cols-[.8fr_1.2fr]">
-          <div className="rounded-[28px] border border-[#ead8ad]/12 bg-black/15 p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black text-[#d6b16b]">أهل المجلس</p><h2 className="mt-1 text-xl font-black text-[#f7efdc]">جهّز الفرق</h2></div><Swords className="h-6 w-6 text-[#ead8ad]/70"/></div><div className="mt-4 grid grid-cols-3 gap-2">{[2,3,4].map(count=><button key={count} type="button" onClick={()=>{setTeamCount(count);playMajlisSound("tap");}} className={cn("min-h-11 rounded-2xl border text-xs font-black",teamCount===count?"border-[#d6b16b]/45 bg-[#d6b16b] text-[#173b35]":"border-[#ead8ad]/10 bg-white/[0.035] text-[#f7efdc]/55")}>{count} فرق</button>)}</div><div className="mt-3 space-y-2">{Array.from({length:teamCount},(_,index)=><label key={index} className="flex items-center gap-2 rounded-2xl border border-[#ead8ad]/10 bg-black/15 p-2"><span className="h-8 w-1.5 rounded-full" style={{background:TEAM_COLORS[index]}}/><input value={teamNames[index]} onChange={e=>setTeamNames(current=>current.map((name,i)=>i===index?e.target.value.slice(0,24):name))} className="h-10 min-w-0 flex-1 bg-transparent px-2 text-sm font-black text-[#f7efdc] outline-none" aria-label={`اسم الفريق ${index+1}`}/></label>)}</div><div className="mt-4 grid grid-cols-3 gap-2 text-center">{[{icon:Lightbulb,label:"مشورة",text:"تلميح"},{icon:Hourglass,label:"مهلة",text:"+15ث"},{icon:Crown,label:"الدبل",text:"×2"}].map(item=><div key={item.label} className="rounded-2xl border border-[#ead8ad]/10 bg-white/[0.035] p-2.5"><item.icon className="mx-auto h-4 w-4 text-[#d6b16b]"/><div className="mt-1 text-[10px] font-black text-[#f7efdc]">{item.label}</div><div className="text-[9px] font-bold text-[#f7efdc]/35">{item.text} مرة</div></div>)}</div></div>
+          <div className="rounded-[28px] border border-[#ead8ad]/12 bg-black/15 p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black text-[#d6b16b]">أهل المجلس</p><h2 className="mt-1 text-xl font-black text-[#f7efdc]">جهّز الفرق</h2></div><Swords className="h-6 w-6 text-[#ead8ad]/70"/></div><div className="mt-4 grid grid-cols-3 gap-2">{[2,3,4].map(count=><button key={count} type="button" onClick={()=>{setTeamCount(count);playMajlisSound("tap");}} className={cn("min-h-11 rounded-2xl border text-xs font-black",teamCount===count?"border-[#d6b16b]/45 bg-[#d6b16b] text-[#173b35]":"border-[#ead8ad]/10 bg-white/[0.035] text-[#f7efdc]/55")}>{count} فرق</button>)}</div><div className="mt-3 space-y-2">{Array.from({length:teamCount},(_,index)=><label key={index} className="flex items-center gap-2 rounded-2xl border border-[#ead8ad]/10 bg-black/15 p-2"><span className="h-8 w-1.5 rounded-full" style={{background:TEAM_COLORS[index]}}/><input value={teamNames[index]} onChange={e=>setTeamNames(current=>current.map((name,i)=>i===index?e.target.value.slice(0,24):name))} className="h-10 min-w-0 flex-1 bg-transparent px-2 text-sm font-black text-[#f7efdc] outline-none" aria-label={`اسم الفريق ${index+1}`}/></label>)}</div><div className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">{[{icon:Lightbulb,label:"مشورة",text:"تلميح"},{icon:Hourglass,label:"مهلة",text:"+15ث"},{icon:Crown,label:"الدبل",text:"×2"},{icon:ListChecks,label:"اختيارات",text:"مرة واحدة"}].map(item=><div key={item.label} className="rounded-2xl border border-[#ead8ad]/10 bg-white/[0.035] p-2.5"><item.icon className="mx-auto h-4 w-4 text-[#d6b16b]"/><div className="mt-1 text-[10px] font-black text-[#f7efdc]">{item.label}</div><div className="text-[9px] font-bold text-[#f7efdc]/35">{item.text} مرة</div></div>)}</div></div>
           <div className="rounded-[28px] border border-[#ead8ad]/12 bg-black/15 p-4 sm:p-5"><div className="flex flex-wrap items-end justify-between gap-2"><div><p className="text-[10px] font-black text-[#d6b16b]">مجالات المجلس</p><h2 className="mt-1 text-xl font-black text-[#f7efdc]">اختر {settings?.categoriesPerGame||6} فئات</h2></div><div className="rounded-full border border-[#ead8ad]/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-black text-[#ead8ad]">{selectedCategoryIds.length}/{settings?.categoriesPerGame||6}</div></div><div className="mt-4 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">{categories.map(category=>{const selected=selectedCategoryIds.includes(category.id);return <button key={category.id} type="button" onClick={()=>toggleCategory(category.id)} aria-pressed={selected} className={cn("relative min-h-[112px] min-w-0 overflow-hidden rounded-[22px] border p-3 text-right active:scale-[.985]",selected?"border-[#d6b16b]/45 bg-[#d6b16b]/[0.10]":"border-[#ead8ad]/10 bg-white/[0.03]")}><div className="flex items-start justify-between gap-2"><span className="text-2xl">{category.icon}</span>{selected?<span className="grid h-6 w-6 place-items-center rounded-full bg-[#d6b16b] text-[#173b35]"><Check className="h-3.5 w-3.5"/></span>:null}</div><div className="mt-2 truncate text-xs font-black text-[#f7efdc] sm:text-sm">{category.title}</div><div className="mt-1 text-[9px] font-bold text-[#f7efdc]/36" dir="ltr">{category.activeQuestions}+ سؤال</div></button>})}</div><button type="button" onClick={startGame} disabled={starting||!settings||selectedCategoryIds.length!==settings.categoriesPerGame} className="mt-4 inline-flex min-h-[54px] w-full items-center justify-center gap-2 rounded-[20px] bg-[#d6b16b] px-5 text-sm font-black text-[#173b35] disabled:opacity-40">{starting?<LoaderCircle className="h-5 w-5 animate-spin"/>:<Dices className="h-5 w-5"/>}{starting?"جاري تجهيز الأسئلة…":"ابدأ مجلس التحدي"}</button></div>
         </div>:null}
       </div>:null}
 
-      {phase==="board"&&session?<div id="majlis-board" className="mt-4">
-        {playMode==="online"&&onlineRoom?<div className="mb-3"><VoiceControls room={onlineRoom} userId={user?.id} compact/></div>:null}
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{teams.map((team,index)=><div key={team.id} className={cn("relative overflow-hidden rounded-[22px] border p-3",index===currentTeamIndex?"border-[#d6b16b]/45 bg-[#d6b16b]/[0.10]":"border-[#ead8ad]/10 bg-black/15")}><span className="absolute inset-y-0 right-0 w-1" style={{background:team.accent}}/><div className="flex items-center justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-black text-[#f7efdc]">{team.name}</p><p className="mt-1 text-[9px] font-bold text-[#f7efdc]/35">{index===currentTeamIndex?"دوره يختار السؤال":"بانتظار الدور"}</p></div><div dir="ltr" className="text-xl font-black text-[#d6b16b]">{formatNumber(team.score)}</div></div><div className="mt-2 flex gap-1">{Object.entries(team.assists).map(([key,available])=><span key={key} className={cn("h-1.5 flex-1 rounded-full",available?"bg-[#d6b16b]/65":"bg-white/[0.06]")}/>)}</div></div>)}</div>
-        <div className="mt-3 overflow-hidden rounded-[22px] border border-[#ead8ad]/10 bg-black/15"><div className="flex items-center justify-between gap-3 px-3 py-2.5 text-[10px] font-black text-[#f7efdc]/48"><span>{canControl?"تقدم المجلس":"المضيف يدير لوحة الأسئلة"}</span><span dir="ltr">{progress}%</span></div><div className="h-1.5 bg-white/[0.04]"><div className="h-full bg-[#d6b16b] transition-[width]" style={{width:`${progress}%`}}/></div></div>
-        <div className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">{session.categories.map(category=>{const questions=session.board[category.id]||[];const remaining=questions.filter(q=>!usedSet.has(q.id)).length;return <article key={category.id} className="min-w-0 overflow-hidden rounded-[26px] border border-[#ead8ad]/12 bg-black/15"><div className="relative overflow-hidden p-3.5"><div className="absolute inset-y-0 right-0 w-1" style={{background:category.accent}}/><div className="flex items-center justify-between gap-2"><div className="min-w-0"><div className="flex items-center gap-2"><span className="text-xl">{category.icon}</span><h3 className="truncate text-sm font-black text-[#f7efdc]">{category.title}</h3></div><p className="mt-1 text-[9px] font-bold text-[#f7efdc]/35">باقي {remaining} من 6</p></div><ChevronLeft className="h-4 w-4 text-[#d6b16b]/50"/></div></div><div className="grid grid-cols-3 gap-1.5 border-t border-[#ead8ad]/8 p-2.5">{questions.map(question=>{const used=usedSet.has(question.id);return <button key={question.id} type="button" disabled={used||!canControl} onClick={()=>openQuestion(question)} className={cn("min-h-[54px] rounded-[16px] border text-sm font-black tabular-nums active:scale-[.98] disabled:cursor-default",used?"border-white/[0.04] bg-white/[0.02] text-white/14 line-through":question.difficulty==="hard"?"border-[#c77a62]/22 bg-[#c77a62]/[0.08] text-[#efc3b5]":"border-[#d6b16b]/20 bg-[#d6b16b]/[0.07] text-[#ead8ad]")}>{used?"تم":formatNumber(question.points)}</button>})}</div></article>})}</div>
+      {phase==="board"&&session?<div id="majlis-board" className={styles.gameViewport}>
+        {!isLandscape?<div className={styles.rotateOverlay}><div className={styles.rotateCard}><RotateCw className="mx-auto h-10 w-10 text-[#d6b16b]"/><h2>لف الجهاز بالعرض</h2><p>لوحة مجلس التحدي مصممة لتظهر الفئات الست كاملة في شاشة واحدة.</p><button type="button" onClick={()=>void enterGamePresentation()} className="mt-4 min-h-11 rounded-2xl bg-[#d6b16b] px-5 text-xs font-black text-[#173b35]">فتح ملء الشاشة</button></div></div>:null}
+        <div className={styles.gameHud}>
+          <div className={styles.hudBrand}><Coffee className="h-4 w-4"/><strong>مجلس التحدي</strong><span>{currentTeam?.name} يختار</span></div>
+          <div className={styles.scoreStrip}>{teams.map((team,index)=><div key={team.id} className={cn(styles.scoreChip,index===currentTeamIndex&&styles.scoreChipActive)} style={{"--team":team.accent} as CSSProperties}><span>{team.name}</span><b dir="ltr">{formatNumber(team.score)}</b></div>)}</div>
+          <div className={styles.hudActions}><button type="button" onClick={toggleSound} aria-label={soundOn?"إيقاف الصوت":"تشغيل الصوت"}>{soundOn?<Volume2/>:<VolumeX/>}</button>{canControl?<button type="button" onClick={()=>void finishNow()} className={styles.endButton}><X/> <span>إنهاء</span></button>:null}</div>
+        </div>
+        {playMode==="online"&&onlineRoom?<div className={styles.voiceDock}><VoiceControls room={onlineRoom} userId={user?.id} compact/></div>:null}
+        <div className={styles.boardGrid}>{session.categories.map(category=>{const questions=session.board[category.id]||[];const remaining=questions.filter(q=>!usedSet.has(q.id)).length;return <article key={category.id} className={styles.boardCategory} style={{"--category":category.accent} as CSSProperties}><div className={styles.categoryHead}><span>{category.icon}</span><div><h3>{category.title}</h3><small>باقي {remaining}</small></div></div><div className={styles.questionTiles}>{questions.map(question=>{const used=usedSet.has(question.id);return <button key={question.id} type="button" disabled={used||!canControl} onClick={()=>openQuestion(question)} className={cn(styles.questionTile,question.difficulty==="hard"&&styles.questionTileHard,used&&styles.questionTileUsed)}>{used?<Check className="h-4 w-4"/>:<span dir="ltr">{formatNumber(question.points)}</span>}</button>})}</div></article>})}</div>
+        <div className={styles.progressLine}><span style={{width:`${progress}%`}}/></div>
       </div>:null}
 
-      {phase==="finished"?<div className="mt-4 overflow-hidden rounded-[30px] border border-[#d6b16b]/25 bg-black/20 p-5 text-center sm:p-7"><Trophy className="mx-auto h-10 w-10 text-[#d6b16b]"/><p className="mt-2 text-[10px] font-black text-[#d6b16b]">{finishReason==="complete"?"اكتملت أسئلة مجلس التحدي":"انتهى المجلس"}</p><h2 className="mt-2 text-2xl font-black text-[#f7efdc] sm:text-3xl">{winners.length===1?`الفائز: ${winners[0]?.name}`:"تعادل في الصدارة"}</h2><div className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-2">{sortedTeams.map((team,index)=><div key={team.id} className={cn("flex items-center justify-between rounded-[20px] border p-3 text-right",index===0?"border-[#d6b16b]/35 bg-[#d6b16b]/[0.08]":"border-[#ead8ad]/10 bg-white/[0.03]")}><div className="flex items-center gap-2">{index===0?<Crown className="h-4 w-4 text-[#d6b16b]"/>:<Medal className="h-4 w-4 text-[#f7efdc]/35"/>}<span className="text-xs font-black text-[#f7efdc]">{team.name}</span></div><span dir="ltr" className="text-lg font-black text-[#d6b16b]">{formatNumber(team.score)}</span></div>)}</div>{canControl?<button type="button" onClick={resetSession} className="mt-5 inline-flex min-h-[50px] items-center gap-2 rounded-[18px] bg-[#d6b16b] px-6 text-sm font-black text-[#173b35]"><RotateCcw className="h-4 w-4"/> مجلس جديد</button>:<p className="mt-4 text-xs font-black text-[#f7efdc]/42">بانتظار المضيف لبدء مجلس جديد.</p>}</div>:null}
+      {phase==="finished"?<div className="mt-4 overflow-hidden rounded-[30px] border border-[#d6b16b]/25 bg-black/20 p-5 text-center sm:p-7"><Trophy className="mx-auto h-10 w-10 text-[#d6b16b]"/><p className="mt-2 text-[10px] font-black text-[#d6b16b]">{finishReason==="complete"?"اكتملت أسئلة مجلس التحدي":"انتهى المجلس"}</p><h2 className="mt-2 text-2xl font-black text-[#f7efdc] sm:text-3xl">{winners.length===1?`الفائز: ${winners[0]?.name}`:"تعادل في الصدارة"}</h2><div className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-2">{sortedTeams.map((team,index)=><div key={team.id} className={cn("flex items-center justify-between rounded-[20px] border p-3 text-right",index===0?"border-[#d6b16b]/35 bg-[#d6b16b]/[0.08]":"border-[#ead8ad]/10 bg-white/[0.03]")}><div className="flex items-center gap-2">{index===0?<Crown className="h-4 w-4 text-[#d6b16b]"/>:<Medal className="h-4 w-4 text-[#f7efdc]/35"/>}<span className="text-xs font-black text-[#f7efdc]">{team.name}</span></div><span dir="ltr" className="text-lg font-black text-[#d6b16b]">{formatNumber(team.score)}</span></div>)}</div>{canControl?<button type="button" onClick={()=>void resetSession()} className="mt-5 inline-flex min-h-[50px] items-center gap-2 rounded-[18px] bg-[#d6b16b] px-6 text-sm font-black text-[#173b35]"><RotateCcw className="h-4 w-4"/> مجلس جديد</button>:<p className="mt-4 text-xs font-black text-[#f7efdc]/42">بانتظار المضيف لبدء مجلس جديد.</p>}</div>:null}
     </div>
 
     <AnimatePresence>{activeQuestion&&session?<motion.div className={styles.questionOverlay} initial={reduceMotion?false:{opacity:0}} animate={{opacity:1}} exit={reduceMotion?undefined:{opacity:0}}><motion.div className={styles.questionPanel} initial={reduceMotion?false:{y:20,scale:.985}} animate={{y:0,scale:1}} exit={reduceMotion?undefined:{y:12,scale:.99}} transition={{duration:.22}}><div className={cn(styles.saduBand,"h-2 w-full opacity-75")}/><div className="p-4 sm:p-6">
       <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-[#ead8ad]/10 bg-white/[0.04] px-2.5 py-1 text-[9px] font-black text-[#f7efdc]/55">{difficultyLabel(activeQuestion.difficulty)}</span><span className="rounded-full border border-[#d6b16b]/20 bg-[#d6b16b]/[0.08] px-2.5 py-1 text-[10px] font-black text-[#d6b16b]" dir="ltr">{activeQuestion.points}{doubleActive?" ×2":""}</span>{stealMode?<span className="rounded-full border border-[#7fb3a8]/20 bg-[#7fb3a8]/[0.08] px-2.5 py-1 text-[9px] font-black text-[#bfe2d8]">فزعة للفريق التالي</span>:null}</div><p className="mt-2 text-xs font-black text-[#f7efdc]/52">الدور الآن: <span className="text-[#ead8ad]">{answeringTeam?.name}</span></p></div><div className={cn(styles.timerRing,"relative grid h-16 w-16 shrink-0 place-items-center rounded-full p-[5px]")} style={{"--ring-progress":`${Math.max(0,Math.min(100,(secondsLeft/(stealMode?session.settings.stealSeconds:session.settings.questionSeconds+(timeBonusActive?15:0)))*100))}%`,"--ring-color":secondsLeft<=5?"#c77a62":"#d2aa61"} as CSSProperties}><div className="grid h-full w-full place-items-center rounded-full bg-[#102d2b] text-lg font-black text-[#f7efdc]" dir="ltr">{secondsLeft}</div></div></div>
-      <div className="mt-5 rounded-[26px] border border-[#ead8ad]/10 bg-black/15 p-4 sm:p-5"><h2 className="text-[clamp(1.25rem,5.2vw,2rem)] font-black leading-[1.55] text-[#f7efdc]">{activeQuestion.prompt}</h2>{activeQuestion.type==="audio"?<div className="mt-4"><AudioQuestionPlayer question={activeQuestion}/></div>:null}{activeQuestion.options?.length?<div className="mt-4 grid grid-cols-2 gap-2">{activeQuestion.options.map((option,index)=><div key={`${option}-${index}`} className="rounded-[17px] border border-[#ead8ad]/10 bg-white/[0.035] px-3 py-3 text-center text-xs font-black text-[#f7efdc]/78"><span className="ml-1 text-[#d6b16b]" dir="ltr">{index+1}</span>{option}</div>)}</div>:null}{hintVisible&&activeQuestion.hint?<div className="mt-4 rounded-[18px] border border-[#d6b16b]/18 bg-[#d6b16b]/[0.07] p-3 text-xs font-bold leading-6 text-[#ead8ad]"><Lightbulb className="ml-1 inline h-4 w-4"/> {activeQuestion.hint}</div>:null}</div>
+      <div className={styles.questionBody}>
+        <h2 className={styles.questionTitle}>{activeQuestion.prompt}</h2>
+        {activeQuestion.quoteText?<blockquote className={styles.quranQuote}>{activeQuestion.quoteText}</blockquote>:null}
+        {activeQuestion.type==="audio"?<div className="mt-3"><AudioQuestionPlayer question={activeQuestion}/></div>:null}
+        {activeQuestion.type==="speech"?<div className="mt-3"><SpeechQuestionPlayer question={activeQuestion}/></div>:null}
+        {optionsVisible&&activeQuestion.options?.length?<div className={styles.optionsGrid}>{activeQuestion.options.map((option,index)=><div key={`${option}-${index}`} className={styles.optionCard}><span dir="ltr">{index+1}</span>{option}</div>)}</div>:null}
+        {hintVisible&&activeQuestion.hint?<div className={styles.hintBox}><Lightbulb className="ml-1 inline h-4 w-4"/> {activeQuestion.hint}</div>:null}
+      </div>
       {!canControl&&!reveal?<div className="mt-3 rounded-[18px] border border-[#7fb3a8]/15 bg-[#7fb3a8]/[.06] p-3 text-center text-[10px] font-black text-[#bfe2d8]">المضيف يدير السؤال والمؤقت. تشاور مع فريقك بالمايك «فريقي» بدون أن يسمعكم الفريق المقابل.</div>:null}
-      {canControl&&!reveal?<><div className="mt-3 grid grid-cols-3 gap-2">{[{key:"hint" as const,icon:Lightbulb,label:"مشورة",disabled:!answeringTeam?.assists.hint||!activeQuestion.hint},{key:"time" as const,icon:Hourglass,label:"+15 ثانية",disabled:!answeringTeam?.assists.time},{key:"double" as const,icon:Crown,label:"دبل",disabled:!answeringTeam?.assists.double||doubleActive}].map(assist=><button key={assist.key} type="button" disabled={assist.disabled||stealMode} onClick={()=>useAssist(assist.key)} className="min-h-[50px] rounded-[16px] border border-[#ead8ad]/10 bg-white/[0.035] px-2 text-[10px] font-black text-[#f7efdc]/65 disabled:opacity-25"><assist.icon className="mx-auto mb-1 h-4 w-4 text-[#d6b16b]"/>{assist.label}</button>)}</div><div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={revealAnswer} disabled={revealing} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] bg-[#d6b16b] px-4 text-sm font-black text-[#173b35]">{revealing?<LoaderCircle className="h-4 w-4 animate-spin"/>:<Eye className="h-4 w-4"/>} إظهار الإجابة</button>{session.settings.allowSteal&&teams.length>1&&!stealMode?<button type="button" onClick={offerSteal} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] border border-[#7fb3a8]/22 bg-[#7fb3a8]/[0.08] px-4 text-sm font-black text-[#bfe2d8]"><HandHelping className="h-4 w-4"/> فزعة للفريق التالي</button>:null}</div><button type="button" onClick={toggleTimerPause} className="mx-auto mt-2 flex min-h-10 items-center gap-1.5 px-3 text-[10px] font-black text-[#f7efdc]/38">{timerPaused?<Play className="h-3.5 w-3.5"/>:<Pause className="h-3.5 w-3.5"/>}{timerPaused?"استئناف المؤقت":"إيقاف المؤقت مؤقتًا"}</button></>:null}
+      {canControl&&!reveal?<><div className="mt-3 grid grid-cols-4 gap-2">{[{key:"hint" as const,icon:Lightbulb,label:"مشورة",disabled:!answeringTeam?.assists.hint||!activeQuestion.hint},{key:"time" as const,icon:Hourglass,label:"+15 ثانية",disabled:!answeringTeam?.assists.time},{key:"double" as const,icon:Crown,label:"دبل",disabled:!answeringTeam?.assists.double||doubleActive},{key:"options" as const,icon:ListChecks,label:"اختيارات",disabled:!answeringTeam?.assists.options||!activeQuestion.options?.length||optionsVisible}].map(assist=><button key={assist.key} type="button" disabled={assist.disabled||stealMode} onClick={()=>useAssist(assist.key)} className="min-h-[50px] rounded-[16px] border border-[#ead8ad]/10 bg-white/[0.035] px-2 text-[10px] font-black text-[#f7efdc]/65 disabled:opacity-25"><assist.icon className="mx-auto mb-1 h-4 w-4 text-[#d6b16b]"/>{assist.label}</button>)}</div><div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={revealAnswer} disabled={revealing} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] bg-[#d6b16b] px-4 text-sm font-black text-[#173b35]">{revealing?<LoaderCircle className="h-4 w-4 animate-spin"/>:<Eye className="h-4 w-4"/>} إظهار الإجابة</button>{session.settings.allowSteal&&teams.length>1&&!stealMode?<button type="button" onClick={offerSteal} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] border border-[#7fb3a8]/22 bg-[#7fb3a8]/[0.08] px-4 text-sm font-black text-[#bfe2d8]"><HandHelping className="h-4 w-4"/> فزعة للفريق التالي</button>:null}</div><button type="button" onClick={toggleTimerPause} className="mx-auto mt-2 flex min-h-10 items-center gap-1.5 px-3 text-[10px] font-black text-[#f7efdc]/38">{timerPaused?<Play className="h-3.5 w-3.5"/>:<Pause className="h-3.5 w-3.5"/>}{timerPaused?"استئناف المؤقت":"إيقاف المؤقت مؤقتًا"}</button></>:null}
       {reveal?<div className="mt-4"><div className="rounded-[24px] border border-[#d6b16b]/24 bg-[#d6b16b]/[0.08] p-4 sm:p-5"><div className="flex items-center gap-2 text-[10px] font-black text-[#d6b16b]"><EyeOff className="h-4 w-4"/> الإجابة</div><div className="mt-2 text-xl font-black text-[#f7efdc] sm:text-2xl">{reveal.answer}</div>{session.settings.showExplanations&&reveal.explanation?<p className="mt-2 text-xs font-semibold leading-6 text-[#f7efdc]/52">{reveal.explanation}</p>:null}{reveal.sourceLabel?<p className="mt-2 text-[9px] font-bold text-[#f7efdc]/28">المصدر: {reveal.sourceLabel}</p>:null}</div>{canControl?<div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>closeQuestionAfterResult(true)} className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[18px] bg-[#7fb3a8] px-4 text-sm font-black text-[#102d2b]"><Check className="h-5 w-5"/> إجابة صحيحة</button><button type="button" onClick={()=>closeQuestionAfterResult(false)} className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[18px] bg-[#8d4939] px-4 text-sm font-black text-[#f7efdc]"><X className="h-5 w-5"/> إجابة خاطئة</button></div>:null}</div>:null}
     </div></motion.div></motion.div>:null}</AnimatePresence>
   </section>;

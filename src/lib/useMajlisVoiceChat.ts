@@ -313,7 +313,7 @@ export function useMajlisVoiceChat(room: MajlisOnlineRoom | null, userId?: strin
       if (mode !== "off") await ensureLocalStream();
       setMicModeState(mode);
       await setMajlisVoiceMode(currentRoom.id, mode);
-      for (const player of Object.values(currentRoom.players)) {
+      for (const player of Object.values(currentRoom.players) as Array<MajlisOnlineRoom["players"][string]>) {
         if (player.userId === userId) continue;
         await ensurePeer(player.userId);
       }
