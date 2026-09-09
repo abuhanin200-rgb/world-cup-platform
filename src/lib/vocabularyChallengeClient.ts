@@ -8,6 +8,7 @@ import type {
   VocabularyLeaderboard,
   VocabularyLeaderboardPeriod,
   VocabularyProfile,
+  VocabularyRoomRecovery,
   VocabularyVoiceIceConfig,
 } from "@/types/vocabularyChallenge";
 
@@ -28,6 +29,9 @@ type ActionResponse = {
   reported?: boolean;
   heartbeat?: boolean;
   at?: number;
+  recoveryStatus?: VocabularyRoomRecovery["status"];
+  repairedHands?: string[];
+  reason?: string;
 };
 
 type ErrorPayload = {
@@ -48,6 +52,25 @@ export class VocabularyChallengeApiError extends Error {
   }
 }
 
+const VOCABULARY_API_TIMEOUT_MS = 15_000;
+
+async function vocabularyFetch(input: RequestInfo | URL, init: RequestInit, label: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), VOCABULARY_API_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    const timedOut = error instanceof DOMException && error.name === "AbortError";
+    if (process.env.NODE_ENV !== "production") console.error("[VocabularyInit]", { phase: label, timedOut, error });
+    throw new VocabularyChallengeApiError(
+      timedOut ? "انتهت مهلة الاتصال بالمباراة. تحقق من الإنترنت ثم أعد المحاولة." : "تعذر الاتصال بخدمة تحدي المفردات. تحقق من الإنترنت ثم أعد المحاولة.",
+      timedOut ? "NETWORK_TIMEOUT" : "NETWORK_FAILED",
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function authHeaders(withJson = false) {
   const firebaseUser = auth.currentUser;
   if (!firebaseUser) {
@@ -61,12 +84,12 @@ async function authHeaders(withJson = false) {
 }
 
 async function actionRequest(body: VocabularyChallengeAction): Promise<ActionResponse> {
-  const response = await fetch("/api/games/vocabulary-challenge", {
+  const response = await vocabularyFetch("/api/games/vocabulary-challenge", {
     method: "POST",
     headers: await authHeaders(true),
     body: JSON.stringify(body),
     cache: "no-store",
-  });
+  }, "action");
   const data = (await response.json().catch(() => ({}))) as ActionResponse & ErrorPayload;
 
   if (!response.ok) {
@@ -124,6 +147,20 @@ export function cancelVocabularyMatchmaking() {
   return actionRequest({ action: "cancelMatchmaking" });
 }
 
+export async function recoverVocabularyChallenge(roomId: string): Promise<VocabularyRoomRecovery> {
+  const result = await actionRequest({ action: "recover", roomId });
+  const status = result.recoveryStatus;
+  if (status !== "ready" && status !== "recovered" && status !== "stale") {
+    throw new VocabularyChallengeApiError("تعذر التحقق من حالة المباراة المحفوظة.", "RECOVERY_INVALID_RESPONSE");
+  }
+  return {
+    roomId,
+    status,
+    repairedHands: Array.isArray(result.repairedHands) ? result.repairedHands : [],
+    reason: result.reason,
+  };
+}
+
 
 export function playVocabularyBotTurn(roomId: string) {
   return actionRequest({ action: "botTurn", roomId });
@@ -144,10 +181,10 @@ export function sendVocabularyVoiceSignal(
 
 
 export async function getVocabularyActiveRoom(): Promise<{ roomId: string | null; status?: string; mode?: string }> {
-  const response = await fetch("/api/games/vocabulary-challenge?view=active", {
+  const response = await vocabularyFetch("/api/games/vocabulary-challenge?view=active", {
     headers: await authHeaders(),
     cache: "no-store",
-  });
+  }, "active-room");
   const data = (await response.json().catch(() => ({}))) as { roomId?: string | null; status?: string; mode?: string } & ErrorPayload;
   if (!response.ok) throw new VocabularyChallengeApiError(data.error || "تعذر استعادة المباراة الحالية.", data.code || "");
   return { roomId: data.roomId || null, status: data.status, mode: data.mode };
@@ -181,10 +218,10 @@ export async function getVocabularyProfile(): Promise<VocabularyProfile> {
 }
 
 export async function getVocabularyDictionaryOverrides(): Promise<VocabularyDictionaryClientOverrides> {
-  const response = await fetch("/api/games/vocabulary-challenge?view=overrides", {
+  const response = await vocabularyFetch("/api/games/vocabulary-challenge?view=overrides", {
     headers: await authHeaders(),
     cache: "no-store",
-  });
+  }, "dictionary-overrides");
   const data = (await response.json().catch(() => ({}))) as VocabularyDictionaryClientOverrides & ErrorPayload;
   if (!response.ok) throw new VocabularyChallengeApiError(data.error || "تعذر تحديث قاموس اللعبة.", data.code || "");
   return {

@@ -120,8 +120,39 @@ beforeEach(async () => {
       setDoc(doc(db, "Stats", "old-stats"), { total: 1 }),
       setDoc(doc(db, "Predictions", "old-prediction"), { userId: "user-1", points: 3 }),
       setDoc(doc(db, "Users", "user-1"), { userId: "user-1", password: "old-secret" }),
+      setDoc(doc(db, "vocabularyChallengeRooms", "vocabulary-room-1"), {
+        hostId: "user-1", guestId: "user-2", mode: "duel", status: "playing", currentWord: "قال",
+      }),
+      setDoc(doc(db, "vocabularyChallengeRooms", "vocabulary-room-1", "hands", "user-1"), {
+        userId: "user-1", cards: [{ id: "card-owner", letter: "م" }], updatedAt: 1,
+      }),
+      setDoc(doc(db, "vocabularyChallengeRooms", "vocabulary-room-1", "hands", "user-2"), {
+        userId: "user-2", cards: [{ id: "card-guest", letter: "ر" }], updatedAt: 1,
+      }),
     ]);
   });
+});
+
+test("تحدي المفردات يقرأ الغرفة ويد اللاعب فقط ويحظر الكتابة المباشرة", async () => {
+  const owner = testEnv.authenticatedContext("user-1").firestore();
+  const guest = testEnv.authenticatedContext("user-2").firestore();
+  const outsider = testEnv.authenticatedContext("outsider").firestore();
+  const anonymous = testEnv.unauthenticatedContext().firestore();
+  const room = ["vocabularyChallengeRooms", "vocabulary-room-1"];
+  const ownerHand = [...room, "hands", "user-1"];
+  const guestHand = [...room, "hands", "user-2"];
+
+  await assertSucceeds(getDoc(doc(owner, ...room)));
+  await assertSucceeds(getDoc(doc(guest, ...room)));
+  await assertSucceeds(getDoc(doc(owner, ...ownerHand)));
+  await assertSucceeds(getDoc(doc(guest, ...guestHand)));
+  await assertFails(getDoc(doc(owner, ...guestHand)));
+  await assertFails(getDoc(doc(outsider, ...room)));
+  await assertFails(getDoc(doc(anonymous, ...room)));
+  await assertFails(getDocs(collection(owner, "vocabularyChallengeRooms")));
+  await assertFails(setDoc(doc(owner, ...ownerHand), {
+    userId: "user-1", cards: [{ id: "forged", letter: "ا" }], updatedAt: 2,
+  }));
 });
 
 test("يرفض إنشاء توقع V2 مباشرة من العميل", async () => {

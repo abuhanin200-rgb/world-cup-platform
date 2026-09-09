@@ -3,6 +3,7 @@ export type VocabularyBotDifficulty = "easy" | "normal" | "hard";
 export type VocabularyChallengeRoomStatus = "waiting" | "playing" | "finished" | "cancelled";
 export type VocabularyChallengeFinishReason = "cards" | "time" | "forfeit" | "disconnect" | "cancelled" | null;
 export type VocabularyLeaderboardPeriod = "daily" | "weekly" | "season";
+export type VocabularyInitializationState = "idle" | "loading" | "ready" | "recovering" | "error";
 
 export type VocabularyChallengePlayerSummary = {
   userId: string;
@@ -145,6 +146,13 @@ export type VocabularyDictionaryClientOverrides = {
   disabledWords: string[];
 };
 
+export type VocabularyRoomRecovery = {
+  roomId: string;
+  status: "ready" | "recovered" | "stale";
+  repairedHands: string[];
+  reason?: string;
+};
+
 export type VocabularyChallengeAction =
   | { action: "create"; mode: VocabularyChallengeMode; botDifficulty?: VocabularyBotDifficulty }
   | { action: "join"; roomCode: string }
@@ -157,6 +165,7 @@ export type VocabularyChallengeAction =
   | { action: "rematch"; roomId: string }
   | { action: "matchmake" }
   | { action: "cancelMatchmaking" }
+  | { action: "recover"; roomId: string }
   | { action: "botTurn"; roomId: string }
   | { action: "voiceSignal"; roomId: string; kind: "offer" | "answer" | "reset"; sessionId: string; sdp?: string }
   | { action: "reportWord"; roomId: string; word: string };

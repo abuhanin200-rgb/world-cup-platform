@@ -3,6 +3,7 @@ import type { DocumentReference, QueryDocumentSnapshot, Transaction } from "fire
 import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
 import {
   VOCABULARY_DICTIONARY_VERSION,
+  VOCABULARY_ALLOWED_LETTERS,
   createFairVocabularyLetters,
   drawFairVocabularyLetter,
   getVocabularyMoves,
@@ -93,6 +94,33 @@ async function uniqueRoomCode() {
 
 function createCards(letters: readonly string[]): VocabularyChallengeCard[] {
   return letters.map((letter) => ({ id: crypto.randomUUID(), letter }));
+}
+
+function readValidCards(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  const allowed = new Set<string>(VOCABULARY_ALLOWED_LETTERS);
+  const cards = value
+    .map((card) => card && typeof card === "object" ? { id: text((card as Record<string, unknown>).id), letter: text((card as Record<string, unknown>).letter) } : null)
+    .filter((card): card is VocabularyChallengeCard => Boolean(card && card.id && allowed.has(card.letter)));
+  if (cards.length !== value.length || new Set(cards.map((card) => card.id)).size !== cards.length) return null;
+  return cards;
+}
+
+function recoveredPlayerSummary(room: Record<string, unknown>, userId: string, cards: VocabularyChallengeCard[], now: number) {
+  const players = room.players && typeof room.players === "object"
+    ? room.players as Record<string, Record<string, unknown>>
+    : {};
+  const current = players[userId] || {};
+  return {
+    ...current,
+    userId,
+    userName: text(current.userName) || (userId === BOT_ID ? BOT_NAME : playerName(room, userId)),
+    cardCount: cards.length,
+    moves: Math.max(0, Math.floor(number(current.moves))),
+    draws: Math.max(0, Math.floor(number(current.draws))),
+    ...(userId === BOT_ID ? { isBot: true } : {}),
+    lastSeenAt: number(current.lastSeenAt) || now,
+  };
 }
 
 function participant(room: Record<string, unknown>, userId: string) {
@@ -302,6 +330,89 @@ async function createRoom(userId: string, userName: string, mode: VocabularyChal
   await batch.commit();
 
   return { roomId: roomRef.id, roomCode, status: room.status };
+}
+
+/** Repairs only server-owned, missing/corrupt hand documents. */
+async function recoverVocabularyRoom(userId: string, roomId: string) {
+  if (!roomId) throw new Error("ROOM_NOT_FOUND");
+  const roomRef = adminDb.collection(ROOM_COLLECTION).doc(roomId);
+  const now = Date.now();
+
+  return adminDb.runTransaction(async (transaction: Transaction) => {
+    const roomSnap = await transaction.get(roomRef);
+    if (!roomSnap.exists) return { recoveryStatus: "stale" as const, repairedHands: [], reason: "room_missing" };
+
+    const room = roomSnap.data() || {};
+    if (!participant(room, userId)) throw new Error("FORBIDDEN");
+
+    const status = text(room.status);
+    const mode = text(room.mode);
+    const currentWord = text(room.currentWord);
+    const hostId = text(room.hostId);
+    const guestId = text(room.guestId);
+    const expectedPlayerIds = mode === "solo"
+      ? [hostId, BOT_ID]
+      : status === "playing"
+        ? [hostId, guestId]
+        : [hostId];
+    const structurallyValid = ["waiting", "playing"].includes(status)
+      && ["solo", "duel"].includes(mode)
+      && hostId
+      && expectedPlayerIds.every(Boolean)
+      && expectedPlayerIds.includes(userId)
+      && (mode !== "solo" || guestId === BOT_ID)
+      && (status !== "playing" || (number(room.matchEndsAt) > now && number(room.turnEndsAt) > 0));
+    const wordIsValid = structurallyValid && await isApprovedVocabularyWordServer(currentWord, transaction);
+
+    if (!wordIsValid) {
+      transaction.update(roomRef, {
+        status: "cancelled",
+        finishReason: "cancelled",
+        turnPlayerId: null,
+        turnStartedAt: null,
+        turnEndsAt: null,
+        updatedAt: now,
+      });
+      return { recoveryStatus: "stale" as const, repairedHands: [], reason: "invalid_room_state" };
+    }
+
+    const handRefs = expectedPlayerIds.map((playerId) => roomRef.collection("hands").doc(playerId));
+    const handSnaps = await Promise.all(handRefs.map((ref) => transaction.get(ref)));
+    const players = room.players && typeof room.players === "object"
+      ? structuredClone(room.players as Record<string, Record<string, unknown>>)
+      : {};
+    const repairedHands: string[] = [];
+    let playersChanged = false;
+
+    handSnaps.forEach((handSnap, index) => {
+      const playerId = expectedPlayerIds[index];
+      const existingCards = handSnap.exists ? readValidCards((handSnap.data() || {}).cards) : null;
+      const mustRestore = !existingCards || (status === "playing" && existingCards.length === 0);
+      const cards = mustRestore
+        ? createCards(createFairVocabularyLetters(currentWord, HAND_SIZE))
+        : existingCards;
+      if (mustRestore) {
+        transaction.set(handRefs[index], { userId: playerId, cards, updatedAt: now });
+        repairedHands.push(playerId);
+      }
+
+      const summary = recoveredPlayerSummary(room, playerId, cards, now);
+      const previous = players[playerId];
+      if (!previous || number(previous.cardCount) !== cards.length || !text(previous.userId)) {
+        players[playerId] = summary;
+        playersChanged = true;
+      }
+    });
+
+    if (playersChanged || repairedHands.length) {
+      transaction.update(roomRef, { players, updatedAt: now });
+    }
+
+    return {
+      recoveryStatus: repairedHands.length ? "recovered" as const : "ready" as const,
+      repairedHands,
+    };
+  });
 }
 
 function startedDuelRoomData(params: {
@@ -1446,6 +1557,9 @@ export async function POST(request: NextRequest) {
     }
     if (body.action === "cancelMatchmaking") {
       return NextResponse.json(await cancelMatchmaking(member.userId));
+    }
+    if (body.action === "recover") {
+      return NextResponse.json(await recoverVocabularyRoom(member.userId, text(body.roomId)));
     }
     if (body.action === "botTurn") {
       return NextResponse.json(await playBotTurn(member.userId, text(body.roomId)));

@@ -57,12 +57,13 @@ import {
   playVocabularyCard,
   processVocabularyTimeout,
   reportVocabularyWord,
+  recoverVocabularyChallenge,
   requestVocabularyRematch,
 } from "@/lib/vocabularyChallengeClient";
 import { playVocabularySound, prepareVocabularyAudio } from "@/lib/vocabularyChallengeAudio";
 import { useVocabularyVoiceChat } from "@/lib/useVocabularyVoiceChat";
 import { syncPlatformGameXp as syncPlatformGameXpClient } from "@/lib/platformGameXpClient";
-import { hasVocabularyMoveWithOverrides } from "@/lib/vocabularyChallengeDictionary";
+import { hasVocabularyMoveWithOverrides, VOCABULARY_ALLOWED_LETTERS } from "@/lib/vocabularyChallengeDictionary";
 import type {
   VocabularyBotDifficulty,
   VocabularyChallengeCard,
@@ -70,9 +71,21 @@ import type {
   VocabularyChallengePlayerSummary,
   VocabularyChallengeRoom,
   VocabularyDictionaryClientOverrides,
+  VocabularyInitializationState,
   VocabularyLeaderboard,
   VocabularyLeaderboardPeriod,
 } from "@/types/vocabularyChallenge";
+
+const VOCABULARY_SYNC_TIMEOUT_MS = 12_000;
+const VOCABULARY_AUTOMATIC_RETRY_LIMIT = 2;
+
+function vocabularyDiagnostic(scope: "Init" | "Cards" | "Match" | "Firestore" | "Dictionary", detail: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== "production") console.info(`[Vocabulary${scope}]`, detail);
+}
+
+function vocabularyDiagnosticError(scope: "Init" | "Cards" | "Match" | "Firestore" | "Dictionary", detail: Record<string, unknown>) {
+  if (process.env.NODE_ENV !== "production") console.error(`[Vocabulary${scope}]`, detail);
+}
 
 const CARD_TONES = [
   {
@@ -123,6 +136,31 @@ function mapHand(data: Record<string, unknown>): VocabularyChallengeHand {
     cards: Array.isArray(data.cards) ? data.cards as VocabularyChallengeCard[] : [],
     updatedAt: Number(data.updatedAt || 0),
   };
+}
+
+function hasValidRoomShape(data: Record<string, unknown>) {
+  const status = String(data.status || "");
+  const mode = String(data.mode || "");
+  return ["waiting", "playing", "finished", "cancelled"].includes(status)
+    && ["solo", "duel"].includes(mode)
+    && typeof data.hostId === "string"
+    && Boolean(data.hostId)
+    && typeof data.currentWord === "string"
+    && Boolean(data.currentWord);
+}
+
+function hasValidHandShape(data: Record<string, unknown>, expectedUserId: string) {
+  if (String(data.userId || "") !== expectedUserId || !Array.isArray(data.cards)) return false;
+  const allowedLetters = new Set<string>(VOCABULARY_ALLOWED_LETTERS);
+  const cardIds = new Set<string>();
+  return data.cards.every((card) => {
+    if (!card || typeof card !== "object") return false;
+    const id = String((card as Record<string, unknown>).id || "");
+    const letter = String((card as Record<string, unknown>).letter || "");
+    if (!id || !allowedLetters.has(letter) || cardIds.has(id)) return false;
+    cardIds.add(id);
+    return true;
+  });
 }
 
 function CardFace({
@@ -348,7 +386,11 @@ export default function VocabularyChallengeGame() {
   const [dictionaryOverrides, setDictionaryOverrides] = useState<VocabularyDictionaryClientOverrides>({ enabledWords: [], disabledWords: [] });
   const [matchmaking, setMatchmaking] = useState(false);
   const [botDifficulty, setBotDifficulty] = useState<VocabularyBotDifficulty>("normal");
-  const [restoringRoom, setRestoringRoom] = useState(true);
+  const [initializationState, setInitializationState] = useState<VocabularyInitializationState>("loading");
+  const [initializationError, setInitializationError] = useState("");
+  const [syncAttempt, setSyncAttempt] = useState(0);
+  const [automaticRetryCount, setAutomaticRetryCount] = useState(0);
+  const [dictionaryStatus, setDictionaryStatus] = useState<"loading" | "ready" | "fallback">("loading");
   const [isOnline, setIsOnline] = useState(true);
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<"success" | "error" | "info">("info");
@@ -365,6 +407,7 @@ export default function VocabularyChallengeGame() {
   const botTurnKeyRef = useRef("");
   const gameArenaRef = useRef<HTMLElement | null>(null);
   const voiceChat = useVocabularyVoiceChat(room, user?.id);
+  const restoringRoom = initializationState === "loading" || initializationState === "recovering";
 
   useEffect(() => {
     const update = () => setIsOnline(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -375,20 +418,46 @@ export default function VocabularyChallengeGame() {
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn || !user?.id) { setRestoringRoom(false); return; }
+    if (!isLoggedIn || !user?.id) {
+      const resetTimer = window.setTimeout(() => {
+        setRoomId("");
+        setRoom(null);
+        setHand(null);
+        setInitializationError("");
+        setInitializationState("idle");
+      }, 0);
+      return () => window.clearTimeout(resetTimer);
+    }
     let cancelled = false;
-    setRestoringRoom(true);
+    const startTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setInitializationState("loading");
+      setInitializationError("");
+    }, 0);
+    vocabularyDiagnostic("Init", { phase: "active-room", userId: user.id });
     void getVocabularyActiveRoom()
       .then((active) => {
-        if (cancelled || roomId || !active.roomId) return;
+        if (cancelled) return;
+        if (!active.roomId) {
+          setInitializationState("idle");
+          return;
+        }
+        vocabularyDiagnostic("Match", { phase: "active-room-found", roomId: active.roomId, status: active.status });
         setRoomId(active.roomId);
         setMessageKind("info");
         setMessage(active.status === "waiting" ? "تم استعادة الغرفة التي كنت تنتظر فيها." : "تم استعادة مباراتك الحالية.");
       })
-      .catch((error) => console.warn("Vocabulary active room recovery failed:", error))
-      .finally(() => { if (!cancelled) setRestoringRoom(false); });
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch((error) => {
+        vocabularyDiagnosticError("Init", { phase: "active-room", error: String(error) });
+        if (!cancelled) {
+          setInitializationState("idle");
+          setFeedback("info", "تعذر فحص مباراة سابقة الآن؛ يمكنك بدء مباراة جديدة.");
+        }
+      });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(startTimer);
+    };
   }, [isLoggedIn, user?.id]);
 
   async function refreshLeaderboard(period = leaderboardPeriod) {
@@ -407,15 +476,37 @@ export default function VocabularyChallengeGame() {
 
   useEffect(() => {
     if (!isLoggedIn || !user) return;
-    void refreshLeaderboard(leaderboardPeriod);
+    const refreshTimer = window.setTimeout(() => void refreshLeaderboard(leaderboardPeriod), 0);
+    return () => window.clearTimeout(refreshTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn, user?.id, leaderboardPeriod]);
 
   useEffect(() => {
-    if (!isLoggedIn || !user) return;
-    void getVocabularyDictionaryOverrides().then(setDictionaryOverrides).catch((error) => {
-      console.warn("Vocabulary dictionary overrides load failed:", error);
-    });
+    if (!isLoggedIn || !user?.id) return;
+    let cancelled = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (!cancelled) setDictionaryStatus("loading");
+    }, 0);
+    void getVocabularyDictionaryOverrides()
+      .then((overrides) => {
+        if (cancelled) return;
+        window.clearTimeout(loadingTimer);
+        setDictionaryOverrides(overrides);
+        setDictionaryStatus("ready");
+        vocabularyDiagnostic("Dictionary", { phase: "overrides-ready", enabled: overrides.enabledWords.length, disabled: overrides.disabledWords.length });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        window.clearTimeout(loadingTimer);
+        // The embedded approved dictionary stays available if optional overrides fail.
+        setDictionaryOverrides({ enabledWords: [], disabledWords: [] });
+        setDictionaryStatus("fallback");
+        vocabularyDiagnosticError("Dictionary", { phase: "overrides-fallback", error: String(error) });
+      });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(loadingTimer);
+    };
   }, [isLoggedIn, user?.id]);
 
   useEffect(() => {
@@ -431,40 +522,165 @@ export default function VocabularyChallengeGame() {
 
   useEffect(() => {
     if (!roomId || !user?.id) return;
-    setRoom(null);
-    setHand(null);
+    let cancelled = false;
+    let roomLoaded = false;
+    let handLoaded = false;
+    let recoveryInFlight = false;
+    let recoveryAttempts = 0;
+    let syncTimeout: number | null = null;
+    let resetTimer: number | null = null;
+    let retryTimer: number | null = null;
+    let recoveryRetryTimer: number | null = null;
+    let retryScheduled = false;
+
+    const clearSyncTimeout = () => {
+      if (syncTimeout) window.clearTimeout(syncTimeout);
+      syncTimeout = null;
+    };
+    const failInitialization = (stage: string, error: unknown, message: string) => {
+      if (cancelled) return;
+      clearSyncTimeout();
+      vocabularyDiagnosticError("Firestore", { phase: stage, roomId, userId: user.id, error: String(error) });
+      setInitializationError(message);
+      setInitializationState("error");
+      setMessageKind("error");
+      setMessage(message);
+    };
+    const scheduleSubscriptionRetry = (stage: string, error: unknown, message: string) => {
+      if (cancelled || retryScheduled) return true;
+      if (automaticRetryCount >= VOCABULARY_AUTOMATIC_RETRY_LIMIT) return false;
+      retryScheduled = true;
+      clearSyncTimeout();
+      setInitializationState("recovering");
+      setFeedback("info", message);
+      vocabularyDiagnosticError("Firestore", { phase: `${stage}-retry`, roomId, userId: user.id, attempt: automaticRetryCount + 1, error: String(error) });
+      retryTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        setAutomaticRetryCount((count) => count + 1);
+        setSyncAttempt((attempt) => attempt + 1);
+      }, 650 * (automaticRetryCount + 1));
+      return true;
+    };
+    const markReady = () => {
+      if (cancelled || recoveryInFlight || !roomLoaded || !handLoaded) return;
+      clearSyncTimeout();
+      if (resetTimer) window.clearTimeout(resetTimer);
+      resetTimer = null;
+      setInitializationError("");
+      setInitializationState("ready");
+      vocabularyDiagnostic("Init", { phase: "ready", roomId, userId: user.id });
+    };
+    const recover = async (reason: "timeout" | "room_missing" | "hand_missing") => {
+      if (cancelled || recoveryInFlight) return;
+      if (recoveryAttempts >= 2) {
+        failInitialization("recovery-timeout", reason, "تعذر استلام بيانات المباراة بعد محاولتين. تحقق من الاتصال أو ابدأ مباراة جديدة.");
+        return;
+      }
+      recoveryAttempts += 1;
+      recoveryInFlight = true;
+      clearSyncTimeout();
+      setInitializationState("recovering");
+      vocabularyDiagnostic("Cards", { phase: "recover", reason, roomId, userId: user.id, attempt: recoveryAttempts });
+      try {
+        const result = await recoverVocabularyChallenge(roomId);
+        if (cancelled) return;
+        if (result.status === "stale") {
+          setRoom(null);
+          setHand(null);
+          setInitializationError("انتهت الجلسة القديمة أو كانت بياناتها غير صالحة. ابدأ مباراة جديدة.");
+          setInitializationState("error");
+          setMessageKind("error");
+          setMessage("تم تنظيف الجلسة غير الصالحة. يمكنك بدء مباراة جديدة الآن.");
+          vocabularyDiagnostic("Match", { phase: "stale-session-cleared", roomId, reason: result.reason });
+          return;
+        }
+        recoveryInFlight = false;
+        setInitializationState("loading");
+        if (result.repairedHands.length) {
+          setFeedback("success", "تمت استعادة البطاقات الناقصة بأمان.");
+          vocabularyDiagnostic("Cards", { phase: "recovered", roomId, repairedHands: result.repairedHands.length });
+        }
+        markReady();
+        armSyncTimeout();
+      } catch (error) {
+        if (!cancelled && recoveryAttempts < VOCABULARY_AUTOMATIC_RETRY_LIMIT) {
+          recoveryInFlight = false;
+          recoveryRetryTimer = window.setTimeout(() => void recover(reason), 650 * recoveryAttempts);
+          return;
+        }
+        failInitialization("recover", error, "تعذر استعادة بيانات المباراة. تحقق من الاتصال ثم أعد المحاولة.");
+      } finally {
+        recoveryInFlight = false;
+      }
+    };
+    const armSyncTimeout = () => {
+      clearSyncTimeout();
+      syncTimeout = window.setTimeout(() => {
+        if (!roomLoaded || !handLoaded) void recover("timeout");
+      }, VOCABULARY_SYNC_TIMEOUT_MS);
+    };
+
+    resetTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setRoom(null);
+      setHand(null);
+      setInitializationError("");
+      setInitializationState("loading");
+    }, 0);
+    vocabularyDiagnostic("Init", { phase: "subscribe", roomId, userId: user.id, attempt: syncAttempt });
+    armSyncTimeout();
     const roomUnsubscribe = onSnapshot(
       doc(db, "vocabularyChallengeRooms", roomId),
       (snapshot) => {
         if (!snapshot.exists()) {
-          setMessageKind("error");
-          setMessage("تعذر العثور على المباراة.");
+          void recover("room_missing");
           return;
         }
+        if (!hasValidRoomShape(snapshot.data())) {
+          void recover("room_missing");
+          return;
+        }
+        roomLoaded = true;
         setRoom(mapRoom(snapshot.id, snapshot.data()));
+        markReady();
       },
       (error) => {
-        console.error("Vocabulary room subscription error:", error);
-        setMessageKind("error");
-        setMessage("تعذر مزامنة المباراة. انشر قواعد Firestore المرفقة مع هذه النسخة.");
+        if (scheduleSubscriptionRetry("room-listener", error, "انقطعت مزامنة المباراة. جارٍ إعادة المحاولة تلقائيًا…")) return;
+        failInitialization("room-listener", error, "تعذر مزامنة المباراة. تحقق من الاتصال وقواعد Firestore ثم أعد المحاولة.");
       },
     );
     const handUnsubscribe = onSnapshot(
       doc(db, "vocabularyChallengeRooms", roomId, "hands", user.id),
       (snapshot) => {
-        if (snapshot.exists()) setHand(mapHand(snapshot.data()));
+        if (!snapshot.exists()) {
+          void recover("hand_missing");
+          return;
+        }
+        const handData = snapshot.data();
+        const nextHand = mapHand(handData);
+        if (!hasValidHandShape(handData, user.id)) {
+          void recover("hand_missing");
+          return;
+        }
+        handLoaded = true;
+        setHand(nextHand);
+        markReady();
       },
       (error) => {
-        console.error("Vocabulary hand subscription error:", error);
-        setMessageKind("error");
-        setMessage("تعذر تحميل بطاقاتك الآن.");
+        if (scheduleSubscriptionRetry("hand-listener", error, "تعذر تحميل بطاقاتك. جارٍ إعادة المحاولة تلقائيًا…")) return;
+        failInitialization("hand-listener", error, "تعذر تحميل بطاقاتك الآن. تحقق من الاتصال ثم أعد المحاولة.");
       },
     );
     return () => {
+      cancelled = true;
+      clearSyncTimeout();
+      if (resetTimer) window.clearTimeout(resetTimer);
+      if (retryTimer) window.clearTimeout(retryTimer);
+      if (recoveryRetryTimer) window.clearTimeout(recoveryRetryTimer);
       roomUnsubscribe();
       handUnsubscribe();
     };
-  }, [roomId, user?.id]);
+  }, [automaticRetryCount, roomId, syncAttempt, user?.id]);
 
   useEffect(() => {
     if (!room || room.mode !== "duel" || room.status !== "playing" || !roomId || !user?.id) return;
@@ -488,7 +704,7 @@ export default function VocabularyChallengeGame() {
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [room?.id, room?.mode, room?.status, roomId, user?.id]);
+  }, [room, room?.id, room?.mode, room?.status, roomId, user?.id]);
 
   useEffect(() => {
     if (!matchmaking || roomId) return;
@@ -521,9 +737,13 @@ export default function VocabularyChallengeGame() {
 
   useEffect(() => {
     if (!room?.rematchRoomId || room.rematchRoomId === roomId) return;
-    setSelectedCardId("");
-    setMessage("");
-    setRoomId(room.rematchRoomId);
+    const rematchRoomId = room.rematchRoomId;
+    const transitionTimer = window.setTimeout(() => {
+      setSelectedCardId("");
+      setMessage("");
+      setRoomId(rematchRoomId);
+    }, 0);
+    return () => window.clearTimeout(transitionTimer);
   }, [room?.rematchRoomId, roomId]);
 
   useEffect(() => {
@@ -539,7 +759,7 @@ export default function VocabularyChallengeGame() {
     matchStartSoundKeyRef.current = key;
     prepareVocabularyAudio();
     playVocabularySound("matchStart");
-  }, [room?.id, room?.matchStartedAt, room?.status]);
+  }, [room, room?.id, room?.matchStartedAt, room?.status]);
 
   useEffect(() => {
     if (!room || room.status !== "playing" || !user?.id || room.turnPlayerId !== user.id) return;
@@ -548,7 +768,7 @@ export default function VocabularyChallengeGame() {
     if (turnSoundKeyRef.current === key) return;
     turnSoundKeyRef.current = key;
     playVocabularySound("yourTurn");
-  }, [now, room?.id, room?.status, room?.turnEndsAt, room?.turnPlayerId, room?.turnStartedAt, user?.id]);
+  }, [now, room, room?.id, room?.status, room?.turnEndsAt, room?.turnPlayerId, room?.turnStartedAt, user?.id]);
 
   useEffect(() => {
     if (!room || room.status !== "playing" || !user?.id || room.turnPlayerId !== user.id) return;
@@ -559,7 +779,7 @@ export default function VocabularyChallengeGame() {
     if (countdownSoundKeyRef.current === key) return;
     countdownSoundKeyRef.current = key;
     playVocabularySound(seconds === 1 ? "countdownFinal" : "countdownTick", { vibrate: seconds === 1 });
-  }, [now, room?.id, room?.status, room?.turnEndsAt, room?.turnPlayerId, user?.id]);
+  }, [now, room, room?.id, room?.status, room?.turnEndsAt, room?.turnPlayerId, user?.id]);
 
   useEffect(() => {
     if (!room || room.status !== "finished" || !user?.id) return;
@@ -574,7 +794,7 @@ export default function VocabularyChallengeGame() {
     } else {
       playVocabularySound("lose");
     }
-  }, [room?.id, room?.mode, room?.status, room?.updatedAt, room?.winnerId, user?.id]);
+  }, [room, room?.id, room?.mode, room?.status, room?.updatedAt, room?.winnerId, user?.id]);
 
   useEffect(() => {
     if (!room?.lastMove || !user?.id || room.lastMove.actorId === user.id) return;
@@ -641,7 +861,8 @@ export default function VocabularyChallengeGame() {
 
   useEffect(() => {
     if (room?.status !== "finished") return;
-    void refreshLeaderboard();
+    const refreshTimer = window.setTimeout(() => void refreshLeaderboard(), 0);
+    return () => window.clearTimeout(refreshTimer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.status, room?.id]);
 
@@ -676,6 +897,9 @@ export default function VocabularyChallengeGame() {
       playVocabularySound("cardSelect");
       setBusy(true);
       setMessage("");
+      setInitializationError("");
+      setInitializationState("loading");
+      setAutomaticRetryCount(0);
       const result = await createVocabularyChallenge(mode, botDifficulty);
       if (!result.roomId) throw new Error("تعذر إنشاء المباراة.");
       setXpAward(null);
@@ -683,6 +907,7 @@ export default function VocabularyChallengeGame() {
       setSelectedCardId("");
       // Match-start audio is triggered when the room enters the playing state.
     } catch (error) {
+      setInitializationState("idle");
       setFeedback("error", error instanceof Error ? error.message : "تعذر إنشاء المباراة.");
       playVocabularySound("incorrect");
     } finally {
@@ -716,6 +941,8 @@ export default function VocabularyChallengeGame() {
       playVocabularySound("cardSelect");
       setBusy(true);
       setMessage("");
+      setInitializationError("");
+      setInitializationState("loading");
       const result = await joinVocabularyChallenge(joinCode);
       if (!result.roomId) throw new Error("تعذر الانضمام إلى الغرفة.");
       setXpAward(null);
@@ -723,6 +950,7 @@ export default function VocabularyChallengeGame() {
       setSelectedCardId("");
       // Match-start audio is triggered for both players when play begins.
     } catch (error) {
+      setInitializationState("idle");
       setFeedback("error", error instanceof Error ? error.message : "تعذر الانضمام إلى الغرفة.");
       playVocabularySound("incorrect");
     } finally {
@@ -861,6 +1089,24 @@ export default function VocabularyChallengeGame() {
     setXpAward(null);
     setXpSyncing(false);
     setNow(Date.now());
+    setInitializationError("");
+    setInitializationState("idle");
+    setAutomaticRetryCount(0);
+  }
+
+  function retryInitialization() {
+    if (!roomId) return;
+    setInitializationError("");
+    setMessageKind("info");
+    setMessage("جاري إعادة مزامنة المباراة…");
+    setInitializationState("loading");
+    setAutomaticRetryCount(0);
+    setSyncAttempt((attempt) => attempt + 1);
+  }
+
+  function startFreshSoloMatch() {
+    resetToMenu();
+    window.setTimeout(() => void handleCreate("solo"), 0);
   }
 
   async function copyRoomCode() {
@@ -941,7 +1187,11 @@ export default function VocabularyChallengeGame() {
         ) : <span aria-hidden="true" />}
       </div>
 
-      {!roomId ? (
+      {roomId && initializationState === "error" ? (
+        <section className="grid min-h-[430px] place-items-center rounded-[34px] border border-rose-200/20 bg-[#063f35] p-6 text-center">
+          <div className="max-w-md"><WifiOff className="mx-auto h-10 w-10 text-rose-200/75" /><h1 className="mt-4 text-2xl font-black">تعذر تجهيز المباراة</h1><p className="mt-2 text-sm font-semibold leading-7 text-rose-100/70">{initializationError || "تعذر مزامنة بيانات المباراة."}</p><div className="mt-5 flex flex-wrap justify-center gap-2"><button type="button" onClick={retryInitialization} className="inline-flex min-h-[46px] items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.08] px-5 text-sm font-black text-white"><RefreshCw className="h-4 w-4" /> إعادة المحاولة</button><button type="button" onClick={startFreshSoloMatch} className="inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-lime-300 px-5 text-sm font-black text-emerald-950"><Bot className="h-4 w-4" /> بدء مباراة جديدة</button></div></div>
+        </section>
+      ) : !roomId ? (
         <section className="relative mx-auto box-border w-full min-w-0 max-w-[1180px] overflow-hidden rounded-[26px] border border-emerald-200/15 bg-[linear-gradient(155deg,#073c34_0%,#075640_46%,#063a32_100%)] p-[clamp(10px,2.8vw,16px)] shadow-[0_28px_90px_rgba(0,0,0,.32)] sm:rounded-[32px] md:p-6">
           <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_50%_50%,rgba(255,255,255,.10)_0_1px,transparent_1.5px),linear-gradient(30deg,transparent_48%,rgba(255,255,255,.05)_49%_51%,transparent_52%),linear-gradient(-30deg,transparent_48%,rgba(255,255,255,.045)_49%_51%,transparent_52%)] [background-size:26px_26px,52px_45px,52px_45px]" />
           <div className="pointer-events-none absolute -top-24 left-1/2 h-72 w-[80%] -translate-x-1/2 rounded-[50%] border border-emerald-100/10 bg-emerald-100/[0.025]" />
@@ -1002,6 +1252,7 @@ export default function VocabularyChallengeGame() {
 
           <LeaderboardPanel data={leaderboard} loading={leaderboardLoading} error={leaderboardError} period={leaderboardPeriod} onPeriodChange={setLeaderboardPeriod} onRefresh={() => void refreshLeaderboard(leaderboardPeriod)} />
 
+          {dictionaryStatus === "fallback" ? <div role="status" className="relative mt-3 rounded-2xl border border-amber-200/15 bg-amber-300/[0.07] px-3 py-2.5 text-xs font-bold text-amber-50/80">تم تشغيل القاموس الأساسي؛ تعذر تحميل التخصيصات الإدارية مؤقتًا.</div> : null}
           {message ? <div role="alert" className={`relative mt-4 rounded-2xl border px-3 py-2.5 text-xs font-bold ${messageKind === "error" ? "border-red-300/20 bg-red-400/[0.08] text-red-100" : messageKind === "success" ? "border-lime-300/20 bg-lime-300/[0.08] text-lime-100" : "border-white/10 bg-white/[0.04] text-white/70"}`}>{message}</div> : null}
         </section>
       ) : !room || !hand ? (

@@ -42,6 +42,15 @@ service cloud.firestore {
       return value is string && value.size() > 0 && value.size() <= maxLength;
     }
 
+    function vocabularyRoomParticipant(roomId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/vocabularyChallengeRooms/$(roomId))
+        && (
+          get(/databases/$(database)/documents/vocabularyChallengeRooms/$(roomId)).data.hostId == request.auth.uid
+          || get(/databases/$(database)/documents/vocabularyChallengeRooms/$(roomId)).data.guestId == request.auth.uid
+        );
+    }
+
     match /admins/{userId} {
       allow get: if ownsPathUser(userId) || isAdmin();
       allow list: if isAdmin();
@@ -376,6 +385,23 @@ service cloud.firestore {
     match /platformGameStats/{documentId} {
       allow read: if true;
       allow create, update, delete: if false;
+    }
+
+    // Vocabulary matches and hands are authored exclusively by the protected
+    // server route. Clients only need a live, direct read of their own active
+    // room and their own hand; without these reads onSnapshot fails with
+    // permission-denied and leaves the game permanently in its sync state.
+    match /vocabularyChallengeRooms/{roomId} {
+      allow get: if signedIn()
+        && (resource.data.hostId == request.auth.uid || resource.data.guestId == request.auth.uid);
+      allow list: if false;
+      allow create, update, delete: if false;
+
+      match /hands/{handUserId} {
+        allow get: if vocabularyRoomParticipant(roomId) && handUserId == request.auth.uid;
+        allow list: if false;
+        allow create, update, delete: if false;
+      }
     }
 
     match /notifications/{documentId} {
