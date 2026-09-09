@@ -12,7 +12,8 @@
     "test:predictions:all": "npm run test:predictions && npm run test:firestore-rules",
     "purge:notifications": "node --env-file=.env.local scripts/purge-notifications.js",
     "test:vocabulary-dictionary": "node scripts/audit-vocabulary-dictionary.mjs",
-    "test:majlis-bank": "node scripts/audit-majlis-bank.mjs"
+    "test:majlis-bank": "node scripts/audit-majlis-bank.mjs && node scripts/simulate-majlis-sessions.mjs",
+    "test:majlis-audio": "node scripts/preflight-majlis-audio.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

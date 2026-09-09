@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import Image from "next/image";
 import {
-  AudioLines, Check, ChevronLeft, Clock3, Coffee, Copy, Crown, Dices, DoorOpen, Eye, EyeOff,
+  AudioLines, Check, ChevronLeft, Coffee, Copy, Crown, Dices, DoorOpen, Eye, EyeOff,
   HandHelping, Hourglass, Lightbulb, ListChecks, LoaderCircle, Medal, Mic, MicOff, Pause, Play, Radio,
-  RefreshCw, RotateCcw, RotateCw, ShieldCheck, Sparkles, Swords, Trophy, UsersRound, Volume2, VolumeX, Wifi, X,
+  RefreshCw, RotateCcw, RotateCw, Swords, Trophy, UsersRound, Volume2, VolumeX, Wifi, X,
 } from "lucide-react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import styles from "./MajlisGame.module.css";
@@ -12,15 +13,15 @@ import { useAuth } from "@/context/AuthContext";
 import {
   createMajlisOnlineRoom, getMajlisOnlineRoom, heartbeatMajlisOnlineRoom, joinMajlisOnlineRoom,
   leaveMajlisOnlineRoom, closeMajlisOnlineRoom, setMajlisOnlineTeam, startMajlisOnlineGame,
-  syncMajlisOnlineState, updateMajlisOnlineLobby,
+  syncMajlisOnlineState, updateMajlisOnlineLobby, revealMajlisOnlineQuestion, requestMajlisOnlineAssist,
 } from "@/lib/majlisClient";
 import { useMajlisVoiceChat } from "@/lib/useMajlisVoiceChat";
 import {
   isMajlisSoundEnabled, majlisHaptic, playMajlisSound, preloadMajlisSounds, setMajlisSoundEnabled,
 } from "@/lib/majlisAudio";
 import type {
-  MajlisCategory, MajlisClientQuestion, MajlisGameStartResponse, MajlisOnlinePublicState, MajlisOnlineRoom,
-  MajlisPlayMode, MajlisReveal, MajlisSettings, MajlisVoiceMode,
+  MajlisAssistPayload, MajlisAudioPlaybackState, MajlisCategory, MajlisClientQuestion, MajlisGameStartResponse,
+  MajlisOnlinePublicState, MajlisOnlineRoom, MajlisPlayMode, MajlisReveal, MajlisSettings, MajlisVoiceMode,
 } from "@/types/majlisGame";
 
 type CategorySummary = MajlisCategory & { totalQuestions: number; activeQuestions: number; easy: number; medium: number; hard: number; audio: number };
@@ -33,11 +34,6 @@ const TEAM_COLORS = ["#d6b16b", "#7fb3a8", "#c77a62", "#8f9fc9"];
 function cn(...values: Array<string | false | null | undefined>) { return values.filter(Boolean).join(" "); }
 function formatNumber(value: number) { return new Intl.NumberFormat("en-US").format(value); }
 function difficultyLabel(value: MajlisClientQuestion["difficulty"]) { return value === "hard" ? "صعب" : value === "medium" ? "متوسط" : "سهل"; }
-function sameTeam(room: MajlisOnlineRoom, a?: string | null, b?: string | null) {
-  if (!a || !b) return false;
-  return Boolean(room.players[a]?.teamId && room.players[a]?.teamId === room.players[b]?.teamId);
-}
-
 async function enterGamePresentation() {
   if (typeof window === "undefined") return;
   try {
@@ -67,10 +63,11 @@ function LoadingBlock() {
   return <div className="grid min-h-[320px] place-items-center p-6 text-center"><div><LoaderCircle className="mx-auto h-8 w-8 animate-spin text-[#d6b16b]"/><p className="mt-3 text-sm font-black text-[#f7efdc]/70">نجهّز مجلس التحدي وبنك الأسئلة…</p></div></div>;
 }
 
-function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
+function AudioQuestionPlayer({ question, onPlaybackStateChange }: { question: MajlisClientQuestion; onPlaybackStateChange?: (state: MajlisAudioPlaybackState) => void }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const callbackRef = useRef(onPlaybackStateChange);
+  const cappedEndRef = useRef(false);
+  const [status, setStatus] = useState<MajlisAudioPlaybackState>("idle");
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -78,8 +75,15 @@ function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
 
   const isHumanDataset = question.categoryId === "dialects" || question.categoryId === "languages";
   const isReciter = question.categoryId === "reciter";
-  const maxSeconds = Math.max(8, Math.min(15, question.audioMaxSeconds || 15));
+  const maxSeconds = Math.max(8, Math.min(20, question.audioMaxSeconds || 18));
   const minSeconds = isHumanDataset ? Math.max(6, question.audioMinSeconds || 8) : 0;
+
+  useEffect(() => { callbackRef.current = onPlaybackStateChange; }, [onPlaybackStateChange]);
+
+  function publish(next: MajlisAudioPlaybackState) {
+    setStatus(next);
+    callbackRef.current?.(next);
+  }
 
   function sourceForRetry(attempt: number) {
     const raw = attempt === 1 && question.audioFallbackUrl ? question.audioFallbackUrl : question.audioUrl;
@@ -94,6 +98,13 @@ function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
   const clearAudio = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    audio.onplaying = null;
+    audio.onwaiting = null;
+    audio.onstalled = null;
+    audio.onpause = null;
+    audio.onended = null;
+    audio.onerror = null;
+    audio.ontimeupdate = null;
     audio.pause();
     audio.src = "";
     audio.load();
@@ -101,13 +112,28 @@ function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
   }, []);
 
   useEffect(() => () => clearAudio(), [clearAudio]);
-  useEffect(() => { clearAudio(); setPlaying(false); setLoading(false); setError(""); setRetry(0); setElapsed(0); setDuration(maxSeconds); }, [question.id, clearAudio, maxSeconds]);
+  useEffect(() => {
+    clearAudio();
+    const timer = window.setTimeout(() => {
+      setStatus("idle"); setError(""); setRetry(0); setElapsed(0); setDuration(maxSeconds); cappedEndRef.current = false;
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [question.id, clearAudio, maxSeconds]);
+  useEffect(() => {
+    if (!question.audioUrl) return;
+    const preloader = new Audio(question.audioUrl);
+    preloader.preload = "metadata";
+    preloader.setAttribute("playsinline", "true");
+    preloader.load();
+    return () => { preloader.pause(); preloader.src = ""; };
+  }, [question.id, question.audioUrl]);
 
   async function loadAndPlay(attempt: number): Promise<void> {
     const url = sourceForRetry(attempt);
     if (!url) throw new Error("AUDIO_URL_MISSING");
     clearAudio();
-    setLoading(true);
+    publish("loading");
+    setError("");
     setRetry(attempt);
     const audio = new Audio(url);
     audioRef.current = audio;
@@ -115,20 +141,21 @@ function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
     audio.setAttribute("playsinline", "true");
 
     await new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(() => fail(), 8_000);
       const done = () => { cleanup(); resolve(); };
       const fail = () => { cleanup(); reject(new Error("AUDIO_LOAD_FAILED")); };
-      const cleanup = () => { audio.removeEventListener("loadedmetadata", done); audio.removeEventListener("error", fail); };
-      if (audio.readyState >= 1) return resolve();
+      const cleanup = () => { window.clearTimeout(timeout); audio.removeEventListener("loadedmetadata", done); audio.removeEventListener("error", fail); };
+      if (audio.readyState >= 1) return done();
       audio.addEventListener("loadedmetadata", done, { once: true });
       audio.addEventListener("error", fail, { once: true });
-      window.setTimeout(() => { if (audio.readyState >= 1) done(); }, 4500);
     });
 
     const startAt = Math.max(0, question.audioStartSeconds || 0);
     const nativeDuration = Number.isFinite(audio.duration) ? audio.duration : 0;
     const playableDuration = nativeDuration > 0 ? Math.max(0, nativeDuration - startAt) : maxSeconds;
-    if (isHumanDataset && nativeDuration > 0 && playableDuration < minSeconds && attempt < 6) {
-      return loadAndPlay(attempt + 1);
+    if (isHumanDataset && nativeDuration > 0 && playableDuration < minSeconds) {
+      if (attempt < 2) return loadAndPlay(attempt + 1);
+      throw new Error("AUDIO_TOO_SHORT");
     }
 
     const cappedDuration = Math.max(1, Math.min(maxSeconds, playableDuration || maxSeconds));
@@ -139,31 +166,46 @@ function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
     audio.ontimeupdate = () => {
       const relative = Math.max(0, audio.currentTime - startAt);
       setElapsed(Math.min(cappedDuration, relative));
-      if (relative >= cappedDuration) { audio.pause(); setPlaying(false); }
+      if (relative >= cappedDuration) {
+        cappedEndRef.current = true;
+        audio.pause();
+        publish("ended");
+      }
     };
-    audio.onended = () => { setElapsed(cappedDuration); setPlaying(false); };
-    audio.onerror = () => setPlaying(false);
+    audio.onplaying = () => publish("playing");
+    audio.onwaiting = () => publish("buffering");
+    audio.onstalled = () => publish("buffering");
+    audio.onpause = () => {
+      if (cappedEndRef.current || audio.ended) publish("ended");
+      else if (audio.currentTime > 0) publish("paused");
+    };
+    audio.onended = () => { setElapsed(cappedDuration); publish("ended"); };
+    audio.onerror = () => { publish("error"); setError("انقطع مصدر التسجيل. اختر تسجيلًا بديلًا أو تخطَّ السؤال."); };
+    cappedEndRef.current = false;
     await audio.play();
-    setLoading(false);
-    setPlaying(true);
   }
 
   async function toggle() {
     setError("");
     const current = audioRef.current;
-    if (current && playing) { current.pause(); setPlaying(false); return; }
-    if (current && !playing && elapsed > 0 && elapsed < duration) {
-      try { await current.play(); setPlaying(true); return; } catch {}
+    if (current && status === "playing") { current.pause(); return; }
+    if (current && status === "paused" && elapsed > 0 && elapsed < duration) {
+      try { await current.play(); return; } catch {}
     }
     try {
       await loadAndPlay(retry);
     } catch {
-      for (let attempt = Math.max(1, retry + 1); attempt <= 6; attempt += 1) {
+      for (let attempt = Math.max(1, retry + 1); attempt <= 2; attempt += 1) {
         try { await loadAndPlay(attempt); return; } catch {}
       }
-      setLoading(false); setPlaying(false);
-      setError("تعذر تشغيل التسجيل البشري بعد تجربة المقاطع البديلة.");
+      publish("error");
+      setError("تعذر تحميل التسجيل — اختر تسجيلًا بديلًا أو تخطَّ السؤال.");
     }
+  }
+
+  async function retryAlternative() {
+    try { await loadAndPlay(Math.min(2, retry + 1)); }
+    catch { publish("error"); setError("تعذر تحميل المصادر الثلاثة. يمكن للمضيف تخطي السؤال دون احتسابه."); }
   }
 
   function formatAudioTime(value: number) {
@@ -172,22 +214,25 @@ function AudioQuestionPlayer({ question }: { question: MajlisClientQuestion }) {
   }
 
   const progress = Math.max(0, Math.min(100, (elapsed / Math.max(1, duration)) * 100));
+  const loading = status === "loading" || status === "buffering";
+  const playing = status === "playing";
   const mediaCaption = isReciter
     ? "تلاوة بشرية حقيقية · رابط القارئ مخفي حتى كشف الإجابة"
     : isHumanDataset
-      ? "جملة بشرية حقيقية من مصدر بيانات مفتوح · حتى 15 ثانية · بدون TTS"
+      ? "جملة بشرية حقيقية من مصدر بيانات مفتوح · من 8 إلى 20 ثانية · بدون TTS"
       : "مقطع صوتي للسؤال";
 
   return <div className={styles.mediaPlayer}>
     <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-[#d6b16b]/25 bg-[#d6b16b]/10 text-[#ead8ad]"><AudioLines className="h-6 w-6"/></div>
     <p className="mt-2 text-[11px] font-black text-[#f7efdc]/60">{mediaCaption}</p>
-    <button type="button" onClick={()=>void toggle()} disabled={loading} className="mx-auto mt-3 inline-flex min-h-[48px] items-center gap-2 rounded-2xl bg-[#d6b16b] px-5 text-sm font-black text-[#173b35] disabled:opacity-60">{loading?<LoaderCircle className="h-4 w-4 animate-spin"/>:playing?<Pause className="h-4 w-4"/>:<Play className="h-4 w-4"/>}{loading?"جاري تحميل التسجيل…":playing?"إيقاف مؤقت":"تشغيل / استكمال"}</button>
+    <div className={styles.waveform} aria-hidden="true">{[36,62,44,80,52,92,58,74,42,86,66,48,78,54,90,60,72,40].map((height,index)=><span key={index} style={{height:`${height}%`}} className={index/18*100<=progress?styles.waveformActive:""}/>)}</div>
+    <button type="button" onClick={()=>void toggle()} disabled={loading} className="mx-auto mt-3 inline-flex min-h-[48px] cursor-pointer items-center gap-2 rounded-2xl bg-[#d6b16b] px-5 text-sm font-black text-[#173b35] transition-colors duration-200 disabled:cursor-wait disabled:opacity-60">{loading?<LoaderCircle className="h-4 w-4 animate-spin"/>:playing?<Pause className="h-4 w-4"/>:<Play className="h-4 w-4"/>}{status==="buffering"?"جارٍ التخزين المؤقت…":status==="loading"?"جاري تحميل التسجيل…":playing?"إيقاف مؤقت":status==="paused"?"استكمال التسجيل":"تشغيل التسجيل"}</button>
     <div className="mx-auto mt-4 max-w-md" dir="ltr">
       <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#d6b16b] transition-[width] duration-150" style={{width:`${progress}%`}}/></div>
-      <div className="mt-1.5 flex items-center justify-between text-[10px] font-black tabular-nums text-[#f7efdc]/45"><span>{formatAudioTime(elapsed)}</span><span>{formatAudioTime(duration)}</span></div>
+      <div className="mt-1.5 flex items-center justify-between text-[10px] font-black tabular-nums text-[#f7efdc]/45"><span>{formatAudioTime(elapsed)}</span><span>-{formatAudioTime(Math.max(0,duration-elapsed))} / {formatAudioTime(duration)}</span></div>
     </div>
     {retry>0?<p className="mt-1 text-[9px] font-bold text-[#f7efdc]/30">تم اختيار مقطع بديل تلقائيًا لضمان مدة ووضوح أفضل.</p>:null}
-    {error?<p role="alert" className="mt-2 text-[11px] font-bold text-rose-200">{error}</p>:null}
+    {error?<div role="alert" className="mt-2"><p className="text-[11px] font-bold text-rose-200">{error}</p><button type="button" onClick={()=>void retryAlternative()} className="mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-rose-200/20 bg-rose-300/[.07] px-4 text-[10px] font-black text-rose-100"><RefreshCw className="h-3.5 w-3.5"/> تجربة تسجيل بديل</button></div>:null}
   </div>;
 }
 
@@ -245,7 +290,7 @@ export default function MajlisGame() {
   const [phase,setPhase]=useState<"setup"|"board"|"finished">("setup"); const [teamCount,setTeamCount]=useState(2); const [teamNames,setTeamNames]=useState(["الفريق الأول","الفريق الثاني","الفريق الثالث","الفريق الرابع"]); const [selectedCategoryIds,setSelectedCategoryIds]=useState<string[]>([]);
   const [session,setSession]=useState<MajlisGameStartResponse|null>(null); const [teams,setTeams]=useState<Team[]>([]); const [currentTeamIndex,setCurrentTeamIndex]=useState(0); const [usedQuestionIds,setUsedQuestionIds]=useState<string[]>([]);
   const [activeQuestion,setActiveQuestion]=useState<MajlisClientQuestion|null>(null); const [questionOwnerIndex,setQuestionOwnerIndex]=useState(0); const [answeringTeamIndex,setAnsweringTeamIndex]=useState(0); const [secondsLeft,setSecondsLeft]=useState(0); const [timerPaused,setTimerPaused]=useState(false); const [questionDeadlineAt,setQuestionDeadlineAt]=useState<number|null>(null);
-  const [revealing,setRevealing]=useState(false); const [reveal,setReveal]=useState<MajlisReveal|null>(null); const [hintVisible,setHintVisible]=useState(false); const [optionsVisible,setOptionsVisible]=useState(false); const [doubleActive,setDoubleActive]=useState(false); const [timeBonusActive,setTimeBonusActive]=useState(false); const [stealMode,setStealMode]=useState(false); const [soundOn,setSoundOn]=useState(true); const [starting,setStarting]=useState(false); const [isLandscape,setIsLandscape]=useState(true); const [finishReason,setFinishReason]=useState<"complete"|"manual">("complete");
+  const [revealing,setRevealing]=useState(false); const [reveal,setReveal]=useState<MajlisReveal|null>(null); const [hintVisible,setHintVisible]=useState(false); const [optionsVisible,setOptionsVisible]=useState(false); const [visibleHint,setVisibleHint]=useState<string|null>(null); const [visibleOptions,setVisibleOptions]=useState<string[]>([]); const [assistBusy,setAssistBusy]=useState<"hint"|"options"|null>(null); const [audioPlaybackState,setAudioPlaybackState]=useState<MajlisAudioPlaybackState>("idle"); const [doubleActive,setDoubleActive]=useState(false); const [timeBonusActive,setTimeBonusActive]=useState(false); const [stealMode,setStealMode]=useState(false); const [soundOn,setSoundOn]=useState(true); const [starting,setStarting]=useState(false); const [isLandscape,setIsLandscape]=useState(true); const [finishReason,setFinishReason]=useState<"complete"|"manual">("complete");
 
   const onlineHost = Boolean(user?.id && onlineRoom?.hostId === user.id);
   const canControl = playMode === "local" || onlineHost;
@@ -254,7 +299,7 @@ export default function MajlisGame() {
 
   const loadCatalog=useCallback(async()=>{try{setLoading(true);setError("");const response=await fetch("/api/games/majlis",{cache:"no-store"});const payload=await response.json().catch(()=>({})) as {categories?:CategorySummary[];settings?:MajlisSettings;totalQuestions?:number;error?:string};if(!response.ok)throw new Error(payload.error||"تعذر تحميل اللعبة.");const list=payload.categories||[];setCategories(list);setSettings(payload.settings||null);setTotalQuestions(payload.totalQuestions||0);const count=payload.settings?.categoriesPerGame||6;setSelectedCategoryIds(current=>current.length?current:list.slice(0,count).map(item=>item.id));}catch(e){setError(e instanceof Error?e.message:"تعذر تحميل اللعبة.");}finally{setLoading(false);}},[]);
 
-  useEffect(()=>{preloadMajlisSounds();setSoundOn(isMajlisSoundEnabled());void loadCatalog();try{const saved=localStorage.getItem(STORAGE_KEY);if(!saved)return;const parsed=JSON.parse(saved) as PersistedState;if(!parsed?.session||Date.now()-Number(parsed.savedAt||0)>8*60*60*1000){localStorage.removeItem(STORAGE_KEY);return;}setSession(parsed.session);setTeams(parsed.teams||[]);setCurrentTeamIndex(parsed.currentTeamIndex||0);setUsedQuestionIds(parsed.usedQuestionIds||[]);setPhase(parsed.phase||"board");}catch{localStorage.removeItem(STORAGE_KEY);}},[loadCatalog]);
+  useEffect(()=>{preloadMajlisSounds();const timer=window.setTimeout(()=>{setSoundOn(isMajlisSoundEnabled());void loadCatalog();try{const saved=localStorage.getItem(STORAGE_KEY);if(!saved)return;const parsed=JSON.parse(saved) as PersistedState;if(!parsed?.session||Date.now()-Number(parsed.savedAt||0)>8*60*60*1000){localStorage.removeItem(STORAGE_KEY);return;}setSession(parsed.session);setTeams(parsed.teams||[]);setCurrentTeamIndex(parsed.currentTeamIndex||0);setUsedQuestionIds(parsed.usedQuestionIds||[]);setPhase(parsed.phase||"board");}catch{localStorage.removeItem(STORAGE_KEY);}},0);return()=>window.clearTimeout(timer);},[loadCatalog]);
   useEffect(()=>{if(playMode!=="local"||!session||!teams.length||phase==="setup")return;localStorage.setItem(STORAGE_KEY,JSON.stringify({savedAt:Date.now(),session,teams,currentTeamIndex,usedQuestionIds,phase} satisfies PersistedState));},[playMode,session,teams,currentTeamIndex,usedQuestionIds,phase]);
 
   useEffect(()=>{
@@ -276,10 +321,10 @@ export default function MajlisGame() {
   useEffect(()=>{if(!activeQuestion||timerPaused||reveal)return;if(secondsLeft>0&&secondsLeft<=5)playMajlisSound("timer");},[secondsLeft,activeQuestion,timerPaused,reveal]);
 
   // Online room polling + heartbeat.
-  useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!user?.id)return;let cancelled=false;let pollTimer:ReturnType<typeof setTimeout>|null=null;let heartbeatTimer:ReturnType<typeof setInterval>|null=null;const roomId=onlineRoom.id;const poll=async()=>{try{const {room}=await getMajlisOnlineRoom(roomId);if(cancelled)return;setOnlineRoom(room);setTeamCount(room.teamCount);setTeamNames(current=>current.map((name,i)=>room.teamNames[i]||name));if(!onlineHost)setSelectedCategoryIds(room.selectedCategoryIds);if(!onlineHost&&room.session&&room.publicState){const ps=room.publicState;setSession(room.session);setTeams(ps.teams);setCurrentTeamIndex(ps.currentTeamIndex);setUsedQuestionIds(ps.usedQuestionIds);setActiveQuestion(ps.activeQuestion);setQuestionOwnerIndex(ps.questionOwnerIndex);setAnsweringTeamIndex(ps.answeringTeamIndex);setSecondsLeft(ps.secondsLeft);setTimerPaused(ps.timerPaused);setQuestionDeadlineAt(ps.questionDeadlineAt);setReveal(ps.reveal);setHintVisible(ps.hintVisible);setOptionsVisible(ps.optionsVisible);setDoubleActive(ps.doubleActive);setTimeBonusActive(ps.timeBonusActive);setStealMode(ps.stealMode);setFinishReason(ps.finishReason);setPhase(ps.phase);}if(room.status==="closed"){cancelled=true;void exitGamePresentation();setOnlineRoom(null);setSession(null);setTeams([]);setPhase("setup");setError("انتهى المجلس.");return;}}catch(e){const message=e instanceof Error?e.message:"";if(!cancelled&&/(غير موجود|انتهى|صلاحية|إغلاق|closed)/i.test(message)){cancelled=true;void exitGamePresentation();setOnlineRoom(null);setSession(null);setTeams([]);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setPhase("setup");setError("انتهى المجلس. ابدأ مجلسًا جديدًا.");return;}if(!cancelled)console.warn("Majlis room poll",e);}finally{if(!cancelled)pollTimer=setTimeout(poll,900);}};void poll();heartbeatTimer=setInterval(()=>void heartbeatMajlisOnlineRoom(roomId).catch(()=>{}),12000);return()=>{cancelled=true;if(pollTimer)clearTimeout(pollTimer);if(heartbeatTimer)clearInterval(heartbeatTimer);};},[playMode,onlineRoom?.id,user?.id,onlineHost]);
+  useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!user?.id)return;let cancelled=false;let pollTimer:ReturnType<typeof setTimeout>|null=null;let heartbeatTimer:ReturnType<typeof setInterval>|null=null;const roomId=onlineRoom.id;const poll=async()=>{try{const {room}=await getMajlisOnlineRoom(roomId);if(cancelled)return;setOnlineRoom(room);setTeamCount(room.teamCount);setTeamNames(current=>current.map((name,i)=>room.teamNames[i]||name));if(!onlineHost)setSelectedCategoryIds(room.selectedCategoryIds);if(!onlineHost&&room.session&&room.publicState){const ps=room.publicState;setSession(room.session);setTeams(ps.teams);setCurrentTeamIndex(ps.currentTeamIndex);setUsedQuestionIds(ps.usedQuestionIds);setActiveQuestion(ps.activeQuestion);setQuestionOwnerIndex(ps.questionOwnerIndex);setAnsweringTeamIndex(ps.answeringTeamIndex);setSecondsLeft(ps.secondsLeft);setTimerPaused(ps.timerPaused);setQuestionDeadlineAt(ps.questionDeadlineAt?Date.now()+Math.max(0,ps.questionDeadlineAt-ps.updatedAt):null);setReveal(ps.reveal);setHintVisible(ps.hintVisible);setOptionsVisible(ps.optionsVisible);setVisibleHint(ps.visibleHint);setVisibleOptions(ps.visibleOptions);setAudioPlaybackState(ps.audioPlaybackState);setDoubleActive(ps.doubleActive);setTimeBonusActive(ps.timeBonusActive);setStealMode(ps.stealMode);setFinishReason(ps.finishReason);setPhase(ps.phase);}if(room.status==="closed"){cancelled=true;void exitGamePresentation();setOnlineRoom(null);setSession(null);setTeams([]);setPhase("setup");setError("انتهى المجلس.");return;}}catch(e){const message=e instanceof Error?e.message:"";if(!cancelled&&/(غير موجود|انتهى|صلاحية|إغلاق|closed)/i.test(message)){cancelled=true;void exitGamePresentation();setOnlineRoom(null);setSession(null);setTeams([]);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setVisibleHint(null);setVisibleOptions([]);setPhase("setup");setError("انتهى المجلس. ابدأ مجلسًا جديدًا.");return;}if(!cancelled)console.warn("Majlis room poll",e);}finally{if(!cancelled)pollTimer=setTimeout(poll,900);}};void poll();heartbeatTimer=setInterval(()=>void heartbeatMajlisOnlineRoom(roomId).catch(()=>{}),12000);return()=>{cancelled=true;if(pollTimer)clearTimeout(pollTimer);if(heartbeatTimer)clearInterval(heartbeatTimer);};},[playMode,onlineRoom?.id,user?.id,onlineHost]);
 
   // Host publishes only authoritative state. Debounced; the deadline makes timers deterministic on all devices.
-  useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!onlineHost||!session||phase==="setup"||onlineRoom.status!=="playing")return;const publicState:MajlisOnlinePublicState={phase:phase==="finished"?"finished":"board",teams,currentTeamIndex,usedQuestionIds,activeQuestion,questionOwnerIndex,answeringTeamIndex,secondsLeft,timerPaused,questionDeadlineAt,reveal,hintVisible,optionsVisible,doubleActive,timeBonusActive,stealMode,finishReason,updatedAt:Date.now()};const timer=setTimeout(()=>void syncMajlisOnlineState(onlineRoom.id,publicState).catch(e=>console.warn("Majlis state sync",e)),180);return()=>clearTimeout(timer);},[playMode,onlineRoom?.id,onlineRoom?.status,onlineHost,session,phase,teams,currentTeamIndex,usedQuestionIds,activeQuestion,questionOwnerIndex,answeringTeamIndex,timerPaused,questionDeadlineAt,reveal,hintVisible,optionsVisible,doubleActive,timeBonusActive,stealMode,finishReason]);
+  useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!onlineHost||!session||phase==="setup"||onlineRoom.status!=="playing")return;const publicState:MajlisOnlinePublicState={phase:phase==="finished"?"finished":"board",teams,currentTeamIndex,usedQuestionIds,activeQuestion,questionOwnerIndex,answeringTeamIndex,secondsLeft,timerPaused,questionDeadlineAt,reveal,hintVisible,optionsVisible,visibleHint,visibleOptions,audioPlaybackState,doubleActive,timeBonusActive,stealMode,finishReason,updatedAt:Date.now()};const timer=setTimeout(()=>void syncMajlisOnlineState(onlineRoom.id,publicState).catch(e=>console.warn("Majlis state sync",e)),180);return()=>clearTimeout(timer);},[playMode,onlineRoom?.id,onlineRoom?.status,onlineHost,session,phase,teams,currentTeamIndex,usedQuestionIds,activeQuestion,questionOwnerIndex,answeringTeamIndex,secondsLeft,timerPaused,questionDeadlineAt,reveal,hintVisible,optionsVisible,visibleHint,visibleOptions,audioPlaybackState,doubleActive,timeBonusActive,stealMode,finishReason]);
 
   // Keep online lobby settings visible to everyone before the host starts.
   useEffect(()=>{if(playMode!=="online"||!onlineRoom?.id||!onlineHost||onlineRoom.status!=="lobby")return;const timer=setTimeout(()=>void updateMajlisOnlineLobby(onlineRoom.id,teamCount,teamNames.slice(0,teamCount),selectedCategoryIds).catch(()=>{}),450);return()=>clearTimeout(timer);},[playMode,onlineRoom?.id,onlineRoom?.status,onlineHost,teamCount,teamNames,selectedCategoryIds]);
@@ -296,32 +341,34 @@ export default function MajlisGame() {
   function createdTeamsFor(count=teamCount,names=teamNames):Team[]{return Array.from({length:count},(_,index)=>({id:`team-${index+1}`,name:names[index]?.trim()||`الفريق ${index+1}`,score:0,accent:TEAM_COLORS[index],assists:{hint:true,time:true,double:true,options:true}}));}
   async function startGame(){if(!settings||selectedCategoryIds.length!==settings.categoriesPerGame)return;const presentationPromise=enterGamePresentation();try{setStarting(true);setError("");let payload:MajlisGameStartResponse;if(playMode==="online"){if(!onlineRoom||!onlineHost)throw new Error("بدء المجلس متاح للمضيف فقط.");const result=await startMajlisOnlineGame(onlineRoom.id,selectedCategoryIds,teamCount,teamNames.slice(0,teamCount));payload=result.session;setOnlineRoom(result.room);setTeams(result.room.publicState?.teams||createdTeamsFor());}else{const response=await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"start",categoryIds:selectedCategoryIds})});const result=await response.json().catch(()=>({})) as MajlisGameStartResponse&{error?:string};if(!response.ok)throw new Error(result.error||"تعذر بدء المجلس.");payload=result;setTeams(createdTeamsFor());}setSession(payload);setCurrentTeamIndex(0);setUsedQuestionIds([]);setPhase("board");setFinishReason("complete");playMajlisSound("start");majlisHaptic("success");void presentationPromise;window.setTimeout(()=>document.getElementById("majlis-board")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),80);}catch(e){void exitGamePresentation();setError(e instanceof Error?e.message:"تعذر بدء المجلس.");}finally{setStarting(false);}}
 
-  function openQuestion(question:MajlisClientQuestion){if(!canControl||!session||usedSet.has(question.id)||!currentTeam)return;playMajlisSound("question");majlisHaptic();const seconds=session.settings.questionSeconds;setQuestionOwnerIndex(currentTeamIndex);setAnsweringTeamIndex(currentTeamIndex);setActiveQuestion(question);setSecondsLeft(seconds);setTimerPaused(false);setQuestionDeadlineAt(Date.now()+seconds*1000);setReveal(null);setHintVisible(false);setOptionsVisible(false);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);}
-  async function revealAnswer(){if(!canControl||!activeQuestion||!session||reveal)return;try{setRevealing(true);setTimerPaused(true);setQuestionDeadlineAt(null);const response=await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"reveal",sessionId:session.sessionId,questionId:activeQuestion.id})});const payload=await response.json().catch(()=>({})) as MajlisReveal&{error?:string};if(!response.ok)throw new Error(payload.error||"تعذر إظهار الإجابة.");setReveal(payload);playMajlisSound("reveal");}catch(e){setError(e instanceof Error?e.message:"تعذر إظهار الإجابة.");}finally{setRevealing(false);}}
-  function toggleTimerPause(){if(!canControl||!activeQuestion||reveal)return;if(timerPaused){setQuestionDeadlineAt(Date.now()+secondsLeft*1000);setTimerPaused(false);}else{setQuestionDeadlineAt(null);setTimerPaused(true);}}
-  function useAssist(type:keyof Team["assists"]){if(!canControl||!activeQuestion||!answeringTeam||reveal||stealMode||!answeringTeam.assists[type])return;playMajlisSound("tap");majlisHaptic();setTeams(current=>current.map((team,index)=>index===answeringTeamIndex?{...team,assists:{...team.assists,[type]:false}}:team));if(type==="hint")setHintVisible(true);if(type==="options")setOptionsVisible(true);if(type==="time"){setTimeBonusActive(true);setSecondsLeft(value=>value+15);setQuestionDeadlineAt(deadline=>deadline?deadline+15000:Date.now()+(secondsLeft+15)*1000);}if(type==="double")setDoubleActive(true);}
-  function offerSteal(){if(!canControl||!activeQuestion||!session?.settings.allowSteal||reveal||teams.length<2)return;const next=(answeringTeamIndex+1)%teams.length;const secs=session.settings.stealSeconds;setAnsweringTeamIndex(next);setStealMode(true);setDoubleActive(false);setTimeBonusActive(false);setHintVisible(false);setOptionsVisible(false);setSecondsLeft(secs);setTimerPaused(false);setQuestionDeadlineAt(Date.now()+secs*1000);playMajlisSound("steal");majlisHaptic();}
-  function closeQuestionAfterResult(correct:boolean){if(!canControl||!activeQuestion)return;const award=correct?activeQuestion.points*(doubleActive?2:1):0;if(award>0){setTeams(current=>current.map((team,index)=>index===answeringTeamIndex?{...team,score:team.score+award}:team));playMajlisSound("correct");majlisHaptic("success");}else{playMajlisSound("wrong");majlisHaptic("error");}const nextUsed=[...usedQuestionIds,activeQuestion.id];setUsedQuestionIds(nextUsed);setCurrentTeamIndex((questionOwnerIndex+1)%teams.length);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);setTimerPaused(false);setQuestionDeadlineAt(null);if(nextUsed.length>=totalBoardQuestions){setFinishReason("complete");setPhase("finished");playMajlisSound("finish");}}
-  async function closeLocalServerSession(sessionId?: string | null){if(!sessionId)return;await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"closeSession",sessionId})}).catch(()=>undefined);}
+  function openQuestion(question:MajlisClientQuestion, openedAt:number){if(!canControl||!session||usedSet.has(question.id)||!currentTeam)return;playMajlisSound("question");majlisHaptic();const seconds=session.settings.questionSeconds;const waitsForAudio=question.type==="audio";setQuestionOwnerIndex(currentTeamIndex);setAnsweringTeamIndex(currentTeamIndex);setActiveQuestion(question);setSecondsLeft(seconds);setTimerPaused(waitsForAudio);setQuestionDeadlineAt(waitsForAudio?null:openedAt+seconds*1000);setAudioPlaybackState("idle");setReveal(null);setHintVisible(false);setOptionsVisible(false);setVisibleHint(null);setVisibleOptions([]);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);}
+  async function revealAnswer(){if(!canControl||!activeQuestion||!session||reveal)return;try{setRevealing(true);setTimerPaused(true);setQuestionDeadlineAt(null);let payload:MajlisReveal;if(playMode==="online"){if(!onlineRoom)throw new Error("المجلس الأونلاين غير متصل.");payload=await revealMajlisOnlineQuestion(onlineRoom.id,activeQuestion.id);}else{const response=await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"reveal",sessionId:session.sessionId,questionId:activeQuestion.id,controlToken:session.controlToken})});const result=await response.json().catch(()=>({})) as MajlisReveal&{error?:string};if(!response.ok)throw new Error(result.error||"تعذر إظهار الإجابة.");payload=result;}setReveal(payload);playMajlisSound("reveal");}catch(e){setError(e instanceof Error?e.message:"تعذر إظهار الإجابة.");}finally{setRevealing(false);}}
+  function toggleTimerPause(){if(!canControl||!activeQuestion||reveal)return;if(timerPaused){if(activeQuestion.type==="audio"&&!(["playing","ended"] as MajlisAudioPlaybackState[]).includes(audioPlaybackState)){setError("يبدأ مؤقت السؤال الصوتي فقط بعد بدء التسجيل فعليًا.");return;}setQuestionDeadlineAt(Date.now()+secondsLeft*1000);setTimerPaused(false);}else{const remaining=questionDeadlineAt?Math.max(0,Math.ceil((questionDeadlineAt-Date.now())/1000)):secondsLeft;setSecondsLeft(remaining);setQuestionDeadlineAt(null);setTimerPaused(true);}}
+  async function activateAssist(type:keyof Team["assists"]){if(!canControl||!activeQuestion||!answeringTeam||!session||reveal||stealMode||!answeringTeam.assists[type])return;try{if(type==="hint"||type==="options"){setAssistBusy(type);let payload:MajlisAssistPayload;if(playMode==="online"){if(!onlineRoom)throw new Error("المجلس الأونلاين غير متصل.");payload=await requestMajlisOnlineAssist(onlineRoom.id,activeQuestion.id,type);}else{const response=await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"assist",kind:type,sessionId:session.sessionId,questionId:activeQuestion.id,controlToken:session.controlToken})});const result=await response.json().catch(()=>({})) as MajlisAssistPayload&{error?:string};if(!response.ok)throw new Error(result.error||"تعذر فتح المساعدة.");payload=result;}if(type==="hint"){setVisibleHint(payload.hint||"");setHintVisible(true);}else{setVisibleOptions(payload.options||[]);setOptionsVisible(true);}}playMajlisSound("tap");majlisHaptic();setTeams(current=>current.map((team,index)=>index===answeringTeamIndex?{...team,assists:{...team.assists,[type]:false}}:team));if(type==="time"){setTimeBonusActive(true);setSecondsLeft(value=>value+15);setQuestionDeadlineAt(deadline=>deadline?deadline+15000:timerPaused?null:Date.now()+(secondsLeft+15)*1000);}if(type==="double")setDoubleActive(true);}catch(e){setError(e instanceof Error?e.message:"تعذر فتح المساعدة.");}finally{setAssistBusy(null);}}
+  const handleAudioPlaybackState=useCallback((state:MajlisAudioPlaybackState)=>{setAudioPlaybackState(state);if(!canControl||!activeQuestion||activeQuestion.type!=="audio"||reveal)return;if(state==="playing"){if(timerPaused){setQuestionDeadlineAt(Date.now()+secondsLeft*1000);setTimerPaused(false);}return;}if((state==="buffering"||state==="paused"||state==="error")&&!timerPaused){const remaining=questionDeadlineAt?Math.max(0,Math.ceil((questionDeadlineAt-Date.now())/1000)):secondsLeft;setSecondsLeft(remaining);setQuestionDeadlineAt(null);setTimerPaused(true);}},[canControl,activeQuestion,reveal,timerPaused,secondsLeft,questionDeadlineAt]);
+  function offerSteal(){if(!canControl||!activeQuestion||!session?.settings.allowSteal||reveal||teams.length<2)return;const next=(answeringTeamIndex+1)%teams.length;const secs=session.settings.stealSeconds;setAnsweringTeamIndex(next);setStealMode(true);setDoubleActive(false);setTimeBonusActive(false);setHintVisible(false);setOptionsVisible(false);setVisibleHint(null);setVisibleOptions([]);setSecondsLeft(secs);setTimerPaused(false);setQuestionDeadlineAt(Date.now()+secs*1000);playMajlisSound("steal");majlisHaptic();}
+  function closeQuestionAfterResult(correct:boolean){if(!canControl||!activeQuestion)return;const award=correct?activeQuestion.points*(doubleActive?2:1):0;if(award>0){setTeams(current=>current.map((team,index)=>index===answeringTeamIndex?{...team,score:team.score+award}:team));playMajlisSound("correct");majlisHaptic("success");}else{playMajlisSound("wrong");majlisHaptic("error");}const nextUsed=[...usedQuestionIds,activeQuestion.id];setUsedQuestionIds(nextUsed);setCurrentTeamIndex((questionOwnerIndex+1)%teams.length);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setVisibleHint(null);setVisibleOptions([]);setAudioPlaybackState("idle");setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);setTimerPaused(false);setQuestionDeadlineAt(null);if(nextUsed.length>=totalBoardQuestions){setFinishReason("complete");setPhase("finished");playMajlisSound("finish");}}
+  async function closeLocalServerSession(activeSession?: MajlisGameStartResponse | null){if(!activeSession?.sessionId||!activeSession.controlToken)return;await fetch("/api/games/majlis",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"closeSession",sessionId:activeSession.sessionId,controlToken:activeSession.controlToken})}).catch(()=>undefined);}
   async function finishNow(){
     if(!canControl)return;
     if(!window.confirm("إنهاء مجلس التحدي؟ ستُحذف الجلسة الحالية وتعود مباشرة لإعداد مجلس جديد."))return;
     try{
       if(playMode==="online"&&onlineRoom&&onlineHost)await closeMajlisOnlineRoom(onlineRoom.id);
-      else if(playMode==="local")await closeLocalServerSession(session?.sessionId);
+      else if(playMode==="local")await closeLocalServerSession(session);
     }catch{}
     await exitGamePresentation();
-    localStorage.removeItem(STORAGE_KEY);setOnlineRoom(null);setSession(null);setTeams([]);setUsedQuestionIds([]);setCurrentTeamIndex(0);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setPhase("setup");setFinishReason("complete");setQuestionDeadlineAt(null);playMajlisSound("tap");
+    window.speechSynthesis?.cancel();localStorage.removeItem(STORAGE_KEY);setOnlineRoom(null);setSession(null);setTeams([]);setUsedQuestionIds([]);setCurrentTeamIndex(0);setActiveQuestion(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setVisibleHint(null);setVisibleOptions([]);setAudioPlaybackState("idle");setPhase("setup");setFinishReason("complete");setQuestionDeadlineAt(null);playMajlisSound("tap");
     window.setTimeout(()=>document.getElementById("majlis-setup")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),50);
   }
   async function resetSession(){
-    if(playMode==="local")await closeLocalServerSession(session?.sessionId);
+    if(playMode==="local")await closeLocalServerSession(session);
     else if(playMode==="online"&&onlineRoom)await leaveOnline();
     await exitGamePresentation();
-    localStorage.removeItem(STORAGE_KEY);setSession(null);setTeams([]);setUsedQuestionIds([]);setCurrentTeamIndex(0);setActiveQuestion(null);setQuestionOwnerIndex(0);setAnsweringTeamIndex(0);setSecondsLeft(0);setTimerPaused(false);setQuestionDeadlineAt(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);setPhase("setup");setFinishReason("complete");playMajlisSound("tap");window.setTimeout(()=>document.getElementById("majlis-setup")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),50);
+    window.speechSynthesis?.cancel();localStorage.removeItem(STORAGE_KEY);setSession(null);setTeams([]);setUsedQuestionIds([]);setCurrentTeamIndex(0);setActiveQuestion(null);setQuestionOwnerIndex(0);setAnsweringTeamIndex(0);setSecondsLeft(0);setTimerPaused(false);setQuestionDeadlineAt(null);setReveal(null);setHintVisible(false);setOptionsVisible(false);setVisibleHint(null);setVisibleOptions([]);setAudioPlaybackState("idle");setDoubleActive(false);setTimeBonusActive(false);setStealMode(false);setPhase("setup");setFinishReason("complete");playMajlisSound("tap");window.setTimeout(()=>document.getElementById("majlis-setup")?.scrollIntoView({behavior:reduceMotion?"auto":"smooth",block:"start"}),50);
   }
 
   const sortedTeams=useMemo(()=>[...teams].sort((a,b)=>b.score-a.score),[teams]); const topScore=sortedTeams[0]?.score??0; const winners=sortedTeams.filter(team=>team.score===topScore); const progress=totalBoardQuestions?Math.round((usedQuestionIds.length/totalBoardQuestions)*100):0;
+  const audioTimerLabel:Record<MajlisAudioPlaybackState,string>={idle:"بانتظار تشغيل التسجيل",loading:"تحميل التسجيل — المؤقت متوقف",playing:"التسجيل يعمل — المؤقت يعمل",buffering:"تخزين مؤقت — المؤقت متوقف",paused:"التسجيل والمؤقت متوقفان",error:"فشل التسجيل — لم يُحتسب الوقت",ended:"انتهى التسجيل — المؤقت مستمر"};
   const onlinePlayers: Array<MajlisOnlineRoom["players"][string]> = onlineRoom ? Object.values(onlineRoom.players) as Array<MajlisOnlineRoom["players"][string]> : []; const myOnlinePlayer=user?.id&&onlineRoom?onlineRoom.players[user.id]:null;
 
   if(loading&&!categories.length&&!session)return <section className={styles.shell}><LoadingBlock/></section>;
@@ -357,7 +404,7 @@ export default function MajlisGame() {
         {(playMode==="local"||onlineHost)?<div className="grid gap-3 lg:grid-cols-[.8fr_1.2fr]">
           <div className="rounded-[28px] border border-[#ead8ad]/12 bg-black/15 p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black text-[#d6b16b]">أهل المجلس</p><h2 className="mt-1 text-xl font-black text-[#f7efdc]">جهّز الفرق</h2></div><Swords className="h-6 w-6 text-[#ead8ad]/70"/></div><div className="mt-4 grid grid-cols-3 gap-2">{[2,3,4].map(count=><button key={count} type="button" onClick={()=>{setTeamCount(count);playMajlisSound("tap");}} className={cn("min-h-11 rounded-2xl border text-xs font-black",teamCount===count?"border-[#d6b16b]/45 bg-[#d6b16b] text-[#173b35]":"border-[#ead8ad]/10 bg-white/[0.035] text-[#f7efdc]/55")}>{count} فرق</button>)}</div><div className="mt-3 space-y-2">{Array.from({length:teamCount},(_,index)=><label key={index} className="flex items-center gap-2 rounded-2xl border border-[#ead8ad]/10 bg-black/15 p-2"><span className="h-8 w-1.5 rounded-full" style={{background:TEAM_COLORS[index]}}/><input value={teamNames[index]} onChange={e=>setTeamNames(current=>current.map((name,i)=>i===index?e.target.value.slice(0,24):name))} className="h-10 min-w-0 flex-1 bg-transparent px-2 text-sm font-black text-[#f7efdc] outline-none" aria-label={`اسم الفريق ${index+1}`}/></label>)}</div><div className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">{[{icon:Lightbulb,label:"مشورة",text:"تلميح"},{icon:Hourglass,label:"مهلة",text:"+15ث"},{icon:Crown,label:"الدبل",text:"×2"},{icon:ListChecks,label:"اختيارات",text:"مرة واحدة"}].map(item=><div key={item.label} className="rounded-2xl border border-[#ead8ad]/10 bg-white/[0.035] p-2.5"><item.icon className="mx-auto h-4 w-4 text-[#d6b16b]"/><div className="mt-1 text-[10px] font-black text-[#f7efdc]">{item.label}</div><div className="text-[9px] font-bold text-[#f7efdc]/35">{item.text} مرة</div></div>)}</div></div>
           <div className="rounded-[28px] border border-[#ead8ad]/12 bg-black/15 p-4 sm:p-5"><div className="flex flex-wrap items-end justify-between gap-2"><div><p className="text-[10px] font-black text-[#d6b16b]">مجالات المجلس</p><h2 className="mt-1 text-xl font-black text-[#f7efdc]">اختر {settings?.categoriesPerGame||6} فئات</h2></div><div className="rounded-full border border-[#ead8ad]/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-black text-[#ead8ad]">{selectedCategoryIds.length}/{settings?.categoriesPerGame||6}</div></div><div className="mt-4 grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">{categories.map(category=>{const selected=selectedCategoryIds.includes(category.id);return <button key={category.id} type="button" onClick={()=>toggleCategory(category.id)} aria-pressed={selected} className={cn("group relative min-h-[126px] min-w-0 overflow-hidden rounded-[22px] border text-right active:scale-[.985]",selected?"border-[#d6b16b]/60":"border-[#ead8ad]/10")}>
-            {category.imageUrl?<img src={category.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" loading="lazy"/>:<div className="absolute inset-0 bg-[#173b35]"/>}
+            {category.imageUrl?<Image src={category.imageUrl} alt="" fill unoptimized sizes="(max-width: 768px) 50vw, 25vw" className="absolute inset-0 object-cover transition-transform duration-300 group-hover:scale-[1.03]"/>:<div className="absolute inset-0 bg-[#173b35]"/>}
             <div className={cn("absolute inset-0 bg-gradient-to-t from-[#081b1a] via-[#0d2927]/70 to-black/15",selected&&"ring-2 ring-inset ring-[#d6b16b]/45")}/>
             <div className="relative z-10 flex min-h-[126px] flex-col justify-between p-3"><div className="flex justify-end">{selected?<span className="grid h-7 w-7 place-items-center rounded-full bg-[#d6b16b] text-[#173b35] shadow-lg"><Check className="h-4 w-4"/></span>:null}</div><div><div className="truncate text-sm font-black text-white drop-shadow-sm">{category.title}</div><div className="mt-1 text-[9px] font-bold text-white/55" dir="ltr">{category.activeQuestions}+ سؤال</div></div></div>
           </button>})}</div><button type="button" onClick={startGame} disabled={starting||!settings||selectedCategoryIds.length!==settings.categoriesPerGame} className="mt-4 inline-flex min-h-[54px] w-full items-center justify-center gap-2 rounded-[20px] bg-[#d6b16b] px-5 text-sm font-black text-[#173b35] disabled:opacity-40">{starting?<LoaderCircle className="h-5 w-5 animate-spin"/>:<Dices className="h-5 w-5"/>}{starting?"جاري تجهيز الأسئلة…":"ابدأ مجلس التحدي"}</button></div>
@@ -372,26 +419,26 @@ export default function MajlisGame() {
           <div className={styles.hudActions}><button type="button" onClick={toggleSound} aria-label={soundOn?"إيقاف الصوت":"تشغيل الصوت"}>{soundOn?<Volume2/>:<VolumeX/>}</button>{canControl?<button type="button" onClick={()=>void finishNow()} className={styles.endButton}><X/> <span>إنهاء</span></button>:null}</div>
         </div>
         {playMode==="online"&&onlineRoom?<div className={styles.voiceDock}><VoiceControls room={onlineRoom} userId={user?.id} compact/></div>:null}
-        <div className={styles.boardGrid}>{session.categories.map(category=>{const questions=session.board[category.id]||[];const remaining=questions.filter(q=>!usedSet.has(q.id)).length;return <article key={category.id} className={styles.boardCategory} style={{"--category":category.accent,backgroundImage:category.imageUrl?`linear-gradient(180deg,rgba(8,27,26,.32),rgba(8,27,26,.92)),url(${category.imageUrl})`:undefined,backgroundSize:"cover",backgroundPosition:"center"} as CSSProperties}><div className={styles.categoryHead}><div><h3>{category.title}</h3><small>باقي {remaining}</small></div></div><div className={styles.questionTiles}>{questions.map(question=>{const used=usedSet.has(question.id);return <button key={question.id} type="button" disabled={used||!canControl} onClick={()=>openQuestion(question)} className={cn(styles.questionTile,question.difficulty==="hard"&&styles.questionTileHard,used&&styles.questionTileUsed)}>{used?<Check className="h-4 w-4"/>:<span dir="ltr">{formatNumber(question.points)}</span>}</button>})}</div></article>})}</div>
+        <div className={styles.boardGrid}>{session.categories.map(category=>{const questions=session.board[category.id]||[];const remaining=questions.filter(q=>!usedSet.has(q.id)).length;return <article key={category.id} className={styles.boardCategory} style={{"--category":category.accent,backgroundImage:category.imageUrl?`linear-gradient(180deg,rgba(8,27,26,.32),rgba(8,27,26,.92)),url(${category.imageUrl})`:undefined,backgroundSize:"cover",backgroundPosition:"center"} as CSSProperties}><div className={styles.categoryHead}><div><h3>{category.title}</h3><small>باقي {remaining}</small></div></div><div className={styles.questionTiles}>{questions.map(question=>{const used=usedSet.has(question.id);return <button key={question.id} type="button" disabled={used||!canControl} onClick={()=>openQuestion(question,Date.now())} className={cn(styles.questionTile,question.difficulty==="hard"&&styles.questionTileHard,used&&styles.questionTileUsed)}>{used?<Check className="h-4 w-4"/>:<span dir="ltr">{formatNumber(question.points)}</span>}</button>})}</div></article>})}</div>
         <div className={styles.progressLine}><span style={{width:`${progress}%`}}/></div>
       </div>:null}
 
       {phase==="finished"?<div className="mt-4 overflow-hidden rounded-[30px] border border-[#d6b16b]/25 bg-black/20 p-5 text-center sm:p-7"><Trophy className="mx-auto h-10 w-10 text-[#d6b16b]"/><p className="mt-2 text-[10px] font-black text-[#d6b16b]">{finishReason==="complete"?"اكتملت أسئلة مجلس التحدي":"انتهى المجلس"}</p><h2 className="mt-2 text-2xl font-black text-[#f7efdc] sm:text-3xl">{winners.length===1?`الفائز: ${winners[0]?.name}`:"تعادل في الصدارة"}</h2><div className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-2">{sortedTeams.map((team,index)=><div key={team.id} className={cn("flex items-center justify-between rounded-[20px] border p-3 text-right",index===0?"border-[#d6b16b]/35 bg-[#d6b16b]/[0.08]":"border-[#ead8ad]/10 bg-white/[0.03]")}><div className="flex items-center gap-2">{index===0?<Crown className="h-4 w-4 text-[#d6b16b]"/>:<Medal className="h-4 w-4 text-[#f7efdc]/35"/>}<span className="text-xs font-black text-[#f7efdc]">{team.name}</span></div><span dir="ltr" className="text-lg font-black text-[#d6b16b]">{formatNumber(team.score)}</span></div>)}</div>{canControl?<button type="button" onClick={()=>void resetSession()} className="mt-5 inline-flex min-h-[50px] items-center gap-2 rounded-[18px] bg-[#d6b16b] px-6 text-sm font-black text-[#173b35]"><RotateCcw className="h-4 w-4"/> مجلس جديد</button>:<p className="mt-4 text-xs font-black text-[#f7efdc]/42">بانتظار المضيف لبدء مجلس جديد.</p>}</div>:null}
     </div>
 
-    <AnimatePresence>{activeQuestion&&session?<motion.div className={styles.questionOverlay} initial={reduceMotion?false:{opacity:0}} animate={{opacity:1}} exit={reduceMotion?undefined:{opacity:0}}><motion.div className={styles.questionPanel} initial={reduceMotion?false:{y:20,scale:.985}} animate={{y:0,scale:1}} exit={reduceMotion?undefined:{y:12,scale:.99}} transition={{duration:.22}}><div className={cn(styles.saduBand,"h-2 w-full opacity-75")}/><div className="p-4 sm:p-6">
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-[#ead8ad]/10 bg-white/[0.04] px-2.5 py-1 text-[9px] font-black text-[#f7efdc]/55">{difficultyLabel(activeQuestion.difficulty)}</span><span className="rounded-full border border-[#d6b16b]/20 bg-[#d6b16b]/[0.08] px-2.5 py-1 text-[10px] font-black text-[#d6b16b]" dir="ltr">{activeQuestion.points}{doubleActive?" ×2":""}</span>{stealMode?<span className="rounded-full border border-[#7fb3a8]/20 bg-[#7fb3a8]/[0.08] px-2.5 py-1 text-[9px] font-black text-[#bfe2d8]">فزعة للفريق التالي</span>:null}</div><p className="mt-2 text-xs font-black text-[#f7efdc]/52">الدور الآن: <span className="text-[#ead8ad]">{answeringTeam?.name}</span></p></div><div className={cn(styles.timerRing,"relative grid h-16 w-16 shrink-0 place-items-center rounded-full p-[5px]")} style={{"--ring-progress":`${Math.max(0,Math.min(100,(secondsLeft/(stealMode?session.settings.stealSeconds:session.settings.questionSeconds+(timeBonusActive?15:0)))*100))}%`,"--ring-color":secondsLeft<=5?"#c77a62":"#d2aa61"} as CSSProperties}><div className="grid h-full w-full place-items-center rounded-full bg-[#102d2b] text-lg font-black text-[#f7efdc]" dir="ltr">{secondsLeft}</div></div></div>
+    <AnimatePresence>{activeQuestion&&session?<motion.div className={styles.questionOverlay} initial={reduceMotion?false:{opacity:0}} animate={{opacity:1}} exit={reduceMotion?undefined:{opacity:0}}><motion.div className={styles.questionPanel} initial={reduceMotion?false:{y:20,scale:.985}} animate={{y:0,scale:1}} exit={reduceMotion?undefined:{y:12,scale:.99}} transition={{duration:.22}}><div className={cn(styles.saduBand,"h-2 w-full opacity-75")}/><div className={styles.questionLayout}>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-[#ead8ad]/10 bg-white/[0.04] px-2.5 py-1 text-[9px] font-black text-[#f7efdc]/55">{difficultyLabel(activeQuestion.difficulty)}</span><span className="rounded-full border border-[#d6b16b]/20 bg-[#d6b16b]/[0.08] px-2.5 py-1 text-[10px] font-black text-[#d6b16b]" dir="ltr">{activeQuestion.points}{doubleActive?" ×2":""}</span>{stealMode?<span className="rounded-full border border-[#7fb3a8]/20 bg-[#7fb3a8]/[0.08] px-2.5 py-1 text-[9px] font-black text-[#bfe2d8]">فزعة للفريق التالي</span>:null}</div><p className="mt-2 text-xs font-black text-[#f7efdc]/52">الدور الآن: <span className="text-[#ead8ad]">{answeringTeam?.name}</span></p>{activeQuestion.type==="audio"?<p aria-live="polite" className="mt-1 text-[9px] font-black text-[#bfe2d8]/75">{audioTimerLabel[audioPlaybackState]}</p>:null}</div><div className={cn(styles.timerRing,"relative grid h-16 w-16 shrink-0 place-items-center rounded-full p-[5px]")} style={{"--ring-progress":`${Math.max(0,Math.min(100,(secondsLeft/(stealMode?session.settings.stealSeconds:session.settings.questionSeconds+(timeBonusActive?15:0)))*100))}%`,"--ring-color":secondsLeft<=5?"#c77a62":"#d2aa61"} as CSSProperties}><div className="grid h-full w-full place-items-center rounded-full bg-[#102d2b] text-lg font-black text-[#f7efdc]" dir="ltr">{secondsLeft}</div></div></div>
       <div className={styles.questionBody}>
         <h2 className={styles.questionTitle}>{activeQuestion.prompt}</h2>
         {activeQuestion.quoteText?<blockquote className={styles.quranQuote}>{activeQuestion.quoteText}</blockquote>:null}
-        {activeQuestion.imageUrl?<figure className="mx-auto mt-3 max-w-2xl overflow-hidden rounded-[22px] border border-[#ead8ad]/12 bg-black/20"><img src={activeQuestion.imageUrl} alt={activeQuestion.imageAlt||"صورة السؤال"} className="max-h-[38vh] w-full object-contain"/>{activeQuestion.imageSourceName?<figcaption className="px-3 py-2 text-center text-[9px] font-bold text-[#f7efdc]/35">{activeQuestion.imageSourceName}</figcaption>:null}</figure>:null}
-        {activeQuestion.type==="audio"?<div className="mt-3"><AudioQuestionPlayer question={activeQuestion}/></div>:null}
+        {activeQuestion.imageUrl?<figure className="mx-auto mt-3 max-w-2xl overflow-hidden rounded-[22px] border border-[#ead8ad]/12 bg-black/20"><Image src={activeQuestion.imageUrl} alt={activeQuestion.imageAlt||"صورة السؤال"} width={1200} height={720} unoptimized className="max-h-[38vh] w-full object-contain"/></figure>:null}
+        {activeQuestion.type==="audio"?<div className="mt-3"><AudioQuestionPlayer question={activeQuestion} onPlaybackStateChange={canControl?handleAudioPlaybackState:undefined}/></div>:null}
         {activeQuestion.type==="speech"?<div className="mt-3"><SpeechQuestionPlayer question={activeQuestion}/></div>:null}
-        {optionsVisible&&activeQuestion.options?.length?<div className={styles.optionsGrid}>{activeQuestion.options.map((option,index)=><div key={`${option}-${index}`} className={styles.optionCard}><span dir="ltr">{index+1}</span>{option}</div>)}</div>:null}
-        {hintVisible&&activeQuestion.hint?<div className={styles.hintBox}><Lightbulb className="ml-1 inline h-4 w-4"/> {activeQuestion.hint}</div>:null}
+        {optionsVisible&&visibleOptions.length?<div className={styles.optionsGrid}>{visibleOptions.map((option,index)=><div key={`${option}-${index}`} className={styles.optionCard}><span dir="ltr">{index+1}</span>{option}</div>)}</div>:null}
+        {hintVisible&&visibleHint?<div className={styles.hintBox}><Lightbulb className="ml-1 inline h-4 w-4"/> {visibleHint}</div>:null}
       </div>
       {!canControl&&!reveal?<div className="mt-3 rounded-[18px] border border-[#7fb3a8]/15 bg-[#7fb3a8]/[.06] p-3 text-center text-[10px] font-black text-[#bfe2d8]">المضيف يدير السؤال والمؤقت. تشاور مع فريقك بالمايك «فريقي» بدون أن يسمعكم الفريق المقابل.</div>:null}
-      {canControl&&!reveal?<><div className="mt-3 grid grid-cols-4 gap-2">{[{key:"hint" as const,icon:Lightbulb,label:"مشورة",disabled:!answeringTeam?.assists.hint||!activeQuestion.hint},{key:"time" as const,icon:Hourglass,label:"+15 ثانية",disabled:!answeringTeam?.assists.time},{key:"double" as const,icon:Crown,label:"دبل",disabled:!answeringTeam?.assists.double||doubleActive},{key:"options" as const,icon:ListChecks,label:"اختيارات",disabled:!answeringTeam?.assists.options||!activeQuestion.options?.length||optionsVisible}].map(assist=><button key={assist.key} type="button" disabled={assist.disabled||stealMode} onClick={()=>useAssist(assist.key)} className="min-h-[50px] rounded-[16px] border border-[#ead8ad]/10 bg-white/[0.035] px-2 text-[10px] font-black text-[#f7efdc]/65 disabled:opacity-25"><assist.icon className="mx-auto mb-1 h-4 w-4 text-[#d6b16b]"/>{assist.label}</button>)}</div><div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={revealAnswer} disabled={revealing} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] bg-[#d6b16b] px-4 text-sm font-black text-[#173b35]">{revealing?<LoaderCircle className="h-4 w-4 animate-spin"/>:<Eye className="h-4 w-4"/>} إظهار الإجابة</button>{session.settings.allowSteal&&teams.length>1&&!stealMode?<button type="button" onClick={offerSteal} className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-[18px] border border-[#7fb3a8]/22 bg-[#7fb3a8]/[0.08] px-4 text-sm font-black text-[#bfe2d8]"><HandHelping className="h-4 w-4"/> فزعة للفريق التالي</button>:null}</div><button type="button" onClick={toggleTimerPause} className="mx-auto mt-2 flex min-h-10 items-center gap-1.5 px-3 text-[10px] font-black text-[#f7efdc]/38">{timerPaused?<Play className="h-3.5 w-3.5"/>:<Pause className="h-3.5 w-3.5"/>}{timerPaused?"استئناف المؤقت":"إيقاف المؤقت مؤقتًا"}</button></>:null}
+      {canControl&&!reveal?<><div className="mt-3 grid grid-cols-4 gap-2">{[{key:"hint" as const,icon:Lightbulb,label:"مشورة",disabled:!answeringTeam?.assists.hint||!activeQuestion.hasHint},{key:"time" as const,icon:Hourglass,label:"+15 ثانية",disabled:!answeringTeam?.assists.time},{key:"double" as const,icon:Crown,label:"دبل",disabled:!answeringTeam?.assists.double||doubleActive},{key:"options" as const,icon:ListChecks,label:"اختيارات",disabled:!answeringTeam?.assists.options||!activeQuestion.optionsCount||optionsVisible}].map(assist=><button key={assist.key} type="button" disabled={assist.disabled||stealMode||assistBusy===assist.key} onClick={()=>void activateAssist(assist.key)} className="min-h-[50px] cursor-pointer rounded-[16px] border border-[#ead8ad]/10 bg-white/[0.035] px-2 text-[10px] font-black text-[#f7efdc]/65 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-25">{assistBusy===assist.key?<LoaderCircle className="mx-auto mb-1 h-4 w-4 animate-spin text-[#d6b16b]"/>:<assist.icon className="mx-auto mb-1 h-4 w-4 text-[#d6b16b]"/>}{assist.label}</button>)}</div><div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={revealAnswer} disabled={revealing} className="inline-flex min-h-[52px] cursor-pointer items-center justify-center gap-2 rounded-[18px] bg-[#d6b16b] px-4 text-sm font-black text-[#173b35]">{revealing?<LoaderCircle className="h-4 w-4 animate-spin"/>:<Eye className="h-4 w-4"/>} إظهار الإجابة</button>{session.settings.allowSteal&&teams.length>1&&!stealMode?<button type="button" onClick={offerSteal} className="inline-flex min-h-[52px] cursor-pointer items-center justify-center gap-2 rounded-[18px] border border-[#7fb3a8]/22 bg-[#7fb3a8]/[0.08] px-4 text-sm font-black text-[#bfe2d8]"><HandHelping className="h-4 w-4"/> فزعة للفريق التالي</button>:null}</div>{activeQuestion.type==="audio"&&audioPlaybackState==="error"?<button type="button" onClick={()=>closeQuestionAfterResult(false)} className="mx-auto mt-2 flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-rose-200/15 px-3 text-[10px] font-black text-rose-100"><ChevronLeft className="h-3.5 w-3.5"/> تخطي السؤال بقرار المضيف</button>:<button type="button" onClick={toggleTimerPause} className="mx-auto mt-2 flex min-h-11 cursor-pointer items-center gap-1.5 px-3 text-[10px] font-black text-[#f7efdc]/48">{timerPaused?<Play className="h-3.5 w-3.5"/>:<Pause className="h-3.5 w-3.5"/>}{timerPaused?"استئناف المؤقت":"إيقاف المؤقت مؤقتًا"}</button>}</>:null}
       {reveal?<div className="mt-4"><div className="rounded-[24px] border border-[#d6b16b]/24 bg-[#d6b16b]/[0.08] p-4 sm:p-5"><div className="flex items-center gap-2 text-[10px] font-black text-[#d6b16b]"><EyeOff className="h-4 w-4"/> الإجابة</div><div className="mt-2 text-xl font-black text-[#f7efdc] sm:text-2xl">{reveal.answer}</div>
             {activeQuestion.categoryId==="quran"&&reveal.quranText?<div className="mx-auto mt-4 max-w-3xl overflow-hidden rounded-[26px] border border-[#c9aa67]/35 bg-[#f4ead1] p-1 text-[#1c3a31] shadow-[0_18px_45px_rgba(0,0,0,.18)]"><div className="rounded-[22px] border border-[#a98746]/35 px-5 py-5 sm:px-8"><div className="text-center text-[10px] font-black tracking-wide text-[#725f36]">مصحف المدينة · الرسم العثماني</div><div dir="rtl" className="mt-3 text-center text-[clamp(1.35rem,3vw,2rem)] font-semibold leading-[2.15]">﴿ {reveal.quranText} ﴾</div><div className="mt-3 flex items-center justify-center gap-2 text-[11px] font-black text-[#725f36]"><span>{reveal.quranSurah?`سورة ${reveal.quranSurah}`:"القرآن الكريم"}</span>{reveal.quranAyah?<span dir="ltr">• {reveal.quranAyah}</span>:null}</div><a href="https://publications-img.qurancomplex.gov.sa" target="_blank" rel="noreferrer" className="mx-auto mt-3 block w-fit text-[9px] font-black text-[#5c744f] underline decoration-dotted underline-offset-4">صور مصحف المدينة الرسمية — مجمع الملك فهد</a></div></div>:null}
             {session.settings.showExplanations&&reveal.explanation?<p className="mt-2 text-xs font-semibold leading-6 text-[#f7efdc]/52">{reveal.explanation}</p>:null}{reveal.sourceLabel?<p className="mt-2 text-[9px] font-bold text-[#f7efdc]/28">المصدر: {reveal.sourceLabel}</p>:null}</div>{canControl?<div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>closeQuestionAfterResult(true)} className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[18px] bg-[#7fb3a8] px-4 text-sm font-black text-[#102d2b]"><Check className="h-5 w-5"/> إجابة صحيحة</button><button type="button" onClick={()=>closeQuestionAfterResult(false)} className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-[18px] bg-[#8d4939] px-4 text-sm font-black text-[#f7efdc]"><X className="h-5 w-5"/> إجابة خاطئة</button></div>:null}</div>:null}

@@ -1,6 +1,8 @@
 import { auth } from "@/lib/firebase";
 import type {
   MajlisGameStartResponse,
+  MajlisAssistPayload,
+  MajlisReveal,
   MajlisOnlinePublicState,
   MajlisOnlineRoom,
   MajlisVoiceIceConfig,
@@ -87,6 +89,14 @@ export function startMajlisOnlineGame(roomId: string, categoryIds: string[], tea
 
 export function syncMajlisOnlineState(roomId: string, publicState: MajlisOnlinePublicState) {
   return action<{ ok: true }>({ action: "onlineSync", roomId, publicState });
+}
+
+export function revealMajlisOnlineQuestion(roomId: string, questionId: string) {
+  return action<MajlisReveal>({ action: "onlineReveal", roomId, questionId });
+}
+
+export function requestMajlisOnlineAssist(roomId: string, questionId: string, kind: "hint" | "options") {
+  return action<MajlisAssistPayload>({ action: "onlineAssist", roomId, questionId, kind });
 }
 
 export function closeMajlisOnlineRoom(roomId: string) {

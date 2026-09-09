@@ -24,6 +24,8 @@ function number(value: unknown, fallback = 0) { const parsed = Number(value); re
 function difficulty(value: unknown): MajlisDifficulty { return value === "hard" ? "hard" : value === "medium" ? "medium" : "easy"; }
 function type(value: unknown): MajlisQuestionType { return value === "speech" ? "speech" : value === "audio" ? "audio" : value === "image" ? "image" : value === "multiple_choice" ? "multiple_choice" : "text"; }
 function options(value: unknown) { return Array.isArray(value) ? value.map(text).filter(Boolean).slice(0, 6) : []; }
+function verifiedStatus(value: unknown) { return ["structural", "source_checked", "verified", "rejected"].includes(text(value)) ? text(value) : "unverified"; }
+function normalized(value: unknown) { return text(value).toLocaleLowerCase("ar").replace(/[\u064B-\u065F\u0670]/g, "").replace(/[إأآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[^\p{L}\p{N}]+/gu, " ").trim(); }
 function slug(value: unknown) {
   const cleaned = text(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
   return cleaned || `custom-${randomUUID().slice(0, 8)}`;
@@ -38,9 +40,17 @@ async function listPayload(request: NextRequest) {
   const kind = text(request.nextUrl.searchParams.get("type"));
   const family = text(request.nextUrl.searchParams.get("questionFamily"));
   const status = text(request.nextUrl.searchParams.get("status"));
+  const source = text(request.nextUrl.searchParams.get("source"));
+  const media = text(request.nextUrl.searchParams.get("media"));
+  const review = text(request.nextUrl.searchParams.get("review"));
   const page = Math.max(1, Math.floor(number(request.nextUrl.searchParams.get("page"), 1)));
   const pageSize = Math.max(20, Math.min(100, Math.floor(number(request.nextUrl.searchParams.get("pageSize"), 50))));
 
+  const duplicateCounts = new Map<string, number>();
+  for (const item of bank.questions) {
+    const key = `${item.categoryId}::${normalized(item.prompt)}`;
+    duplicateCounts.set(key, (duplicateCounts.get(key) || 0) + 1);
+  }
   let questions = bank.questions.filter((item) => {
     if (category && item.categoryId !== category) return false;
     if (diff && item.difficulty !== diff) return false;
@@ -48,8 +58,20 @@ async function listPayload(request: NextRequest) {
     if (family && item.questionFamily !== family) return false;
     if (status === "enabled" && !item.enabled) return false;
     if (status === "disabled" && item.enabled) return false;
+    const hasSource = Boolean(item.sourceName && item.sourceUrl && item.license);
+    const hasMedia = Boolean(item.imageUrl || item.audioUrl || item.quranImageUrl);
+    const audioSources = [item.audioUrl, item.audioFallbackUrl, ...(item.audioFallbacks || [])].filter(Boolean);
+    const duplicate = (duplicateCounts.get(`${item.categoryId}::${normalized(item.prompt)}`) || 0) > 1;
+    if (source === "with" && !hasSource) return false;
+    if (source === "without" && hasSource) return false;
+    if (media === "with" && !hasMedia) return false;
+    if (media === "without" && hasMedia) return false;
+    if (review === "needs" && item.verifiedStatus && item.verifiedStatus !== "unverified") return false;
+    if (review === "verified" && item.verifiedStatus !== "verified") return false;
+    if (review === "duplicate" && !duplicate) return false;
+    if (review === "audio_error" && !(item.type === "audio" && audioSources.length < 3)) return false;
     if (q) {
-      const haystack = [item.prompt, item.answer, item.hint, item.explanation, item.sourceLabel, item.sourceName, item.groupKey, item.questionFamily, item.reciterName, item.dialect, item.speechLanguage, item.id].join(" ").toLocaleLowerCase("ar");
+      const haystack = [item.prompt, item.answer, item.hint, item.explanation, item.sourceLabel, item.sourceName, item.sourceUrl, item.license, item.groupKey, item.factKey, item.questionFamily, item.reciterName, item.dialect, item.speechLanguage, item.id].join(" ").toLocaleLowerCase("ar");
       if (!haystack.includes(q)) return false;
     }
     return true;
@@ -60,6 +82,7 @@ async function listPayload(request: NextRequest) {
 
   return {
     settings,
+    families: Array.from(new Set(bank.questions.map((item) => item.questionFamily).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
     categories: majlisBankSummary(bank.categories, bank.questions),
     questions: questions.slice(offset, offset + pageSize),
     total,
@@ -164,6 +187,7 @@ export async function POST(request: NextRequest) {
       await adminDb.collection(collection).doc(id).set({
         categoryId,
         groupKey: text(raw.groupKey) || id,
+        factKey: text(raw.factKey) || text(raw.groupKey) || id,
         questionFamily: text(raw.questionFamily) || text(raw.family) || `${categoryId}-general`,
         family: text(raw.questionFamily) || text(raw.family) || `${categoryId}-general`,
         prompt,
@@ -188,6 +212,7 @@ export async function POST(request: NextRequest) {
         speechLang: text(raw.speechLang),
         audioUrl: text(raw.audioUrl),
         audioFallbackUrl: text(raw.audioFallbackUrl),
+        audioFallbacks: options(raw.audioFallbacks),
         audioStartSeconds: Math.max(0, Math.min(3600, number(raw.audioStartSeconds, 0))),
         audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 15)))),
         audioMinSeconds: Math.max(0, Math.min(20, number(raw.audioMinSeconds, 0))),
@@ -202,6 +227,7 @@ export async function POST(request: NextRequest) {
         quranText: text(raw.quranText),
         quranPage: raw.quranPage == null ? null : Math.max(1, Math.floor(number(raw.quranPage, 1))),
         quranImageUrl: text(raw.quranImageUrl),
+        verifiedStatus: verifiedStatus(raw.verifiedStatus),
         enabled: raw.enabled !== false,
         updatedAt: now,
         updatedBy: admin.uid,
@@ -232,13 +258,13 @@ export async function POST(request: NextRequest) {
       const nearby = bank.questions
         .filter((item) => item.categoryId === categoryId)
         .slice(0, 250)
-        .map((item) => ({ id: item.id, groupKey: item.groupKey, questionFamily: item.questionFamily, prompt: item.prompt, answer: item.answer }));
+        .map((item) => ({ id: item.id, factKey: item.factKey, questionFamily: item.questionFamily, prompt: item.prompt, answer: item.answer }));
       const response = await openai.chat.completions.create({
         model: process.env.OPENAI_MAJLIS_MODEL || "gpt-5-mini",
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "أنت مراجع محتوى لمسابقات عربية. لا تخترع مصدرًا. راجع الوضوح، الغموض، احتمال الخطأ، صعوبة المعلومة، questionFamily، groupKey، والتشابه الدلالي. أعد JSON فقط بالمفاتيح: verdict(pass|warn|reject), confidence(0-100), clarityIssues[], factualRisk[], suggestedQuestionFamily, suggestedGroupKey, duplicateCandidates[], suggestedPrompt, notes[]. إذا تعذر التحقق الخارجي قل ذلك صراحة في factualRisk." },
-          { role: "user", content: JSON.stringify({ question: { categoryId, prompt, answer, questionFamily: text(raw.questionFamily) || text(raw.family), groupKey: text(raw.groupKey), sourceName: text(raw.sourceName), sourceUrl: text(raw.sourceUrl) }, nearby }) },
+          { role: "system", content: "أنت مراجع محتوى لمسابقات عربية. لا تخترع مصدرًا ولا تعتبر مراجعتك تحققًا مرجعيًا. راجع الوضوح والصعوبة والغموض وتسريب الإجابة والتكرار وجودة المعلومة وقيمتها في اللعب. أعد JSON فقط بالمفاتيح: verdict(pass|warn|reject), confidence(0-100), scores{clarity,difficulty,ambiguityRisk,answerLeakRisk,duplicateRisk,factQuality,gameValue وكلها 0-100}, clarityIssues[], factualRisk[], answerLeakEvidence[], suggestedQuestionFamily, suggestedFactKey, duplicateCandidates[], suggestedPrompt, notes[]. إذا تعذر التحقق الخارجي قل ذلك صراحة في factualRisk ولا تدّعِ التوثيق." },
+          { role: "user", content: JSON.stringify({ question: { categoryId, prompt, answer, questionFamily: text(raw.questionFamily) || text(raw.family), factKey: text(raw.factKey) || text(raw.groupKey), sourceName: text(raw.sourceName), sourceUrl: text(raw.sourceUrl) }, nearby }) },
         ],
       });
       const content = response.choices[0]?.message?.content || "{}";
@@ -252,7 +278,7 @@ export async function POST(request: NextRequest) {
       if (!rows.length) return NextResponse.json({ error: "لا توجد أسئلة للاستيراد." }, { status: 400 });
       const batch = adminDb.batch();
       let imported = 0;
-      rows.forEach((row, index) => {
+      rows.forEach((row) => {
         if (!row || typeof row !== "object") return;
         const raw = row as Record<string, unknown>;
         const prompt = text(raw.prompt);
@@ -264,6 +290,7 @@ export async function POST(request: NextRequest) {
         batch.set(adminDb.collection(MAJLIS_CUSTOM_QUESTION_COLLECTION).doc(id), {
           categoryId,
           groupKey: text(raw.groupKey) || id,
+          factKey: text(raw.factKey) || text(raw.groupKey) || id,
           questionFamily: text(raw.questionFamily) || text(raw.family) || `${categoryId}-general`,
           family: text(raw.questionFamily) || text(raw.family) || `${categoryId}-general`,
           prompt,
@@ -273,10 +300,10 @@ export async function POST(request: NextRequest) {
           points: Math.max(50, Math.min(1000, Math.floor(number(raw.points, diff === "hard" ? 300 : diff === "medium" ? 200 : 100)))),
           hint: text(raw.hint), explanation: text(raw.explanation), sourceLabel: text(raw.sourceLabel), sourceName: text(raw.sourceName), sourceUrl: text(raw.sourceUrl), license: text(raw.license),
           type: type(raw.type), quoteText: text(raw.quoteText), imageUrl: text(raw.imageUrl), imageAlt: text(raw.imageAlt), imageSourceName: text(raw.imageSourceName), imageSourceUrl: text(raw.imageSourceUrl), imageLicense: text(raw.imageLicense), speechText: text(raw.speechText), speechLang: text(raw.speechLang),
-          audioUrl: text(raw.audioUrl), audioFallbackUrl: text(raw.audioFallbackUrl), audioStartSeconds: Math.max(0, Math.min(3600, number(raw.audioStartSeconds, 0))),
+          audioUrl: text(raw.audioUrl), audioFallbackUrl: text(raw.audioFallbackUrl), audioFallbacks: options(raw.audioFallbacks), audioStartSeconds: Math.max(0, Math.min(3600, number(raw.audioStartSeconds, 0))),
           audioMaxSeconds: Math.max(4, Math.min(20, Math.floor(number(raw.audioMaxSeconds, 15)))), audioMinSeconds: Math.max(0, Math.min(20, number(raw.audioMinSeconds, 0))), audioSourceKey: text(raw.audioSourceKey), reciterName: text(raw.reciterName), speakerCountry: text(raw.speakerCountry), dialect: text(raw.dialect), speechLanguage: text(raw.speechLanguage),
           quranSurah: text(raw.quranSurah), quranAyah: raw.quranAyah == null ? null : Math.max(1, Math.floor(number(raw.quranAyah, 1))), quranText: text(raw.quranText), quranPage: raw.quranPage == null ? null : Math.max(1, Math.floor(number(raw.quranPage, 1))), quranImageUrl: text(raw.quranImageUrl),
-          enabled: raw.enabled !== false, updatedAt: now, updatedBy: admin.uid,
+          verifiedStatus: verifiedStatus(raw.verifiedStatus), enabled: raw.enabled !== false, updatedAt: now, updatedBy: admin.uid,
         }, { merge: true });
         imported += 1;
       });

@@ -71,6 +71,9 @@
     linear-gradient(160deg, #183a34 0%, #102d2b 100%);
   box-shadow: 0 32px 100px rgba(0,0,0,.48);
 }
+.questionLayout {
+  padding: clamp(12px, 2.4vw, 24px);
+}
 .timerRing {
   background: conic-gradient(var(--ring-color, #d2aa61) var(--ring-progress, 100%), rgba(255,255,255,.08) 0);
 }
@@ -152,6 +155,9 @@
 .rotateCard h2 { margin:12px 0 5px; font-size:22px; font-weight:950; }
 .rotateCard p { margin:0; color:rgba(247,239,220,.55); font-size:12px; line-height:1.8; }
 .mediaPlayer { border:1px solid rgba(210,170,97,.20); border-radius:20px; background:rgba(0,0,0,.18); padding:12px; text-align:center; }
+.waveform { display:flex; align-items:center; justify-content:center; gap:3px; width:min(300px,82%); height:34px; margin:8px auto 0; }
+.waveform span { width:4px; min-height:4px; border-radius:999px; background:rgba(234,216,173,.18); transition:background-color .18s ease,opacity .18s ease; }
+.waveform .waveformActive { background:#d6b16b; box-shadow:0 0 10px rgba(210,170,97,.22); }
 .questionBody { margin-top:12px; border:1px solid rgba(234,216,173,.10); border-radius:22px; background:rgba(0,0,0,.14); padding:14px; }
 .questionTitle { margin:0; color:#f7efdc; font-size:clamp(18px,3vw,30px); font-weight:950; line-height:1.45; text-align:center; }
 .quranQuote { margin:12px auto 0; max-width:780px; padding:14px 18px; border:1px solid rgba(210,170,97,.25); border-radius:18px; background:linear-gradient(135deg,rgba(247,239,220,.96),rgba(234,216,173,.92)); color:#153a34; text-align:center; font-size:clamp(19px,3vw,31px); font-weight:850; line-height:1.9; }
@@ -180,12 +186,14 @@
   .categoryHead small { display:none; }
   .questionTiles { gap:3px; padding:4px; }
   .questionTile { border-radius:9px; font-size:11px; }
-  .questionPanel { max-height:100dvh; border-radius:18px; }
+  .questionPanel { height:100dvh; max-height:100dvh; overflow:hidden; border-radius:18px; }
+  .questionLayout { display:flex; height:calc(100dvh - 8px); min-height:0; flex-direction:column; overflow:hidden; padding:8px 12px; }
   .questionBody { margin-top:7px; padding:8px 10px; border-radius:16px; }
   .questionTitle { font-size:clamp(16px,2.6vw,24px); line-height:1.35; }
   .quranQuote { margin-top:7px; padding:7px 12px; font-size:clamp(16px,2.7vw,23px); line-height:1.6; }
   .mediaPlayer { padding:7px; }
   .mediaPlayer p { display:none; }
+  .waveform { height:20px; margin-top:3px; }
   .optionsGrid { margin-top:7px; }
   .voiceDock { bottom:max(8px,env(safe-area-inset-bottom)); }
 }
@@ -295,6 +303,13 @@
   .questionTile { border-radius:8px; font-size:10px; }
   .questionTile::after { bottom:3px; height:1px; }
   .voiceDock { transform:scale(.88); transform-origin:left bottom; }
+  .questionLayout { padding:6px 10px; }
+  .questionBody { flex:1 1 auto; min-height:0; overflow:hidden; }
+  .questionTitle { font-size:clamp(14px,2.35vw,20px); line-height:1.28; }
+  .mediaPlayer { max-height:138px; overflow:hidden; }
+  .waveform { height:16px; }
+  .optionsGrid { gap:4px; }
+  .optionCard { min-height:36px; padding:5px 8px; }
 }
 
 @media (orientation:landscape) and (min-width:1180px) and (min-height:650px) {

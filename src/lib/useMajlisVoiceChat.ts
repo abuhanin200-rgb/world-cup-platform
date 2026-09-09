@@ -63,8 +63,6 @@ export function useMajlisVoiceChat(room: MajlisOnlineRoom | null, userId?: strin
   const lastSignalAtRef = useRef(0);
   const roomRef = useRef<MajlisOnlineRoom | null>(room);
 
-  roomRef.current = room;
-
   const supported =
     typeof window !== "undefined" &&
     typeof navigator !== "undefined" &&
@@ -73,6 +71,12 @@ export function useMajlisVoiceChat(room: MajlisOnlineRoom | null, userId?: strin
     typeof window.RTCPeerConnection !== "undefined";
 
   const myPlayer = userId && room ? room.players[userId] : null;
+  const roomId = room?.id;
+  const roomStatus = room?.status;
+
+  useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
   const teammates = useMemo(() => {
     if (!room || !userId) return [];
     return Object.values(room.players).filter((player) => player.userId !== userId && sameTeam(room, userId, player.userId));
@@ -84,7 +88,9 @@ export function useMajlisVoiceChat(room: MajlisOnlineRoom | null, userId?: strin
   }, [room, userId]);
 
   useEffect(() => {
-    if (myPlayer?.micMode) setMicModeState(myPlayer.micMode);
+    if (!myPlayer?.micMode) return;
+    const syncMode = setTimeout(() => setMicModeState(myPlayer.micMode), 0);
+    return () => clearTimeout(syncMode);
   }, [myPlayer?.micMode]);
 
   const canSendTo = useCallback((targetUserId: string, mode = micMode) => {
@@ -126,10 +132,10 @@ export function useMajlisVoiceChat(room: MajlisOnlineRoom | null, userId?: strin
   }, []);
 
   const ensureIce = useCallback(async () => {
-    if (!room?.id) return [] as RTCIceServer[];
+    if (!roomId) return [] as RTCIceServer[];
     if (iceServersRef.current.length) return iceServersRef.current;
     try {
-      const config = await getMajlisVoiceIce(room.id);
+      const config = await getMajlisVoiceIce(roomId);
       iceServersRef.current = config.iceServers;
       setTurnEnabled(config.turnEnabled);
       return config.iceServers;
@@ -141,7 +147,7 @@ export function useMajlisVoiceChat(room: MajlisOnlineRoom | null, userId?: strin
       setTurnEnabled(false);
       return fallback;
     }
-  }, [room?.id]);
+  }, [roomId]);
 
   const negotiate = useCallback(async (targetUserId: string) => {
     const currentRoom = roomRef.current;
@@ -269,13 +275,13 @@ export function useMajlisVoiceChat(room: MajlisOnlineRoom | null, userId?: strin
   }, [ensurePeer, userId]);
 
   useEffect(() => {
-    if (!room?.id || !userId || room.status === "closed") return;
+    if (!roomId || !userId || roomStatus === "closed") return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const poll = async () => {
       try {
-        const result = await getMajlisVoiceSignals(room.id, Math.max(0, lastSignalAtRef.current - 1000));
+        const result = await getMajlisVoiceSignals(roomId, Math.max(0, lastSignalAtRef.current - 1000));
         for (const signal of result.signals) {
           if (cancelled) return;
           await handleSignal(signal);
@@ -288,7 +294,7 @@ export function useMajlisVoiceChat(room: MajlisOnlineRoom | null, userId?: strin
     };
     void poll();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
-  }, [handleSignal, room?.id, room?.status, userId]);
+  }, [handleSignal, roomId, roomStatus, userId]);
 
   useEffect(() => {
     if (!room || !userId) return;

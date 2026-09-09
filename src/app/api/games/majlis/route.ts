@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
 import {
@@ -10,6 +10,7 @@ import type {
   MajlisClientQuestion,
   MajlisDifficulty,
   MajlisGameStartResponse,
+  MajlisAssistPayload,
   MajlisOnlinePublicState,
   MajlisOnlineRoom,
   MajlisVoiceMode,
@@ -42,28 +43,53 @@ function cleanPrompt(value: string) {
   return value.replace(/^(?:سؤال المجلس|اختبر معلوماتك|للنقطة هذه|السؤال)\s*[:：-]?\s*/i, "").trim();
 }
 
-function safeQuestion(question: Awaited<ReturnType<typeof getEffectiveMajlisBank>>["questions"][number], points: number): MajlisClientQuestion {
-  const mustProxyAudio = question.type === "audio" && ["reciter", "dialects", "languages"].includes(question.categoryId);
+function normalizedArabic(value: unknown) {
+  return text(value).toLocaleLowerCase("ar").replace(/[\u064B-\u065F\u0670]/g, "").replace(/[إأآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function quranQuoteIsSafe(question: BankQuestion) {
+  if (!question.quoteText) return false;
+  if (question.questionFamily === "quran_complete_verse") return false;
+  const answer = normalizedArabic(question.answer).replace(/^سوره\s+/, "");
+  const quote = normalizedArabic(question.quoteText);
+  return answer.length < 3 || !quote.includes(answer);
+}
+
+function sessionTokenHash(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function safeQuestion(
+  question: Awaited<ReturnType<typeof getEffectiveMajlisBank>>["questions"][number],
+  points: number,
+  sessionId: string,
+  audioId?: string,
+  imageId?: string,
+): MajlisClientQuestion {
+  const mustProxyAudio = question.type === "audio" && Boolean(audioId);
+  const audioPath = mustProxyAudio
+    ? `/api/games/majlis/human-audio?sessionId=${encodeURIComponent(sessionId)}&audioId=${encodeURIComponent(audioId!)}`
+    : undefined;
   return {
     id: question.id,
     categoryId: question.categoryId,
-    groupKey: question.groupKey,
     questionFamily: question.questionFamily,
     family: question.questionFamily,
     prompt: cleanPrompt(question.prompt),
-    options: question.options,
     difficulty: question.difficulty,
     points,
-    hint: question.hint,
+    hasHint: Boolean(text(question.hint)),
+    optionsCount: question.options?.length || 0,
     type: question.type,
-    quoteText: question.quoteText,
-    imageUrl: question.imageUrl,
-    imageAlt: question.imageAlt,
-    imageSourceName: question.imageSourceName,
-    imageSourceUrl: question.imageSourceUrl,
-    imageLicense: question.imageLicense,
-    audioUrl: mustProxyAudio ? `/api/games/majlis/human-audio?questionId=${encodeURIComponent(question.id)}` : question.audioUrl,
-    audioFallbackUrl: mustProxyAudio ? `/api/games/majlis/human-audio?questionId=${encodeURIComponent(question.id)}&retry=1` : question.audioFallbackUrl,
+    // Quran quoteText historically contained the complete verse. The prompt already carries the
+    // safe stem, so Quran reveal material is never serialized into the initial client payload.
+    quoteText: question.categoryId === "quran" ? (quranQuoteIsSafe(question) ? question.quoteText : undefined) : question.quoteText,
+    imageId,
+    imageUrl: imageId ? `/api/games/majlis/question-image?sessionId=${encodeURIComponent(sessionId)}&imageId=${encodeURIComponent(imageId)}` : undefined,
+    imageAlt: imageId ? "صورة السؤال" : undefined,
+    audioId,
+    audioUrl: audioPath,
+    audioFallbackUrl: audioPath ? `${audioPath}&retry=1` : undefined,
     audioStartSeconds: question.audioStartSeconds,
     audioMaxSeconds: question.audioMaxSeconds,
     audioMinSeconds: question.audioMinSeconds,
@@ -82,9 +108,10 @@ type BankQuestion = Awaited<ReturnType<typeof getEffectiveMajlisBank>>["question
 function representativeGroups(items: BankQuestion[]) {
   const map = new Map<string, BankQuestion[]>();
   for (const item of items.filter((question) => question.enabled && question.difficulty !== "easy")) {
-    const list = map.get(item.groupKey) || [];
+    const key = item.factKey || item.groupKey;
+    const list = map.get(key) || [];
     list.push(item);
-    map.set(item.groupKey, list);
+    map.set(key, list);
   }
   return map;
 }
@@ -117,8 +144,39 @@ function pickGroupKeys(
   // balanced, so a six-question session can keep six distinct patterns all the way to the tail.
   const axes = shuffle([...axisBuckets.entries()])
     .sort((a, b) => b[1].length - a[1].length);
+
+  // For a complete board column, reserve Medium facts across the remaining
+  // Global Cycle instead of spending them early by chance. Always consume the
+  // six largest axes so the cycle tail remains partitionable.
+  if (count === 6 && excludedAxes.size === 0) {
+    const available = [...axisBuckets.values()].flat();
+    const mediumAvailable = available.filter((key) => qFor(key)?.difficulty === "medium").length;
+    const sessionsLeft = Math.max(1, Math.ceil(available.length / 6));
+    const targetMedium = mediumAvailable === 0 ? 0 : Math.max(1, Math.min(2, Math.round(mediumAvailable / sessionsLeft)));
+    const selectedAxes = axes.slice(0, 6);
+    const forcedMedium = selectedAxes.filter(([, bucket]) => !bucket.some((key) => qFor(key)?.difficulty === "hard"));
+    const mediumCapable = selectedAxes.filter(([, bucket]) => bucket.some((key) => qFor(key)?.difficulty === "medium"));
+    const mediumCount = Math.max(forcedMedium.length, Math.min(targetMedium, mediumCapable.length));
+    const mediumAxes = new Set(forcedMedium.map(([axis]) => axis));
+    const optionalMedium = shuffle(mediumCapable.filter(([axis]) => !mediumAxes.has(axis)))
+      .sort(([, left], [, right]) => {
+        const leftRatio = left.filter((key) => qFor(key)?.difficulty === "medium").length / left.length;
+        const rightRatio = right.filter((key) => qFor(key)?.difficulty === "medium").length / right.length;
+        return rightRatio - leftRatio;
+      });
+    optionalMedium.slice(0, Math.max(0, mediumCount - mediumAxes.size)).forEach(([axis]) => mediumAxes.add(axis));
+    const exactSelection = selectedAxes.map(([axis, bucket]) => {
+      const randomized = shuffle(bucket);
+      const wanted = mediumAxes.has(axis) ? "medium" : "hard";
+      return randomized.find((key) => qFor(key)?.difficulty === wanted) || randomized[0];
+    }).filter(Boolean) as string[];
+    if (exactSelection.length === 6) {
+      return shuffle(exactSelection);
+    }
+  }
+
   const selected: string[] = [];
-  const targetHard = Math.min(5, count);
+  const targetHard = Math.min(4, count);
   let hardCount = 0;
 
   const chooseFromBucket = (bucket: string[], preferHard: boolean) => {
@@ -130,11 +188,10 @@ function pickGroupKeys(
     return shuffled.find((key) => qFor(key)?.difficulty === "medium") || shuffled[0];
   };
 
-  // First pass targets 4–5 Hard while maintaining unique axes.
+  // Largest axes go first so the Global Cycle tail remains partitionable without repeats.
   for (const [, bucket] of axes) {
     if (selected.length >= count) break;
-    const preferHard = hardCount < targetHard;
-    const key = chooseFromBucket(bucket, preferHard);
+    const key = chooseFromBucket(bucket, hardCount < targetHard);
     if (!key) continue;
     selected.push(key);
     if (qFor(key)?.difficulty === "hard") hardCount += 1;
@@ -147,6 +204,14 @@ function pickGroupKeys(
       const axis = diversityAxis(qFor(selected[i]!));
       const hard = axisBuckets.get(axis)?.find((key) => qFor(key)?.difficulty === "hard");
       if (hard && !selected.includes(hard)) { selected[i] = hard; hardCount += 1; }
+    }
+  }
+  // Keep one medium seat whenever the category has one, without sacrificing axis diversity.
+  if (hardCount === count && count > 1) {
+    for (let index = selected.length - 1; index >= 0; index -= 1) {
+      const axis = diversityAxis(qFor(selected[index]!));
+      const medium = axisBuckets.get(axis)?.find((key) => qFor(key)?.difficulty === "medium" && !selected.includes(key));
+      if (medium) { selected[index] = medium; hardCount -= 1; break; }
     }
   }
   return selected.slice(0, count);
@@ -172,6 +237,7 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
   }
 
   const sessionId = randomUUID();
+  const controlToken = `${randomUUID()}${randomUUID()}`;
   const createdAt = Date.now();
   const sessionRef = adminDb.collection(SESSION_COLLECTION).doc(sessionId);
 
@@ -193,7 +259,7 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
       let usedKeys = new Set(Array.isArray(raw.usedGroupKeys) ? raw.usedGroupKeys.map(String).filter((key) => groupMap.has(key)) : []);
       // V17 changed fact/family composition substantially. Reset old V15/V16 cycle state once,
       // otherwise a legacy tail can be mathematically impossible to distribute without repeats.
-      if (text(raw.bankVersion) !== "17") {
+      if (text(raw.bankVersion) !== "18") {
         cycle += 1;
         usedKeys = new Set<string>();
       }
@@ -224,7 +290,7 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
         cycle,
         usedGroupKeys: Array.from(new Set(nextUsed)),
         totalGroups: allKeys.length,
-        bankVersion: "17",
+        bankVersion: "18",
         updatedAt: createdAt,
       }, { merge: true });
 
@@ -237,52 +303,94 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
     }
 
     const revealRows = [] as Array<Record<string, unknown>>;
+    const audioAssets = [] as Array<Record<string, unknown>>;
+    const audioIds = new Map<string, string>();
+    const imageAssets = [] as Array<Record<string, unknown>>;
+    const imageIds = new Map<string, string>();
     for (const rows of selectedByCategory.values()) {
-      rows.forEach((question) => revealRows.push({
-        questionId: question.id,
-        answer: question.answer,
-        explanation: question.explanation || "",
-        sourceLabel: question.sourceLabel || "",
-        sourceName: question.sourceName || "",
-        sourceUrl: question.sourceUrl || "",
-        license: question.license || "",
-        quranSurah: question.quranSurah || "",
-        quranAyah: question.quranAyah || null,
-        quranText: question.quranText || "",
-        quranPage: question.quranPage || null,
-        quranImageUrl: question.quranImageUrl || "",
-      }));
+      rows.forEach((question) => {
+        revealRows.push({
+          questionId: question.id,
+          answer: question.answer,
+          hint: question.hint || "",
+          options: question.options || [],
+          explanation: question.explanation || "",
+          sourceLabel: question.sourceLabel || "",
+          sourceName: question.sourceName || "",
+          sourceUrl: question.sourceUrl || "",
+          license: question.license || "",
+          quranSurah: question.quranSurah || "",
+          quranAyah: question.quranAyah || null,
+          quranText: question.quranText || "",
+          quranPage: question.quranPage || null,
+          quranImageUrl: question.quranImageUrl || "",
+          imageSourceName: question.imageSourceName || "",
+          imageSourceUrl: question.imageSourceUrl || "",
+          imageLicense: question.imageLicense || "",
+        });
+        if (question.type === "audio") {
+          const audioId = randomUUID();
+          audioIds.set(question.id, audioId);
+          audioAssets.push({
+            audioId,
+            questionId: question.id,
+            categoryId: question.categoryId,
+            audioSourceKey: question.audioSourceKey || "",
+            sources: [question.audioUrl, question.audioFallbackUrl, ...(question.audioFallbacks || [])].filter(Boolean).slice(0, 3),
+          });
+        }
+        if (question.imageUrl) {
+          const imageId = randomUUID();
+          imageIds.set(question.id, imageId);
+          imageAssets.push({ imageId, questionId: question.id, source: question.imageUrl });
+        }
+      });
     }
     transaction.set(sessionRef, {
       sessionId,
       createdAt,
       expiresAt: createdAt + SESSION_MAX_AGE_MS,
       categoryIds: categories.map((category) => category.id),
+      controlTokenHash: sessionTokenHash(controlToken),
       reveals: revealRows,
+      audioAssets,
+      imageAssets,
       usedQuestionIds: [],
     });
-    return selectedByCategory;
+    return { selectedByCategory, audioIds, imageIds };
   });
 
   const board: Record<string, MajlisClientQuestion[]> = {};
   for (const category of categories) {
-    const rows = allocated.get(category.id) || [];
-    board[category.id] = rows.map((question) => safeQuestion(question, pointsFor(question.difficulty, settings)));
+    const rows = allocated.selectedByCategory.get(category.id) || [];
+    board[category.id] = rows.map((question) => safeQuestion(question, pointsFor(question.difficulty, settings), sessionId, allocated.audioIds.get(question.id), allocated.imageIds.get(question.id)));
   }
-  return { sessionId, createdAt, settings, categories, board };
+  return { sessionId, createdAt, settings, categories, board, controlToken };
 }
 
-async function revealQuestion(sessionId: string, questionId: string) {
+function assertSessionControl(data: Record<string, unknown>, controlToken: string) {
+  const expiresAt = Number(data.expiresAt || 0);
+  if (!expiresAt || Date.now() > expiresAt) throw new Error("انتهت جلسة المجلس. ابدأ جلسة جديدة.");
+  const expectedHash = text(data.controlTokenHash);
+  if (!expectedHash || sessionTokenHash(controlToken) !== expectedHash) throw new Error("صلاحية إدارة السؤال غير صحيحة.");
+}
+
+function privateSessionRow(data: Record<string, unknown>, questionId: string, controlToken?: string) {
+  if (controlToken) assertSessionControl(data, controlToken);
+  else if (!Number(data.expiresAt) || Date.now() > Number(data.expiresAt)) throw new Error("انتهت جلسة المجلس. ابدأ جلسة جديدة.");
+  const reveals = Array.isArray(data.reveals) ? data.reveals as Array<Record<string, unknown>> : [];
+  const row = reveals.find((item) => text(item.questionId) === questionId);
+  if (!row) throw new Error("هذا السؤال لا ينتمي إلى الجلسة الحالية.");
+  return row;
+}
+
+async function revealQuestion(sessionId: string, questionId: string, controlToken?: string) {
   const ref = adminDb.collection(SESSION_COLLECTION).doc(sessionId);
   return adminDb.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
     if (!snap.exists) throw new Error("انتهت جلسة المجلس. ابدأ جلسة جديدة.");
     const data = snap.data() || {};
-    const expiresAt = Number(data.expiresAt || 0);
-    if (!expiresAt || Date.now() > expiresAt) throw new Error("انتهت جلسة المجلس. ابدأ جلسة جديدة.");
-    const reveals = Array.isArray(data.reveals) ? data.reveals as Array<Record<string, unknown>> : [];
-    const row = reveals.find((item) => text(item.questionId) === questionId);
-    if (!row) throw new Error("هذا السؤال لا ينتمي إلى الجلسة الحالية.");
+    const row = privateSessionRow(data, questionId, controlToken);
     const used = Array.isArray(data.usedQuestionIds) ? data.usedQuestionIds.map(String) : [];
     if (!used.includes(questionId)) transaction.set(ref, { usedQuestionIds: [...used, questionId], lastRevealAt: Date.now() }, { merge: true });
     return {
@@ -298,8 +406,20 @@ async function revealQuestion(sessionId: string, questionId: string) {
       quranText: text(row.quranText) || undefined,
       quranPage: row.quranPage == null ? undefined : Math.max(1, Math.floor(number(row.quranPage, 1))),
       quranImageUrl: text(row.quranImageUrl) || undefined,
+      imageSourceName: text(row.imageSourceName) || undefined,
+      imageSourceUrl: text(row.imageSourceUrl) || undefined,
+      imageLicense: text(row.imageLicense) || undefined,
     };
   });
+}
+
+async function revealAssist(sessionId: string, questionId: string, controlToken: string | undefined, kind: "hint" | "options"): Promise<MajlisAssistPayload> {
+  const snap = await adminDb.collection(SESSION_COLLECTION).doc(sessionId).get();
+  if (!snap.exists) throw new Error("انتهت جلسة المجلس. ابدأ جلسة جديدة.");
+  const row = privateSessionRow(snap.data() || {}, questionId, controlToken);
+  if (kind === "hint") return { questionId, kind, hint: text(row.hint) };
+  const options = Array.isArray(row.options) ? row.options.map(text).filter(Boolean).slice(0, 6) : [];
+  return { questionId, kind, options };
 }
 
 function bearerToken(request: NextRequest) {
@@ -346,6 +466,8 @@ function mapOnlineRoom(id: string, data: Record<string, unknown>): MajlisOnlineR
     joinedAt: number(player.joinedAt),
     lastSeenAt: number(player.lastSeenAt),
   }]));
+  const storedSession = data.session && typeof data.session === "object" ? data.session as MajlisGameStartResponse : null;
+  const publicSession = storedSession ? { ...storedSession, controlToken: undefined } : null;
   return {
     id,
     roomCode: text(data.roomCode),
@@ -356,7 +478,7 @@ function mapOnlineRoom(id: string, data: Record<string, unknown>): MajlisOnlineR
     teamNames: normalizeTeamNames(data.teamNames, normalizeTeamCount(data.teamCount)),
     selectedCategoryIds: Array.isArray(data.selectedCategoryIds) ? data.selectedCategoryIds.map(String).slice(0, 8) : [],
     players,
-    session: data.session && typeof data.session === "object" ? data.session as MajlisGameStartResponse : null,
+    session: publicSession,
     publicState: data.publicState && typeof data.publicState === "object" ? data.publicState as MajlisOnlinePublicState : null,
     createdAt: number(data.createdAt),
     updatedAt: number(data.updatedAt),
@@ -414,7 +536,7 @@ async function joinOnlineRoom(userId: string, userName: string, code: string) {
   return mapOnlineRoom(ref.id, snap.data() || {});
 }
 
-function sanitizePublicState(value: unknown): MajlisOnlinePublicState {
+function sanitizePublicState(value: unknown, room: MajlisOnlineRoom): MajlisOnlinePublicState {
   const data = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const phase = data.phase === "finished" ? "finished" : "board";
   const teamsRaw = Array.isArray(data.teams) ? data.teams.slice(0, 4) : [];
@@ -429,9 +551,34 @@ function sanitizePublicState(value: unknown): MajlisOnlinePublicState {
       assists: { hint: assists.hint !== false, time: assists.time !== false, double: assists.double !== false, options: assists.options !== false },
     };
   });
-  const active = data.activeQuestion && typeof data.activeQuestion === "object" ? data.activeQuestion as MajlisClientQuestion : null;
+  const requestedActive = data.activeQuestion && typeof data.activeQuestion === "object" ? data.activeQuestion as Record<string, unknown> : null;
+  const activeId = text(requestedActive?.id);
+  const active = activeId && room.session
+    ? Object.values(room.session.board).flat().find((question) => question.id === activeId) || null
+    : null;
   const revealRaw = data.reveal && typeof data.reveal === "object" ? data.reveal as Record<string, unknown> : null;
-  const reveal = revealRaw ? { questionId: text(revealRaw.questionId), answer: text(revealRaw.answer), explanation: text(revealRaw.explanation), sourceLabel: text(revealRaw.sourceLabel) } : null;
+  const reveal = revealRaw && text(revealRaw.questionId) === active?.id ? {
+    questionId: text(revealRaw.questionId),
+    answer: text(revealRaw.answer),
+    explanation: text(revealRaw.explanation),
+    sourceLabel: text(revealRaw.sourceLabel),
+    sourceName: text(revealRaw.sourceName) || undefined,
+    sourceUrl: text(revealRaw.sourceUrl) || undefined,
+    license: text(revealRaw.license) || undefined,
+    quranSurah: text(revealRaw.quranSurah) || undefined,
+    quranAyah: revealRaw.quranAyah == null ? undefined : Math.max(1, Math.floor(number(revealRaw.quranAyah, 1))),
+    quranText: text(revealRaw.quranText) || undefined,
+    quranPage: revealRaw.quranPage == null ? undefined : Math.max(1, Math.floor(number(revealRaw.quranPage, 1))),
+    quranImageUrl: text(revealRaw.quranImageUrl) || undefined,
+    imageSourceName: text(revealRaw.imageSourceName) || undefined,
+    imageSourceUrl: text(revealRaw.imageSourceUrl) || undefined,
+    imageLicense: text(revealRaw.imageLicense) || undefined,
+  } : null;
+  const secondsLeft = Math.max(0, Math.min(120, Math.floor(number(data.secondsLeft))));
+  const timerPaused = data.timerPaused === true;
+  const serverNow = Date.now();
+  const playback = text(data.audioPlaybackState);
+  const audioPlaybackState = playback === "loading" || playback === "playing" || playback === "buffering" || playback === "paused" || playback === "error" || playback === "ended" ? playback : "idle";
   return {
     phase, teams,
     currentTeamIndex: Math.max(0, Math.min(3, Math.floor(number(data.currentTeamIndex)))),
@@ -439,21 +586,25 @@ function sanitizePublicState(value: unknown): MajlisOnlinePublicState {
     activeQuestion: active,
     questionOwnerIndex: Math.max(0, Math.min(3, Math.floor(number(data.questionOwnerIndex)))),
     answeringTeamIndex: Math.max(0, Math.min(3, Math.floor(number(data.answeringTeamIndex)))),
-    secondsLeft: Math.max(0, Math.min(120, Math.floor(number(data.secondsLeft)))),
-    timerPaused: data.timerPaused === true,
-    questionDeadlineAt: data.questionDeadlineAt == null ? null : number(data.questionDeadlineAt),
+    secondsLeft,
+    timerPaused,
+    // Online clients receive a server-clock canonical deadline, not the host device clock.
+    questionDeadlineAt: !active || timerPaused ? null : serverNow + secondsLeft * 1000,
     reveal,
     hintVisible: data.hintVisible === true,
     optionsVisible: data.optionsVisible === true,
+    visibleHint: data.hintVisible === true ? text(data.visibleHint) || null : null,
+    visibleOptions: data.optionsVisible === true && Array.isArray(data.visibleOptions) ? data.visibleOptions.map(text).filter(Boolean).slice(0, 6) : [],
+    audioPlaybackState,
     doubleActive: data.doubleActive === true,
     timeBonusActive: data.timeBonusActive === true,
     stealMode: data.stealMode === true,
     finishReason: data.finishReason === "manual" ? "manual" : "complete",
-    updatedAt: Date.now(),
+    updatedAt: serverNow,
   };
 }
 
-async function generateVoiceIce(roomId: string, userId: string) {
+async function generateVoiceIce() {
   const keyId = text(process.env.CLOUDFLARE_TURN_KEY_ID);
   const token = text(process.env.CLOUDFLARE_TURN_KEY_API_TOKEN);
   const fallback: RTCIceServer[] = [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53", "stun:stun.l.google.com:19302"] }];
@@ -488,7 +639,7 @@ export async function GET(request: NextRequest) {
     if (!view) {
       const [bank, settings] = await Promise.all([getEffectiveMajlisBank(), getMajlisSettings()]);
       const categories = majlisBankSummary(bank.categories, bank.questions).filter((category) => category.enabled && category.activeQuestions >= 6);
-      return NextResponse.json({ categories, settings, bankVersion: "1.5.0", totalQuestions: bank.questions.filter((question) => question.enabled).length }, { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json({ categories, settings, bankVersion: bank.version, totalQuestions: bank.questions.filter((question) => question.enabled).length }, { headers: { "Cache-Control": "no-store" } });
     }
 
     const member = await verifiedMember(request);
@@ -499,7 +650,7 @@ export async function GET(request: NextRequest) {
     }
     if (view === "voice-ice") {
       await getOnlineRoomForUser(roomId, member.userId);
-      return NextResponse.json(await generateVoiceIce(roomId, member.userId), { headers: { "Cache-Control": "no-store" } });
+      return NextResponse.json(await generateVoiceIce(), { headers: { "Cache-Control": "no-store" } });
     }
     if (view === "voice-signals") {
       await getOnlineRoomForUser(roomId, member.userId);
@@ -530,14 +681,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(await startGame(categoryIds), { headers: { "Cache-Control": "no-store" } });
     }
     if (action === "reveal") {
-      const sessionId = text(body.sessionId), questionId = text(body.questionId);
-      if (!sessionId || !questionId) throw new Error("طلب إظهار الإجابة غير مكتمل.");
-      return NextResponse.json(await revealQuestion(sessionId, questionId), { headers: { "Cache-Control": "no-store" } });
+      const sessionId = text(body.sessionId), questionId = text(body.questionId), controlToken = text(body.controlToken);
+      if (!sessionId || !questionId || !controlToken) throw new Error("طلب إظهار الإجابة غير مكتمل.");
+      return NextResponse.json(await revealQuestion(sessionId, questionId, controlToken), { headers: { "Cache-Control": "no-store" } });
+    }
+    if (action === "assist") {
+      const sessionId = text(body.sessionId), questionId = text(body.questionId), controlToken = text(body.controlToken);
+      const kind = body.kind === "options" ? "options" : "hint";
+      if (!sessionId || !questionId || !controlToken) throw new Error("طلب المساعدة غير مكتمل.");
+      return NextResponse.json(await revealAssist(sessionId, questionId, controlToken, kind), { headers: { "Cache-Control": "no-store" } });
     }
     if (action === "closeSession") {
-      const sessionId = text(body.sessionId);
-      if (!sessionId) throw new Error("جلسة المجلس غير مكتملة.");
-      await adminDb.collection(SESSION_COLLECTION).doc(sessionId).delete().catch(() => undefined);
+      const sessionId = text(body.sessionId), controlToken = text(body.controlToken);
+      if (!sessionId || !controlToken) throw new Error("جلسة المجلس غير مكتملة.");
+      const ref = adminDb.collection(SESSION_COLLECTION).doc(sessionId);
+      const snap = await ref.get();
+      if (snap.exists) assertSessionControl(snap.data() || {}, controlToken);
+      await ref.delete().catch(() => undefined);
       return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
     }
 
@@ -614,15 +774,29 @@ export async function POST(request: NextRequest) {
       const teamNames = normalizeTeamNames(body.teamNames, teamCount);
       const categoryIds = Array.isArray(body.categoryIds) ? body.categoryIds.map(String) : [];
       const session = await startGame(categoryIds);
+      const publicSession = Object.fromEntries(Object.entries(session).filter(([key]) => key !== "controlToken")) as MajlisGameStartResponse;
       const teams = Array.from({ length: teamCount }, (_, index) => ({ id: `team-${index + 1}`, name: teamNames[index], score: 0, accent: ["#d6b16b", "#7fb3a8", "#c77a62", "#8f9fc9"][index] || "#d6b16b", assists: { hint: true, time: true, double: true, options: true } }));
-      const publicState: MajlisOnlinePublicState = { phase: "board", teams, currentTeamIndex: 0, usedQuestionIds: [], activeQuestion: null, questionOwnerIndex: 0, answeringTeamIndex: 0, secondsLeft: 0, timerPaused: false, questionDeadlineAt: null, reveal: null, hintVisible: false, optionsVisible: false, doubleActive: false, timeBonusActive: false, stealMode: false, finishReason: "complete", updatedAt: now };
-      await ref.set({ status: "playing", teamCount, teamNames, selectedCategoryIds: categoryIds, session, publicState, updatedAt: now }, { merge: true });
+      const publicState: MajlisOnlinePublicState = { phase: "board", teams, currentTeamIndex: 0, usedQuestionIds: [], activeQuestion: null, questionOwnerIndex: 0, answeringTeamIndex: 0, secondsLeft: 0, timerPaused: false, questionDeadlineAt: null, reveal: null, hintVisible: false, optionsVisible: false, visibleHint: null, visibleOptions: [], audioPlaybackState: "idle", doubleActive: false, timeBonusActive: false, stealMode: false, finishReason: "complete", updatedAt: now };
+      await ref.set({ status: "playing", teamCount, teamNames, selectedCategoryIds: categoryIds, session: publicSession, publicState, updatedAt: now }, { merge: true });
       const snap = await ref.get();
-      return NextResponse.json({ room: mapOnlineRoom(ref.id, snap.data() || {}), session });
+      return NextResponse.json({ room: mapOnlineRoom(ref.id, snap.data() || {}), session: publicSession });
+    }
+    if (action === "onlineReveal") {
+      if (member.userId !== room.hostId || room.status !== "playing" || !room.session?.sessionId) throw new Error("كشف الإجابة متاح للمضيف فقط.");
+      const questionId = text(body.questionId);
+      if (!questionId) throw new Error("السؤال غير مكتمل.");
+      return NextResponse.json(await revealQuestion(room.session.sessionId, questionId), { headers: { "Cache-Control": "no-store" } });
+    }
+    if (action === "onlineAssist") {
+      if (member.userId !== room.hostId || room.status !== "playing" || !room.session?.sessionId) throw new Error("المساعدة متاحة للمضيف فقط.");
+      const questionId = text(body.questionId);
+      const kind = body.kind === "options" ? "options" : "hint";
+      if (!questionId) throw new Error("السؤال غير مكتمل.");
+      return NextResponse.json(await revealAssist(room.session.sessionId, questionId, undefined, kind), { headers: { "Cache-Control": "no-store" } });
     }
     if (action === "onlineSync") {
       if (member.userId !== room.hostId || room.status !== "playing") throw new Error("مزامنة المجلس متاحة للمضيف فقط.");
-      const publicState = sanitizePublicState(body.publicState);
+      const publicState = sanitizePublicState(body.publicState, room);
       await ref.set({ publicState, status: publicState.phase === "finished" ? "finished" : "playing", updatedAt: now }, { merge: true });
       return NextResponse.json({ ok: true });
     }

@@ -6,7 +6,9 @@ import {
   type MajlisDifficulty,
   type MajlisQuestion,
   type MajlisQuestionType,
+  type MajlisQualityScore,
   type MajlisSettings,
+  type MajlisVerifiedStatus,
 } from "@/types/majlisGame";
 
 export const MAJLIS_CATEGORY_OVERRIDE_COLLECTION = "majlisCategoryOverrides";
@@ -35,6 +37,36 @@ function difficulty(value: unknown): MajlisDifficulty {
 
 function questionType(value: unknown): MajlisQuestionType {
   return value === "speech" ? "speech" : value === "audio" ? "audio" : value === "image" ? "image" : value === "multiple_choice" ? "multiple_choice" : "text";
+}
+
+function textList(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+  const values = value.map((item) => text(item)).filter(Boolean).slice(0, 3);
+  return values.length ? values : undefined;
+}
+
+function score(value: unknown, fallback = 0) {
+  return Math.max(0, Math.min(100, number(value, fallback)));
+}
+
+function qualityScore(value: unknown): MajlisQualityScore | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const item = value as Record<string, unknown>;
+  return {
+    clarity: score(item.clarity),
+    difficulty: score(item.difficulty),
+    ambiguityRisk: score(item.ambiguityRisk),
+    answerLeakRisk: score(item.answerLeakRisk),
+    duplicateRisk: score(item.duplicateRisk),
+    factQuality: score(item.factQuality),
+    gameValue: score(item.gameValue),
+    method: item.method === "ai" ? "ai" : item.method === "human" ? "human" : "rules",
+    reviewedAt: item.reviewedAt == null ? undefined : Math.max(0, number(item.reviewedAt)),
+  };
+}
+
+function verifiedStatus(value: unknown): MajlisVerifiedStatus {
+  return value === "structural" || value === "source_checked" || value === "verified" || value === "rejected" ? value : "unverified";
 }
 
 
@@ -74,6 +106,7 @@ function baseQuestions(): MajlisQuestion[] {
     id: text(item.id),
     categoryId: text(item.categoryId),
     groupKey: text(item.groupKey, text(item.id)),
+    factKey: text(item.factKey, text(item.groupKey, text(item.id))),
     questionFamily: text(item.questionFamily, text(item.family, `${text(item.categoryId, "general")}-general`)),
     family: text(item.family, text(item.questionFamily)) || undefined,
     prompt: cleanPrompt(item.prompt),
@@ -94,16 +127,21 @@ function baseQuestions(): MajlisQuestion[] {
     imageSourceName: text(item.imageSourceName) || undefined,
     imageSourceUrl: text(item.imageSourceUrl) || undefined,
     imageLicense: text(item.imageLicense) || undefined,
+    imageSource: text(item.imageSource, text(item.imageSourceName)) || undefined,
     speechText: text(item.speechText) || undefined,
     speechLang: text(item.speechLang) || undefined,
     audioUrl: text(item.audioUrl) || undefined,
     audioFallbackUrl: text(item.audioFallbackUrl) || undefined,
-    audioStartSeconds: item.audioStartSeconds == null ? undefined : Math.max(0, Math.min(3600, number(item.audioStartSeconds, 0))),
+    audioFallbacks: textList(item.audioFallbacks),
+    audioId: text(item.audioId) || undefined,
+    audioStartSeconds: item.audioStartSeconds == null && item.audioStart == null ? undefined : Math.max(0, Math.min(3600, number(item.audioStartSeconds, number(item.audioStart, 0)))),
+    audioStart: item.audioStart == null && item.audioStartSeconds == null ? undefined : Math.max(0, Math.min(3600, number(item.audioStart, number(item.audioStartSeconds, 0)))),
     audioMaxSeconds: item.audioMaxSeconds == null ? undefined : Math.max(4, Math.min(20, Math.floor(number(item.audioMaxSeconds, 12)))),
     audioMinSeconds: item.audioMinSeconds == null ? undefined : Math.max(0, Math.min(20, number(item.audioMinSeconds, 0))),
     audioSourceKey: text(item.audioSourceKey) || undefined,
     audioDuration: item.audioDuration == null ? undefined : Math.max(0, number(item.audioDuration, 0)),
     reciterName: text(item.reciterName) || undefined,
+    reciter: text(item.reciter, text(item.reciterName)) || undefined,
     speakerCountry: text(item.speakerCountry) || undefined,
     dialect: text(item.dialect) || undefined,
     speechLanguage: text(item.speechLanguage) || undefined,
@@ -112,6 +150,8 @@ function baseQuestions(): MajlisQuestion[] {
     quranText: text(item.quranText) || undefined,
     quranPage: item.quranPage == null ? undefined : Math.max(1, Math.floor(number(item.quranPage, 1))),
     quranImageUrl: text(item.quranImageUrl) || undefined,
+    qualityScore: qualityScore(item.qualityScore),
+    verifiedStatus: verifiedStatus(item.verifiedStatus),
     enabled: item.enabled !== false,
     custom: false,
     overridden: false,
@@ -162,6 +202,7 @@ function mergeQuestion(base: MajlisQuestion, override: Record<string, unknown> |
     ...base,
     categoryId: text(override.categoryId, base.categoryId),
     groupKey: text(override.groupKey, base.groupKey),
+    factKey: text(override.factKey, override.groupKey == null ? base.factKey : text(override.groupKey, base.factKey)),
     questionFamily: override.questionFamily == null && override.family == null ? base.questionFamily : text(override.questionFamily, text(override.family, base.questionFamily)),
     family: override.family == null && override.questionFamily == null ? base.family : (text(override.family, text(override.questionFamily)) || undefined),
     prompt: override.prompt == null ? base.prompt : cleanPrompt(override.prompt),
@@ -182,16 +223,21 @@ function mergeQuestion(base: MajlisQuestion, override: Record<string, unknown> |
     imageSourceName: override.imageSourceName == null ? base.imageSourceName : (text(override.imageSourceName) || undefined),
     imageSourceUrl: override.imageSourceUrl == null ? base.imageSourceUrl : (text(override.imageSourceUrl) || undefined),
     imageLicense: override.imageLicense == null ? base.imageLicense : (text(override.imageLicense) || undefined),
+    imageSource: override.imageSource == null && override.imageSourceName == null ? base.imageSource : (text(override.imageSource, text(override.imageSourceName)) || undefined),
     speechText: override.speechText == null ? base.speechText : (text(override.speechText) || undefined),
     speechLang: override.speechLang == null ? base.speechLang : (text(override.speechLang) || undefined),
     audioUrl: override.audioUrl == null ? base.audioUrl : (text(override.audioUrl) || undefined),
     audioFallbackUrl: override.audioFallbackUrl == null ? base.audioFallbackUrl : (text(override.audioFallbackUrl) || undefined),
-    audioStartSeconds: override.audioStartSeconds == null ? base.audioStartSeconds : Math.max(0, Math.min(3600, number(override.audioStartSeconds, 0))),
+    audioFallbacks: override.audioFallbacks == null ? base.audioFallbacks : textList(override.audioFallbacks),
+    audioId: override.audioId == null ? base.audioId : (text(override.audioId) || undefined),
+    audioStartSeconds: override.audioStartSeconds == null && override.audioStart == null ? base.audioStartSeconds : Math.max(0, Math.min(3600, number(override.audioStartSeconds, number(override.audioStart, 0)))),
+    audioStart: override.audioStart == null && override.audioStartSeconds == null ? base.audioStart : Math.max(0, Math.min(3600, number(override.audioStart, number(override.audioStartSeconds, 0)))),
     audioMaxSeconds: override.audioMaxSeconds == null ? base.audioMaxSeconds : Math.max(4, Math.min(20, Math.floor(number(override.audioMaxSeconds, 12)))),
     audioMinSeconds: override.audioMinSeconds == null ? base.audioMinSeconds : Math.max(0, Math.min(20, number(override.audioMinSeconds, 0))),
     audioSourceKey: override.audioSourceKey == null ? base.audioSourceKey : (text(override.audioSourceKey) || undefined),
     audioDuration: override.audioDuration == null ? base.audioDuration : Math.max(0, number(override.audioDuration, 0)),
     reciterName: override.reciterName == null ? base.reciterName : (text(override.reciterName) || undefined),
+    reciter: override.reciter == null && override.reciterName == null ? base.reciter : (text(override.reciter, text(override.reciterName)) || undefined),
     speakerCountry: override.speakerCountry == null ? base.speakerCountry : (text(override.speakerCountry) || undefined),
     dialect: override.dialect == null ? base.dialect : (text(override.dialect) || undefined),
     speechLanguage: override.speechLanguage == null ? base.speechLanguage : (text(override.speechLanguage) || undefined),
@@ -200,6 +246,8 @@ function mergeQuestion(base: MajlisQuestion, override: Record<string, unknown> |
     quranText: override.quranText == null ? base.quranText : (text(override.quranText) || undefined),
     quranPage: override.quranPage == null ? base.quranPage : Math.max(1, Math.floor(number(override.quranPage, 1))),
     quranImageUrl: override.quranImageUrl == null ? base.quranImageUrl : (text(override.quranImageUrl) || undefined),
+    qualityScore: override.qualityScore == null ? base.qualityScore : qualityScore(override.qualityScore),
+    verifiedStatus: override.verifiedStatus == null ? base.verifiedStatus : verifiedStatus(override.verifiedStatus),
     enabled: bool(override.enabled, base.enabled),
     overridden: true,
   };
@@ -211,6 +259,7 @@ function mapCustomQuestion(id: string, data: Record<string, unknown>): MajlisQue
     id,
     categoryId: text(data.categoryId),
     groupKey: text(data.groupKey, id),
+    factKey: text(data.factKey, text(data.groupKey, id)),
     questionFamily: text(data.questionFamily, text(data.family, `${text(data.categoryId, "general")}-general`)),
     family: text(data.family, text(data.questionFamily)) || undefined,
     prompt: cleanPrompt(data.prompt),
@@ -231,16 +280,21 @@ function mapCustomQuestion(id: string, data: Record<string, unknown>): MajlisQue
     imageSourceName: text(data.imageSourceName) || undefined,
     imageSourceUrl: text(data.imageSourceUrl) || undefined,
     imageLicense: text(data.imageLicense) || undefined,
+    imageSource: text(data.imageSource, text(data.imageSourceName)) || undefined,
     speechText: text(data.speechText) || undefined,
     speechLang: text(data.speechLang) || undefined,
     audioUrl: text(data.audioUrl) || undefined,
     audioFallbackUrl: text(data.audioFallbackUrl) || undefined,
-    audioStartSeconds: data.audioStartSeconds == null ? undefined : Math.max(0, Math.min(3600, number(data.audioStartSeconds, 0))),
+    audioFallbacks: textList(data.audioFallbacks),
+    audioId: text(data.audioId) || undefined,
+    audioStartSeconds: data.audioStartSeconds == null && data.audioStart == null ? undefined : Math.max(0, Math.min(3600, number(data.audioStartSeconds, number(data.audioStart, 0)))),
+    audioStart: data.audioStart == null && data.audioStartSeconds == null ? undefined : Math.max(0, Math.min(3600, number(data.audioStart, number(data.audioStartSeconds, 0)))),
     audioMaxSeconds: data.audioMaxSeconds == null ? undefined : Math.max(4, Math.min(20, Math.floor(number(data.audioMaxSeconds, 12)))),
     audioMinSeconds: data.audioMinSeconds == null ? undefined : Math.max(0, Math.min(20, number(data.audioMinSeconds, 0))),
     audioSourceKey: text(data.audioSourceKey) || undefined,
     audioDuration: data.audioDuration == null ? undefined : Math.max(0, number(data.audioDuration, 0)),
     reciterName: text(data.reciterName) || undefined,
+    reciter: text(data.reciter, text(data.reciterName)) || undefined,
     speakerCountry: text(data.speakerCountry) || undefined,
     dialect: text(data.dialect) || undefined,
     speechLanguage: text(data.speechLanguage) || undefined,
@@ -249,6 +303,8 @@ function mapCustomQuestion(id: string, data: Record<string, unknown>): MajlisQue
     quranText: text(data.quranText) || undefined,
     quranPage: data.quranPage == null ? undefined : Math.max(1, Math.floor(number(data.quranPage, 1))),
     quranImageUrl: text(data.quranImageUrl) || undefined,
+    qualityScore: qualityScore(data.qualityScore),
+    verifiedStatus: verifiedStatus(data.verifiedStatus),
     enabled: bool(data.enabled, true),
     custom: true,
     overridden: false,
@@ -291,22 +347,37 @@ export async function getEffectiveMajlisBank() {
     ...customQuestionsSnap.docs.map((doc) => mapCustomQuestion(doc.id, doc.data())),
   ];
 
-  return { categories, questions };
+  return { version: text(rawBank.version, "18.0.0"), categories, questions };
 }
 
 export function majlisBankSummary(categories: MajlisCategory[], questions: MajlisQuestion[]) {
   return categories.map((category) => {
     const items = questions.filter((question) => question.categoryId === category.id);
     const active = items.filter((question) => question.enabled);
+    const factCounts = new Map<string, number>();
+    const familyCounts = new Map<string, number>();
+    active.forEach((question) => {
+      const fact = question.factKey || question.groupKey;
+      factCounts.set(fact, (factCounts.get(fact) || 0) + 1);
+      familyCounts.set(question.questionFamily, (familyCounts.get(question.questionFamily) || 0) + 1);
+    });
+    const hard = active.filter((question) => question.difficulty === "hard").length;
+    const medium = active.filter((question) => question.difficulty === "medium").length;
     return {
       ...category,
       totalQuestions: items.length,
       activeQuestions: active.length,
       easy: active.filter((question) => question.difficulty === "easy").length,
-      medium: active.filter((question) => question.difficulty === "medium").length,
-      hard: active.filter((question) => question.difficulty === "hard").length,
+      medium,
+      hard,
+      mediumPercent: active.length ? Math.round((medium / active.length) * 100) : 0,
+      hardPercent: active.length ? Math.round((hard / active.length) * 100) : 0,
       audio: active.filter((question) => question.type === "audio" || question.type === "speech").length,
-      uniqueFacts: new Set(active.map((question) => question.groupKey)).size,
+      images: active.filter((question) => Boolean(question.imageUrl)).length,
+      brokenAudio: active.filter((question) => question.type === "audio" && (!question.audioSourceKey || !question.audioUrl)).length,
+      possibleDuplicates: [...factCounts.values()].filter((count) => count > 1).reduce((sum, count) => sum + count - 1, 0),
+      weakFamilies: [...familyCounts.values()].filter((count) => count < 2).length,
+      uniqueFacts: factCounts.size,
       questionFamilies: new Set(active.map((question) => question.questionFamily)).size,
     };
   });
