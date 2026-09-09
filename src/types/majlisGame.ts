@@ -232,6 +232,8 @@ export type MajlisOnlinePublicState = {
   timerPaused: boolean;
   questionDeadlineAt: number | null;
   reveal: MajlisReveal | null;
+  /** The host advances this explicitly so reveal and scoring are never conflated. */
+  resolutionStage: "question" | "reveal" | "award";
   hintVisible: boolean;
   optionsVisible: boolean;
   visibleHint: string | null;

@@ -158,10 +158,21 @@ for (const category of categories.filter((c) => c.enabled !== false)) {
 // Quran-specific anti-monotony, leakage checks, family coverage, and reveal metadata.
 const quran = active.filter((q) => q.categoryId === "quran");
 const quranReps = representatives(quran);
+const legacyCompleteVerse = questions.filter((q) => q.categoryId === "quran" && (q.questionFamily || q.family) === "quran_complete_verse");
+if (legacyCompleteVerse.length) fail(`Legacy complete-the-verse prompts must be removed: ${legacyCompleteVerse.map((q) => q.id).join(", ")}`);
+const adjacentQuran = quran.filter((q) => (q.questionFamily || q.family) === "quran_adjacent_ayah");
+const allAdjacentQuran = questions.filter((q) => q.categoryId === "quran" && (q.questionFamily || q.family) === "quran_adjacent_ayah");
+if (allAdjacentQuran.length !== 23) fail(`Expected 23 converted adjacent-ayah prompts, got ${allAdjacentQuran.length}`);
+if (adjacentQuran.length < 19) fail(`Too few active adjacent-ayah prompts: ${adjacentQuran.length}`);
+for (const q of adjacentQuran) {
+  if (!q.quoteText || !q.quranSurah || !q.quranAyah || !q.quranText) fail(`Adjacent-ayah metadata incomplete: ${q.id}`);
+  if (!/الآية التي (تلي|تسبق)/.test(String(q.prompt || ""))) fail(`Adjacent-ayah prompt is not deterministic: ${q.id}`);
+  if (containsPhrase(q.quoteText, q.answer)) fail(`Adjacent-ayah answer overlaps the displayed verse: ${q.id}`);
+}
 const roteCount = quranReps.filter((q) => ["quran_ayah_count", "quran_order"].includes(q.questionFamily || q.family)).length;
 if (roteCount / quranReps.length > 0.12) fail(`Quran count/order ratio exceeds 12%: ${roteCount}/${quranReps.length}`);
 const requiredQuranFamilies = [
-  "quran_complete_verse", "quran_which_surah", "quran_who_is_meant", "quran_meaning",
+  "quran_adjacent_ayah", "quran_which_surah", "quran_who_is_meant", "quran_meaning",
   "quran_vocabulary", "quran_context", "quran_story", "quran_people", "quran_places",
   "quran_events", "quran_opening", "quran_closing", "quran_names", "quran_repeated_phrase",
   "quran_tadabbur_objective", "quran_order", "quran_ayah_count", "quran_similar_verses",
@@ -174,9 +185,9 @@ for (const q of quran) {
   const answer = quranAnswerToken(q.answer);
   const publicStem = norm([q.prompt, q.hint, q.quoteText].filter(Boolean).join(" "));
   if (answer.length >= 3 && publicStem.includes(answer)) { answerLeakIds.add(q.id); fail(`Quran answer leaks through pre-reveal content: ${q.id}`); }
-  if ((q.questionFamily || q.family) === "quran_complete_verse" && q.quoteText) fail(`Complete-verse answer is exposed as quoteText: ${q.id}`);
+  if ((q.questionFamily || q.family) === "quran_complete_verse") fail(`Complete-verse prompt is still active: ${q.id}`);
 }
-for (const q of quran.filter((q) => ["quran_complete_verse", "quran_people", "quran_vocabulary", "quran_story", "quran_context", "quran_events"].includes(q.questionFamily || q.family))) {
+for (const q of quran.filter((q) => ["quran_adjacent_ayah", "quran_people", "quran_vocabulary", "quran_story", "quran_context", "quran_events"].includes(q.questionFamily || q.family))) {
   if (!q.quranSurah || !q.quranAyah || !q.quranText) fail(`Quran reveal metadata incomplete: ${q.id}`);
   if (!String(q.sourceUrl || "").includes("qurancomplex.gov.sa")) fail(`Quran source is not KFGQPC developer source: ${q.id}`);
 }
@@ -195,6 +206,7 @@ let aiTts = 0;
 let brokenAudioMetadata = 0;
 const nadiMap = { KSA:"السعودية", KUW:"الكويتية", BAH:"البحرينية", QAT:"القطرية", UAE:"الإماراتية", OMA:"العُمانية", YEM:"اليمنية", IRA:"العراقية", EGY:"المصرية", SUD:"السودانية", PAL:"الفلسطينية", JOR:"الأردنية", LEB:"اللبنانية", SYR:"السورية", MOR:"المغربية", ALG:"الجزائرية", TUN:"التونسية", LIB:"الليبية" };
 for (const q of audio) {
+  if (q.audioMaxSeconds !== 20) fail(`Audio target must be 20 seconds: ${q.id}`);
   const source = `${q.sourceLabel || ""} ${q.sourceName || ""} ${q.audioSourceKey || ""}`.toLowerCase();
   if (/speechsynthesis|elevenlabs|google tts|text.to.speech|ai voice|synthetic/.test(source)) { aiTts += 1; fail(`Synthetic audio marker: ${q.id}`); }
   if (["reciter", "dialects", "languages"].includes(q.categoryId)) {
@@ -256,6 +268,8 @@ console.log(`Hard ratio (unique facts): ${hardFacts}/${representativeFacts.lengt
 console.log(`Medium ratio (unique facts): ${mediumFacts}/${representativeFacts.length} (${(mediumFacts / representativeFacts.length * 100).toFixed(1)}%)`);
 console.log(`Rows missing source URL/license: ${missingSourceLicense}`);
 console.log(`Quran required families: ${requiredQuranFamilies.length}/${requiredQuranFamilies.length}`);
+console.log(`Adjacent Quran prompts: ${adjacentQuran.length} active / ${allAdjacentQuran.length} converted`);
+console.log(`Legacy complete-verse prompts remaining: ${legacyCompleteVerse.length}`);
 console.log(`Warnings: ${warnings.length}`);
 if (warnings.length) warnings.slice(0, 30).forEach((message) => console.log(`WARN: ${message}`));
 if (errors.length) {

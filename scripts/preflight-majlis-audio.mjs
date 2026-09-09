@@ -5,6 +5,12 @@ import { createGunzip } from "node:zlib";
 const bank = JSON.parse(fs.readFileSync(new URL("../src/data/majlisQuestionBank.json", import.meta.url), "utf8"));
 const failures = [];
 const checks = [];
+const targetFailures = [];
+const configuredAudio = bank.questions.filter((q) => q.enabled !== false && q.type === "audio");
+for (const question of configuredAudio) {
+  if (question.audioMaxSeconds !== 20) targetFailures.push(`20-second playback target missing: ${question.id}`);
+}
+failures.push(...targetFailures);
 
 function findAudioSrc(value) {
   if (!value) return "";
@@ -142,6 +148,7 @@ for (const job of datasetJobs) {
 
 console.log("Majlis Human Audio Preflight");
 console.log("----------------------------");
+console.log(`20-second playback target: ${configuredAudio.length - targetFailures.length}/${configuredAudio.length}`);
 console.log(`Checks passed: ${checks.length}/${reciterJobs.length + datasetJobs.length}`);
 checks.forEach((item) => console.log(`PASS: ${item}`));
 if (failures.length) {

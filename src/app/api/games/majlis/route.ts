@@ -81,8 +81,8 @@ function safeQuestion(
     hasHint: Boolean(text(question.hint)),
     optionsCount: question.options?.length || 0,
     type: question.type,
-    // Quran quoteText historically contained the complete verse. The prompt already carries the
-    // safe stem, so Quran reveal material is never serialized into the initial client payload.
+    // Quran answer/reveal metadata is never serialized into the initial client payload. A quoted
+    // verse is included only when it has been audited not to disclose the answer.
     quoteText: question.categoryId === "quran" ? (quranQuoteIsSafe(question) ? question.quoteText : undefined) : question.quoteText,
     imageId,
     imageUrl: imageId ? `/api/games/majlis/question-image?sessionId=${encodeURIComponent(sessionId)}&imageId=${encodeURIComponent(imageId)}` : undefined,
@@ -259,7 +259,7 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
       let usedKeys = new Set(Array.isArray(raw.usedGroupKeys) ? raw.usedGroupKeys.map(String).filter((key) => groupMap.has(key)) : []);
       // V17 changed fact/family composition substantially. Reset old V15/V16 cycle state once,
       // otherwise a legacy tail can be mathematically impossible to distribute without repeats.
-      if (text(raw.bankVersion) !== "18") {
+      if (text(raw.bankVersion) !== "19") {
         cycle += 1;
         usedKeys = new Set<string>();
       }
@@ -290,7 +290,7 @@ async function startGame(categoryIds: string[]): Promise<MajlisGameStartResponse
         cycle,
         usedGroupKeys: Array.from(new Set(nextUsed)),
         totalGroups: allKeys.length,
-        bankVersion: "18",
+        bankVersion: "19",
         updatedAt: createdAt,
       }, { merge: true });
 
@@ -591,6 +591,7 @@ function sanitizePublicState(value: unknown, room: MajlisOnlineRoom): MajlisOnli
     // Online clients receive a server-clock canonical deadline, not the host device clock.
     questionDeadlineAt: !active || timerPaused ? null : serverNow + secondsLeft * 1000,
     reveal,
+    resolutionStage: data.resolutionStage === "award" ? "award" : reveal ? "reveal" : "question",
     hintVisible: data.hintVisible === true,
     optionsVisible: data.optionsVisible === true,
     visibleHint: data.hintVisible === true ? text(data.visibleHint) || null : null,
@@ -776,7 +777,7 @@ export async function POST(request: NextRequest) {
       const session = await startGame(categoryIds);
       const publicSession = Object.fromEntries(Object.entries(session).filter(([key]) => key !== "controlToken")) as MajlisGameStartResponse;
       const teams = Array.from({ length: teamCount }, (_, index) => ({ id: `team-${index + 1}`, name: teamNames[index], score: 0, accent: ["#d6b16b", "#7fb3a8", "#c77a62", "#8f9fc9"][index] || "#d6b16b", assists: { hint: true, time: true, double: true, options: true } }));
-      const publicState: MajlisOnlinePublicState = { phase: "board", teams, currentTeamIndex: 0, usedQuestionIds: [], activeQuestion: null, questionOwnerIndex: 0, answeringTeamIndex: 0, secondsLeft: 0, timerPaused: false, questionDeadlineAt: null, reveal: null, hintVisible: false, optionsVisible: false, visibleHint: null, visibleOptions: [], audioPlaybackState: "idle", doubleActive: false, timeBonusActive: false, stealMode: false, finishReason: "complete", updatedAt: now };
+      const publicState: MajlisOnlinePublicState = { phase: "board", teams, currentTeamIndex: 0, usedQuestionIds: [], activeQuestion: null, questionOwnerIndex: 0, answeringTeamIndex: 0, secondsLeft: 0, timerPaused: false, questionDeadlineAt: null, reveal: null, resolutionStage: "question", hintVisible: false, optionsVisible: false, visibleHint: null, visibleOptions: [], audioPlaybackState: "idle", doubleActive: false, timeBonusActive: false, stealMode: false, finishReason: "complete", updatedAt: now };
       await ref.set({ status: "playing", teamCount, teamNames, selectedCategoryIds: categoryIds, session: publicSession, publicState, updatedAt: now }, { merge: true });
       const snap = await ref.get();
       return NextResponse.json({ room: mapOnlineRoom(ref.id, snap.data() || {}), session: publicSession });
