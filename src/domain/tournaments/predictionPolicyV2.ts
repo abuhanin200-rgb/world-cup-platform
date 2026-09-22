@@ -11,6 +11,7 @@ export type TournamentPredictionWindowMatchV2 = {
   predictionClosesAt: number | null;
   predictionIsOpen?: boolean;
   predictionEditingIsOpen?: boolean;
+  predictionManualOverride?: "open" | "closed" | null;
 };
 
 export type TournamentPredictionWindowStateV2 =
@@ -69,13 +70,16 @@ export function getTournamentPredictionWindowStateV2(
   const deadline = getTournamentPredictionDeadlineV2(match);
   if (!deadline || now >= deadline || now >= match.kickoffAt) return "closed";
 
+  if (match.predictionManualOverride === "closed") return "closed";
+  if (match.predictionManualOverride === "open") return "open";
+
   const opensAt = match.predictionOpensAt;
-  if (opensAt != null && now < opensAt) return "not_open";
+  if (opensAt == null || now < opensAt) return "not_open";
 
-  if (!match.predictionIsOpen) {
-    return opensAt == null ? "not_open" : "closed";
-  }
-
+  // The authoritative automatic window is time-based. predictionIsOpen is kept
+  // as an operational mirror for the UI/admin, but it must never be required
+  // for a valid submission. This keeps opening/locking correct even if no
+  // browser or admin session is running.
   return "open";
 }
 
@@ -88,9 +92,13 @@ export function canEditTournamentPredictionV2(
   if (match.status !== "scheduled" && match.status !== "prediction_open") {
     return false;
   }
+  if (match.predictionManualOverride === "closed") return false;
 
   const deadline = getTournamentPredictionDeadlineV2(match);
-  return Boolean(deadline && now < deadline && now < match.kickoffAt);
+  if (!deadline || now >= deadline || now >= match.kickoffAt) return false;
+
+  if (match.predictionManualOverride === "open") return true;
+  return match.predictionOpensAt != null && now >= match.predictionOpensAt;
 }
 
 export function getTournamentPredictionSubmissionDecisionV2({

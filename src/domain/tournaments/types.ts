@@ -73,6 +73,7 @@ export type Tournament = {
   status: TournamentStatus;
   sortOrder: number;
   isCurrent: boolean;
+  displayStatusOverride?: TournamentStatus;
   format: TournamentFormat;
   engine: TournamentEngine;
   calculationMode: TournamentCalculationMode;

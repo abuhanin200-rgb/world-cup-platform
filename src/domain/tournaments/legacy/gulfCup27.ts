@@ -13,11 +13,11 @@ const DEFINITION_TIMESTAMP = Date.UTC(2026, 7, 29);
  */
 export const GULF_CUP_27_TOURNAMENT = {
   id: GULF_CUP_27_TOURNAMENT_ID,
-  name: "كأس الخليج 27",
+  name: "خليجي الديار العربية 27",
   shortName: "خليجي 27",
   slug: GULF_CUP_27_TOURNAMENT_SLUG,
   description:
-    "بطولة خليجي 27 في السعودية، وتجربة توقعات مستقلة بهوية البطولة ضمن منصة التحدي.",
+    "بطولة خليجي الديار العربية 27 في السعودية، وتجربة توقعات مستقلة بهوية البطولة ضمن منصة التحدي.",
   hostCountry: "السعودية",
   hostCities: [],
   startAt: null,
@@ -25,13 +25,14 @@ export const GULF_CUP_27_TOURNAMENT = {
   status: "active",
   sortOrder: 10,
   isCurrent: true,
+  displayStatusOverride: "active",
   format: "groups_knockout",
   engine: "v2",
   calculationMode: "automatic_guarded",
   scoringTemplateId: "gulf-cup-27",
   scoringVersion: "v1",
   branding: {
-    logoUrl: "/tournaments/gulf-cup-27/logo.jpg",
+    logoUrl: "/tournaments/gulf-cup-27/logo.png",
     coverUrl: "/tournaments/gulf-cup-27/identity-cover.jpg",
     heroUrl: "/tournaments/gulf-cup-27/identity-cover.jpg",
     backgroundUrl: "/tournaments/gulf-cup-27/identity-cover.jpg",

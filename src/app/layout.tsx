@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   description: brandDescription,
   applicationName: brandName,
   manifest: "/manifest.json",
-  keywords: ["التحدي", "توقعات كرة القدم", "خليجي 27", "كأس العالم 2026", "كأس آسيا 2027", "ألعاب رياضية"],
+  keywords: ["التحدي", "توقعات كرة القدم", "خليجي الديار العربية 27", "خليجي 27", "كأس العالم 2026", "كأس آسيا 2027", "ألعاب رياضية"],
   authors: [{ name: "منصة التحدي" }],
   creator: "منصة التحدي",
   publisher: "منصة التحدي",

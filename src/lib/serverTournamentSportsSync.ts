@@ -874,7 +874,7 @@ export async function calculateTournamentMatchManuallyServerV2(
     throw new Error("النتيجة يجب أن تكون أرقامًا صحيحة من 0 إلى 30");
   }
   if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) {
-    throw new Error("محرك الاحتساب الحالي مخصص لخليجي 27 فقط");
+    throw new Error("محرك الاحتساب الحالي مخصص لخليجي الديار العربية 27 فقط");
   }
 
   const ref = adminDb.collection(COLLECTIONS.matches).doc(entityId(tournamentId, matchId));

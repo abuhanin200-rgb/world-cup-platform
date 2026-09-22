@@ -81,6 +81,10 @@ function readMatchForSubmission(data: Record<string, unknown>) {
     predictionClosesAt: optionalNumber(data.predictionClosesAt),
     predictionIsOpen: data.predictionIsOpen === true,
     predictionEditingIsOpen: data.predictionEditingIsOpen !== false,
+    predictionManualOverride:
+      data.predictionManualOverride === "open" || data.predictionManualOverride === "closed"
+        ? data.predictionManualOverride
+        : null,
     stage: data.stage === "knockout" ? "knockout" : "group",
   } as const;
 }
@@ -281,14 +285,29 @@ export async function saveTournamentPredictionOnServerV2(
     schemaVersion: 2,
   };
 
-  await commitWrites([
-    createDocumentWrite(
-      PREDICTIONS_COLLECTION,
-      predictionId,
-      persistedFields,
-      Object.keys(persistedFields),
-    ),
-  ]);
+  try {
+    await commitWrites([
+      createDocumentWrite(
+        PREDICTIONS_COLLECTION,
+        predictionId,
+        persistedFields,
+        Object.keys(persistedFields),
+        latestPredictionDocument
+          ? { updateTime: latestPredictionDocument.updateTime }
+          : { exists: false },
+      ),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "");
+    if (message.includes("FIRESTORE_REQUEST_FAILED_409")) {
+      throw new TournamentPredictionSubmissionError(
+        "تم تعديل التوقع من جلسة أخرى. حدّث الصفحة ثم أعد المحاولة.",
+        "PREDICTION_CONCURRENT_UPDATE",
+        409,
+      );
+    }
+    throw error;
+  }
 
   if (!statsDocument) {
     try {

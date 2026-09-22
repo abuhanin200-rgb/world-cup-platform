@@ -104,7 +104,7 @@ export const GULF_CUP_27_KNOCKOUT_MATCHES: readonly TournamentMatchV2[] = [
   knockoutMatch({
     id: "g27-sf-1",
     round: "نصف النهائي",
-    iso: "2026-10-03T18:55:00+03:00",
+    iso: "2026-10-03T18:00:00+03:00",
     homeSourceLabel: "متصدر المجموعة A",
     awaySourceLabel: "وصيف المجموعة B",
   }),
@@ -118,7 +118,7 @@ export const GULF_CUP_27_KNOCKOUT_MATCHES: readonly TournamentMatchV2[] = [
   knockoutMatch({
     id: "g27-final",
     round: "النهائي",
-    iso: "2026-10-06T21:00:00+03:00",
+    iso: "2026-10-06T18:00:00+03:00",
     homeSourceLabel: "الفائز من نصف النهائي 1",
     awaySourceLabel: "الفائز من نصف النهائي 2",
   }),
@@ -130,8 +130,8 @@ export const GULF_CUP_27_MATCHES: readonly TournamentMatchV2[] = [
 ] as const;
 
 export const GULF_CUP_27_KNOCKOUT_DATES = {
-  semiFinalsAt: new Date("2026-10-03T18:55:00+03:00").getTime(),
-  finalAt: new Date("2026-10-06T21:00:00+03:00").getTime(),
+  semiFinalsAt: new Date("2026-10-03T18:00:00+03:00").getTime(),
+  finalAt: new Date("2026-10-06T18:00:00+03:00").getTime(),
 } as const;
 
 export function getGulfCup27Team(teamId: string) {

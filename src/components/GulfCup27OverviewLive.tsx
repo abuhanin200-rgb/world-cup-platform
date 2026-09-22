@@ -142,7 +142,7 @@ export default function GulfCup27OverviewLive() {
     return (
       <div className="mb-7 rounded-[28px] border border-white/10 bg-white/5 p-8 text-center text-white/55">
         <Loader2 className="mx-auto h-7 w-7 animate-spin text-[var(--tournament-primary)]" aria-hidden="true" />
-        <p className="mt-3 text-sm font-black">جاري تحميل حالة خليجي 27...</p>
+        <p className="mt-3 text-sm font-black">جاري تحميل حالة خليجي الديار العربية 27...</p>
       </div>
     );
   }

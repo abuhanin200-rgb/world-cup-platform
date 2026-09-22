@@ -362,6 +362,7 @@ export function createDocumentWrite(
   id: string,
   data: Record<string, unknown>,
   fieldPaths?: string[],
+  currentDocument?: { exists?: boolean; updateTime?: string },
 ): FirestoreWrite {
   return {
     update: {
@@ -369,6 +370,7 @@ export function createDocumentWrite(
       fields: encodeFields(data),
     },
     ...(fieldPaths ? { updateMask: { fieldPaths } } : {}),
+    ...(currentDocument ? { currentDocument } : {}),
   };
 }
 

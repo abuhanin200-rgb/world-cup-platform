@@ -35,6 +35,10 @@ export function getTournamentDisplayStatus(
   tournament: Tournament,
   now: number = Date.now(),
 ): TournamentStatus {
+  if (tournament.displayStatusOverride) {
+    return tournament.displayStatusOverride;
+  }
+
   if (
     tournament.status === "hidden" ||
     tournament.status === "draft" ||

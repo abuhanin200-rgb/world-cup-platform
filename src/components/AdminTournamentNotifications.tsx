@@ -106,7 +106,7 @@ export default function AdminTournamentNotifications({
       await addAdminLog({
         action: "other",
         title: "إشعار بطولة جماعي",
-        description: `تم إرسال إشعار خليجي 27 إلى ${result.recipients} عضو.`,
+        description: `تم إرسال إشعار خليجي الديار العربية 27 إلى ${result.recipients} عضو.`,
         metadata: {
           tournamentId: GULF_CUP_27_TOURNAMENT_ID,
           recipients: result.recipients,
@@ -143,7 +143,7 @@ export default function AdminTournamentNotifications({
       });
       await addAdminLog({
         action: "other",
-        title: "تنبيه توقعات خليجي 27",
+        title: "تنبيه توقعات خليجي الديار العربية 27",
         description: `${label} — تم إرسال ${result.recipients} إشعار.`,
         metadata: {
           tournamentId: GULF_CUP_27_TOURNAMENT_ID,
@@ -241,7 +241,7 @@ export default function AdminTournamentNotifications({
         <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
           <div className="flex items-center gap-2 text-sm font-black text-white">
             <Megaphone className="h-4 w-4 text-amber-300" aria-hidden="true" />
-            إعلان عام لخليجي 27
+            إعلان عام لخليجي الديار العربية 27
           </div>
           <label className="mt-4 block text-xs font-bold text-slate-300" htmlFor="tournament-notification-title">
             العنوان

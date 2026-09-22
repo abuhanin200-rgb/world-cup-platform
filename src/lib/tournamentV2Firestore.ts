@@ -14,6 +14,7 @@ import {
   GULF_CUP_27_GROUP_MATCHES,
   GULF_CUP_27_KNOCKOUT_MATCHES,
   GULF_CUP_27_MATCHES,
+  GULF_CUP_27_PREDICTION_OPEN_LEAD_MS,
   GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT,
   GULF_CUP_27_TOURNAMENT_ID,
@@ -25,7 +26,6 @@ import {
   type TournamentTeamV2,
   type TournamentUserStatsV2,
 } from "@/domain/tournaments";
-import { requestAdminTournamentPredictionActionV2 } from "./adminTournamentPredictionsApiV2";
 
 export const TOURNAMENT_V2_COLLECTIONS = {
   tournaments: "tournaments",
@@ -119,6 +119,10 @@ function mapMatchDoc(
         : toNumber(data.predictionClosesAt),
     predictionIsOpen: Boolean(data.predictionIsOpen),
     predictionEditingIsOpen: data.predictionEditingIsOpen !== false,
+    predictionManualOverride:
+      data.predictionManualOverride === "open" || data.predictionManualOverride === "closed"
+        ? data.predictionManualOverride
+        : null,
     calculationStatus:
       data.calculationStatus === "processing" ||
       data.calculationStatus === "calculated" ||
@@ -243,6 +247,7 @@ function getGulfStaticFallback(): TournamentMatchRuntimeV2[] {
     ...match,
     predictionIsOpen: false,
     predictionEditingIsOpen: true,
+    predictionManualOverride: null,
     calculationStatus: "not_calculated",
     calculationVersion: null,
     resultHash: null,
@@ -307,6 +312,9 @@ export async function initializeGulfCup27V2Data() {
         predictionOpensAt: match.predictionOpensAt,
         predictionClosesAt: match.predictionClosesAt,
         officialScheduleSyncedAt: now,
+        scheduleSource: match.stage === "group" ? "official-and-current-verified-2026-09-22" : "current-knockout-listing-2026-09-22",
+        scheduleConfidence: match.stage === "group" ? "official_verified" : "provisional_current_listing",
+        scheduleTimezone: "Asia/Riyadh",
         updatedAt: now,
       };
 
@@ -329,9 +337,13 @@ export async function initializeGulfCup27V2Data() {
         ...dropUndefined(match),
         predictionIsOpen: false,
         predictionEditingIsOpen: true,
+        predictionManualOverride: null,
         schemaVersion: 2,
         createdAt: now,
         officialScheduleSyncedAt: now,
+        scheduleSource: match.stage === "group" ? "official-and-current-verified-2026-09-22" : "current-knockout-listing-2026-09-22",
+        scheduleConfidence: match.stage === "group" ? "official_verified" : "provisional_current_listing",
+        scheduleTimezone: "Asia/Riyadh",
         updatedAt: now,
       },
       { merge: true },
@@ -389,18 +401,6 @@ export async function getTournamentMatchesV2(
     .sort((a, b) => a.kickoffAt - b.kickoffAt);
 }
 
-
-async function deleteTournamentPredictionsForMatchV2(
-  tournamentId: string,
-  matchId: string,
-) {
-  const result = await requestAdminTournamentPredictionActionV2<{ deleted: number }>({
-    action: "delete_match_predictions",
-    tournamentId,
-    matchId,
-  });
-  return result.deleted;
-}
 
 export async function syncGulfCup27KnockoutBracketV2() {
   const now = Date.now();
@@ -481,10 +481,32 @@ export async function syncGulfCup27KnockoutBracketV2() {
       return;
     }
 
-    const predictionsCleared = await deleteTournamentPredictionsForMatchV2(
-      GULF_CUP_27_TOURNAMENT_ID,
-      matchId,
-    );
+    // Never rewrite a knockout pairing after its prediction window has started.
+    // That protects already-saved member predictions from being detached from
+    // their original teams if upstream standings are later corrected.
+    if (
+      current.predictionOpensAt != null &&
+      now >= current.predictionOpensAt &&
+      (current.homeTeamId || current.awayTeamId)
+    ) {
+      await setDoc(
+        doc(
+          db,
+          TOURNAMENT_V2_COLLECTIONS.matches,
+          entityDocId(GULF_CUP_27_TOURNAMENT_ID, matchId),
+        ),
+        {
+          bracketSyncConflict: true,
+          bracketSyncConflictMessage: "تغيّرت أطراف المباراة بعد بدء نافذة التوقعات؛ لم تُعدل حمايةً للتوقعات المحفوظة.",
+          bracketSyncConflictAt: now,
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+      return;
+    }
+
+    const predictionsCleared = 0;
 
     await setDoc(
       doc(
@@ -496,9 +518,12 @@ export async function syncGulfCup27KnockoutBracketV2() {
         homeTeamId,
         awayTeamId,
         predictionIsOpen: false,
+        predictionManualOverride: null,
         status: "scheduled",
-        predictionOpensAt: null,
+        predictionOpensAt: current.kickoffAt - GULF_CUP_27_PREDICTION_OPEN_LEAD_MS,
         predictionClosesAt: current.kickoffAt,
+        bracketSyncConflict: false,
+        bracketSyncConflictMessage: null,
         updatedAt: Date.now(),
         updatedAtServer: serverTimestamp(),
       },
@@ -518,10 +543,10 @@ export async function syncGulfCup27KnockoutBracketV2() {
     if (!current || current.calculationStatus === "calculated") return;
     if (!current.homeTeamId && !current.awayTeamId) return;
 
-    const predictionsCleared = await deleteTournamentPredictionsForMatchV2(
-      GULF_CUP_27_TOURNAMENT_ID,
-      matchId,
-    );
+    if (current.predictionOpensAt != null && now >= current.predictionOpensAt) {
+      return;
+    }
+    const predictionsCleared = 0;
 
     await setDoc(
       doc(
@@ -533,6 +558,7 @@ export async function syncGulfCup27KnockoutBracketV2() {
         homeTeamId: "",
         awayTeamId: "",
         predictionIsOpen: false,
+        predictionManualOverride: null,
         status: "scheduled",
         predictionOpensAt: null,
         predictionClosesAt: current.kickoffAt,
@@ -598,10 +624,10 @@ export async function syncGulfCup27KnockoutBracketV2() {
       finalMatch.calculationStatus !== "calculated" &&
       (finalMatch.homeTeamId || finalMatch.awayTeamId)
     ) {
-      const predictionsCleared = await deleteTournamentPredictionsForMatchV2(
-        GULF_CUP_27_TOURNAMENT_ID,
-        "g27-final",
-      );
+      if (finalMatch.predictionOpensAt != null && now >= finalMatch.predictionOpensAt) {
+        return { created, allGroupsFinished, changes };
+      }
+      const predictionsCleared = 0;
       await setDoc(
         doc(
           db,
@@ -612,6 +638,7 @@ export async function syncGulfCup27KnockoutBracketV2() {
           homeTeamId: "",
           awayTeamId: "",
           predictionIsOpen: false,
+          predictionManualOverride: null,
           status: "scheduled",
           predictionOpensAt: null,
           predictionClosesAt: finalMatch.kickoffAt,
@@ -686,12 +713,48 @@ export async function setTournamentMatchPredictionOpen(
     matchRef,
     {
       predictionIsOpen,
+      predictionManualOverride: predictionIsOpen ? "open" : "closed",
       status: predictionIsOpen ? "prediction_open" : "scheduled",
       predictionOpensAt:
         predictionIsOpen && current.predictionOpensAt == null
           ? now
           : current.predictionOpensAt,
       predictionClosesAt: nextClosesAt,
+      updatedAt: now,
+      updatedAtServer: serverTimestamp(),
+    },
+    { merge: true },
+  );
+}
+
+export async function clearTournamentMatchPredictionOverride(
+  tournamentId: string,
+  matchId: string,
+) {
+  const matchRef = doc(
+    db,
+    TOURNAMENT_V2_COLLECTIONS.matches,
+    entityDocId(tournamentId, matchId),
+  );
+  const matchSnap = await getDoc(matchRef);
+  if (!matchSnap.exists()) {
+    throw new Error("المباراة غير مهيأة في محرك البطولات الجديد");
+  }
+
+  const current = mapMatchDoc(matchSnap.id, matchSnap.data());
+  const now = Date.now();
+  const state = getTournamentPredictionWindowStateV2(
+    { ...current, predictionManualOverride: null },
+    now,
+  );
+  const predictionIsOpen = state === "open";
+
+  await setDoc(
+    matchRef,
+    {
+      predictionManualOverride: null,
+      predictionIsOpen,
+      status: predictionIsOpen ? "prediction_open" : current.status === "prediction_open" ? "scheduled" : current.status,
       updatedAt: now,
       updatedAtServer: serverTimestamp(),
     },
@@ -781,6 +844,7 @@ export async function setAllTournamentPredictionsOpen(
       ),
       {
         predictionIsOpen,
+        predictionManualOverride: predictionIsOpen ? "open" : "closed",
         status: predictionIsOpen ? "prediction_open" : "scheduled",
         predictionOpensAt:
           predictionIsOpen && match.predictionOpensAt == null

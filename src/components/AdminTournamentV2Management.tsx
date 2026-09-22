@@ -180,7 +180,7 @@ export default function AdminTournamentV2Management({
       await updateTournamentV2Metadata(GULF_CUP_27_TOURNAMENT_ID, meta);
       await addAdminLog({
         action: "other",
-        title: "تعديل إعدادات خليجي 27",
+        title: "تعديل إعدادات خليجي الديار العربية 27",
         description: `تم تحديث بيانات البطولة وحالتها إلى: ${STATUS_LABEL[meta.status]}.`,
         metadata: { tournamentId: GULF_CUP_27_TOURNAMENT_ID, ...meta },
       });
@@ -201,11 +201,11 @@ export default function AdminTournamentV2Management({
       if (editingTeamId) {
         const { id: _id, ...patch } = teamForm;
         await updateTournamentTeamV2(GULF_CUP_27_TOURNAMENT_ID, editingTeamId, patch);
-        await addAdminLog({ action: "other", title: "تعديل منتخب في خليجي 27", description: `تم تعديل ${teamForm.nameAr}.`, metadata: { teamId: editingTeamId } });
+        await addAdminLog({ action: "other", title: "تعديل منتخب في خليجي الديار العربية 27", description: `تم تعديل ${teamForm.nameAr}.`, metadata: { teamId: editingTeamId } });
         setMessage("تم تعديل المنتخب.");
       } else {
         const id = await createTournamentTeamV2(GULF_CUP_27_TOURNAMENT_ID, teamForm);
-        await addAdminLog({ action: "other", title: "إضافة منتخب إلى خليجي 27", description: `تمت إضافة ${teamForm.nameAr}.`, metadata: { teamId: id } });
+        await addAdminLog({ action: "other", title: "إضافة منتخب إلى خليجي الديار العربية 27", description: `تمت إضافة ${teamForm.nameAr}.`, metadata: { teamId: id } });
         setMessage("تمت إضافة المنتخب.");
       }
       setEditingTeamId("");
@@ -225,7 +225,7 @@ export default function AdminTournamentV2Management({
     setError("");
     try {
       await deleteTournamentTeamV2Safely(GULF_CUP_27_TOURNAMENT_ID, team.id);
-      await addAdminLog({ action: "other", title: "حذف منتخب من خليجي 27", description: `تم حذف ${team.nameAr}.`, metadata: { teamId: team.id } });
+      await addAdminLog({ action: "other", title: "حذف منتخب من خليجي الديار العربية 27", description: `تم حذف ${team.nameAr}.`, metadata: { teamId: team.id } });
       setMessage("تم حذف المنتخب.");
       await load();
     } catch (removeError) {
@@ -243,11 +243,11 @@ export default function AdminTournamentV2Management({
       if (editingMatchId) {
         const { id: _id, ...patch } = matchForm;
         await updateTournamentMatchV2(GULF_CUP_27_TOURNAMENT_ID, editingMatchId, patch);
-        await addAdminLog({ action: "other", title: "تعديل مباراة خليجي 27", description: `تم تعديل ${matchForm.round}.`, metadata: { matchId: editingMatchId } });
+        await addAdminLog({ action: "other", title: "تعديل مباراة خليجي الديار العربية 27", description: `تم تعديل ${matchForm.round}.`, metadata: { matchId: editingMatchId } });
         setMessage("تم تعديل المباراة.");
       } else {
         const id = await createTournamentMatchV2(GULF_CUP_27_TOURNAMENT_ID, matchForm);
-        await addAdminLog({ action: "other", title: "إضافة مباراة إلى خليجي 27", description: `تمت إضافة مباراة ${matchForm.round}.`, metadata: { matchId: id } });
+        await addAdminLog({ action: "other", title: "إضافة مباراة إلى خليجي الديار العربية 27", description: `تمت إضافة مباراة ${matchForm.round}.`, metadata: { matchId: id } });
         setMessage("تمت إضافة المباراة.");
       }
       setEditingMatchId("");
@@ -267,7 +267,7 @@ export default function AdminTournamentV2Management({
     setError("");
     try {
       await deleteTournamentMatchV2Safely(GULF_CUP_27_TOURNAMENT_ID, match.id);
-      await addAdminLog({ action: "other", title: "حذف مباراة من خليجي 27", description: `تم حذف ${match.round}.`, metadata: { matchId: match.id } });
+      await addAdminLog({ action: "other", title: "حذف مباراة من خليجي الديار العربية 27", description: `تم حذف ${match.round}.`, metadata: { matchId: match.id } });
       setMessage("تم حذف المباراة.");
       await load();
     } catch (removeError) {
@@ -282,7 +282,7 @@ export default function AdminTournamentV2Management({
   }
 
   if (!meta) {
-    return <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold text-amber-100"><ShieldAlert className="mb-2 h-5 w-5" aria-hidden="true" />هيّئ خليجي 27 أولًا، ثم ستظهر أدوات الإدارة الكاملة هنا.</div>;
+    return <div className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold text-amber-100"><ShieldAlert className="mb-2 h-5 w-5" aria-hidden="true" />هيّئ خليجي الديار العربية 27 أولًا، ثم ستظهر أدوات الإدارة الكاملة هنا.</div>;
   }
 
   const tabs = [
@@ -296,7 +296,7 @@ export default function AdminTournamentV2Management({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-black text-emerald-300">إدارة البطولة</p>
-          <h3 className="mt-1 flex items-center gap-2 text-lg font-black text-white"><Trophy className="h-5 w-5 text-amber-300" aria-hidden="true" />خليجي 27 — إعداد كامل</h3>
+          <h3 className="mt-1 flex items-center gap-2 text-lg font-black text-white"><Trophy className="h-5 w-5 text-amber-300" aria-hidden="true" />خليجي الديار العربية 27 — إعداد كامل</h3>
         </div>
         {showTabs && (
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="أقسام إدارة البطولة">

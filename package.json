@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test:predictions": "node --test tests/predictions/*.test.mjs",
@@ -13,7 +13,9 @@
     "purge:notifications": "node --env-file=.env.local scripts/purge-notifications.js",
     "test:vocabulary-dictionary": "node scripts/audit-vocabulary-dictionary.mjs",
     "test:majlis-bank": "node scripts/audit-majlis-bank.mjs && node scripts/simulate-majlis-sessions.mjs",
-    "test:majlis-audio": "node scripts/preflight-majlis-audio.mjs"
+    "test:majlis-audio": "node scripts/preflight-majlis-audio.mjs",
+    "build:turbopack": "next build",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "clsx": "^2.1.1",

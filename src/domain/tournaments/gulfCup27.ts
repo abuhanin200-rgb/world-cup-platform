@@ -18,7 +18,7 @@ export const GULF_CUP_27_TOURNAMENT = {
   shortName: "خليجي 27",
   slug: GULF_CUP_27_TOURNAMENT_SLUG,
   description:
-    "تابع خليجي 27 في السعودية، توقع النتائج، راقب ترتيبك واستمتع بتغطية البطولة داخل منصة التحدي.",
+    "تابع خليجي الديار العربية 27 في السعودية، توقع النتائج، راقب ترتيبك واستمتع بتغطية البطولة داخل منصة التحدي.",
   hostCountry: "السعودية",
   hostCities: ["جدة"],
   startAt: new Date("2026-09-23T00:00:00+03:00").getTime(),
@@ -26,6 +26,7 @@ export const GULF_CUP_27_TOURNAMENT = {
   status: "active",
   sortOrder: 10,
   isCurrent: true,
+  displayStatusOverride: "active",
   format: "groups_knockout",
   engine: "v2",
   calculationMode: "automatic_guarded",

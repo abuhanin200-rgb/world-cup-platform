@@ -659,7 +659,7 @@ export default function GulfCup27PredictionsPanel() {
       setError(
         loadError instanceof Error
           ? loadError.message
-          : "تعذر تحميل توقعات خليجي 27",
+          : "تعذر تحميل توقعات خليجي الديار العربية 27",
       );
     } finally {
       setLoading(false);
@@ -869,7 +869,7 @@ export default function GulfCup27PredictionsPanel() {
           className="mx-auto h-7 w-7 animate-spin text-[var(--tournament-primary)]"
           aria-hidden="true"
         />
-        <p className="mt-3 text-sm font-bold">جاري تحميل توقعات خليجي 27...</p>
+        <p className="mt-3 text-sm font-bold">جاري تحميل توقعات خليجي الديار العربية 27...</p>
       </div>
     );
   }
@@ -901,7 +901,7 @@ export default function GulfCup27PredictionsPanel() {
       <AuthGateCard
         compact
         returnTo={RETURN_TO}
-        title="ادخل إلى توقعات خليجي 27"
+        title="ادخل إلى توقعات خليجي الديار العربية 27"
         description="سجّل توقعاتك وتابع نقاطك وترتيبك في البطولة."
         benefit="بعد تسجيل الدخول أو إنشاء الحساب ستعود إلى صفحة توقعاتك نفسها مباشرة."
         primaryLabel="تسجيل الدخول"
@@ -918,7 +918,7 @@ export default function GulfCup27PredictionsPanel() {
               توقعات البطولة
             </p>
             <h2 className="mt-1 text-xl font-black md:text-2xl">
-              توقعاتي في خليجي 27
+              توقعاتي في خليجي الديار العربية 27
             </h2>
             <p className="mt-1 text-[11px] font-bold text-white/40">
               المباريات التي تحتاج توقعك تظهر أولًا

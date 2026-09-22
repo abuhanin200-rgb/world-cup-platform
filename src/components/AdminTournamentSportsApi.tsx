@@ -217,11 +217,11 @@ export default function AdminTournamentSportsApi() {
       await load();
       setMessage(
         season.available === true
-          ? "تم اعتماد خليجي 27 على Gulf Cup of Nations (ID 25) وموسم 2026 متاح الآن."
-          : "تم اعتماد خليجي 27 على Gulf Cup of Nations (ID 25). موسم 2026 غير متاح بعد وسيتم رصده تلقائيًا دون استخدام بطولة U23.",
+          ? "تم اعتماد خليجي الديار العربية 27 على Gulf Cup of Nations (ID 25) وموسم 2026 متاح الآن."
+          : "تم اعتماد خليجي الديار العربية 27 على Gulf Cup of Nations (ID 25). موسم 2026 غير متاح بعد وسيتم رصده تلقائيًا دون استخدام بطولة U23.",
       );
     } catch (configError) {
-      setError(configError instanceof Error ? configError.message : "تعذر اعتماد إعداد خليجي 27");
+      setError(configError instanceof Error ? configError.message : "تعذر اعتماد إعداد خليجي الديار العربية 27");
     } finally {
       setWorking("");
     }
@@ -246,7 +246,7 @@ export default function AdminTournamentSportsApi() {
     try {
       const data = await post("sync");
       if (data.skipped === true && data.reason === "season_not_available") {
-        setMessage("المزامنة جاهزة، لكن موسم خليجي 27 لعام 2026 لم يظهر لدى API-FOOTBALL بعد. سيتم فحص توفره تلقائيًا كل 3 ساعات، ومحاولة اكتشاف المباريات كل ساعة بعد توفر الموسم.");
+        setMessage("المزامنة جاهزة، لكن موسم خليجي الديار العربية 27 لعام 2026 لم يظهر لدى API-FOOTBALL بعد. سيتم فحص توفره تلقائيًا كل 3 ساعات، ومحاولة اكتشاف المباريات كل ساعة بعد توفر الموسم.");
       } else if (data.skipped === true && data.reason === "no_mapped_matches") {
         setMessage("لا توجد مباريات مرتبطة بعد. عند ظهور موسم 2026 سيحاول النظام اكتشافها وربطها تلقائيًا.");
       } else {
@@ -297,7 +297,7 @@ export default function AdminTournamentSportsApi() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[11px] font-black text-cyan-100"><Radio className="h-3.5 w-3.5" aria-hidden="true" />Sports API</span>
-            <h3 className="mt-3 text-xl font-black text-white">API-FOOTBALL — مزامنة خليجي 27</h3>
+            <h3 className="mt-3 text-xl font-black text-white">API-FOOTBALL — مزامنة خليجي الديار العربية 27</h3>
             <p className="mt-2 max-w-3xl text-sm font-semibold leading-7 text-slate-300">المفتاح يبقى في السيرفر فقط. وضع الحماية يتحقق من النتيجة النهائية في قراءتين منفصلتين قبل الاحتساب التلقائي، وأي اختلاف يتحول إلى تعارض يحتاج مراجعة الأدمن.</p>
           </div>
           <div className={`rounded-2xl border px-4 py-3 text-xs font-black ${hasApiKey ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-amber-300/20 bg-amber-300/10 text-amber-100"}`}>
@@ -333,7 +333,7 @@ export default function AdminTournamentSportsApi() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="font-black text-white">رصد خليجي 27 الرسمي</h4>
+              <h4 className="font-black text-white">رصد خليجي الديار العربية 27 الرسمي</h4>
               <span dir="ltr" className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] font-black text-cyan-100">League ID 25</span>
               <span dir="ltr" className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[10px] font-black text-white">Season 2026</span>
             </div>
@@ -345,12 +345,12 @@ export default function AdminTournamentSportsApi() {
                   : `موسم 2026 لم يظهر بعد. آخر المواسم لدى المزود: ${config.providerAvailableSeasons.length ? config.providerAvailableSeasons.join("، ") : "لم يتم الفحص بعد"}.`}
               </p>
             ) : (
-              <p className="mt-2 text-xs font-black text-amber-100">الإعداد الحالي ليس خليجي 27 الرسمي. استخدم زر الاعتماد أدناه.</p>
+              <p className="mt-2 text-xs font-black text-amber-100">الإعداد الحالي ليس خليجي الديار العربية 27 الرسمي. استخدم زر الاعتماد أدناه.</p>
             )}
             {config.lastSeasonCheckAt && <p className="mt-1 text-[11px] font-semibold text-slate-500">آخر فحص للموسم: {formatDate(config.lastSeasonCheckAt)} · الفحص التلقائي كل 3 ساعات أثناء عدم توفر الموسم.</p>}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void configureGulfCup27()} disabled={Boolean(working)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 disabled:opacity-50">{working === "configure-gulf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}اعتماد خليجي 27</button>
+            <button type="button" onClick={() => void configureGulfCup27()} disabled={Boolean(working)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 disabled:opacity-50">{working === "configure-gulf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}اعتماد خليجي الديار العربية 27</button>
             <button type="button" onClick={() => void checkSeason()} disabled={Boolean(working) || !config.leagueId} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-xs font-black text-white disabled:opacity-50">{working === "season" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}فحص موسم 2026 الآن</button>
           </div>
         </div>
@@ -362,7 +362,7 @@ export default function AdminTournamentSportsApi() {
         {leagues.length > 0 && <div className="mt-3 grid gap-2 md:grid-cols-2">{leagues.slice(0,8).map((league) => {
           const isSeniorGulfCup = league.id === 25;
           const isU23 = league.id === 1208 || /u23/i.test(league.name);
-          return <button key={league.id} type="button" disabled={isU23} onClick={() => setConfig({ ...config, leagueId: league.id, season: isSeniorGulfCup ? 2026 : (league.seasons.includes(2026) ? 2026 : (league.seasons[0] || config.season)) })} className={`min-h-[76px] rounded-2xl border p-3 text-right transition ${isU23 ? "cursor-not-allowed border-red-300/10 bg-red-400/[0.04] opacity-60" : isSeniorGulfCup ? "border-emerald-300/25 bg-emerald-300/[0.08] hover:bg-emerald-300/[0.12]" : "border-white/10 bg-white/5 hover:bg-white/10"}`}><div className="flex items-center justify-between gap-2"><span className="font-black text-white">{league.name}</span><span dir="ltr" className="rounded-lg bg-black/20 px-2 py-1 text-xs font-black text-cyan-200">ID {league.id}</span></div><p className="mt-1 text-xs text-slate-400">{league.country || "—"} · {league.type || "Cup"} · المواسم: {league.seasons.slice(0,6).join(', ') || '—'}</p>{isSeniorGulfCup && <p className="mt-1 text-[11px] font-black text-emerald-200">✓ هذه البطولة الرسمية لخليجي 27 — ننتظر ظهور موسم 2026.</p>}{isU23 && <p className="mt-1 text-[11px] font-black text-red-200">مستبعدة: بطولة تحت 23 سنة وليست خليجي 27.</p>}</button>;
+          return <button key={league.id} type="button" disabled={isU23} onClick={() => setConfig({ ...config, leagueId: league.id, season: isSeniorGulfCup ? 2026 : (league.seasons.includes(2026) ? 2026 : (league.seasons[0] || config.season)) })} className={`min-h-[76px] rounded-2xl border p-3 text-right transition ${isU23 ? "cursor-not-allowed border-red-300/10 bg-red-400/[0.04] opacity-60" : isSeniorGulfCup ? "border-emerald-300/25 bg-emerald-300/[0.08] hover:bg-emerald-300/[0.12]" : "border-white/10 bg-white/5 hover:bg-white/10"}`}><div className="flex items-center justify-between gap-2"><span className="font-black text-white">{league.name}</span><span dir="ltr" className="rounded-lg bg-black/20 px-2 py-1 text-xs font-black text-cyan-200">ID {league.id}</span></div><p className="mt-1 text-xs text-slate-400">{league.country || "—"} · {league.type || "Cup"} · المواسم: {league.seasons.slice(0,6).join(', ') || '—'}</p>{isSeniorGulfCup && <p className="mt-1 text-[11px] font-black text-emerald-200">✓ هذه البطولة الرسمية لخليجي الديار العربية 27 — ننتظر ظهور موسم 2026.</p>}{isU23 && <p className="mt-1 text-[11px] font-black text-red-200">مستبعدة: بطولة تحت 23 سنة وليست خليجي الديار العربية 27.</p>}</button>;
         })}</div>}
       </section>
 

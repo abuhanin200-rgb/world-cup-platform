@@ -76,7 +76,7 @@ export default function GulfCup27LeaderboardPanel() {
       setRows(await getTournamentLeaderboardV2(GULF_CUP_27_TOURNAMENT_ID));
     } catch (loadError) {
       console.error("Gulf 27 leaderboard error:", loadError);
-      setError("تعذر تحميل ترتيب خليجي 27");
+      setError("تعذر تحميل ترتيب خليجي الديار العربية 27");
     } finally {
       setLoading(false);
     }
@@ -101,7 +101,7 @@ export default function GulfCup27LeaderboardPanel() {
         <div className="mb-4 text-center md:mb-6">
           <div className="mx-auto mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-300/20 bg-amber-300/[0.08] px-3 py-1.5 text-[10px] font-black text-amber-200 md:text-xs">
             <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" />
-            ترتيب خليجي 27
+            ترتيب خليجي الديار العربية 27
           </div>
 
           <h2 className="text-[22px] font-black md:text-3xl">لوحة الصدارة</h2>
@@ -244,7 +244,7 @@ export default function GulfCup27LeaderboardPanel() {
 
               <table className="w-full table-fixed text-center">
                 <caption className="sr-only">
-                  ترتيب خليجي 27 حسب النقاط والتوقعات الصحيحة
+                  ترتيب خليجي الديار العربية 27 حسب النقاط والتوقعات الصحيحة
                 </caption>
                 <thead className="bg-slate-950">
                   <tr className="text-xs md:text-sm">

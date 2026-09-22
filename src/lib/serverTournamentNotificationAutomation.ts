@@ -14,7 +14,7 @@ const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 const BATCH_SIZE = 350;
 
-type ReminderMode = "prediction_open" | "one_hour" | "thirty_minutes" | "missing_prediction";
+type ReminderMode = "prediction_open" | "one_hour" | "thirty_minutes" | "ten_minutes" | "match_started";
 
 type MatchRow = {
   id: string;
@@ -28,6 +28,7 @@ type MatchRow = {
   predictionOpensAt: number | null;
   predictionClosesAt: number | null;
   predictionIsOpen: boolean;
+  predictionManualOverride: "open" | "closed" | null;
   status: string;
   calculationStatus: string;
 };
@@ -70,9 +71,15 @@ function reminderCopy(mode: ReminderMode, label: string) {
       message: `باقي تقريبًا 30 دقيقة على مباراة ${label}. توقعك ما زال ناقصًا.`,
     };
   }
+  if (mode === "ten_minutes") {
+    return {
+      title: "باقي 10 دقائق 🔔",
+      message: `باقي 10 دقائق تقريبًا على مباراة ${label}. لم تسجل توقعك بعد.`,
+    };
+  }
   return {
-    title: "آخر فرصة للتوقع 🔔",
-    message: `اقترب إغلاق التوقع لمباراة ${label}. ادخل الآن وسجّل توقعك.`,
+    title: "بدأت المباراة ⚽",
+    message: `بدأت مباراة ${label} وأُغلق التوقع تلقائيًا.`,
   };
 }
 
@@ -123,6 +130,10 @@ async function loadGulfMatches(): Promise<Array<MatchRow & { refPath: string }>>
       predictionClosesAt:
         data.predictionClosesAt == null ? null : numberValue(data.predictionClosesAt),
       predictionIsOpen: data.predictionIsOpen === true,
+      predictionManualOverride:
+        data.predictionManualOverride === "open" || data.predictionManualOverride === "closed"
+          ? data.predictionManualOverride
+          : null,
       status: clean(data.status),
       calculationStatus: clean(data.calculationStatus),
       refPath: doc.ref.path,
@@ -158,7 +169,7 @@ async function dispatchReminder(match: MatchRow, mode: ReminderMode) {
   }
 
   const recipients =
-    mode === "prediction_open"
+    mode === "prediction_open" || mode === "match_started"
       ? (await adminDb.collection(USERS_COLLECTION).get()).docs
           .map((doc) => clean(doc.data().id) || doc.id)
           .filter(Boolean)
@@ -174,7 +185,12 @@ async function dispatchReminder(match: MatchRow, mode: ReminderMode) {
       );
       batch.set(adminDb.collection(NOTIFICATIONS_COLLECTION).doc(notificationId), {
         userId,
-        type: mode === "prediction_open" ? "prediction_open" : "prediction_reminder",
+        type:
+          mode === "prediction_open"
+            ? "prediction_open"
+            : mode === "match_started"
+              ? "match_started"
+              : "prediction_reminder",
         title: copy.title,
         message: copy.message,
         isRead: false,
@@ -204,7 +220,7 @@ async function dispatchReminder(match: MatchRow, mode: ReminderMode) {
 
 function chooseReminderMode(remainingMs: number): ReminderMode | null {
   if (remainingMs <= 0) return null;
-  if (remainingMs <= TEN_MINUTES_MS) return "missing_prediction";
+  if (remainingMs <= TEN_MINUTES_MS) return "ten_minutes";
   if (remainingMs <= THIRTY_MINUTES_MS) return "thirty_minutes";
   if (remainingMs <= ONE_HOUR_MS) return "one_hour";
   return null;
@@ -239,22 +255,28 @@ export async function runTournamentNotificationAutomationV2(options?: {
     if (match.calculationStatus === "calculated") continue;
     if (!match.homeTeamId || !match.awayTeamId) continue;
 
-    const closesAt = match.predictionClosesAt || match.kickoffAt;
+    const closesAt = Math.min(match.predictionClosesAt || match.kickoffAt, match.kickoffAt);
     if (!closesAt) continue;
 
     const opensAt = match.predictionOpensAt;
-    const eligibleToOpen =
-      !match.predictionIsOpen &&
-      match.status !== "live" &&
-      match.status !== "finished" &&
-      match.status !== "cancelled" &&
-      match.status !== "postponed" &&
+    const terminal =
+      match.status === "finished" ||
+      match.status === "cancelled" ||
+      match.status === "postponed";
+    const inAutomaticWindow =
+      !terminal &&
       opensAt != null &&
       now >= opensAt &&
       now < closesAt &&
       now < match.kickoffAt;
+    const shouldBeOpen =
+      !terminal &&
+      now < closesAt &&
+      now < match.kickoffAt &&
+      match.predictionManualOverride !== "closed" &&
+      (match.predictionManualOverride === "open" || inAutomaticWindow);
 
-    if (eligibleToOpen) {
+    if (shouldBeOpen && !match.predictionIsOpen) {
       const ref = adminDb.doc(match.refPath);
       await ref.set(
         {
@@ -269,28 +291,41 @@ export async function runTournamentNotificationAutomationV2(options?: {
       match.predictionIsOpen = true;
       match.status = "prediction_open";
       openedMatches += 1;
+    }
+
+    // Dispatch is independently idempotent, so a cron first running after openAt
+    // still sends the opening notification exactly once.
+    if (shouldBeOpen) {
       const opened = await dispatchReminder(match, "prediction_open");
       if (!opened.skipped) remindersDispatched += 1;
       notificationsCreated += opened.sent;
     }
 
-    if (!match.predictionIsOpen) continue;
-
     if (now >= closesAt || now >= match.kickoffAt) {
-      const ref = adminDb.doc(match.refPath);
-      await ref.set(
-        {
-          predictionIsOpen: false,
-          status: now >= match.kickoffAt ? "live" : "scheduled",
-          automationClosedAt: now,
-          updatedAt: now,
-        },
-        { merge: true },
-      );
-      closedMatches += 1;
+      if (match.predictionIsOpen) {
+        const ref = adminDb.doc(match.refPath);
+        await ref.set(
+          {
+            predictionIsOpen: false,
+            status: now >= match.kickoffAt ? "live" : "scheduled",
+            automationClosedAt: now,
+            updatedAt: now,
+          },
+          { merge: true },
+        );
+        match.predictionIsOpen = false;
+        closedMatches += 1;
+      }
+
+      if (now >= match.kickoffAt && !terminal) {
+        const started = await dispatchReminder(match, "match_started");
+        if (!started.skipped) remindersDispatched += 1;
+        notificationsCreated += started.sent;
+      }
       continue;
     }
 
+    if (!shouldBeOpen) continue;
     const mode = chooseReminderMode(closesAt - now);
     if (!mode) continue;
 

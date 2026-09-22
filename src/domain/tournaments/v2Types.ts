@@ -52,6 +52,7 @@ export type TournamentMatchV2 = {
   predictionClosesAt: number | null;
   predictionIsOpen?: boolean;
   predictionEditingIsOpen?: boolean;
+  predictionManualOverride?: "open" | "closed" | null;
   calculationStatus?: "not_calculated" | "processing" | "calculated" | "error";
   calculationVersion?: string | null;
   resultHash?: string | null;

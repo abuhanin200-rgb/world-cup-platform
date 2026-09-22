@@ -176,7 +176,7 @@ export default function AdminTournamentV2Panel() {
       });
     } catch (loadError) {
       console.error("Admin V2 tournament load error:", loadError);
-      setError("تعذر تحميل بيانات خليجي 27");
+      setError("تعذر تحميل بيانات خليجي الديار العربية 27");
     } finally {
       setLoading(false);
     }
@@ -195,11 +195,11 @@ export default function AdminTournamentV2Panel() {
       await syncGulfCup27KnockoutBracketV2();
       await addAdminLog({
         action: "other",
-        title: "تهيئة/مزامنة خليجي 27",
+        title: "تهيئة/مزامنة خليجي الديار العربية 27",
         description: `تمت تهيئة ${result.teams} منتخبات و${result.matches} مباراة في Collections الجديدة.`,
         metadata: result,
       });
-      setMessage("تمت تهيئة/مزامنة خليجي 27 وتحديث الأدوار الإقصائية بنجاح.");
+      setMessage("تمت تهيئة/مزامنة خليجي الديار العربية 27 وتحديث الأدوار الإقصائية بنجاح.");
       await load();
     } catch (initError) {
       setError(initError instanceof Error ? initError.message : "فشلت التهيئة");
@@ -216,7 +216,7 @@ export default function AdminTournamentV2Panel() {
       const result = await syncGulfCup27KnockoutBracketV2();
       await addAdminLog({
         action: "other",
-        title: "مزامنة أدوار خليجي 27 الإقصائية",
+        title: "مزامنة أدوار خليجي الديار العربية 27 الإقصائية",
         description: `تمت المزامنة. أضيفت ${result.created} مباريات جديدة، وتغيرت ${result.changes.length} مواجهات.`,
         metadata: result,
       });
@@ -246,7 +246,7 @@ export default function AdminTournamentV2Panel() {
       );
       await addAdminLog({
         action: "other",
-        title: nextOpen ? "فتح توقعات خليجي 27" : "إغلاق توقعات خليجي 27",
+        title: nextOpen ? "فتح توقعات خليجي الديار العربية 27" : "إغلاق توقعات خليجي الديار العربية 27",
         description: `${formatMatch(match)} — ${nextOpen ? "تم الفتح" : "تم الإغلاق"}.`,
         metadata: {
           tournamentId: GULF_CUP_27_TOURNAMENT_ID,
@@ -293,7 +293,7 @@ export default function AdminTournamentV2Panel() {
       );
       await addAdminLog({
         action: "other",
-        title: nextOpen ? "فتح تعديل توقعات خليجي 27" : "إغلاق تعديل توقعات خليجي 27",
+        title: nextOpen ? "فتح تعديل توقعات خليجي الديار العربية 27" : "إغلاق تعديل توقعات خليجي الديار العربية 27",
         description: `${formatMatch(match)} — ${nextOpen ? "تم فتح التعديل" : "تم إغلاق التعديل"}.`,
         metadata: {
           tournamentId: GULF_CUP_27_TOURNAMENT_ID,
@@ -322,17 +322,17 @@ export default function AdminTournamentV2Panel() {
       await setAllTournamentPredictionsOpen(GULF_CUP_27_TOURNAMENT_ID, open);
       await addAdminLog({
         action: "other",
-        title: open ? "فتح توقعات خليجي 27 بالكامل" : "إغلاق توقعات خليجي 27 بالكامل",
+        title: open ? "فتح توقعات خليجي الديار العربية 27 بالكامل" : "إغلاق توقعات خليجي الديار العربية 27 بالكامل",
         description: open
           ? "تم فتح جميع المباريات المكتملة الأطراف والقابلة للفتح."
-          : "تم إغلاق التوقعات لجميع مباريات خليجي 27.",
+          : "تم إغلاق التوقعات لجميع مباريات خليجي الديار العربية 27.",
         metadata: { tournamentId: GULF_CUP_27_TOURNAMENT_ID, open },
       });
       if (open) {
         try {
           const notification = await sendTournamentAnnouncementV2({
             tournamentId: GULF_CUP_27_TOURNAMENT_ID,
-            title: "توقعات خليجي 27 مفتوحة الآن 🏆",
+            title: "توقعات خليجي الديار العربية 27 مفتوحة الآن 🏆",
             message: "تم فتح التوقعات للمباريات المتاحة. ادخل وسجّل توقعك قبل الإغلاق.",
             route: "/tournaments/gulf-cup-27/predictions",
           });
@@ -415,7 +415,7 @@ export default function AdminTournamentV2Panel() {
 
       await addAdminLog({
         action: "calculate_match",
-        title: `احتساب ${match.stage === "knockout" ? "مباراة إقصائية" : "مباراة"} في خليجي 27`,
+        title: `احتساب ${match.stage === "knockout" ? "مباراة إقصائية" : "مباراة"} في خليجي الديار العربية 27`,
         description: `${formatMatch(match)} — النتيجة ${homeScore}-${awayScore} — تم احتساب ${result.predictionsCalculated} توقع.`,
         metadata: { ...result, homeScore, awayScore, qualifiedTeamId, qualificationMethod },
       });
@@ -445,7 +445,7 @@ export default function AdminTournamentV2Panel() {
       });
       await addAdminLog({
         action: "undo_match_calculation",
-        title: "تراجع عن احتساب خليجي 27",
+        title: "تراجع عن احتساب خليجي الديار العربية 27",
         description: `${formatMatch(match)} — تم إلغاء احتساب ${result.predictionsReset} توقع وإعادة بناء الترتيب.`,
         metadata: result,
       });
@@ -475,7 +475,7 @@ export default function AdminTournamentV2Panel() {
     <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
       <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-2">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="بطولات المنصة">
-          <button type="button" role="tab" aria-selected={tournamentTab === "gulf27"} onClick={() => setTournamentTab("gulf27")} className={`inline-flex min-h-[46px] items-center gap-2 rounded-xl px-4 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${tournamentTab === "gulf27" ? "bg-emerald-400 text-slate-950" : "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"}`}><Trophy className="h-4 w-4" aria-hidden="true" />خليجي 27</button>
+          <button type="button" role="tab" aria-selected={tournamentTab === "gulf27"} onClick={() => setTournamentTab("gulf27")} className={`inline-flex min-h-[46px] items-center gap-2 rounded-xl px-4 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${tournamentTab === "gulf27" ? "bg-emerald-400 text-slate-950" : "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"}`}><Trophy className="h-4 w-4" aria-hidden="true" />خليجي الديار العربية 27</button>
           <button type="button" role="tab" aria-selected={tournamentTab === "asian2027"} onClick={() => setTournamentTab("asian2027")} className={`inline-flex min-h-[46px] items-center gap-2 rounded-xl px-4 text-sm font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${tournamentTab === "asian2027" ? "bg-violet-400 text-slate-950" : "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"}`}><Trophy className="h-4 w-4" aria-hidden="true" />كأس آسيا 2027 <span className="rounded-full bg-black/15 px-2 py-0.5 text-[10px]">قريبًا</span></button>
         </div>
       </div>
@@ -488,7 +488,7 @@ export default function AdminTournamentV2Panel() {
         </div>
       ) : (
         <>
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="أقسام خليجي 27">
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="أقسام خليجي الديار العربية 27">
             {sectionTabs.map((item) => { const Icon = item.icon; const active = sectionTab === item.id; return <button key={item.id} type="button" role="tab" aria-selected={active} onClick={() => setSectionTab(item.id)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${active ? "border-emerald-300/30 bg-emerald-300/15 text-emerald-100" : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"}`}><Icon className="h-4 w-4" aria-hidden="true" />{item.label}</button>; })}
           </div>
 
@@ -496,7 +496,7 @@ export default function AdminTournamentV2Panel() {
         <div>
           <h2 className="flex items-center gap-2 text-xl font-black md:text-2xl">
             <ShieldCheck className="h-6 w-6 text-emerald-300" aria-hidden="true" />
-            إدارة البطولات — خليجي 27
+            إدارة البطولات — خليجي الديار العربية 27
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-300">
             إدارة المجموعات والأدوار الإقصائية والنتائج والتأهل والاحتساب من مكان واحد.
@@ -550,7 +550,7 @@ export default function AdminTournamentV2Panel() {
         </div>
       )}
 
-      {sectionTab === "results" && <AdminTournamentPredictionsManager tournamentId={GULF_CUP_27_TOURNAMENT_ID} tournamentLabel="خليجي 27" />}
+      {sectionTab === "results" && <AdminTournamentPredictionsManager tournamentId={GULF_CUP_27_TOURNAMENT_ID} tournamentLabel="خليجي الديار العربية 27" />}
 
       {sectionTab === "results" && (loading ? (
         <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/50 p-8 text-center text-slate-300">
@@ -560,10 +560,10 @@ export default function AdminTournamentV2Panel() {
       ) : matches.length === 0 ? (
         <div className="mt-5 rounded-3xl border border-dashed border-emerald-300/20 bg-emerald-300/[0.05] p-6 text-center">
           <Database className="mx-auto h-10 w-10 text-emerald-300" aria-hidden="true" />
-          <h3 className="mt-3 text-lg font-black">خليجي 27 لم تتم تهيئتها بعد</h3>
+          <h3 className="mt-3 text-lg font-black">خليجي الديار العربية 27 لم تتم تهيئتها بعد</h3>
           <button type="button" onClick={() => void initialize()} disabled={working === "init"} className="mt-5 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-emerald-400 px-5 text-sm font-black text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50">
             {working === "init" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Database className="h-4 w-4" aria-hidden="true" />}
-            تهيئة/مزامنة خليجي 27
+            تهيئة/مزامنة خليجي الديار العربية 27
           </button>
         </div>
       ) : (

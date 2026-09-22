@@ -92,13 +92,13 @@ export async function POST(request: NextRequest) {
         syncMode: body.syncMode === "review_only" ? "review_only" : "protected_auto",
         autoDiscover: body.autoDiscover !== false,
       });
-      await logAdmin("تحديث ربط Sports API", `تم تحديث إعدادات مزود البيانات لخليجي 27.`, { tournamentId, leagueId: config.leagueId, season: config.season, syncMode: config.syncMode });
+      await logAdmin("تحديث ربط Sports API", `تم تحديث إعدادات مزود البيانات لخليجي الديار العربية 27.`, { tournamentId, leagueId: config.leagueId, season: config.season, syncMode: config.syncMode });
       return NextResponse.json({ ok: true, config });
     }
 
     if (action === "discover") {
       const result = await discoverTournamentSportsFixtures(tournamentId);
-      await logAdmin("ربط مباريات خليجي 27 بالمزود", `تم ربط ${result.linked} مباراة تلقائيًا.`, result as unknown as Record<string, unknown>);
+      await logAdmin("ربط مباريات خليجي الديار العربية 27 بالمزود", `تم ربط ${result.linked} مباراة تلقائيًا.`, result as unknown as Record<string, unknown>);
       return NextResponse.json({ ok: true, ...result });
     }
 
