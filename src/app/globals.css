@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+:root {
+  --font-alexandria: "Alexandria", Tahoma, Arial, sans-serif;
+}
+
 @theme inline {
   --font-sans: var(--font-alexandria);
 }
@@ -657,3 +661,28 @@ body {
   .altahaddi-body-copy { font-size: 0.8rem; }
 }
 
+
+
+/* Gulf 27 live activity strips — left-to-right motion by request. */
+@keyframes tournament-activity-ltr {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
+}
+
+.tournament-activity-track {
+  direction: ltr;
+  animation: tournament-activity-ltr 34s linear infinite;
+  will-change: transform;
+}
+
+button:hover .tournament-activity-track,
+button:focus-visible .tournament-activity-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tournament-activity-track {
+    animation: none !important;
+    transform: none !important;
+  }
+}

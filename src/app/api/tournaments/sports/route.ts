@@ -23,11 +23,13 @@ function errorResponse(error: unknown) {
   const friendly =
     message === "API_FOOTBALL_KEY_MISSING"
       ? "أضف API_FOOTBALL_KEY في Environment Variables أولًا"
-      : message.startsWith("API_FOOTBALL_HTTP_")
-        ? "تعذر الاتصال بمزود API-FOOTBALL"
-        : message.startsWith("API_FOOTBALL_ERROR:")
-          ? message.replace("API_FOOTBALL_ERROR:", "مزود البيانات: ")
-          : message;
+      : /Free plans do not have access to this season/i.test(message)
+        ? "مفتاح API-FOOTBALL الحالي على الخطة المجانية ولا يملك وصولًا لموسم 2026. الربط والاحتساب التلقائيان جاهزان برمجيًا، لكن يلزم مفتاح بخطة تسمح ببيانات موسم 2026 ثم إعادة فحص الموسم واكتشاف المباريات."
+        : message.startsWith("API_FOOTBALL_HTTP_")
+          ? "تعذر الاتصال بمزود API-FOOTBALL"
+          : message.startsWith("API_FOOTBALL_ERROR:")
+            ? message.replace("API_FOOTBALL_ERROR:", "مزود البيانات: ")
+            : message;
   return NextResponse.json({ ok: false, error: friendly }, { status });
 }
 

@@ -41,6 +41,10 @@ type Mapping = {
   matchId: string;
   label: string;
   kickoffAt: number;
+  stage?: "group" | "knockout";
+  homeTeamId?: string;
+  awayTeamId?: string;
+  linkReady?: boolean;
   providerFixtureId: number | null;
   providerStatusShort: string | null;
   providerLastSyncedAt: number | null;
@@ -278,14 +282,30 @@ export default function AdminTournamentSportsApi() {
     finally { setWorking(""); }
   }
 
-  const counts = useMemo(() => ({
-    linked: mappings.filter((item) => item.providerFixtureId).length,
-    conflicts: mappings.filter((item) => item.providerSyncState === "conflict").length,
-    awaiting: mappings.filter((item) => item.providerSyncState === "awaiting_review").length,
-  }), [mappings]);
+  const counts = useMemo(() => {
+    const linkable = mappings.filter((item) => item.linkReady !== false);
+    return {
+      linked: mappings.filter((item) => item.providerFixtureId).length,
+      linkable: linkable.length,
+      linkedReady: linkable.filter((item) => item.providerFixtureId).length,
+      pendingBracket: mappings.filter((item) => item.linkReady === false).length,
+      conflicts: mappings.filter((item) => item.providerSyncState === "conflict").length,
+      awaiting: mappings.filter((item) => item.providerSyncState === "awaiting_review").length,
+    };
+  }, [mappings]);
 
   const isOfficialGulfCup = config?.leagueId === 25 && config?.season === 2026;
   const seasonIsAvailable = config?.seasonAvailability === "available";
+  const automaticResultsReady = Boolean(
+    hasApiKey &&
+      config?.enabled &&
+      isOfficialGulfCup &&
+      seasonIsAvailable &&
+      config?.syncResults &&
+      config?.syncMode === "protected_auto" &&
+      counts.linkable > 0 &&
+      counts.linkedReady === counts.linkable,
+  );
 
   if (!config) {
     return <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-3xl border border-white/10 bg-black/20 text-slate-300"><Loader2 className="ml-2 h-5 w-5 animate-spin" aria-hidden="true" />تحميل إعدادات Sports API…</div>;
@@ -366,12 +386,25 @@ export default function AdminTournamentSportsApi() {
         })}</div>}
       </section>
 
+      <section className={`rounded-3xl border p-4 md:p-5 ${automaticResultsReady ? "border-emerald-300/20 bg-emerald-300/[0.06]" : "border-amber-300/20 bg-amber-300/[0.055]"}`}>
+        <div className="flex items-start gap-3">
+          {automaticResultsReady ? <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-200" aria-hidden="true" /> : <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-200" aria-hidden="true" />}
+          <div>
+            <h4 className="font-black text-white">{automaticResultsReady ? "الاحتساب التلقائي جاهز" : "الاحتساب التلقائي يحتاج إكمال الربط"}</h4>
+            <p className="mt-2 text-xs font-semibold leading-6 text-slate-300"><strong className="text-white">فائدة الربط:</strong> كل مباراة في التحدي تُربط بـ Fixture ID الحقيقي لدى API-FOOTBALL. بعد الربط، الـCron يقرأ حالة المباراة والنتيجة النهائية تلقائيًا، يتحقق منها، يحفظ النتيجة، يحتسب توقعات الأعضاء، ويعيد بناء الترتيب. الإدخال والاحتساب اليدويان يبقيان متاحين دائمًا كخطة احتياط.</p>
+            {!seasonIsAvailable ? <p className="mt-2 text-xs font-black text-amber-100">الموسم 2026 غير قابل للقراءة بالمفتاح الحالي. إذا ظهرت رسالة أن الخطة المجانية لا تدعم الموسم، يلزم تفعيل خطة API تسمح بموسم 2026 ثم الضغط على «فحص موسم 2026 الآن» وبعدها «اكتشاف وربط تلقائي».</p> : null}
+            {seasonIsAvailable && counts.linkedReady < counts.linkable ? <p className="mt-2 text-xs font-black text-amber-100">الموسم متاح، لكن ما زال ربط المباريات ذات الأطراف المحددة ناقصًا: {counts.linkedReady}/{counts.linkable}.</p> : null}
+            {seasonIsAvailable && counts.linkedReady === counts.linkable && counts.pendingBracket > 0 ? <p className="mt-2 text-xs font-black text-emerald-100">مباريات الأطراف المحددة جاهزة للربط التلقائي. تبقى {counts.pendingBracket} مباريات إقصائية ستُكتشف وتُربط تلقائيًا بعد تحديد أطرافها.</p> : null}
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-3xl border border-white/10 bg-black/20 p-4 md:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h4 className="font-black text-white">ربط المباريات</h4><p className="mt-1 text-xs text-slate-400">مرتبط {counts.linked}/{mappings.length} · تعارض {counts.conflicts} · بانتظار تحقق {counts.awaiting}</p></div><button type="button" onClick={() => void discover()} disabled={Boolean(working) || !config.leagueId} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 text-xs font-black text-emerald-100 disabled:opacity-50">{working === "discover" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}اكتشاف وربط تلقائي</button></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h4 className="font-black text-white">ربط المباريات</h4><p className="mt-1 text-xs text-slate-400">جاهز الآن {counts.linkedReady}/{counts.linkable} · إجمالي الربط {counts.linked}/{mappings.length} · تعارض {counts.conflicts} · بانتظار تحقق {counts.awaiting}</p></div><button type="button" onClick={() => void discover()} disabled={Boolean(working) || !config.leagueId} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 text-xs font-black text-emerald-100 disabled:opacity-50">{working === "discover" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CloudDownload className="h-4 w-4" />}اكتشاف وربط تلقائي</button></div>
         <div className="mt-4 space-y-2">{mappings.map((item) => <div key={item.matchId} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><span className="font-black text-white">{item.label}</span><span className={`rounded-full border px-2 py-1 text-[10px] font-black ${stateClass(item.providerSyncState)}`}>{stateLabel(item.providerSyncState)}</span>{item.providerStatusShort && <span dir="ltr" className="rounded-md bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-300">{item.providerStatusShort}</span>}</div><p className="mt-1 text-xs text-slate-500">{formatDate(item.kickoffAt)}{item.providerLastSyncedAt ? ` · آخر مزامنة ${formatDate(item.providerLastSyncedAt)}` : ""}</p>{item.providerSyncMessage && <p className={`mt-1 text-xs font-bold ${item.providerSyncState === 'conflict' ? 'text-red-200' : 'text-slate-400'}`}>{item.providerSyncMessage}</p>}</div><div className="flex flex-wrap items-center gap-2"><input aria-label={`Fixture ID ${item.label}`} dir="ltr" inputMode="numeric" value={manualIds[item.matchId] || ""} onChange={(e) => setManualIds({ ...manualIds, [item.matchId]: e.target.value })} placeholder="Fixture ID" className="h-10 w-32 rounded-xl border border-white/10 bg-black/25 px-2 text-center text-xs font-bold outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"/><button type="button" onClick={() => void mapFixture(item.matchId)} disabled={Boolean(working)} className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 text-[11px] font-black"><Link2 className="h-3.5 w-3.5" />ربط</button>{item.providerFixtureId && <button type="button" onClick={() => void mapFixture(item.matchId, true)} disabled={Boolean(working)} className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-red-300/15 bg-red-400/10 px-3 text-[11px] font-black text-red-100"><Unlink className="h-3.5 w-3.5" />فصل</button>}{item.providerSyncState === "awaiting_review" && item.calculationStatus !== "calculated" && <button type="button" onClick={() => void approveResult(item.matchId)} disabled={Boolean(working)} className="inline-flex min-h-[40px] items-center gap-1 rounded-xl bg-amber-300 px-3 text-[11px] font-black text-slate-950"><CheckCircle2 className="h-3.5 w-3.5" />اعتماد النتيجة</button>}</div></div></div>)}</div>
       </section>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-xs font-semibold leading-6 text-slate-400"><p><strong className="text-slate-200">المزامنة التلقائية:</strong> عند وجود مستخدم نشط في المنصة يعمل Heartbeat بخادم المنصة. قبل المباريات البعيدة تكون المزامنة قليلة، وتزداد حول وقت المباراة، مع حد أدنى يمنع استنزاف حصة API.</p><p className="mt-2">آخر مزامنة: {formatDate(config.lastSyncAt)} · آخر نجاح: {formatDate(config.lastSuccessAt)}{config.lastError ? ` · آخر خطأ: ${config.lastError}` : ""}</p></section>
+      <section className="rounded-3xl border border-white/10 bg-white/[0.035] p-4 text-xs font-semibold leading-6 text-slate-400"><p><strong className="text-slate-200">المزامنة التلقائية:</strong> في الإنتاج تستدعي مهمة Vercel Cron مسار الأتمتة كل 5 دقائق بحسب <span dir="ltr" className="[unicode-bidi:isolate]">vercel.json</span>، ولا تعتمد على وجود مستخدم فاتح للموقع. داخل الخادم توجد حماية Throttling لتقليل طلبات المزود عندما تكون المباريات بعيدة.</p><p className="mt-2">آخر مزامنة: {formatDate(config.lastSyncAt)} · آخر نجاح: {formatDate(config.lastSuccessAt)}{config.lastError ? ` · آخر خطأ: ${config.lastError}` : ""}</p></section>
     </div>
   );
 }

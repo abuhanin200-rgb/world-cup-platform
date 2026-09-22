@@ -140,7 +140,7 @@ function formatDuration(milliseconds: number) {
   return `${minutes}د ${seconds}ث`;
 }
 
-function Countdown({ deadline, now }: { deadline: number; now: number }) {
+function Countdown({ deadline, now, mode = "close" }: { deadline: number; now: number; mode?: "open" | "close" }) {
   const remaining = Math.max(0, deadline - now);
   const urgent = remaining > 0 && remaining <= 15 * 60 * 1000;
   const minutes = Math.max(0, Math.ceil(remaining / 60_000));
@@ -156,9 +156,9 @@ function Countdown({ deadline, now }: { deadline: number; now: number }) {
       }`}
     >
       <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-      <span aria-hidden="true">يغلق بعد {formatDuration(remaining)}</span>
+      <span aria-hidden="true">{mode === "open" ? "يفتح بعد" : "يغلق بعد"} {formatDuration(remaining)}</span>
       <span className="sr-only" aria-live="polite" aria-atomic="true">
-        متبقٍ نحو {minutes} دقيقة لإغلاق التوقع
+        {mode === "open" ? `متبقٍ نحو ${minutes} دقيقة لفتح التوقع` : `متبقٍ نحو ${minutes} دقيقة لإغلاق التوقع`}
       </span>
     </span>
   );
@@ -260,7 +260,6 @@ function MatchPredictionCard({
       !awayInvalid &&
       !knockoutSelectionMissing,
   );
-  const showCountdown = deadline > now && (state === "open" || canEditSaved);
 
   return (
     <article className="min-w-0 rounded-[26px] border border-white/10 bg-black/20 p-4 shadow-xl shadow-black/10 md:p-5">
@@ -274,9 +273,6 @@ function MatchPredictionCard({
           </span>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          {showCountdown ? (
-            <Countdown deadline={deadline} now={now} />
-          ) : null}
           <span
             className={`inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black ${statusTone(state)}`}
           >
@@ -382,15 +378,19 @@ function MatchPredictionCard({
         {state === "teams_pending" ? (
           <span>يفتح التوقع بعد تحديد طرفي المباراة واعتماد الإدارة.</span>
         ) : state === "not_open" ? (
-          <span>
-            {match.predictionOpensAt && match.predictionOpensAt > now
-              ? `يفتح التوقع: ${formatDateTime(match.predictionOpensAt)}`
-              : "لم تفتح الإدارة التوقع لهذه المباراة بعد."}
-          </span>
+          match.predictionOpensAt && match.predictionOpensAt > now ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span>يفتح التوقع: {formatDateTime(match.predictionOpensAt)}</span>
+              <Countdown deadline={match.predictionOpensAt} now={now} mode="open" />
+            </div>
+          ) : (
+            <span>لم تفتح الإدارة التوقع لهذه المباراة بعد.</span>
+          )
         ) : state === "open" || canEditSaved ? (
-          <span>
-            يغلق التوقع: {formatDateTime(deadline)} بتوقيت الرياض، أو عند بدء المباراة أيهما أسبق.
-          </span>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>يغلق التوقع: {formatDateTime(deadline)} بتوقيت مكة.</span>
+            {deadline > now ? <Countdown deadline={deadline} now={now} /> : null}
+          </div>
         ) : state === "live" ? (
           <span>
             المباراة مباشرة والتوقع مقفل.

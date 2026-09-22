@@ -2,6 +2,11 @@ import "server-only";
 import type { DocumentReference, WriteBatch } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebaseAdmin";
 import {
+  deleteExactHitActivitiesServer,
+  deletePredictionActivityServer,
+  writeExactHitActivitiesServer,
+} from "@/lib/serverTournamentActivity";
+import {
   GULF_CUP_27_ACHIEVEMENTS,
   GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
   GULF_CUP_27_SCORING_VERSION,
@@ -280,6 +285,10 @@ export async function getTournamentSportsIntegration(tournamentId: string) {
         matchId: match.id,
         label: localMatchLabel(match, teamMap),
         kickoffAt: match.kickoffAt,
+        stage: match.stage,
+        homeTeamId: match.homeTeamId,
+        awayTeamId: match.awayTeamId,
+        linkReady: Boolean(match.homeTeamId && match.awayTeamId),
         providerFixtureId: match.providerFixtureId,
         providerStatusShort: match.providerStatusShort,
         providerLastSyncedAt: match.providerLastSyncedAt,
@@ -778,7 +787,7 @@ async function sendResultNotificationsServer(input: {
   match: MatchRow;
   candidate: ProviderCandidateResult;
   resultHash: string;
-  scored: Array<{ userId: string; points: number; resultType: "exact" | "outcome" | "wrong" }>;
+  scored: Array<{ userId: string; userName: string; points: number; resultType: "exact" | "outcome" | "wrong" }>;
 }) {
   const nowIso = new Date().toISOString();
   const operations: Array<(batch: WriteBatch) => void> = [];
@@ -825,13 +834,13 @@ async function calculateMatchServer(matchRow: { ref: DocumentReference; match: M
   if (!claimed) return { predictionsCalculated: 0, alreadyCalculated: true };
 
   const predictionsSnapshot = await adminDb.collection(COLLECTIONS.predictions).where("tournamentId", "==", match.tournamentId).where("matchId", "==", match.id).get();
-  const scored: Array<{ userId: string; points: number; resultType: "exact" | "outcome" | "wrong" }> = [];
+  const scored: Array<{ userId: string; userName: string; points: number; resultType: "exact" | "outcome" | "wrong" }> = [];
   const resultMatch: TournamentMatchV2 = { ...match, status: "finished", result: { homeScore: candidate.homeScore, awayScore: candidate.awayScore, extraTimeHomeScore: candidate.extraTimeHomeScore, extraTimeAwayScore: candidate.extraTimeAwayScore, penaltiesHomeScore: candidate.penaltiesHomeScore, penaltiesAwayScore: candidate.penaltiesAwayScore, qualifiedTeamId: candidate.qualifiedTeamId, qualificationMethod: candidate.qualificationMethod } };
   const runId = `${match.tournamentId}_${match.id}_provider_${now}`;
   const operations = predictionsSnapshot.docs.map((item) => (batch: WriteBatch) => {
     const prediction = predictionFromData(item.id, item.data());
     const score = match.stage === "knockout" ? scoreGulfCup27KnockoutPredictionV1({ prediction, match: resultMatch }) : scoreGulfCup27PredictionV1({ prediction, match: resultMatch });
-    scored.push({ userId: prediction.userId, points: score.points, resultType: score.resultType });
+    scored.push({ userId: prediction.userId, userName: prediction.userName || "عضو", points: score.points, resultType: score.resultType });
     batch.set(item.ref, { points: score.points, pointsBreakdown: score.pointsBreakdown, isCalculated: true, resultType: score.resultType, calculatedAt: now, scoringVersion: score.scoringVersion, resultHash: candidate.hash, calculationRunId: runId, updatedAt: now }, { merge: true });
   });
 
@@ -841,6 +850,21 @@ async function calculateMatchServer(matchRow: { ref: DocumentReference; match: M
     result: resultMatch.result, status: "finished", predictionIsOpen: false, calculationStatus: "calculated", calculationVersion: candidate.scoringVersion, resultHash: candidate.hash, calculationRunId: runId,
     calculatedAt: now, calculatedPredictions: predictionsSnapshot.size, providerSyncState: "calculated", providerSyncMessage: "تم التحقق من نتيجة المزود واحتسابها تلقائيًا", providerCalculatedAt: now, updatedAt: now,
   }, { merge: true });
+  try {
+    await writeExactHitActivitiesServer({
+      tournamentId: match.tournamentId,
+      matchId: match.id,
+      homeTeamId: match.homeTeamId,
+      awayTeamId: match.awayTeamId,
+      resultHash: candidate.hash,
+      resultHomeScore: candidate.homeScore,
+      resultAwayScore: candidate.awayScore,
+      rows: scored,
+      createdAt: now,
+    });
+  } catch (activityError) {
+    console.error("Exact-hit activity write failed:", activityError);
+  }
   await syncKnockoutBracketServer(match.tournamentId);
   await rebuildAchievementsServer(match.tournamentId);
   await sendResultNotificationsServer({ tournamentId: match.tournamentId, match, candidate, resultHash: candidate.hash, scored });
@@ -999,6 +1023,19 @@ export async function undoTournamentMatchCalculationServerV2(input: {
     .where("tournamentId", "==", tournamentId)
     .where("matchId", "==", matchId)
     .get();
+  try {
+    await deleteExactHitActivitiesServer({
+      tournamentId,
+      matchId,
+      resultHash: match.resultHash,
+      rows: predictions.docs.map((item) => ({
+        userId: clean(item.data().userId),
+        resultType: clean(item.data().resultType),
+      })),
+    });
+  } catch (activityError) {
+    console.error("Exact-hit activity cleanup failed:", activityError);
+  }
   await commitOperations(predictions.docs.map((item) => (batch) => batch.set(item.ref, {
     points: null,
     pointsBreakdown: null,
@@ -1110,7 +1147,13 @@ export async function deleteTournamentPredictionByAdminServerV2(predictionId: st
   if (snapshot.data()?.isCalculated === true) {
     throw new Error("تراجع عن احتساب المباراة أولًا قبل حذف توقع محتسب");
   }
+  const data = snapshot.data() || {};
   await ref.delete();
+  await deletePredictionActivityServer({
+    tournamentId: clean(data.tournamentId),
+    matchId: clean(data.matchId),
+    userId: clean(data.userId),
+  });
   return { deleted: true };
 }
 
@@ -1126,6 +1169,15 @@ export async function deleteTournamentMatchPredictionsByAdminServerV2(input: {
     throw new Error("يوجد توقعات محتسبة. تراجع عن احتساب المباراة أولًا");
   }
   await commitOperations(snapshot.docs.map((item) => (batch) => batch.delete(item.ref)));
+  await Promise.all(
+    snapshot.docs.map((item) =>
+      deletePredictionActivityServer({
+        tournamentId: clean(item.data().tournamentId),
+        matchId: clean(item.data().matchId),
+        userId: clean(item.data().userId),
+      }),
+    ),
+  );
   return { deleted: snapshot.size };
 }
 

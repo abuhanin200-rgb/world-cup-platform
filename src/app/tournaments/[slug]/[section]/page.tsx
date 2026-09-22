@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import TournamentCompactHeader from "@/components/tournaments/TournamentCompactHeader";
 import TournamentNavigation from "@/components/tournaments/TournamentNavigation";
+import TournamentActivityStrips from "@/components/tournaments/TournamentActivityStrips";
 import TournamentStatsSummary from "@/components/TournamentStatsSummary";
 import TournamentSectionHeader from "@/components/tournaments/TournamentSectionHeader";
 import TournamentV2Section from "@/components/TournamentV2Section";
@@ -30,5 +31,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TournamentSectionPage({ params }: Props) {
   const { slug, section } = await params; const tournament = await tournamentService.getBySlug(slug);
   if (!tournament || tournament.status === "hidden" || tournament.status === "draft" || !isTournamentSection(section)) notFound();
-  return <main dir="rtl" style={getTournamentThemeStyle(tournament)} className="min-h-screen bg-[var(--tournament-background)] text-[var(--tournament-text)]"><TournamentCompactHeader tournament={tournament}/><TournamentNavigation tournament={tournament} activeSection={section}/><TournamentSectionHeader tournament={tournament} section={section}/><div className="mx-auto max-w-7xl px-3 sm:px-4 md:px-6"><TournamentStatsSummary tournament={tournament}/></div>{tournament.engine === "legacy_wc2026" ? <WorldCup2026Section section={section}/> : <TournamentV2Section tournament={tournament} section={section}/>}</main>;
+  return <main dir="rtl" style={getTournamentThemeStyle(tournament)} className="min-h-screen bg-[var(--tournament-background)] text-[var(--tournament-text)]"><TournamentCompactHeader tournament={tournament}/>{tournament.slug === "gulf-cup-27" ? <TournamentActivityStrips /> : null}<TournamentNavigation tournament={tournament} activeSection={section}/><TournamentSectionHeader tournament={tournament} section={section}/><div className="mx-auto max-w-7xl px-3 sm:px-4 md:px-6"><TournamentStatsSummary tournament={tournament}/></div>{tournament.engine === "legacy_wc2026" ? <WorldCup2026Section section={section}/> : <TournamentV2Section tournament={tournament} section={section}/>}</main>;
 }

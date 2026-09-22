@@ -13,6 +13,7 @@ import {
   decodeFields,
   getDocument,
 } from "@/lib/serverFirebaseRest";
+import { writePredictionActivityServer } from "@/lib/serverTournamentActivity";
 
 const MATCHES_COLLECTION = "tournamentMatches";
 const PREDICTIONS_COLLECTION = "tournamentPredictions";
@@ -307,6 +308,20 @@ export async function saveTournamentPredictionOnServerV2(
       );
     }
     throw error;
+  }
+
+  try {
+    await writePredictionActivityServer({
+      tournamentId,
+      matchId,
+      userId,
+      userName,
+      homeTeamId: latestMatch.homeTeamId,
+      awayTeamId: latestMatch.awayTeamId,
+      createdAt: acceptedAt,
+    });
+  } catch (activityError) {
+    console.error("Tournament activity write failed:", activityError);
   }
 
   if (!statsDocument) {
