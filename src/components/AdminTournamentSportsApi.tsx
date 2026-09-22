@@ -246,7 +246,7 @@ export default function AdminTournamentSportsApi() {
     try {
       const data = await post("sync");
       if (data.skipped === true && data.reason === "season_not_available") {
-        setMessage("المزامنة جاهزة، لكن موسم خليجي 27 لعام 2026 لم يظهر لدى API-FOOTBALL بعد. سيتم فحص توفره تلقائيًا كل 12 ساعة.");
+        setMessage("المزامنة جاهزة، لكن موسم خليجي 27 لعام 2026 لم يظهر لدى API-FOOTBALL بعد. سيتم فحص توفره تلقائيًا كل 3 ساعات، ومحاولة اكتشاف المباريات كل ساعة بعد توفر الموسم.");
       } else if (data.skipped === true && data.reason === "no_mapped_matches") {
         setMessage("لا توجد مباريات مرتبطة بعد. عند ظهور موسم 2026 سيحاول النظام اكتشافها وربطها تلقائيًا.");
       } else {
@@ -347,7 +347,7 @@ export default function AdminTournamentSportsApi() {
             ) : (
               <p className="mt-2 text-xs font-black text-amber-100">الإعداد الحالي ليس خليجي 27 الرسمي. استخدم زر الاعتماد أدناه.</p>
             )}
-            {config.lastSeasonCheckAt && <p className="mt-1 text-[11px] font-semibold text-slate-500">آخر فحص للموسم: {formatDate(config.lastSeasonCheckAt)} · الفحص التلقائي كل 12 ساعة أثناء عدم توفر الموسم.</p>}
+            {config.lastSeasonCheckAt && <p className="mt-1 text-[11px] font-semibold text-slate-500">آخر فحص للموسم: {formatDate(config.lastSeasonCheckAt)} · الفحص التلقائي كل 3 ساعات أثناء عدم توفر الموسم.</p>}
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void configureGulfCup27()} disabled={Boolean(working)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 disabled:opacity-50">{working === "configure-gulf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}اعتماد خليجي 27</button>

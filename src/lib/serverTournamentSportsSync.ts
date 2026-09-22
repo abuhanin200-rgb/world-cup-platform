@@ -48,8 +48,9 @@ const RESULT_VERIFY_GAP_MS = 60_000;
 const MAX_BATCH_WRITES = 350;
 const GULF_CUP_27_API_LEAGUE_ID = 25;
 const GULF_CUP_27_TARGET_SEASON = 2026;
-const SEASON_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
-const DISCOVERY_RETRY_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const SEASON_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
+const DISCOVERY_RETRY_INTERVAL_MS = 60 * 60 * 1000;
+const PREDICTION_OPEN_LEAD_MS = 3 * 24 * 60 * 60 * 1000;
 
 type MatchRow = TournamentMatchV2 & {
   calculationStatus: "not_calculated" | "processing" | "calculated" | "error";
@@ -1215,8 +1216,17 @@ export async function syncTournamentSportsProvider(tournamentId: string, source:
       providerSyncState: row.match.calculationStatus === "calculated" ? "calculated" : "synced", providerSyncMessage: "تمت مزامنة بيانات المباراة", updatedAt: Date.now(),
     };
     if (config.syncSchedule && row.match.calculationStatus !== "calculated") {
+      const previousKickoff = row.match.kickoffAt;
       patch.kickoffAt = fixture.kickoffAt;
-      patch.predictionClosesAt = row.match.predictionClosesAt == null || row.match.predictionClosesAt === row.match.kickoffAt ? fixture.kickoffAt : row.match.predictionClosesAt;
+      patch.predictionClosesAt =
+        row.match.predictionClosesAt == null || row.match.predictionClosesAt === previousKickoff
+          ? fixture.kickoffAt
+          : row.match.predictionClosesAt;
+      const previousDefaultOpen = previousKickoff - PREDICTION_OPEN_LEAD_MS;
+      patch.predictionOpensAt =
+        row.match.predictionOpensAt == null || row.match.predictionOpensAt === previousDefaultOpen
+          ? fixture.kickoffAt - PREDICTION_OPEN_LEAD_MS
+          : row.match.predictionOpensAt;
       if (fixture.venue) patch.stadium = fixture.venue;
       if (fixture.city) patch.city = fixture.city;
     }

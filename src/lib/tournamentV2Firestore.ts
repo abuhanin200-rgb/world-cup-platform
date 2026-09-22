@@ -289,20 +289,49 @@ export async function initializeGulfCup27V2Data() {
   });
 
   GULF_CUP_27_MATCHES.forEach((match) => {
-    if (existingMatchIds.has(match.id)) return;
+    const exists = existingMatchIds.has(match.id);
+    const matchRef = doc(
+      db,
+      TOURNAMENT_V2_COLLECTIONS.matches,
+      entityDocId(GULF_CUP_27_TOURNAMENT_ID, match.id),
+    );
+
+    if (exists) {
+      const officialSchedulePatch: Record<string, unknown> = {
+        round: match.round,
+        group: match.group,
+        stage: match.stage,
+        kickoffAt: match.kickoffAt,
+        stadium: match.stadium,
+        city: match.city,
+        predictionOpensAt: match.predictionOpensAt,
+        predictionClosesAt: match.predictionClosesAt,
+        officialScheduleSyncedAt: now,
+        updatedAt: now,
+      };
+
+      // مباريات المجموعات أطرافها ثابتة. مباريات الإقصائيات قد تُسند تلقائيًا لاحقًا، فلا نمسحها.
+      if (match.stage === "group") {
+        officialSchedulePatch.homeTeamId = match.homeTeamId;
+        officialSchedulePatch.awayTeamId = match.awayTeamId;
+      } else {
+        officialSchedulePatch.homeSourceLabel = match.homeSourceLabel;
+        officialSchedulePatch.awaySourceLabel = match.awaySourceLabel;
+      }
+
+      batch.set(matchRef, officialSchedulePatch, { merge: true });
+      return;
+    }
 
     batch.set(
-      doc(
-        db,
-        TOURNAMENT_V2_COLLECTIONS.matches,
-        entityDocId(GULF_CUP_27_TOURNAMENT_ID, match.id),
-      ),
+      matchRef,
       {
         ...dropUndefined(match),
         predictionIsOpen: false,
         predictionEditingIsOpen: true,
         schemaVersion: 2,
         createdAt: now,
+        officialScheduleSyncedAt: now,
         updatedAt: now,
       },
       { merge: true },
@@ -316,6 +345,7 @@ export async function initializeGulfCup27V2Data() {
     teams: GULF_CUP_27_TEAMS.length,
     matches: GULF_CUP_27_MATCHES.length,
     existingMatches: existingMatchIds.size,
+    reconciledMatches: GULF_CUP_27_MATCHES.length,
   };
 }
 

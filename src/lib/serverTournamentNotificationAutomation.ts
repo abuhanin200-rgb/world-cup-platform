@@ -14,7 +14,7 @@ const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const TEN_MINUTES_MS = 10 * 60 * 1000;
 const BATCH_SIZE = 350;
 
-type ReminderMode = "one_hour" | "thirty_minutes" | "missing_prediction";
+type ReminderMode = "prediction_open" | "one_hour" | "thirty_minutes" | "missing_prediction";
 
 type MatchRow = {
   id: string;
@@ -25,8 +25,10 @@ type MatchRow = {
   homeSourceLabel: string;
   awaySourceLabel: string;
   kickoffAt: number;
+  predictionOpensAt: number | null;
   predictionClosesAt: number | null;
   predictionIsOpen: boolean;
+  status: string;
   calculationStatus: string;
 };
 
@@ -50,6 +52,12 @@ function matchLabel(match: MatchRow) {
 }
 
 function reminderCopy(mode: ReminderMode, label: string) {
+  if (mode === "prediction_open") {
+    return {
+      title: "فتح التوقع الآن ⚽",
+      message: `فتح التوقع لمباراة ${label}. لديك حتى موعد البداية لتسجيل توقعك.`,
+    };
+  }
   if (mode === "one_hour") {
     return {
       title: "باقي ساعة على إغلاق التوقع ⏰",
@@ -110,9 +118,12 @@ async function loadGulfMatches(): Promise<Array<MatchRow & { refPath: string }>>
       homeSourceLabel: clean(data.homeSourceLabel),
       awaySourceLabel: clean(data.awaySourceLabel),
       kickoffAt: numberValue(data.kickoffAt),
+      predictionOpensAt:
+        data.predictionOpensAt == null ? null : numberValue(data.predictionOpensAt),
       predictionClosesAt:
         data.predictionClosesAt == null ? null : numberValue(data.predictionClosesAt),
       predictionIsOpen: data.predictionIsOpen === true,
+      status: clean(data.status),
       calculationStatus: clean(data.calculationStatus),
       refPath: doc.ref.path,
     };
@@ -146,7 +157,12 @@ async function dispatchReminder(match: MatchRow, mode: ReminderMode) {
     return { sent: 0, skipped: true };
   }
 
-  const recipients = await getRecipientIds(match.id);
+  const recipients =
+    mode === "prediction_open"
+      ? (await adminDb.collection(USERS_COLLECTION).get()).docs
+          .map((doc) => clean(doc.data().id) || doc.id)
+          .filter(Boolean)
+      : await getRecipientIds(match.id);
   const copy = reminderCopy(mode, matchLabel(match));
   const nowIso = new Date().toISOString();
 
@@ -158,7 +174,7 @@ async function dispatchReminder(match: MatchRow, mode: ReminderMode) {
       );
       batch.set(adminDb.collection(NOTIFICATIONS_COLLECTION).doc(notificationId), {
         userId,
-        type: "prediction_reminder",
+        type: mode === "prediction_open" ? "prediction_open" : "prediction_reminder",
         title: copy.title,
         message: copy.message,
         isRead: false,
@@ -205,6 +221,7 @@ export async function runTournamentNotificationAutomationV2(options?: {
       skipped: true,
       reason: "throttled",
       checkedMatches: 0,
+      openedMatches: 0,
       closedMatches: 0,
       remindersDispatched: 0,
       notificationsCreated: 0,
@@ -213,16 +230,51 @@ export async function runTournamentNotificationAutomationV2(options?: {
 
   const now = Date.now();
   const matches = await loadGulfMatches();
+  let openedMatches = 0;
   let closedMatches = 0;
   let remindersDispatched = 0;
   let notificationsCreated = 0;
 
   for (const match of matches) {
-    if (!match.predictionIsOpen || match.calculationStatus === "calculated") continue;
+    if (match.calculationStatus === "calculated") continue;
     if (!match.homeTeamId || !match.awayTeamId) continue;
 
     const closesAt = match.predictionClosesAt || match.kickoffAt;
     if (!closesAt) continue;
+
+    const opensAt = match.predictionOpensAt;
+    const eligibleToOpen =
+      !match.predictionIsOpen &&
+      match.status !== "live" &&
+      match.status !== "finished" &&
+      match.status !== "cancelled" &&
+      match.status !== "postponed" &&
+      opensAt != null &&
+      now >= opensAt &&
+      now < closesAt &&
+      now < match.kickoffAt;
+
+    if (eligibleToOpen) {
+      const ref = adminDb.doc(match.refPath);
+      await ref.set(
+        {
+          predictionIsOpen: true,
+          predictionEditingIsOpen: true,
+          status: "prediction_open",
+          automationOpenedAt: now,
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+      match.predictionIsOpen = true;
+      match.status = "prediction_open";
+      openedMatches += 1;
+      const opened = await dispatchReminder(match, "prediction_open");
+      if (!opened.skipped) remindersDispatched += 1;
+      notificationsCreated += opened.sent;
+    }
+
+    if (!match.predictionIsOpen) continue;
 
     if (now >= closesAt || now >= match.kickoffAt) {
       const ref = adminDb.doc(match.refPath);
@@ -250,6 +302,7 @@ export async function runTournamentNotificationAutomationV2(options?: {
   return {
     skipped: false,
     checkedMatches: matches.length,
+    openedMatches,
     closedMatches,
     remindersDispatched,
     notificationsCreated,

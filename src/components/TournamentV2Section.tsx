@@ -45,7 +45,7 @@ function GulfRulesSection() {
   return <div className="space-y-4">
     <div className="grid gap-3 md:grid-cols-2">
       <RuleCard icon={<UsersRound className="h-5 w-5" aria-hidden="true" />} title="نظام البطولة"><p>مجموعتان، في كل مجموعة أربعة منتخبات، ويتأهل الأول والثاني إلى نصف النهائي.</p><p>نصف النهائي: {semi}. النهائي: {final} في جدة.</p></RuleCard>
-      <RuleCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} title="فتح التوقع وإغلاقه"><p>يفتح التوقع عندما تفعّله إدارة البطولة وتكتمل هوية طرفي المباراة.</p><p>يُغلق في الموعد المحدد للمباراة أو في وقت الإغلاق الذي تعتمده الإدارة، أيهما مطبق في بيانات المواجهة.</p></RuleCard>
+      <RuleCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} title="فتح التوقع وإغلاقه"><p>يفتح التوقع تلقائيًا قبل بداية المباراة بثلاثة أيام عند اكتمال هوية الطرفين.</p><p>يُغلق تلقائيًا عند موعد بداية المباراة، مع بقاء التحكم اليدوي متاحًا للإدارة عند الحاجة.</p></RuleCard>
       <RuleCard icon={<Edit3 className="h-5 w-5" aria-hidden="true" />} title="التعديل بعد الحفظ"><p>يمكن تعديل التوقع ما دامت حالة التعديل مفتوحة والمباراة مجدولة أو باب التوقع مفتوحًا.</p><p>بعد الإغلاق أو بدء المباراة لا يقبل النظام توقعًا جديدًا أو تعديلًا متأخرًا.</p></RuleCard>
       <RuleCard icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />} title="التأجيل والإلغاء"><p>المباراة المؤجلة أو الملغاة لا تظهر كتوقع مفتوح، ولا تُحتسب بلا نتيجة مكتملة ومعتمدة.</p><p>عند اعتماد موعد جديد، تتبع الواجهة وقت الفتح والإغلاق المسجل للمواجهة.</p></RuleCard>
       <RuleCard icon={<Trophy className="h-5 w-5" aria-hidden="true" />} title="دور المجموعات"><p>النتيجة بالملي: <strong className="text-white">{GULF_CUP_27_SCORING_V1.exact} نقاط بطولة</strong>. توقع الفائز أو التعادل الصحيح: <strong className="text-white">{GULF_CUP_27_SCORING_V1.outcome}</strong>. خلاف ذلك: صفر.</p></RuleCard>
@@ -70,5 +70,5 @@ export default function TournamentV2Section({ tournament, section }: { tournamen
   else if (section === "leaderboard") content = <GulfCup27LeaderboardPanel />;
   else if (section === "rules") content = <GulfRulesSection />;
   else content = <GulfCup27StudioPanel />;
-  return <><TournamentAutomationHeartbeat /><div className="mx-auto max-w-7xl px-3 pb-14 pt-1 sm:px-4 md:px-6 md:pb-20">{content}</div></>;
+  return <><TournamentAutomationHeartbeat /><div className="relative isolate overflow-hidden"><div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-50" style={{ backgroundImage: "linear-gradient(135deg,transparent 0 44%,rgba(22,183,125,.055) 44% 49%,transparent 49% 56%,rgba(242,198,71,.035) 56% 60%,transparent 60%),radial-gradient(circle at 88% 8%,rgba(133,201,91,.08),transparent 24%)", backgroundSize: "360px 360px,100% 100%" }} /><div className="mx-auto max-w-7xl px-3 pb-14 pt-1 sm:px-4 md:px-6 md:pb-20">{content}</div></div></>;
 }

@@ -10,19 +10,19 @@ const DEFINITION_TIMESTAMP = Date.UTC(2026, 7, 29);
  *
  * لا توجد في هذا الملف أي قراءة أو كتابة إلى Firestore؛ هو تعريف Domain فقط.
  * موعد البطولة: 23 سبتمبر حتى 6 أكتوبر 2026.
- * مواعيد المباريات الدقيقة ستأتي لاحقًا من إدارة البطولة / Sports API.
+ * الجدول الأساسي مضبوط على توقيت جدة، ويستطيع Sports API مزامنته عند توفر موسم 2026.
  */
 export const GULF_CUP_27_TOURNAMENT = {
   id: GULF_CUP_27_TOURNAMENT_ID,
-  name: "كأس الخليج 27",
+  name: "خليجي الديار العربية 27",
   shortName: "خليجي 27",
   slug: GULF_CUP_27_TOURNAMENT_SLUG,
   description:
     "تابع خليجي 27 في السعودية، توقع النتائج، راقب ترتيبك واستمتع بتغطية البطولة داخل منصة التحدي.",
   hostCountry: "السعودية",
   hostCities: ["جدة"],
-  startAt: Date.UTC(2026, 8, 23),
-  endAt: Date.UTC(2026, 9, 6, 23, 59, 59, 999),
+  startAt: new Date("2026-09-23T00:00:00+03:00").getTime(),
+  endAt: new Date("2026-10-06T23:59:59+03:00").getTime(),
   status: "active",
   sortOrder: 10,
   isCurrent: true,

@@ -12,6 +12,16 @@ function seasonMark(tournament: Tournament) {
   return "التحدي";
 }
 
+
+function gulfCupPattern(tournament: Tournament) {
+  if (tournament.slug !== "gulf-cup-27") return undefined;
+  return {
+    backgroundImage:
+      "linear-gradient(120deg,transparent 0 42%,rgba(133,201,91,.12) 42% 48%,transparent 48% 54%,rgba(22,183,125,.16) 54% 60%,transparent 60%),radial-gradient(circle at 78% 18%,rgba(242,198,71,.16),transparent 23%)",
+    backgroundSize: "420px 420px,100% 100%",
+  } as const;
+}
+
 function worldCupBackdrop(tournament: Tournament) {
   if (tournament.slug !== "world-cup-2026") return undefined;
   return "radial-gradient(circle at 15% 25%,rgba(34,211,238,.20),transparent 28%),radial-gradient(circle at 78% 72%,rgba(59,130,246,.25),transparent 35%),linear-gradient(135deg,#020617 0%,#07142f 50%,#101b45 100%)";
@@ -27,6 +37,7 @@ export default function TournamentHero({ tournament }: TournamentHeroProps) {
       {hero ? <img src={hero} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-70" /> : null}
       <div className="absolute inset-0 bg-gradient-to-b from-black/28 via-[var(--tournament-background)]/78 to-[var(--tournament-background)]" />
       <div className="absolute inset-0 opacity-35" style={{ background: "radial-gradient(circle at 82% 18%,var(--tournament-primary),transparent 30%),radial-gradient(circle at 8% 90%,var(--tournament-accent),transparent 28%)" }} />
+      {tournament.slug === "gulf-cup-27" ? <div className="absolute inset-0 opacity-80" style={gulfCupPattern(tournament)} aria-hidden="true" /> : null}
       <div className="absolute -left-4 top-1/2 -translate-y-1/2 select-none text-[105px] font-black leading-none text-white/[0.045] sm:text-[140px] md:text-[210px]" aria-hidden="true">{seasonMark(tournament)}</div>
 
       <div className="relative mx-auto max-w-7xl px-3 pb-6 pt-3 sm:px-4 md:px-6 md:pb-9 md:pt-5">
@@ -37,7 +48,7 @@ export default function TournamentHero({ tournament }: TournamentHeroProps) {
 
         <div className="grid items-center gap-4 md:grid-cols-[1fr_auto] md:gap-8">
           <div className="order-2 md:order-1">
-            <div className="altahaddi-eyebrow altahaddi-glass-chip inline-flex min-h-[30px] items-center gap-1.5 rounded-full px-2.5 font-black text-white/72"><Sparkles className="h-3 w-3 text-[var(--tournament-accent)]" /> موسم مستقل داخل التحدي</div>
+            <div className="altahaddi-eyebrow altahaddi-glass-chip inline-flex min-h-[30px] items-center gap-1.5 rounded-full px-2.5 font-black text-white/72"><Sparkles className="h-3 w-3 text-[var(--tournament-accent)]" /> {tournament.slug === "gulf-cup-27" ? "خليجي الديار العربية 27" : "موسم مستقل داخل التحدي"}</div>
             <h1 className="altahaddi-display-title mt-2 max-w-3xl font-black">{tournament.name}</h1>
             {tournament.description ? <p className="altahaddi-body-copy mt-2 max-w-2xl font-semibold text-white/62 md:mt-3">{tournament.description}</p> : null}
             <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-black text-white/88 md:mt-5 md:text-xs">

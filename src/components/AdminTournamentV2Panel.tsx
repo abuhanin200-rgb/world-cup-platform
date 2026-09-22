@@ -195,11 +195,11 @@ export default function AdminTournamentV2Panel() {
       await syncGulfCup27KnockoutBracketV2();
       await addAdminLog({
         action: "other",
-        title: "تهيئة خليجي 27",
+        title: "تهيئة/مزامنة خليجي 27",
         description: `تمت تهيئة ${result.teams} منتخبات و${result.matches} مباراة في Collections الجديدة.`,
         metadata: result,
       });
-      setMessage("تمت تهيئة خليجي 27 وتحديث الأدوار الإقصائية بنجاح.");
+      setMessage("تمت تهيئة/مزامنة خليجي 27 وتحديث الأدوار الإقصائية بنجاح.");
       await load();
     } catch (initError) {
       setError(initError instanceof Error ? initError.message : "فشلت التهيئة");
@@ -563,7 +563,7 @@ export default function AdminTournamentV2Panel() {
           <h3 className="mt-3 text-lg font-black">خليجي 27 لم تتم تهيئتها بعد</h3>
           <button type="button" onClick={() => void initialize()} disabled={working === "init"} className="mt-5 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-emerald-400 px-5 text-sm font-black text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50">
             {working === "init" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Database className="h-4 w-4" aria-hidden="true" />}
-            تهيئة خليجي 27
+            تهيئة/مزامنة خليجي 27
           </button>
         </div>
       ) : (
