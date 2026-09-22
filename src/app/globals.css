@@ -663,7 +663,7 @@ body {
 
 
 
-/* Gulf 27 live activity strips — constant visual speed, left-to-right, endless. */
+/* Gulf 27 live activity strips — fixed px/s speed with two identical lanes. */
 @keyframes tournament-activity-ltr {
   from { transform: translate3d(-50%, 0, 0); }
   to { transform: translate3d(0, 0, 0); }
@@ -671,14 +671,15 @@ body {
 
 .tournament-activity-track {
   direction: ltr;
-  animation: tournament-activity-ltr var(--ticker-duration, 18s) linear infinite;
+  animation: tournament-activity-ltr var(--ticker-duration, 14s) linear infinite;
   will-change: transform;
   backface-visibility: hidden;
+  transform: translate3d(-50%, 0, 0);
 }
 
-button:hover .tournament-activity-track,
-button:focus-visible .tournament-activity-track {
-  animation-play-state: paused;
+.tournament-activity-lane {
+  direction: ltr;
+  min-width: max-content;
 }
 
 @media (prefers-reduced-motion: reduce) {

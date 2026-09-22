@@ -65,36 +65,47 @@ function ActivityStrip({
   const empty = exact
     ? "يظهر هنا أصحاب التوقعات المطابقة بعد احتساب النتائج"
     : "سيظهر هنا آخر الأعضاء الذين سجّلوا توقعاتهم";
-  const trackRef = useRef<HTMLSpanElement | null>(null);
-  const [durationSeconds, setDurationSeconds] = useState(18);
+  const viewportRef = useRef<HTMLSpanElement | null>(null);
+  const laneRef = useRef<HTMLSpanElement | null>(null);
+  const [repeatCopies, setRepeatCopies] = useState(1);
+  const [durationSeconds, setDurationSeconds] = useState(14);
 
-  // Keep enough entries in short feeds so the ticker never exposes a visual gap.
-  // The list is duplicated once for a seamless loop, while duration is measured
-  // from the actual pixel distance so one item and one hundred items move at
-  // the same visual speed.
-  const loopItems = useMemo(() => {
+  // Build two *identical* lanes and move exactly one lane width per cycle.
+  // Each lane is expanded until it is wider than the visible viewport, which
+  // prevents the short-feed blank gap that can make the ticker appear/disappear.
+  // Duration is derived from pixels, not item count, so 1 and 100 predictions
+  // travel at the same visual speed.
+  const laneItems = useMemo(() => {
     if (!items.length) return [];
-    const minimumItems = 8;
-    const copies = Math.max(1, Math.ceil(minimumItems / items.length));
-    const base = Array.from({ length: copies }, () => items).flat();
-    return [...base, ...base];
-  }, [items]);
+    return Array.from({ length: repeatCopies }, () => items).flat();
+  }, [items, repeatCopies]);
 
   useEffect(() => {
-    const track = trackRef.current;
-    if (!track || !loopItems.length) return;
+    const viewport = viewportRef.current;
+    const lane = laneRef.current;
+    if (!viewport || !lane || !items.length) return;
 
-    const updateDuration = () => {
-      const loopDistance = track.scrollWidth / 2;
-      const pixelsPerSecond = 72;
-      setDurationSeconds(Math.max(10, loopDistance / pixelsPerSecond));
+    const updateMetrics = () => {
+      const currentLaneWidth = Math.max(1, lane.scrollWidth);
+      const estimatedBaseWidth = Math.max(1, currentLaneWidth / Math.max(1, repeatCopies));
+      const targetLaneWidth = Math.max(viewport.clientWidth * 1.35, viewport.clientWidth + 180);
+      const nextCopies = Math.max(1, Math.ceil(targetLaneWidth / estimatedBaseWidth));
+
+      if (nextCopies !== repeatCopies) {
+        setRepeatCopies(nextCopies);
+        return;
+      }
+
+      const pixelsPerSecond = 92;
+      setDurationSeconds(Math.max(7, currentLaneWidth / pixelsPerSecond));
     };
 
-    updateDuration();
-    const observer = new ResizeObserver(updateDuration);
-    observer.observe(track);
+    updateMetrics();
+    const observer = new ResizeObserver(updateMetrics);
+    observer.observe(viewport);
+    observer.observe(lane);
     return () => observer.disconnect();
-  }, [loopItems]);
+  }, [items, repeatCopies]);
 
   return (
     <button
@@ -122,21 +133,29 @@ function ActivityStrip({
         {label}
       </span>
 
-      <span className="relative flex min-w-0 flex-1 items-center overflow-hidden">
+      <span ref={viewportRef} className="relative flex min-w-0 flex-1 items-center overflow-hidden">
         {items.length ? (
           <span
-            ref={trackRef}
-            className="tournament-activity-track flex w-max min-w-max items-center gap-8 whitespace-nowrap px-4 text-[11px] font-bold text-white/78 sm:text-xs"
+            className="tournament-activity-track flex w-max min-w-max items-center whitespace-nowrap text-[11px] font-bold text-white/78 sm:text-xs"
             style={{ "--ticker-duration": `${durationSeconds}s` } as CSSProperties}
           >
-            {loopItems.map((item, index) => (
+            {[0, 1].map((laneIndex) => (
               <span
-                key={`${item.id}-${index}`}
-                dir="rtl"
-                className="inline-flex items-center gap-2"
+                key={laneIndex}
+                ref={laneIndex === 0 ? laneRef : undefined}
+                className="tournament-activity-lane flex shrink-0 items-center gap-8 px-4"
+                aria-hidden={laneIndex === 1 ? "true" : undefined}
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--tournament-primary)]" />
-                <span>{activityText(item, kind)}</span>
+                {laneItems.map((item, index) => (
+                  <span
+                    key={`${laneIndex}-${item.id}-${index}`}
+                    dir="rtl"
+                    className="inline-flex shrink-0 items-center gap-2"
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${exact ? "bg-amber-300" : "bg-emerald-300"}`} />
+                    <span>{activityText(item, kind)}</span>
+                  </span>
+                ))}
               </span>
             ))}
           </span>

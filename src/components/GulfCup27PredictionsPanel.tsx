@@ -117,38 +117,55 @@ function formatKickoff(timestamp: number) {
   };
 }
 
-function formatDuration(milliseconds: number) {
+function countdownParts(milliseconds: number) {
   const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
   const days = Math.floor(totalSeconds / 86_400);
   const hours = Math.floor((totalSeconds % 86_400) / 3_600);
   const minutes = Math.floor((totalSeconds % 3_600) / 60);
   const seconds = totalSeconds % 60;
+  const two = (value: number) => String(value).padStart(2, "0");
 
-  if (days > 0) return `${days}ي ${hours}س ${minutes}د`;
-  if (hours > 0) return `${hours}س ${minutes}د ${seconds}ث`;
-  return `${minutes}د ${seconds}ث`;
+  return {
+    days,
+    clock: `${two(hours)}:${two(minutes)}:${two(seconds)}`,
+  };
 }
 
 function Countdown({ deadline, now, mode = "close" }: { deadline: number; now: number; mode?: "open" | "close" }) {
   const remaining = Math.max(0, deadline - now);
   const urgent = remaining > 0 && remaining <= 15 * 60 * 1000;
   const minutes = Math.max(0, Math.ceil(remaining / 60_000));
+  const { days, clock } = countdownParts(remaining);
 
   if (remaining <= 0) return null;
 
   const tone = mode === "open"
-    ? "border-sky-300/25 bg-sky-300/10 text-sky-100"
+    ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-50 shadow-[0_0_24px_rgba(103,232,249,0.08)]"
     : urgent
-      ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
-      : "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
+      ? "border-amber-300/35 bg-amber-300/10 text-amber-50 shadow-[0_0_24px_rgba(252,211,77,0.08)]"
+      : "border-emerald-300/30 bg-emerald-300/10 text-emerald-50 shadow-[0_0_24px_rgba(110,231,183,0.08)]";
+
+  const dayTone = mode === "open"
+    ? "border-cyan-200/20 bg-cyan-100/10 text-cyan-100"
+    : urgent
+      ? "border-amber-200/20 bg-amber-100/10 text-amber-100"
+      : "border-emerald-200/20 bg-emerald-100/10 text-emerald-100";
 
   return (
     <span
       dir="ltr"
-      className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black tabular-nums [unicode-bidi:isolate] ${tone}`}
+      className={`inline-flex min-h-9 items-center gap-2 rounded-xl border px-2.5 py-1.5 font-black tabular-nums [unicode-bidi:isolate] ${tone}`}
     >
-      <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-      <span aria-hidden="true">{formatDuration(remaining)}</span>
+      <Clock3 className="h-4 w-4 shrink-0 opacity-85" aria-hidden="true" />
+      {days > 0 ? (
+        <span className={`inline-flex h-6 items-center rounded-lg border px-2 text-[10px] tracking-normal ${dayTone}`}>
+          <span className="text-xs font-black">{days}</span>
+          <span className="ms-1 font-bold">يوم</span>
+        </span>
+      ) : null}
+      <span aria-hidden="true" className="min-w-[5.6rem] text-center font-mono text-sm font-black tracking-[0.08em] sm:text-[15px]">
+        {clock}
+      </span>
       <span className="sr-only" aria-live="polite" aria-atomic="true">
         {mode === "open" ? `متبقٍ نحو ${minutes} دقيقة لفتح التوقع` : `متبقٍ نحو ${minutes} دقيقة لإغلاق التوقع`}
       </span>
