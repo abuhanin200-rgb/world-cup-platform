@@ -503,6 +503,10 @@ export default function AdminTournamentV2Panel() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => void initialize()} disabled={Boolean(working)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-300 px-4 text-sm font-black text-slate-950 hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50">
+            {working === "init" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Database className="h-4 w-4" aria-hidden="true" />}
+            مزامنة الجدول الرسمي
+          </button>
           <button type="button" onClick={() => void syncKnockout()} disabled={Boolean(working)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-4 text-sm font-bold text-emerald-100 hover:bg-emerald-300/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50">
             {working === "sync-ko" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <GitBranch className="h-4 w-4" aria-hidden="true" />}
             مزامنة الإقصائيات

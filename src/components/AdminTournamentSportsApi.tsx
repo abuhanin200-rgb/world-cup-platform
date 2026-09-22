@@ -217,8 +217,8 @@ export default function AdminTournamentSportsApi() {
       await load();
       setMessage(
         season.available === true
-          ? "تم اعتماد خليجي الديار العربية 27 على Gulf Cup of Nations (ID 25) وموسم 2026 متاح الآن."
-          : "تم اعتماد خليجي الديار العربية 27 على Gulf Cup of Nations (ID 25). موسم 2026 غير متاح بعد وسيتم رصده تلقائيًا دون استخدام بطولة U23.",
+          ? "تم اعتماد إعداد Sports API لخليجي الديار العربية 27 على Gulf Cup of Nations (ID 25) وموسم 2026 متاح الآن. هذا الإجراء لا يغيّر جدول المباريات المخزن في Firestore."
+          : "تم اعتماد إعداد Sports API لخليجي الديار العربية 27 على Gulf Cup of Nations (ID 25). هذا الإجراء لا يغيّر جدول المباريات المخزن في Firestore. موسم 2026 غير متاح بعد وسيتم رصده تلقائيًا دون استخدام بطولة U23.",
       );
     } catch (configError) {
       setError(configError instanceof Error ? configError.message : "تعذر اعتماد إعداد خليجي الديار العربية 27");
@@ -350,7 +350,7 @@ export default function AdminTournamentSportsApi() {
             {config.lastSeasonCheckAt && <p className="mt-1 text-[11px] font-semibold text-slate-500">آخر فحص للموسم: {formatDate(config.lastSeasonCheckAt)} · الفحص التلقائي كل 3 ساعات أثناء عدم توفر الموسم.</p>}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void configureGulfCup27()} disabled={Boolean(working)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 disabled:opacity-50">{working === "configure-gulf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}اعتماد خليجي الديار العربية 27</button>
+            <button type="button" onClick={() => void configureGulfCup27()} disabled={Boolean(working)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 disabled:opacity-50">{working === "configure-gulf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}اعتماد Sports API لخليجي 27</button>
             <button type="button" onClick={() => void checkSeason()} disabled={Boolean(working) || !config.leagueId} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-xs font-black text-white disabled:opacity-50">{working === "season" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}فحص موسم 2026 الآن</button>
           </div>
         </div>
