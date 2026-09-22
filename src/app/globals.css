@@ -663,16 +663,17 @@ body {
 
 
 
-/* Gulf 27 live activity strips — left-to-right motion by request. */
+/* Gulf 27 live activity strips — constant visual speed, left-to-right, endless. */
 @keyframes tournament-activity-ltr {
-  from { transform: translateX(-50%); }
-  to { transform: translateX(0); }
+  from { transform: translate3d(-50%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
 }
 
 .tournament-activity-track {
   direction: ltr;
-  animation: tournament-activity-ltr 34s linear infinite;
+  animation: tournament-activity-ltr var(--ticker-duration, 18s) linear infinite;
   will-change: transform;
+  backface-visibility: hidden;
 }
 
 button:hover .tournament-activity-track,

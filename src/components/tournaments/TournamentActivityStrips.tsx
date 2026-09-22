@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, List, Sparkles, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { BadgeCheck, Clock3, List, Sparkles, X } from "lucide-react";
 import { GULF_CUP_27_TOURNAMENT_ID } from "@/domain/tournaments";
 
 type ActivityEvent = {
@@ -64,7 +65,36 @@ function ActivityStrip({
   const empty = exact
     ? "يظهر هنا أصحاب التوقعات المطابقة بعد احتساب النتائج"
     : "سيظهر هنا آخر الأعضاء الذين سجّلوا توقعاتهم";
-  const rendered = items.length ? [...items, ...items] : [];
+  const trackRef = useRef<HTMLSpanElement | null>(null);
+  const [durationSeconds, setDurationSeconds] = useState(18);
+
+  // Keep enough entries in short feeds so the ticker never exposes a visual gap.
+  // The list is duplicated once for a seamless loop, while duration is measured
+  // from the actual pixel distance so one item and one hundred items move at
+  // the same visual speed.
+  const loopItems = useMemo(() => {
+    if (!items.length) return [];
+    const minimumItems = 8;
+    const copies = Math.max(1, Math.ceil(minimumItems / items.length));
+    const base = Array.from({ length: copies }, () => items).flat();
+    return [...base, ...base];
+  }, [items]);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track || !loopItems.length) return;
+
+    const updateDuration = () => {
+      const loopDistance = track.scrollWidth / 2;
+      const pixelsPerSecond = 72;
+      setDurationSeconds(Math.max(10, loopDistance / pixelsPerSecond));
+    };
+
+    updateDuration();
+    const observer = new ResizeObserver(updateDuration);
+    observer.observe(track);
+    return () => observer.disconnect();
+  }, [loopItems]);
 
   return (
     <button
@@ -85,7 +115,7 @@ function ActivityStrip({
         }`}
       >
         {exact ? (
-          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          <BadgeCheck className="h-4 w-4" aria-hidden="true" />
         ) : (
           <Sparkles className="h-4 w-4" aria-hidden="true" />
         )}
@@ -94,8 +124,12 @@ function ActivityStrip({
 
       <span className="relative flex min-w-0 flex-1 items-center overflow-hidden">
         {items.length ? (
-          <span className="tournament-activity-track flex w-max min-w-max items-center gap-8 whitespace-nowrap px-4 text-[11px] font-bold text-white/78 sm:text-xs">
-            {rendered.map((item, index) => (
+          <span
+            ref={trackRef}
+            className="tournament-activity-track flex w-max min-w-max items-center gap-8 whitespace-nowrap px-4 text-[11px] font-bold text-white/78 sm:text-xs"
+            style={{ "--ticker-duration": `${durationSeconds}s` } as CSSProperties}
+          >
+            {loopItems.map((item, index) => (
               <span
                 key={`${item.id}-${index}`}
                 dir="rtl"
