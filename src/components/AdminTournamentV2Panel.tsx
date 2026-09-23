@@ -5,6 +5,7 @@ import AdminMemberSecurityMigration from "@/components/AdminMemberSecurityMigrat
 import AdminTournamentV2Management from "@/components/AdminTournamentV2Management";
 import AdminTournamentNotifications from "@/components/AdminTournamentNotifications";
 import AdminTournamentEngagementV2 from "@/components/AdminTournamentEngagementV2";
+import AdminTournamentMissingMembersV2 from "@/components/AdminTournamentMissingMembersV2";
 import AdminTournamentSportsApi from "@/components/AdminTournamentSportsApi";
 import AdminTournamentPredictionsManager from "@/components/AdminTournamentPredictionsManager";
 import {
@@ -26,6 +27,7 @@ import {
   ShieldCheck,
   Trophy,
   UnlockKeyhole,
+  UserRoundX,
   UsersRound,
 } from "lucide-react";
 import {
@@ -122,6 +124,7 @@ type GulfAdminSection =
   | "matches"
   | "results"
   | "notifications"
+  | "missingMembers"
   | "engagement"
   | "sports"
   | "security";
@@ -466,6 +469,7 @@ export default function AdminTournamentV2Panel() {
     { id: "matches", label: "المباريات", icon: CalendarDays },
     { id: "results", label: "التوقعات والنتائج", icon: Calculator },
     { id: "notifications", label: "الإشعارات", icon: BellRing },
+    { id: "missingMembers", label: "غير المتوقّعين", icon: UserRoundX },
     { id: "engagement", label: "الاستوديو والجوائز", icon: Newspaper },
     { id: "sports", label: "Sports API", icon: Satellite },
     { id: "security", label: "أمان الأعضاء", icon: ShieldCheck },
@@ -523,6 +527,8 @@ export default function AdminTournamentV2Panel() {
       )}
 
       {sectionTab === "notifications" && <AdminTournamentNotifications matches={matches} />}
+
+      {sectionTab === "missingMembers" && <AdminTournamentMissingMembersV2 />}
 
       {sectionTab === "engagement" && <AdminTournamentEngagementV2 />}
 
