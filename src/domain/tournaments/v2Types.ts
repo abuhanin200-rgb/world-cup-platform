@@ -105,6 +105,9 @@ export type TournamentUserStatsV2 = {
   fullName: string;
   points: number;
   rank: number | null;
+  previousRank: number | null;
+  rankChange: number;
+  rankDirection: "up" | "down" | "-";
   played: number;
   exact: number;
   correctOutcome: number;

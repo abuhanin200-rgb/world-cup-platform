@@ -63,12 +63,24 @@ function GulfRulesSection() {
 }
 
 export default function TournamentV2Section({ tournament, section }: { tournament: Tournament; section: TournamentSection }) {
-  if (tournament.id !== GULF_CUP_27_TOURNAMENT_ID) return <TournamentSectionPlaceholder tournament={tournament} section={section} />;
+  const isGulf27 = tournament.id === GULF_CUP_27_TOURNAMENT_ID;
   let content: ReactNode;
-  if (section === "matches") content = <GulfCup27CompetitionPanel />;
+
+  if (!isGulf27) {
+    content = section === "leaderboard"
+      ? <GulfCup27LeaderboardPanel tournamentId={tournament.id} tournamentLabel={tournament.shortName || tournament.name} />
+      : <TournamentSectionPlaceholder tournament={tournament} section={section} />;
+  } else if (section === "matches") content = <GulfCup27CompetitionPanel />;
   else if (section === "predictions") content = <GulfCup27PredictionsPanel />;
-  else if (section === "leaderboard") content = <GulfCup27LeaderboardPanel />;
+  else if (section === "leaderboard") content = <GulfCup27LeaderboardPanel tournamentId={tournament.id} tournamentLabel={tournament.shortName || tournament.name} />;
   else if (section === "rules") content = <GulfRulesSection />;
   else content = <GulfCup27StudioPanel />;
-  return <><TournamentAutomationHeartbeat /><div className="relative isolate overflow-hidden"><div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-50" style={{ backgroundImage: "linear-gradient(135deg,transparent 0 44%,rgba(22,183,125,.055) 44% 49%,transparent 49% 56%,rgba(242,198,71,.035) 56% 60%,transparent 60%),radial-gradient(circle at 88% 8%,rgba(133,201,91,.08),transparent 24%)", backgroundSize: "360px 360px,100% 100%" }} /><div className="mx-auto max-w-7xl px-3 pb-14 pt-1 sm:px-4 md:px-6 md:pb-20">{content}</div></div></>;
+
+  return <>
+    {isGulf27 ? <TournamentAutomationHeartbeat /> : null}
+    <div className="relative isolate overflow-hidden">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 opacity-50" style={{ backgroundImage: "linear-gradient(135deg,transparent 0 44%,rgba(22,183,125,.055) 44% 49%,transparent 49% 56%,rgba(242,198,71,.035) 56% 60%,transparent 60%),radial-gradient(circle at 88% 8%,rgba(133,201,91,.08),transparent 24%)", backgroundSize: "360px 360px,100% 100%" }} />
+      <div className="mx-auto max-w-7xl px-3 pb-14 pt-1 sm:px-4 md:px-6 md:pb-20">{content}</div>
+    </div>
+  </>;
 }

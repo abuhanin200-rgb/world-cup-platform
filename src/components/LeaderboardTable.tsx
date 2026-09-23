@@ -2717,7 +2717,7 @@ export default function LeaderboardTable() {
         initial="hidden"
         whileInView="show"
         viewport={scrollOnceViewport}
-        className="relative mt-6 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.08] p-3 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:mt-8 md:p-6"
+        className="relative mt-5 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.08] p-2.5 text-white shadow-lg shadow-slate-950/25 backdrop-blur-sm md:mt-7 md:p-5"
       >
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-cyan-400/5" />
         <div className="pointer-events-none absolute -right-24 top-14 h-56 w-56 rounded-full bg-amber-300/10 blur-2xl" />
@@ -2770,7 +2770,7 @@ export default function LeaderboardTable() {
           </div>
         ) : (
           <>
-            <div className="space-y-2 md:hidden">
+            <div className="space-y-1.5 md:hidden">
               {visibleUsers.map((user) => {
                 const style = getTopRankStyle(user.currentRank);
 
@@ -2781,7 +2781,7 @@ export default function LeaderboardTable() {
                     initial="hidden"
                     whileInView="show"
                     viewport={{ once: true, amount: 0.35 }}
-                    className={`relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 p-3 shadow-inner ${style.rowClass}`}
+                    className={`relative overflow-hidden rounded-[18px] border border-white/10 bg-slate-950/70 p-2.5 shadow-inner ${style.rowClass}`}
                   >
                     <div
                       aria-hidden="true"
@@ -2825,28 +2825,28 @@ export default function LeaderboardTable() {
                     </div>
 
                     <dl className="relative mt-2 grid grid-cols-4 gap-1.5 text-center">
-                      <div className="rounded-xl border border-white/10 bg-white/5 px-1.5 py-2">
+                      <div className="rounded-lg border border-white/10 bg-white/5 px-1 py-1.5">
                         <dt className="text-[10px] font-bold text-slate-400">التوقعات</dt>
                         <dd dir="ltr" className="mt-1 text-sm font-black tabular-nums text-slate-100">
                           {user.total}
                         </dd>
                       </div>
 
-                      <div className="rounded-xl border border-emerald-400/15 bg-emerald-400/10 px-1.5 py-2">
+                      <div className="rounded-lg border border-emerald-400/15 bg-emerald-400/10 px-1 py-1.5">
                         <dt className="text-[10px] font-bold text-emerald-200">صحيحة</dt>
                         <dd dir="ltr" className="mt-1 text-sm font-black tabular-nums text-emerald-300">
                           {user.exact}
                         </dd>
                       </div>
 
-                      <div className="rounded-xl border border-amber-300/15 bg-amber-300/10 px-1.5 py-2">
+                      <div className="rounded-lg border border-amber-300/15 bg-amber-300/10 px-1 py-1.5">
                         <dt className="text-[10px] font-bold text-amber-100">فائز</dt>
                         <dd dir="ltr" className="mt-1 text-sm font-black tabular-nums text-amber-200">
                           {user.winner}
                         </dd>
                       </div>
 
-                      <div className="rounded-xl border border-red-400/15 bg-red-400/10 px-1.5 py-2">
+                      <div className="rounded-lg border border-red-400/15 bg-red-400/10 px-1 py-1.5">
                         <dt className="text-[10px] font-bold text-red-200">خطأ</dt>
                         <dd dir="ltr" className="mt-1 text-sm font-black tabular-nums text-red-300">
                           {user.wrong}
@@ -2869,31 +2869,31 @@ export default function LeaderboardTable() {
                 </caption>
                 <thead className="bg-slate-950">
                   <tr className="text-[10px] md:text-sm">
-                    <th scope="col" className="w-[18%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th scope="col" className="w-[18%] px-1 py-2.5 font-black md:px-3 md:py-3">
                       المركز
                     </th>
 
-                    <th scope="col" className="w-[27%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th scope="col" className="w-[27%] px-1 py-2.5 font-black md:px-3 md:py-3">
                       الاسم
                     </th>
 
-                    <th scope="col" className="w-[13%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th scope="col" className="w-[13%] px-1 py-2.5 font-black md:px-3 md:py-3">
                       التوقعات
                     </th>
 
-                    <th scope="col" className="w-[8%] px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
+                    <th scope="col" className="w-[8%] px-1 py-2.5 font-black text-emerald-300 md:px-3 md:py-3">
                       ص
                     </th>
 
-                    <th scope="col" className="w-[8%] px-1 py-3 font-black text-amber-200 md:px-4 md:py-4">
+                    <th scope="col" className="w-[8%] px-1 py-2.5 font-black text-amber-200 md:px-3 md:py-3">
                       ف
                     </th>
 
-                    <th scope="col" className="w-[8%] px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
+                    <th scope="col" className="w-[8%] px-1 py-2.5 font-black text-red-300 md:px-3 md:py-3">
                       خ
                     </th>
 
-                    <th scope="col" className="w-[18%] px-1 py-3 font-black md:px-4 md:py-4">
+                    <th scope="col" className="w-[18%] px-1 py-2.5 font-black md:px-3 md:py-3">
                       النقاط
                     </th>
                   </tr>
@@ -2913,14 +2913,14 @@ export default function LeaderboardTable() {
                         whileTap={{ scale: 0.998 }}
                         className={`border-t border-white/10 text-[11px] transition md:text-sm ${style.rowClass}`}
                       >
-                        <td className="px-1 py-3 md:px-4 md:py-4">
+                        <td className="px-1 py-2.5 md:px-3 md:py-3">
                           <div className="flex items-center justify-center gap-1 md:gap-2">
                             <RankBadge rank={user.currentRank} />
                             <RankMovement user={user} />
                           </div>
                         </td>
 
-                        <td className="px-1 py-3 font-black md:px-4 md:py-4">
+                        <td className="px-1 py-2.5 font-black md:px-3 md:py-3">
                           <Link
                             href={`/members/${encodeURIComponent(user.id)}`}
                             className={`mx-auto flex w-full min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-1 text-center leading-5 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-[var(--brand-yellow)]/45 ${style.nameClass}`}
@@ -2935,26 +2935,26 @@ export default function LeaderboardTable() {
                           </Link>
                         </td>
 
-                        <td dir="ltr" className="px-1 py-3 font-black text-slate-200 md:px-4 md:py-4">
+                        <td dir="ltr" className="px-1 py-2.5 font-black text-slate-200 md:px-3 md:py-3">
                           {user.total}
                         </td>
 
-                        <td dir="ltr" className="px-1 py-3 font-black text-emerald-300 md:px-4 md:py-4">
+                        <td dir="ltr" className="px-1 py-2.5 font-black text-emerald-300 md:px-3 md:py-3">
                           {user.exact}
                         </td>
 
-                        <td dir="ltr" className="px-1 py-3 font-black text-amber-200 md:px-4 md:py-4">
+                        <td dir="ltr" className="px-1 py-2.5 font-black text-amber-200 md:px-3 md:py-3">
                           {user.winner}
                         </td>
 
-                        <td dir="ltr" className="px-1 py-3 font-black text-red-300 md:px-4 md:py-4">
+                        <td dir="ltr" className="px-1 py-2.5 font-black text-red-300 md:px-3 md:py-3">
                           {user.wrong}
                         </td>
 
-                        <td className="px-1 py-3 md:px-4 md:py-4">
+                        <td className="px-1 py-2.5 md:px-3 md:py-3">
                           <span
                             dir="ltr"
-                            className={`inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[11px] font-black md:h-8 md:min-w-8 md:px-3 md:text-sm ${
+                            className={`inline-flex h-6 min-w-7 items-center justify-center rounded-full px-2 text-[10px] font-black md:h-7 md:min-w-8 md:px-2.5 md:text-xs ${
                               user.currentRank <= 3
                                 ? style.badgeClass
                                 : "bg-amber-400 text-slate-950"
@@ -2970,7 +2970,7 @@ export default function LeaderboardTable() {
               </table>
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="mt-3 flex items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={goToPreviousPage}

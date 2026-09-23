@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GULF_CUP_27_TOURNAMENT_ID } from "@/domain/tournaments";
 import { getTournamentActivityServer } from "@/lib/serverTournamentActivity";
 
 export const runtime = "nodejs";
@@ -8,13 +7,11 @@ export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
-    const tournamentId =
-      request.nextUrl.searchParams.get("tournamentId") ||
-      GULF_CUP_27_TOURNAMENT_ID;
-    if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) {
+    const tournamentId = request.nextUrl.searchParams.get("tournamentId")?.trim();
+    if (!tournamentId) {
       return NextResponse.json(
-        { ok: false, error: "البطولة غير مدعومة" },
-        { status: 404, headers: { "Cache-Control": "no-store" } },
+        { ok: false, error: "معرّف البطولة مطلوب" },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }
 
@@ -29,6 +26,8 @@ export async function GET(request: NextRequest) {
       awayTeamId: item.awayTeamId,
       homeTeamName: item.homeTeamName,
       awayTeamName: item.awayTeamName,
+      homeTeamFlagCode: item.homeTeamFlagCode,
+      awayTeamFlagCode: item.awayTeamFlagCode,
       resultHomeScore: item.resultHomeScore,
       resultAwayScore: item.resultAwayScore,
       createdAt: item.createdAt,

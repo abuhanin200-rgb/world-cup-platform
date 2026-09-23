@@ -1,9 +1,5 @@
 import "server-only";
 import { adminDb } from "@/lib/firebaseAdmin";
-import {
-  GULF_CUP_27_TOURNAMENT_ID,
-  getGulfCup27Team,
-} from "@/domain/tournaments";
 
 const ROOT_COLLECTION = "tournamentActivity";
 const EVENTS_COLLECTION = "events";
@@ -21,6 +17,8 @@ export type TournamentActivityEvent = {
   awayTeamId: string;
   homeTeamName: string;
   awayTeamName: string;
+  homeTeamFlagCode: string;
+  awayTeamFlagCode: string;
   resultHomeScore: number | null;
   resultAwayScore: number | null;
   createdAt: number;
@@ -52,7 +50,6 @@ export async function writePredictionActivityServer(input: {
   awayTeamId: string;
   createdAt: number;
 }) {
-  if (input.tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return;
   const id = `prediction_${input.matchId}_${input.userId}`;
   await activityCollection(input.tournamentId).doc(id).set(
     {
@@ -78,7 +75,6 @@ export async function deletePredictionActivityServer(input: {
   matchId: string;
   userId: string;
 }) {
-  if (input.tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return;
   await activityCollection(input.tournamentId)
     .doc(`prediction_${input.matchId}_${input.userId}`)
     .delete()
@@ -96,7 +92,6 @@ export async function writeExactHitActivitiesServer(input: {
   rows: Array<{ userId: string; userName: string; resultType: string }>;
   createdAt: number;
 }) {
-  if (input.tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return;
   const exactRows = input.rows.filter((row) => row.resultType === "exact");
   if (!exactRows.length) return;
 
@@ -133,12 +128,7 @@ export async function deleteExactHitActivitiesServer(input: {
   resultHash: string | null;
   rows: Array<{ userId: string; resultType: string }>;
 }) {
-  if (
-    input.tournamentId !== GULF_CUP_27_TOURNAMENT_ID ||
-    !input.resultHash
-  ) {
-    return;
-  }
+  if (!input.resultHash) return;
 
   const exactRows = input.rows.filter((row) => row.resultType === "exact");
   if (!exactRows.length) return;
@@ -163,7 +153,7 @@ async function backfillTournamentActivityIfEmpty(tournamentId: string) {
   if (!existing.empty) return;
 
   const [predictions, matches] = await Promise.all([
-    adminDb.collection("tournamentPredictions").orderBy("updatedAt", "desc").limit(120).get(),
+    adminDb.collection("tournamentPredictions").where("tournamentId", "==", tournamentId).limit(200).get(),
     adminDb.collection("tournamentMatches").where("tournamentId", "==", tournamentId).get(),
   ]);
   const matchMap = new Map(
@@ -172,9 +162,7 @@ async function backfillTournamentActivityIfEmpty(tournamentId: string) {
       return [clean(data.id) || item.id.replace(`${tournamentId}_`, ""), data] as const;
     }),
   );
-  const relevant = predictions.docs.filter(
-    (item) => clean(item.data().tournamentId) === tournamentId,
-  );
+  const relevant = predictions.docs;
   if (!relevant.length) return;
 
   for (let index = 0; index < relevant.length; index += 250) {
@@ -253,16 +241,29 @@ export async function getTournamentActivityServer(
   predictions: TournamentActivityEvent[];
   exactHits: TournamentActivityEvent[];
 }> {
-  if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) {
-    return { predictions: [], exactHits: [] };
-  }
-
   await backfillTournamentActivityIfEmpty(tournamentId);
 
-  const snapshot = await activityCollection(tournamentId)
-    .orderBy("createdAt", "desc")
-    .limit(Math.max(20, Math.min(160, limit)))
-    .get();
+  const [snapshot, teamsSnapshot] = await Promise.all([
+    activityCollection(tournamentId)
+      .orderBy("createdAt", "desc")
+      .limit(Math.max(20, Math.min(160, limit)))
+      .get(),
+    adminDb.collection("tournamentTeams").where("tournamentId", "==", tournamentId).get(),
+  ]);
+
+  const teamMap = new Map(
+    teamsSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      const id = clean(data.id) || doc.id.replace(`${tournamentId}_`, "");
+      return [
+        id,
+        {
+          nameAr: clean(data.nameAr) || clean(data.shortName) || clean(data.nameEn) || "المنتخب",
+          flagCode: clean(data.flagCode) || clean(data.code),
+        },
+      ] as const;
+    }),
+  );
 
   const events = snapshot.docs
     .map((doc) => {
@@ -271,6 +272,8 @@ export async function getTournamentActivityServer(
       if (!type) return null;
       const homeTeamId = clean(data.homeTeamId);
       const awayTeamId = clean(data.awayTeamId);
+      const homeTeam = teamMap.get(homeTeamId);
+      const awayTeam = teamMap.get(awayTeamId);
       return {
         id: clean(data.id) || doc.id,
         type,
@@ -280,8 +283,10 @@ export async function getTournamentActivityServer(
         userName: clean(data.userName) || "عضو",
         homeTeamId,
         awayTeamId,
-        homeTeamName: getGulfCup27Team(homeTeamId)?.nameAr || "الفريق الأول",
-        awayTeamName: getGulfCup27Team(awayTeamId)?.nameAr || "الفريق الثاني",
+        homeTeamName: homeTeam?.nameAr || "الفريق الأول",
+        awayTeamName: awayTeam?.nameAr || "الفريق الثاني",
+        homeTeamFlagCode: homeTeam?.flagCode || "",
+        awayTeamFlagCode: awayTeam?.flagCode || "",
         resultHomeScore: numberOrNull(data.resultHomeScore),
         resultAwayScore: numberOrNull(data.resultAwayScore),
         createdAt: Number(data.createdAt || 0),

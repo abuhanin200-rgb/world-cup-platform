@@ -232,6 +232,12 @@ function mapUserStatsDoc(
     fullName: cleanText(data.fullName) || "عضو",
     points: toNumber(data.points),
     rank: data.rank == null ? null : toNumber(data.rank),
+    previousRank: data.previousRank == null ? null : toNumber(data.previousRank),
+    rankChange: toNumber(data.rankChange),
+    rankDirection:
+      data.rankDirection === "up" || data.rankDirection === "down"
+        ? data.rankDirection
+        : "-",
     played: toNumber(data.played),
     exact: toNumber(data.exact),
     correctOutcome: toNumber(data.correctOutcome),

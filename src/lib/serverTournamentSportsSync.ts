@@ -700,14 +700,30 @@ export async function rebuildLeaderboardServer(tournamentId: string) {
     rows.set(prediction.userId, row);
   });
   const sorted = [...rows.values()].sort((a, b) => b.points - a.points || b.exact - a.exact || b.correctOutcome - a.correctOutcome || a.wrong - b.wrong || a.fullName.localeCompare(b.fullName, "ar"));
+  const previousRankByUserId = new Map<string, number>();
+  existingStats.docs.forEach((item) => {
+    const data = item.data();
+    const userId = clean(data.userId) || item.id.replace(`${tournamentId}_`, "");
+    const rank = num(data.rank);
+    if (userId && rank > 0) previousRankByUserId.set(userId, rank);
+  });
+
   const now = Date.now();
+  const ranked = sorted.map((row, index) => {
+    const rank = index + 1;
+    const previousRank = previousRankByUserId.get(row.userId) ?? rank;
+    const rankDirection: "up" | "down" | "-" = previousRank > rank ? "up" : previousRank < rank ? "down" : "-";
+    const rankChange = Math.abs(previousRank - rank);
+    return { ...row, rank, previousRank, rankChange, rankDirection };
+  });
+
   const operations: Array<(batch: WriteBatch) => void> = [];
   existingStats.docs.forEach((item) => operations.push((batch) => batch.delete(item.ref)));
-  sorted.forEach((row, index) => operations.push((batch) => batch.set(adminDb.collection(COLLECTIONS.stats).doc(entityId(tournamentId, row.userId)), {
-    id: entityId(tournamentId, row.userId), tournamentId, ...row, rank: index + 1, updatedAt: now, schemaVersion: 2,
+  ranked.forEach((row) => operations.push((batch) => batch.set(adminDb.collection(COLLECTIONS.stats).doc(entityId(tournamentId, row.userId)), {
+    id: entityId(tournamentId, row.userId), tournamentId, ...row, updatedAt: now, schemaVersion: 2,
   })));
   await commitOperations(operations);
-  return sorted.map((row, index) => ({ ...row, rank: index + 1 }));
+  return ranked;
 }
 
 export async function syncKnockoutBracketServer(tournamentId: string) {

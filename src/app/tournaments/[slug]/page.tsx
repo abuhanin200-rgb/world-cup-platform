@@ -40,7 +40,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {/* Home page only. Because this page unmounts on section routes, the intro replays on every re-entry. */}
       {isGulfCup27 ? <GulfCup27EntranceIntro /> : null}
       <TournamentHero tournament={tournament} />
-      {isGulfCup27 ? <TournamentActivityStrips /> : null}
+      {tournament.engine === "v2" && tournament.status !== "coming_soon" ? (
+        <TournamentActivityStrips tournamentId={tournament.id} tournamentName={tournament.shortName || tournament.name} />
+      ) : null}
       <TournamentNavigation tournament={tournament} activeSection="home" />
       <TournamentOverview tournament={tournament} />
     </main>

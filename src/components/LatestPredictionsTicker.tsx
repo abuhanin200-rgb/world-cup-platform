@@ -568,7 +568,7 @@ export default function LatestPredictionsTicker() {
           <div>
             <div
               className={`text-[14px] font-black ${
-                golden ? "text-fuchsia-100" : "text-white"
+                golden ? "text-fuchsia-100" : "text-amber-300"
               }`}
             >
               {prediction.userName}

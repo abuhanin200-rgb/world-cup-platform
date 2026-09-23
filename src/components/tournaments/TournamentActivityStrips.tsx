@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BadgeCheck, Clock3, List, Sparkles, X } from "lucide-react";
-import { GULF_CUP_27_TOURNAMENT_ID } from "@/domain/tournaments";
+import TeamFlag from "@/components/TeamFlag";
 
 type ActivityEvent = {
   id: string;
@@ -14,6 +14,8 @@ type ActivityEvent = {
   awayTeamId: string;
   homeTeamName: string;
   awayTeamName: string;
+  homeTeamFlagCode: string;
+  awayTeamFlagCode: string;
   resultHomeScore: number | null;
   resultAwayScore: number | null;
   createdAt: number;
@@ -35,19 +37,32 @@ function formatTime(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
-function matchLabel(item: ActivityEvent) {
-  return `${item.homeTeamName} × ${item.awayTeamName}`;
-}
 
-function activityText(item: ActivityEvent, kind: ActivityKind) {
-  if (kind === "exactHits") {
-    const score =
-      item.resultHomeScore != null && item.resultAwayScore != null
-        ? `${item.resultHomeScore}-${item.resultAwayScore}`
-        : "بالملي";
-    return `${item.userName} · ${score} · ${matchLabel(item)}`;
-  }
-  return `${item.userName} توقّع مباراة ${matchLabel(item)}`;
+function ActivityInline({ item, kind }: { item: ActivityEvent; kind: ActivityKind }) {
+  const exact = kind === "exactHits";
+  return (
+    <span dir="rtl" className="inline-flex shrink-0 items-center gap-1.5">
+      <strong className={exact ? "text-amber-200" : "text-emerald-200"}>
+        {item.userName}
+      </strong>
+      <span className="text-white/45">{exact ? "·" : "توقّع"}</span>
+      {exact && item.resultHomeScore != null && item.resultAwayScore != null ? (
+        <span
+          dir="ltr"
+          className="rounded-md border border-amber-300/15 bg-amber-300/10 px-1.5 py-0.5 font-black text-amber-100 [unicode-bidi:isolate]"
+        >
+          {item.resultHomeScore}-{item.resultAwayScore}
+        </span>
+      ) : null}
+      <span className="inline-flex items-center gap-1">
+        <TeamFlag code={item.homeTeamFlagCode || undefined} name={item.homeTeamName} size="xs" />
+        <span>{item.homeTeamName}</span>
+        <span className="text-white/30">×</span>
+        <TeamFlag code={item.awayTeamFlagCode || undefined} name={item.awayTeamName} size="xs" />
+        <span>{item.awayTeamName}</span>
+      </span>
+    </span>
+  );
 }
 
 
@@ -60,6 +75,10 @@ function sameActivityList(a: ActivityEvent[], b: ActivityEvent[]) {
       left.id !== right.id ||
       left.createdAt !== right.createdAt ||
       left.userName !== right.userName ||
+      left.homeTeamName !== right.homeTeamName ||
+      left.awayTeamName !== right.awayTeamName ||
+      left.homeTeamFlagCode !== right.homeTeamFlagCode ||
+      left.awayTeamFlagCode !== right.awayTeamFlagCode ||
       left.resultHomeScore !== right.resultHomeScore ||
       left.resultAwayScore !== right.resultAwayScore
     ) {
@@ -100,9 +119,9 @@ function ActivityStrip({
   const tickerEntries = useMemo(
     () =>
       items.length
-        ? items.map((item) => ({ id: item.id, text: activityText(item, kind) }))
-        : [{ id: `${kind}-empty`, text: emptyTickerText }],
-    [items, kind, emptyTickerText],
+        ? items.map((item) => ({ id: item.id, item }))
+        : [{ id: `${kind}-empty`, item: null as ActivityEvent | null }],
+    [items, kind],
   );
 
   const repeatedEntries = useMemo(() => {
@@ -155,7 +174,13 @@ function ActivityStrip({
             exact ? "bg-amber-300" : "bg-emerald-300"
           }`}
         />
-        <span>{entry.text}</span>
+        {entry.item ? (
+          <ActivityInline item={entry.item} kind={kind} />
+        ) : (
+          <span className={exact ? "text-amber-100/70" : "text-emerald-100/70"}>
+            {emptyTickerText}
+          </span>
+        )}
       </span>
     ));
 
@@ -213,7 +238,13 @@ function ActivityStrip({
   );
 }
 
-export default function TournamentActivityStrips() {
+export default function TournamentActivityStrips({
+  tournamentId,
+  tournamentName = "البطولة",
+}: {
+  tournamentId: string;
+  tournamentName?: string;
+}) {
   const [predictions, setPredictions] = useState<ActivityEvent[]>([]);
   const [exactHits, setExactHits] = useState<ActivityEvent[]>([]);
   const [openKind, setOpenKind] = useState<ActivityKind | null>(null);
@@ -222,7 +253,7 @@ export default function TournamentActivityStrips() {
   const load = useCallback(async () => {
     try {
       const response = await fetch(
-        `/api/tournaments/activity?tournamentId=${encodeURIComponent(GULF_CUP_27_TOURNAMENT_ID)}`,
+        `/api/tournaments/activity?tournamentId=${encodeURIComponent(tournamentId)}`,
         { cache: "no-store" },
       );
       if (!response.ok) return;
@@ -239,7 +270,7 @@ export default function TournamentActivityStrips() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tournamentId]);
 
   useEffect(() => {
     void load();
@@ -267,7 +298,7 @@ export default function TournamentActivityStrips() {
   return (
     <>
       <section
-        aria-label="نشاط خليجي الديار العربية 27"
+        aria-label={`نشاط ${tournamentName}`}
         className="border-b border-white/[0.08] bg-[var(--tournament-background)]/95"
       >
         <div className="mx-auto max-w-7xl overflow-hidden px-3 py-2 sm:px-4 md:px-6">
@@ -328,7 +359,11 @@ export default function TournamentActivityStrips() {
                       className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <strong className="text-sm font-black text-white">
+                        <strong
+                          className={`text-sm font-black ${
+                            openKind === "exactHits" ? "text-amber-200" : "text-emerald-200"
+                          }`}
+                        >
                           {item.userName}
                         </strong>
                         {openKind === "exactHits" &&
@@ -342,8 +377,12 @@ export default function TournamentActivityStrips() {
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-xs font-bold text-white/65">
-                        {matchLabel(item)}
+                      <p className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-xs font-bold text-white/70">
+                        <TeamFlag code={item.homeTeamFlagCode || undefined} name={item.homeTeamName} size="sm" />
+                        <span>{item.homeTeamName}</span>
+                        <span className="text-white/30">×</span>
+                        <TeamFlag code={item.awayTeamFlagCode || undefined} name={item.awayTeamName} size="sm" />
+                        <span>{item.awayTeamName}</span>
                       </p>
                       <p className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/35">
                         <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
