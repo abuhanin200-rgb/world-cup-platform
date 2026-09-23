@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
 import { BadgeCheck, Clock3, List, Sparkles, X } from "lucide-react";
 import { GULF_CUP_27_TOURNAMENT_ID } from "@/domain/tournaments";
 
@@ -51,6 +50,25 @@ function activityText(item: ActivityEvent, kind: ActivityKind) {
   return `${item.userName} توقّع مباراة ${matchLabel(item)}`;
 }
 
+
+function sameActivityList(a: ActivityEvent[], b: ActivityEvent[]) {
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    const left = a[index];
+    const right = b[index];
+    if (
+      left.id !== right.id ||
+      left.createdAt !== right.createdAt ||
+      left.userName !== right.userName ||
+      left.resultHomeScore !== right.resultHomeScore ||
+      left.resultAwayScore !== right.resultAwayScore
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function ActivityStrip({
   kind,
   items,
@@ -66,15 +84,16 @@ function ActivityStrip({
     ? "يظهر هنا أصحاب التوقعات المطابقة بعد احتساب النتائج"
     : "سيظهر هنا آخر الأعضاء الذين سجّلوا توقعاتهم";
   const viewportRef = useRef<HTMLSpanElement | null>(null);
+  const trackRef = useRef<HTMLSpanElement | null>(null);
   const laneRef = useRef<HTMLSpanElement | null>(null);
+  const laneWidthRef = useRef(0);
+  const animationStartedAtRef = useRef<number | null>(null);
   const [repeatCopies, setRepeatCopies] = useState(1);
-  const [durationSeconds, setDurationSeconds] = useState(14);
 
-  // Build two *identical* lanes and move exactly one lane width per cycle.
-  // Each lane is expanded until it is wider than the visible viewport, which
-  // prevents the short-feed blank gap that can make the ticker appear/disappear.
-  // Duration is derived from pixels, not item count, so 1 and 100 predictions
-  // travel at the same visual speed.
+  // Keep one lane wider than the viewport, then render an identical second lane.
+  // The actual motion is driven by requestAnimationFrame at a constant px/s speed,
+  // so polling/re-rendering cannot restart the ticker and there is never a blank
+  // interval between the end of one cycle and the beginning of the next.
   const laneItems = useMemo(() => {
     if (!items.length) return [];
     return Array.from({ length: repeatCopies }, () => items).flat();
@@ -83,21 +102,23 @@ function ActivityStrip({
   useEffect(() => {
     const viewport = viewportRef.current;
     const lane = laneRef.current;
-    if (!viewport || !lane || !items.length) return;
+    if (!viewport || !lane || !items.length) {
+      laneWidthRef.current = 0;
+      return;
+    }
 
     const updateMetrics = () => {
       const currentLaneWidth = Math.max(1, lane.scrollWidth);
-      const estimatedBaseWidth = Math.max(1, currentLaneWidth / Math.max(1, repeatCopies));
-      const targetLaneWidth = Math.max(viewport.clientWidth * 1.35, viewport.clientWidth + 180);
-      const nextCopies = Math.max(1, Math.ceil(targetLaneWidth / estimatedBaseWidth));
+      const unitWidth = Math.max(1, currentLaneWidth / Math.max(1, repeatCopies));
+      const targetLaneWidth = Math.max(viewport.clientWidth + 320, viewport.clientWidth * 1.7);
+      const nextCopies = Math.max(1, Math.ceil(targetLaneWidth / unitWidth));
 
       if (nextCopies !== repeatCopies) {
         setRepeatCopies(nextCopies);
         return;
       }
 
-      const pixelsPerSecond = 92;
-      setDurationSeconds(Math.max(7, currentLaneWidth / pixelsPerSecond));
+      laneWidthRef.current = currentLaneWidth;
     };
 
     updateMetrics();
@@ -105,7 +126,37 @@ function ActivityStrip({
     observer.observe(viewport);
     observer.observe(lane);
     return () => observer.disconnect();
-  }, [items, repeatCopies]);
+  }, [items.length, repeatCopies]);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      track.style.transform = "none";
+      return;
+    }
+
+    const pixelsPerSecond = 96;
+    let frame = 0;
+
+    const animate = (now: number) => {
+      const laneWidth = laneWidthRef.current;
+      if (laneWidth > 0) {
+        if (animationStartedAtRef.current == null) animationStartedAtRef.current = now;
+        const elapsedSeconds = (now - animationStartedAtRef.current) / 1000;
+        const travelled = (elapsedSeconds * pixelsPerSecond) % laneWidth;
+        // Left -> right. At the wrap point, lane 1 and lane 2 are visually identical,
+        // so the reset is mathematically seamless instead of visibly jumping.
+        track.style.transform = `translate3d(${-laneWidth + travelled}px, 0, 0)`;
+      }
+      frame = window.requestAnimationFrame(animate);
+    };
+
+    frame = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <button
@@ -136,8 +187,8 @@ function ActivityStrip({
       <span ref={viewportRef} className="relative flex min-w-0 flex-1 items-center overflow-hidden">
         {items.length ? (
           <span
+            ref={trackRef}
             className="tournament-activity-track flex w-max min-w-max items-center whitespace-nowrap text-[11px] font-bold text-white/78 sm:text-xs"
-            style={{ "--ticker-duration": `${durationSeconds}s` } as CSSProperties}
           >
             {[0, 1].map((laneIndex) => (
               <span
@@ -190,8 +241,10 @@ export default function TournamentActivityStrips() {
         predictions?: ActivityEvent[];
         exactHits?: ActivityEvent[];
       };
-      setPredictions(Array.isArray(data.predictions) ? data.predictions : []);
-      setExactHits(Array.isArray(data.exactHits) ? data.exactHits : []);
+      const nextPredictions = Array.isArray(data.predictions) ? data.predictions : [];
+      const nextExactHits = Array.isArray(data.exactHits) ? data.exactHits : [];
+      setPredictions((current) => (sameActivityList(current, nextPredictions) ? current : nextPredictions));
+      setExactHits((current) => (sameActivityList(current, nextExactHits) ? current : nextExactHits));
     } catch {
       // النشاط إضافي للواجهة ولا يجب أن يعطل صفحة البطولة.
     } finally {
