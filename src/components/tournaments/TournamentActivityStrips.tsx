@@ -83,80 +83,44 @@ function ActivityStrip({
   const empty = exact
     ? "يظهر هنا أصحاب التوقعات المطابقة بعد احتساب النتائج"
     : "سيظهر هنا آخر الأعضاء الذين سجّلوا توقعاتهم";
-  const viewportRef = useRef<HTMLSpanElement | null>(null);
-  const trackRef = useRef<HTMLSpanElement | null>(null);
   const laneRef = useRef<HTMLSpanElement | null>(null);
-  const laneWidthRef = useRef(0);
-  const animationStartedAtRef = useRef<number | null>(null);
-  const [repeatCopies, setRepeatCopies] = useState(1);
+  const [animationDuration, setAnimationDuration] = useState<number | null>(null);
 
-  // Keep one lane wider than the viewport, then render an identical second lane.
-  // The actual motion is driven by requestAnimationFrame at a constant px/s speed,
-  // so polling/re-rendering cannot restart the ticker and there is never a blank
-  // interval between the end of one cycle and the beginning of the next.
+  // Keep every lane comfortably wider than the viewport even when there is
+  // only one prediction. The second identical lane makes the wrap seamless.
+  // Duration is derived from the measured width, so both strips move at the
+  // same fixed visual speed regardless of whether there are 1 or 100 items.
+  const copiesPerLane = useMemo(() => {
+    if (!items.length) return 0;
+    return Math.max(2, Math.ceil(16 / items.length));
+  }, [items.length]);
+
   const laneItems = useMemo(() => {
-    if (!items.length) return [];
-    return Array.from({ length: repeatCopies }, () => items).flat();
-  }, [items, repeatCopies]);
+    if (!items.length || copiesPerLane <= 0) return [];
+    return Array.from({ length: copiesPerLane }, () => items).flat();
+  }, [items, copiesPerLane]);
 
   useEffect(() => {
-    const viewport = viewportRef.current;
     const lane = laneRef.current;
-    if (!viewport || !lane || !items.length) {
-      laneWidthRef.current = 0;
-      return;
-    }
-
-    const updateMetrics = () => {
-      const currentLaneWidth = Math.max(1, lane.scrollWidth);
-      const unitWidth = Math.max(1, currentLaneWidth / Math.max(1, repeatCopies));
-      const targetLaneWidth = Math.max(viewport.clientWidth + 320, viewport.clientWidth * 1.7);
-      const nextCopies = Math.max(1, Math.ceil(targetLaneWidth / unitWidth));
-
-      if (nextCopies !== repeatCopies) {
-        setRepeatCopies(nextCopies);
-        return;
-      }
-
-      laneWidthRef.current = currentLaneWidth;
-    };
-
-    updateMetrics();
-    const observer = new ResizeObserver(updateMetrics);
-    observer.observe(viewport);
-    observer.observe(lane);
-    return () => observer.disconnect();
-  }, [items.length, repeatCopies]);
-
-  useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduceMotion) {
-      track.style.transform = "none";
+    if (!lane || !items.length) {
+      setAnimationDuration(null);
       return;
     }
 
     const pixelsPerSecond = 96;
-    let frame = 0;
-
-    const animate = (now: number) => {
-      const laneWidth = laneWidthRef.current;
-      if (laneWidth > 0) {
-        if (animationStartedAtRef.current == null) animationStartedAtRef.current = now;
-        const elapsedSeconds = (now - animationStartedAtRef.current) / 1000;
-        const travelled = (elapsedSeconds * pixelsPerSecond) % laneWidth;
-        // Left -> right. At the wrap point, lane 1 and lane 2 are visually identical,
-        // so the reset is mathematically seamless instead of visibly jumping.
-        track.style.transform = `translate3d(${-laneWidth + travelled}px, 0, 0)`;
+    const updateDuration = () => {
+      const width = lane.getBoundingClientRect().width;
+      if (width > 0) {
+        setAnimationDuration(Math.max(4, width / pixelsPerSecond));
       }
-      frame = window.requestAnimationFrame(animate);
     };
 
-    frame = window.requestAnimationFrame(animate);
-    return () => window.cancelAnimationFrame(frame);
-  }, []);
+    updateDuration();
+    const observer = new ResizeObserver(updateDuration);
+    observer.observe(lane);
+    return () => observer.disconnect();
+  }, [items.length, copiesPerLane]);
+
 
   return (
     <button
@@ -184,11 +148,11 @@ function ActivityStrip({
         {label}
       </span>
 
-      <span ref={viewportRef} className="relative flex min-w-0 flex-1 items-center overflow-hidden">
+      <span className="relative flex min-w-0 flex-1 items-center overflow-hidden">
         {items.length ? (
           <span
-            ref={trackRef}
-            className="tournament-activity-track flex w-max min-w-max items-center whitespace-nowrap text-[11px] font-bold text-white/78 sm:text-xs"
+            className={`tournament-activity-track flex w-max min-w-max items-center whitespace-nowrap text-[11px] font-bold text-white/78 sm:text-xs ${animationDuration ? "is-running" : ""}`}
+            style={animationDuration ? { animationDuration: `${animationDuration}s` } : undefined}
           >
             {[0, 1].map((laneIndex) => (
               <span

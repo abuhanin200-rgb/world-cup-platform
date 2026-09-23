@@ -29,6 +29,10 @@ export default function TournamentCard({ tournament }: TournamentCardProps) {
   const dateRange = formatTournamentDateRange(tournament);
   const cover = tournament.branding.coverUrl ?? tournament.branding.heroUrl;
   const status = getTournamentDisplayStatus(tournament);
+  const displayLocation =
+    tournament.slug === "gulf-cup-27"
+      ? [tournament.hostCountry, tournament.hostCities?.[0]].filter(Boolean).join(" - ")
+      : tournament.hostCountry;
 
   return (
     <Link
@@ -62,7 +66,7 @@ export default function TournamentCard({ tournament }: TournamentCardProps) {
           </div>
 
           <div className="flex flex-wrap gap-2 text-[10px] font-black text-white/86 md:text-xs">
-            {tournament.hostCountry ? <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-white/12 bg-white/[0.08] px-2.5 backdrop-blur-xl"><MapPin className="h-3.5 w-3.5 text-[var(--tournament-accent)]" />{tournament.hostCountry}</span> : null}
+            {displayLocation ? <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-white/12 bg-white/[0.08] px-2.5 backdrop-blur-xl"><MapPin className="h-3.5 w-3.5 text-[var(--tournament-accent)]" />{displayLocation}</span> : null}
             {dateRange ? <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl border border-white/12 bg-white/[0.08] px-2.5 backdrop-blur-xl"><CalendarDays className="h-3.5 w-3.5 text-[var(--tournament-accent)]" /><span className="[unicode-bidi:isolate]" dir="rtl">{dateRange}</span></span> : null}
           </div>
 

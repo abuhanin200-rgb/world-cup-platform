@@ -81,7 +81,9 @@ export default function TournamentShowcase({ tournaments }: Props) {
   if (!active) return null;
 
   const date = formatTournamentDateRange(active);
-  const location = [active.hostCountry, active.hostCities?.[0]].filter(Boolean).join(" · ");
+  const location = [active.hostCountry, active.hostCities?.[0]]
+    .filter(Boolean)
+    .join(active.slug === "gulf-cup-27" ? " - " : " · ");
   const status = getTournamentDisplayStatus(active);
 
   function select(tournament: Tournament) {

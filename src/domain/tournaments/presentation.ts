@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Tournament, TournamentStatus } from "./types";
+import { TOURNAMENT_TIME_ZONE } from "./time";
 
 export type TournamentThemeStyle = CSSProperties & {
   "--tournament-primary": string;
@@ -35,10 +36,6 @@ export function getTournamentDisplayStatus(
   tournament: Tournament,
   now: number = Date.now(),
 ): TournamentStatus {
-  if (tournament.displayStatusOverride) {
-    return tournament.displayStatusOverride;
-  }
-
   if (
     tournament.status === "hidden" ||
     tournament.status === "draft" ||
@@ -72,7 +69,7 @@ export function formatTournamentDateRange(tournament: Tournament): string | null
     day: "numeric",
     month: "long",
     year: "numeric",
-    timeZone: "UTC",
+    timeZone: TOURNAMENT_TIME_ZONE,
   });
 
   if (tournament.startAt && tournament.endAt) {

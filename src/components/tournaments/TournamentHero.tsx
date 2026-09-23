@@ -30,7 +30,14 @@ function worldCupBackdrop(tournament: Tournament) {
 export default function TournamentHero({ tournament }: TournamentHeroProps) {
   const dateRange = formatTournamentDateRange(tournament);
   const displayStatus = getTournamentDisplayStatus(tournament);
-  const hero = tournament.branding.heroUrl ?? tournament.branding.coverUrl;
+  const isGulfCup27 = tournament.slug === "gulf-cup-27";
+  // Gulf 27 already has its official logo rendered as the foreground mark.
+  // Avoid reusing the identity artwork behind it because that artwork also
+  // contains the tournament logo/title and visually duplicates the hero.
+  const hero = isGulfCup27 ? null : (tournament.branding.heroUrl ?? tournament.branding.coverUrl);
+  const displayLocation = isGulfCup27
+    ? [tournament.hostCountry, tournament.hostCities?.[0]].filter(Boolean).join(" - ")
+    : tournament.hostCountry;
 
   return (
     <section style={{ ...getTournamentThemeStyle(tournament), background: worldCupBackdrop(tournament) }} className="relative isolate overflow-hidden border-b border-white/[0.10] bg-[var(--tournament-background)] text-[var(--tournament-text)]">
@@ -49,10 +56,12 @@ export default function TournamentHero({ tournament }: TournamentHeroProps) {
         <div className="grid items-center gap-4 md:grid-cols-[1fr_auto] md:gap-8">
           <div className="order-2 md:order-1">
             <div className="altahaddi-eyebrow altahaddi-glass-chip inline-flex min-h-[30px] items-center gap-1.5 rounded-full px-2.5 font-black text-white/72"><Sparkles className="h-3 w-3 text-[var(--tournament-accent)]" /> {tournament.slug === "gulf-cup-27" ? "خليجي الديار العربية 27" : "موسم مستقل داخل التحدي"}</div>
-            <h1 className="altahaddi-display-title mt-2 max-w-3xl font-black">{tournament.name}</h1>
+            {!isGulfCup27 ? (
+              <h1 className="altahaddi-display-title mt-2 max-w-3xl font-black">{tournament.name}</h1>
+            ) : null}
             {tournament.description ? <p className="altahaddi-body-copy mt-2 max-w-2xl font-semibold text-white/62 md:mt-3">{tournament.description}</p> : null}
             <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-black text-white/88 md:mt-5 md:text-xs">
-              {tournament.hostCountry ? <div className="altahaddi-glass-chip inline-flex min-h-[36px] items-center gap-2 rounded-xl px-3"><MapPin className="h-4 w-4 text-[var(--tournament-accent)]" />{tournament.hostCountry}</div> : null}
+              {displayLocation ? <div className="altahaddi-glass-chip inline-flex min-h-[36px] items-center gap-2 rounded-xl px-3"><MapPin className="h-4 w-4 text-[var(--tournament-accent)]" />{displayLocation}</div> : null}
               {dateRange ? <div className="altahaddi-glass-chip inline-flex min-h-[36px] items-center gap-2 rounded-xl px-3"><CalendarDays className="h-4 w-4 text-[var(--tournament-accent)]" /><span className="[unicode-bidi:isolate]" dir="rtl">{dateRange}</span></div> : null}
             </div>
           </div>
