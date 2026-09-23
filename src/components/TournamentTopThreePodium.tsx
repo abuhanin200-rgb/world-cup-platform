@@ -57,37 +57,45 @@ function PodiumCard({ place, currentUserId }: { place: PodiumPlace; currentUserI
 
   return (
     <article
-      className={`relative overflow-hidden rounded-[20px] border p-3 text-center shadow-lg backdrop-blur-sm md:rounded-[24px] md:p-4 ${style.card} ${
-        isLeader ? "md:-translate-y-3" : ""
+      className={`relative h-[196px] min-w-0 overflow-hidden rounded-[20px] border px-2.5 py-3 text-center shadow-lg backdrop-blur-sm transition-transform md:h-[214px] md:rounded-[24px] md:px-3 md:py-4 ${style.card} ${
+        isLeader ? "z-10 -translate-y-4 md:-translate-y-6" : "translate-y-0"
       } ${isCurrentUser ? "ring-2 ring-[var(--tournament-primary)]/35" : ""}`}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/[0.08] to-transparent" />
-      <div className="relative">
+      {isLeader ? (
+        <>
+          <div className="pointer-events-none absolute -top-8 left-1/2 h-24 w-24 -translate-x-1/2 rounded-full bg-amber-300/15 blur-2xl" />
+          <div className="pointer-events-none absolute inset-x-5 bottom-2 h-px bg-gradient-to-r from-transparent via-amber-300/30 to-transparent" />
+        </>
+      ) : null}
+      <div className="relative flex h-full flex-col items-center">
         <div className="mx-auto flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-slate-950/30 px-2.5 py-1 text-[9px] font-black text-white/65 md:text-[10px]">
           {isLeader ? <Crown className="h-3.5 w-3.5 text-amber-300" aria-hidden="true" /> : <Medal className="h-3.5 w-3.5" aria-hidden="true" />}
           {style.label}
         </div>
 
-        <div className={`mx-auto mt-3 grid h-12 w-12 place-items-center rounded-full text-lg font-black shadow-md md:h-14 md:w-14 md:text-xl ${style.badge}`}>
+        <div className={`mx-auto mt-2.5 grid h-11 w-11 shrink-0 place-items-center rounded-full text-base font-black shadow-md md:mt-3 md:h-[52px] md:w-[52px] md:text-lg ${style.badge}`}>
           {place.rank}
         </div>
 
         {place.row ? (
           <>
-            <h3 className={`mt-2 truncate text-sm font-black md:text-base ${style.name}`}>
-              <MemberProfileLink userId={place.row.userId}>{place.row.fullName}</MemberProfileLink>
+            <h3 className={`mt-2 flex h-[34px] w-full items-center justify-center overflow-hidden px-0.5 text-[11px] font-black leading-[17px] md:h-[38px] md:text-[13px] md:leading-[19px] ${style.name}`}>
+              <span className="line-clamp-2 max-w-full break-words">
+                <MemberProfileLink userId={place.row.userId}>{place.row.fullName}</MemberProfileLink>
+              </span>
             </h3>
             {isCurrentUser ? <span className="mt-1 inline-flex rounded-full bg-[var(--tournament-primary)]/15 px-2 py-0.5 text-[8px] font-black text-[var(--tournament-primary)]">أنت</span> : null}
-            <div className="mt-2 flex items-end justify-center gap-1">
-              <span dir="ltr" className="text-2xl font-black tabular-nums text-white [unicode-bidi:isolate] md:text-3xl">{place.row.points}</span>
-              <span className="pb-1 text-[9px] font-bold text-white/45">نقطة</span>
+            <div className="mt-auto flex items-end justify-center gap-1 pt-1">
+              <span dir="ltr" className="text-xl font-black tabular-nums text-white [unicode-bidi:isolate] md:text-2xl">{place.row.points}</span>
+              <span className="pb-0.5 text-[8px] font-bold text-white/45 md:text-[9px]">نقطة</span>
             </div>
-            <div className="mt-1 text-[9px] font-bold text-white/45 md:text-[10px]">
+            <div className="mt-1 text-[8px] font-bold text-white/45 md:text-[9px]">
               {place.row.exact} بالملي · {place.row.played} توقع
             </div>
           </>
         ) : (
-          <div className="mt-3 rounded-xl border border-dashed border-white/10 bg-slate-950/20 px-2 py-4 text-[10px] font-bold text-white/40">
+          <div className="mt-auto mb-auto rounded-xl border border-dashed border-white/10 bg-slate-950/20 px-2 py-4 text-[9px] font-bold text-white/40 md:text-[10px]">
             بانتظار المنافسة
           </div>
         )}
@@ -188,17 +196,17 @@ export default function TournamentTopThreePodium({ tournament }: Props) {
   }, [rows]);
 
   return (
-    <section className="relative mt-5 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.055] p-3 shadow-xl shadow-black/10 md:mt-7 md:rounded-[28px] md:p-5">
+    <section className="relative mt-3 overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.055] p-3 shadow-xl shadow-black/10 md:mt-4 md:rounded-[28px] md:p-5">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,.08),transparent_35%),linear-gradient(135deg,transparent,rgba(255,255,255,.025))]" />
       <div className="relative">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-1.5 text-[9px] font-black text-[var(--tournament-accent)] md:text-[10px]">
               <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
               سباق الصدارة
             </div>
-            <h2 className="mt-1 text-lg font-black text-white md:text-2xl">الثلاثة الأوائل الآن</h2>
-            <p className="mt-1 text-[10px] font-semibold text-white/45 md:text-[11px]">يتحدث تلقائيًا من نفس ترتيب البطولة بعد كل احتساب.</p>
+            <h2 className="mt-1 text-[17px] font-black text-white md:text-xl">الثلاثة الأوائل الآن</h2>
+            <p className="mt-1 text-[9px] font-semibold text-white/45 md:text-[10px]">يتحدث تلقائيًا بعد كل احتساب.</p>
           </div>
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-amber-300/20 bg-amber-300/10 text-amber-300">
             <Trophy className="h-5 w-5" aria-hidden="true" />
@@ -216,7 +224,8 @@ export default function TournamentTopThreePodium({ tournament }: Props) {
           </div>
         ) : (
           <>
-            <div className="mt-4 grid grid-cols-3 items-end gap-2 md:mt-7 md:gap-3">
+            <div className="relative mt-7 grid grid-cols-3 items-end gap-2 pt-4 md:mt-9 md:gap-3 md:pt-6">
+              <div aria-hidden="true" className="pointer-events-none absolute inset-x-[8%] bottom-0 h-16 rounded-[50%] bg-gradient-to-t from-black/20 to-transparent blur-xl" />
               {places.map((place) => <PodiumCard key={place.rank} place={place} currentUserId={user?.id} />)}
             </div>
             <MotivationCard rows={rows} tournament={tournament} currentUserId={user?.id} />

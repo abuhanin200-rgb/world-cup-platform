@@ -15,9 +15,9 @@ const FEATURES = [
 export default function TournamentOverview({ tournament }: { tournament: Tournament }) {
   return (
     <div style={getTournamentThemeStyle(tournament)} className="mx-auto max-w-7xl px-3 pb-10 sm:px-4 md:px-6 md:pb-16">
+      {tournament.id === GULF_CUP_27_TOURNAMENT_ID || tournament.id === ASIAN_CUP_2027_TOURNAMENT_ID ? <TournamentTopThreePodium tournament={tournament} /> : null}
       <TournamentStatsSummary tournament={tournament} />
       {tournament.id === GULF_CUP_27_TOURNAMENT_ID ? <GulfCup27OverviewLive /> : null}
-      {tournament.id === GULF_CUP_27_TOURNAMENT_ID || tournament.id === ASIAN_CUP_2027_TOURNAMENT_ID ? <TournamentTopThreePodium tournament={tournament} /> : null}
       <div className="mb-3 mt-5 flex items-center justify-between gap-3 md:mt-7">
         <div><div className="flex items-center gap-1.5 text-[9px] font-black text-[var(--tournament-accent)]"><Sparkles className="h-3 w-3" /> مركز البطولة</div><h2 className="mt-1 text-lg font-black md:text-2xl">كل ما تحتاجه داخل {tournament.shortName}</h2></div>
       </div>
