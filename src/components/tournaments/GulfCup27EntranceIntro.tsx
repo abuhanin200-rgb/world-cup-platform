@@ -1,16 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const INTRO_SRC = "/tournaments/gulf-cup-27/intro-3039-v1.mp4";
 const POSTER_SRC = "/tournaments/gulf-cup-27/intro-3039-poster.jpg";
 const EXIT_MS = 180;
 const SAFETY_TIMEOUT_MS = 5200;
+const SKIP_INTRO_ONCE_KEY = "altahaddi:gulf27:skip-intro-once";
 
 /**
  * Exact Gulf Cup 27 entrance video.
- * Mounted only on the tournament home page, so it replays every time the user
- * enters /tournaments/gulf-cup-27 from another route. No session/local storage.
+ * It is rendered only on the tournament home route.
+ * Returning to Overview from an internal Gulf 27 tab sets a one-shot session flag,
+ * so the intro is skipped for that internal navigation only.
  */
 export default function GulfCup27EntranceIntro() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -19,6 +21,18 @@ export default function GulfCup27EntranceIntro() {
   const finishedRef = useRef(false);
   const [visible, setVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
+
+  useLayoutEffect(() => {
+    try {
+      if (window.sessionStorage.getItem(SKIP_INTRO_ONCE_KEY) === "1") {
+        window.sessionStorage.removeItem(SKIP_INTRO_ONCE_KEY);
+        finishedRef.current = true;
+        setVisible(false);
+      }
+    } catch {
+      // sessionStorage may be unavailable in restrictive browser modes.
+    }
+  }, []);
 
   const finish = useCallback(() => {
     if (finishedRef.current) return;
@@ -30,6 +44,8 @@ export default function GulfCup27EntranceIntro() {
   }, []);
 
   useEffect(() => {
+    if (!visible || finishedRef.current) return;
+
     const html = document.documentElement;
     const body = document.body;
     const previousHtmlOverflow = html.style.overflow;
@@ -66,7 +82,7 @@ export default function GulfCup27EntranceIntro() {
       html.style.overflow = previousHtmlOverflow;
       body.style.overflow = previousBodyOverflow;
     };
-  }, [finish]);
+  }, [finish, visible]);
 
   useEffect(() => {
     if (!visible) {
