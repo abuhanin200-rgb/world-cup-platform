@@ -15,7 +15,10 @@ export async function generateMetadata({ params }: TournamentPageProps): Promise
   const { slug } = await params;
   const tournament = await tournamentService.getBySlug(slug);
   if (!tournament) return {};
-  return { title: tournament.name, description: tournament.description || `نظرة عامة على ${tournament.name} في منصة التحدي.` };
+  return {
+    title: tournament.name,
+    description: tournament.description || `نظرة عامة على ${tournament.name} في منصة التحدي.`,
+  };
 }
 
 export default async function TournamentPage({ params }: TournamentPageProps) {
@@ -34,6 +37,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       style={getTournamentThemeStyle(tournament)}
       className="min-h-screen bg-[var(--tournament-background)] text-[var(--tournament-text)]"
     >
+      {/* Home page only. Because this page unmounts on section routes, the intro replays on every re-entry. */}
       {isGulfCup27 ? <GulfCup27EntranceIntro /> : null}
       <TournamentHero tournament={tournament} />
       {isGulfCup27 ? <TournamentActivityStrips /> : null}
