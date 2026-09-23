@@ -681,3 +681,223 @@ body {
     transform: none !important;
   }
 }
+
+/* Gulf 27 entrance intro — inspired by the supplied short reference clip. */
+html.gulf27-intro-lock,
+html.gulf27-intro-lock body {
+  overflow: hidden !important;
+}
+
+.gulf27-entrance-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  overflow: hidden;
+  background: #020704;
+  isolation: isolate;
+  pointer-events: all;
+  opacity: 1;
+  transform: translateZ(0);
+  animation: gulf27IntroAppear 220ms ease-out both;
+}
+
+.gulf27-entrance-intro--exit {
+  pointer-events: none;
+  animation: gulf27IntroExit 570ms cubic-bezier(.22,.7,.2,1) both;
+}
+
+.gulf27-entrance-intro__base,
+.gulf27-entrance-intro__metal,
+.gulf27-entrance-intro__shine,
+.gulf27-entrance-intro__vignette {
+  position: absolute;
+  inset: -12%;
+}
+
+.gulf27-entrance-intro__base {
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 51% 48%, rgba(255,255,255,.08) 0 7%, transparent 29%),
+    radial-gradient(ellipse at 72% 18%, rgba(14,111,70,.25), transparent 34%),
+    radial-gradient(ellipse at 34% 78%, rgba(86,4,13,.22), transparent 32%),
+    linear-gradient(165deg,#020503 0%,#06120b 47%,#020504 100%);
+}
+
+.gulf27-entrance-intro__metal {
+  filter: blur(2px) saturate(1.22) contrast(1.25);
+  opacity: .92;
+  will-change: transform, filter;
+  background-size: 135% 135%, 90px 90px, 100% 100%;
+  mix-blend-mode: screen;
+}
+
+.gulf27-entrance-intro__metal::before,
+.gulf27-entrance-intro__metal::after {
+  content: "";
+  position: absolute;
+  inset: -12%;
+  border-radius: 42% 58% 57% 43% / 46% 37% 63% 54%;
+  background:
+    repeating-radial-gradient(ellipse at 45% 38%, rgba(255,255,255,.38) 0 1px, rgba(255,255,255,.06) 2px 5px, rgba(0,0,0,.32) 8px 13px, transparent 16px 25px),
+    conic-gradient(from 210deg at 54% 44%, rgba(255,255,255,.05), rgba(255,255,255,.44), rgba(0,0,0,.78), rgba(255,255,255,.24), rgba(0,0,0,.7), rgba(255,255,255,.08));
+  filter: blur(1.2px) contrast(1.45);
+  box-shadow: inset 0 0 85px rgba(255,255,255,.12), inset 0 0 130px rgba(0,0,0,.75);
+}
+
+.gulf27-entrance-intro__metal::after {
+  inset: 8% -15% -9% 18%;
+  opacity: .62;
+  transform: rotate(19deg) scale(1.12);
+  filter: blur(6px) contrast(1.6);
+}
+
+.gulf27-entrance-intro__metal--green {
+  background:
+    radial-gradient(ellipse at 42% 34%, rgba(0,188,110,.72), transparent 33%),
+    radial-gradient(ellipse at 72% 62%, rgba(0,103,62,.64), transparent 34%),
+    linear-gradient(142deg, rgba(0,35,21,.4), rgba(0,173,102,.22) 48%, transparent 72%);
+  animation: gulf27LiquidGreen 3.15s cubic-bezier(.18,.76,.22,1) both;
+}
+
+.gulf27-entrance-intro__metal--silver {
+  background:
+    radial-gradient(ellipse at 52% 52%, rgba(255,255,255,.72), transparent 24%),
+    radial-gradient(ellipse at 35% 70%, rgba(159,177,170,.46), transparent 32%),
+    linear-gradient(112deg, transparent 18%, rgba(255,255,255,.18) 49%, transparent 74%);
+  opacity: .84;
+  animation: gulf27LiquidSilver 3.15s cubic-bezier(.17,.76,.18,1) both;
+}
+
+.gulf27-entrance-intro__metal--red {
+  background:
+    radial-gradient(ellipse at 71% 36%, rgba(206,17,47,.72), transparent 29%),
+    radial-gradient(ellipse at 44% 78%, rgba(92,0,17,.55), transparent 35%),
+    linear-gradient(118deg, transparent 18%, rgba(173,3,32,.22) 47%, transparent 76%);
+  opacity: .80;
+  animation: gulf27LiquidRed 3.15s cubic-bezier(.18,.78,.2,1) both;
+}
+
+.gulf27-entrance-intro__shine {
+  inset: -35%;
+  z-index: 3;
+  opacity: .58;
+  background: linear-gradient(112deg, transparent 36%, rgba(255,255,255,.5) 48%, rgba(255,255,255,.08) 52%, transparent 62%);
+  transform: translate3d(-58%,0,0) rotate(7deg);
+  mix-blend-mode: screen;
+  animation: gulf27IntroShine 2.3s .18s cubic-bezier(.16,.72,.22,1) both;
+}
+
+.gulf27-entrance-intro__vignette {
+  inset: 0;
+  z-index: 5;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,.58), transparent 17%, transparent 76%, rgba(0,0,0,.62)),
+    radial-gradient(ellipse at center, transparent 36%, rgba(0,0,0,.48) 100%);
+}
+
+.gulf27-entrance-intro__logo-wrap {
+  position: absolute;
+  z-index: 10;
+  left: 50%;
+  top: 50%;
+  width: clamp(126px, 28vw, 220px);
+  aspect-ratio: 0.67;
+  transform: translate3d(-50%,-48%,0) scale(.76);
+  filter: drop-shadow(0 16px 34px rgba(0,0,0,.72));
+  animation: gulf27LogoRise 2.85s cubic-bezier(.17,.82,.21,1) both;
+}
+
+.gulf27-entrance-intro__logo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.gulf27-entrance-intro__logo--ghost {
+  opacity: 0;
+  filter: grayscale(1) brightness(4.2) contrast(.72);
+  animation: gulf27LogoGhost 1.22s .1s ease-out both;
+}
+
+.gulf27-entrance-intro__logo--color {
+  opacity: 0;
+  animation: gulf27LogoColor 1.72s .64s cubic-bezier(.18,.78,.2,1) both;
+}
+
+@keyframes gulf27IntroAppear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gulf27IntroExit {
+  0% { opacity: 1; filter: blur(0); transform: scale(1); }
+  62% { opacity: .78; filter: blur(2px); transform: scale(1.018); }
+  100% { opacity: 0; filter: blur(10px); transform: scale(1.055); }
+}
+
+@keyframes gulf27LiquidGreen {
+  0% { transform: translate3d(-22%,8%,0) rotate(-7deg) scale(1.28); opacity: .18; }
+  28% { opacity: .96; }
+  58% { transform: translate3d(3%,-3%,0) rotate(4deg) scale(1.12); }
+  100% { transform: translate3d(20%,-13%,0) rotate(11deg) scale(1.24); opacity: .72; }
+}
+
+@keyframes gulf27LiquidSilver {
+  0% { transform: translate3d(4%,34%,0) rotate(8deg) scale(1.38); opacity: .1; }
+  22% { opacity: .82; }
+  64% { transform: translate3d(-4%,-3%,0) rotate(-7deg) scale(1.08); }
+  100% { transform: translate3d(-10%,-28%,0) rotate(-14deg) scale(1.2); opacity: .58; }
+}
+
+@keyframes gulf27LiquidRed {
+  0% { transform: translate3d(26%,-18%,0) rotate(10deg) scale(1.32); opacity: .08; }
+  31% { opacity: .82; }
+  68% { transform: translate3d(-2%,5%,0) rotate(-4deg) scale(1.12); }
+  100% { transform: translate3d(-18%,17%,0) rotate(-12deg) scale(1.28); opacity: .6; }
+}
+
+@keyframes gulf27IntroShine {
+  0% { transform: translate3d(-58%,0,0) rotate(7deg); opacity: 0; }
+  18% { opacity: .58; }
+  72% { opacity: .4; }
+  100% { transform: translate3d(62%,0,0) rotate(7deg); opacity: 0; }
+}
+
+@keyframes gulf27LogoRise {
+  0% { transform: translate3d(-50%,-42%,0) scale(.67); filter: blur(8px) drop-shadow(0 12px 25px rgba(0,0,0,.75)); }
+  24% { filter: blur(0) drop-shadow(0 15px 32px rgba(0,0,0,.75)); }
+  72% { transform: translate3d(-50%,-50%,0) scale(1.02); }
+  100% { transform: translate3d(-50%,-50%,0) scale(1); }
+}
+
+@keyframes gulf27LogoGhost {
+  0% { opacity: 0; transform: scale(.86); }
+  18% { opacity: .95; }
+  74% { opacity: .88; }
+  100% { opacity: 0; transform: scale(1.025); }
+}
+
+@keyframes gulf27LogoColor {
+  0% { opacity: 0; transform: scale(.96); filter: saturate(.45) brightness(1.45); }
+  30% { opacity: .96; }
+  100% { opacity: 1; transform: scale(1); filter: saturate(1.08) brightness(1); }
+}
+
+@media (max-width: 640px) {
+  .gulf27-entrance-intro__logo-wrap {
+    width: clamp(118px, 35vw, 165px);
+  }
+  .gulf27-entrance-intro__metal {
+    inset: -19%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gulf27-entrance-intro {
+    display: none !important;
+  }
+}

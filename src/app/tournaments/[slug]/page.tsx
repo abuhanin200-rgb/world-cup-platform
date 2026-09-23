@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import GulfCup27EntranceIntro from "@/components/tournaments/GulfCup27EntranceIntro";
 import TournamentHero from "@/components/tournaments/TournamentHero";
 import TournamentNavigation from "@/components/tournaments/TournamentNavigation";
 import TournamentActivityStrips from "@/components/tournaments/TournamentActivityStrips";
@@ -25,14 +26,17 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     notFound();
   }
 
+  const isGulfCup27 = tournament.slug === "gulf-cup-27";
+
   return (
     <main
       dir="rtl"
       style={getTournamentThemeStyle(tournament)}
       className="min-h-screen bg-[var(--tournament-background)] text-[var(--tournament-text)]"
     >
+      {isGulfCup27 ? <GulfCup27EntranceIntro /> : null}
       <TournamentHero tournament={tournament} />
-      {tournament.slug === "gulf-cup-27" ? <TournamentActivityStrips /> : null}
+      {isGulfCup27 ? <TournamentActivityStrips /> : null}
       <TournamentNavigation tournament={tournament} activeSection="home" />
       <TournamentOverview tournament={tournament} />
     </main>
