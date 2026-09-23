@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BadgeCheck, Clock3, List, Sparkles, X } from "lucide-react";
 import { GULF_CUP_27_TOURNAMENT_ID } from "@/domain/tournaments";
 
@@ -69,6 +69,15 @@ function sameActivityList(a: ActivityEvent[], b: ActivityEvent[]) {
   return true;
 }
 
+function getTickerRepeatCount(count: number) {
+  if (count <= 1) return 16;
+  if (count <= 3) return 12;
+  if (count <= 6) return 8;
+  if (count <= 12) return 5;
+  if (count <= 25) return 3;
+  return 2;
+}
+
 function ActivityStrip({
   kind,
   items,
@@ -80,47 +89,75 @@ function ActivityStrip({
 }) {
   const exact = kind === "exactHits";
   const label = exact ? "جابها صح" : "آخر التوقعات";
-  const empty = exact
-    ? "يظهر هنا أصحاب التوقعات المطابقة بعد احتساب النتائج"
-    : "سيظهر هنا آخر الأعضاء الذين سجّلوا توقعاتهم";
-  const laneRef = useRef<HTMLSpanElement | null>(null);
-  const [animationDuration, setAnimationDuration] = useState<number | null>(null);
+  const emptyTickerText = exact ? "لا توجد نتائج حاليا" : "لا توجد توقعات حاليا";
+  const groupRef = useRef<HTMLSpanElement | null>(null);
+  const [groupWidth, setGroupWidth] = useState(0);
 
-  // Keep every lane comfortably wider than the viewport even when there is
-  // only one prediction. The second identical lane makes the wrap seamless.
-  // Duration is derived from the measured width, so both strips move at the
-  // same fixed visual speed regardless of whether there are 1 or 100 items.
-  const copiesPerLane = useMemo(() => {
-    if (!items.length) return 0;
-    return Math.max(2, Math.ceil(16 / items.length));
-  }, [items.length]);
+  // نفس أسلوب شريط «آخر التوقعات» القديم في منصة كأس العالم:
+  // مجموعة طويلة + نسخة مطابقة منها، ثم تحريك نصف المسار فقط.
+  // عند نهاية الدورة تكون النسخة التالية في نفس الموضع تمامًا، لذلك لا توجد
+  // قفزة أو لحظة اختفاء بين دورة وأخرى.
+  const tickerEntries = useMemo(
+    () =>
+      items.length
+        ? items.map((item) => ({ id: item.id, text: activityText(item, kind) }))
+        : [{ id: `${kind}-empty`, text: emptyTickerText }],
+    [items, kind, emptyTickerText],
+  );
 
-  const laneItems = useMemo(() => {
-    if (!items.length || copiesPerLane <= 0) return [];
-    return Array.from({ length: copiesPerLane }, () => items).flat();
-  }, [items, copiesPerLane]);
+  const repeatedEntries = useMemo(() => {
+    const repeatCount = getTickerRepeatCount(tickerEntries.length);
+    return Array.from({ length: repeatCount }, (_, repeatIndex) =>
+      tickerEntries.map((entry, entryIndex) => ({
+        ...entry,
+        renderKey: `${repeatIndex}-${entryIndex}-${entry.id}`,
+      })),
+    ).flat();
+  }, [tickerEntries]);
 
   useEffect(() => {
-    const lane = laneRef.current;
-    if (!lane || !items.length) {
-      setAnimationDuration(null);
-      return;
-    }
+    const group = groupRef.current;
+    if (!group) return;
 
-    const pixelsPerSecond = 96;
-    const updateDuration = () => {
-      const width = lane.getBoundingClientRect().width;
-      if (width > 0) {
-        setAnimationDuration(Math.max(4, width / pixelsPerSecond));
-      }
+    const measure = () => {
+      const nextWidth = group.scrollWidth;
+      if (nextWidth > 0) setGroupWidth(nextWidth);
     };
 
-    updateDuration();
-    const observer = new ResizeObserver(updateDuration);
-    observer.observe(lane);
-    return () => observer.disconnect();
-  }, [items.length, copiesPerLane]);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(group);
+    window.addEventListener("resize", measure);
 
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [repeatedEntries]);
+
+  // سرعة بصرية ثابتة مهما زاد أو قل عدد العناصر.
+  // المدة تتغير مع عرض المجموعة، أما السرعة نفسها فتبقى ثابتة.
+  const pixelsPerSecond = 58;
+  const duration = Math.max(8, (groupWidth || 1800) / pixelsPerSecond);
+  const tickerStyle = {
+    "--tournament-ticker-duration": `${duration}s`,
+  } as CSSProperties;
+
+  const renderEntries = (copy: "a" | "b") =>
+    repeatedEntries.map((entry) => (
+      <span
+        key={`${copy}-${entry.renderKey}`}
+        dir="rtl"
+        className="inline-flex shrink-0 items-center gap-2"
+      >
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${
+            exact ? "bg-amber-300" : "bg-emerald-300"
+          }`}
+        />
+        <span>{entry.text}</span>
+      </span>
+    ));
 
   return (
     <button
@@ -148,37 +185,25 @@ function ActivityStrip({
         {label}
       </span>
 
-      <span className="relative flex min-w-0 flex-1 items-center overflow-hidden">
-        {items.length ? (
+      <span
+        dir="ltr"
+        className="tournament-activity-wrapper relative flex min-w-0 flex-1 items-center overflow-hidden"
+      >
+        <span
+          className="tournament-activity-marquee flex w-max min-w-max items-center whitespace-nowrap text-[11px] font-bold text-white/78 sm:text-xs"
+          style={tickerStyle}
+          aria-hidden="true"
+        >
           <span
-            className={`tournament-activity-track flex w-max min-w-max items-center whitespace-nowrap text-[11px] font-bold text-white/78 sm:text-xs ${animationDuration ? "is-running" : ""}`}
-            style={animationDuration ? { animationDuration: `${animationDuration}s` } : undefined}
+            ref={groupRef}
+            className="tournament-activity-group flex flex-none items-center gap-8 px-4"
           >
-            {[0, 1].map((laneIndex) => (
-              <span
-                key={laneIndex}
-                ref={laneIndex === 0 ? laneRef : undefined}
-                className="tournament-activity-lane flex shrink-0 items-center gap-8 px-4"
-                aria-hidden={laneIndex === 1 ? "true" : undefined}
-              >
-                {laneItems.map((item, index) => (
-                  <span
-                    key={`${laneIndex}-${item.id}-${index}`}
-                    dir="rtl"
-                    className="inline-flex shrink-0 items-center gap-2"
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${exact ? "bg-amber-300" : "bg-emerald-300"}`} />
-                    <span>{activityText(item, kind)}</span>
-                  </span>
-                ))}
-              </span>
-            ))}
+            {renderEntries("a")}
           </span>
-        ) : (
-          <span className="truncate px-4 text-[11px] font-semibold text-white/45 sm:text-xs">
-            {empty}
+          <span className="tournament-activity-group flex flex-none items-center gap-8 px-4">
+            {renderEntries("b")}
           </span>
-        )}
+        </span>
       </span>
 
       <span className="inline-flex shrink-0 items-center border-r border-white/[0.06] px-2 text-white/35 transition group-hover:text-white/70">

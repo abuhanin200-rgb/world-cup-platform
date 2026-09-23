@@ -663,28 +663,52 @@ body {
 
 
 
-/* Gulf 27 live activity strips — fixed px/s, gapless infinite loop. */
-.tournament-activity-track {
+/* Gulf 27 activity tickers — same seamless two-group marquee model used by
+   the legacy World Cup latest-predictions ticker. Each group is identical, so
+   moving exactly half the track loops without a blank frame or visible jump. */
+@keyframes tournamentActivityTicker {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.tournament-activity-wrapper {
   direction: ltr;
-  will-change: transform;
+  isolation: isolate;
+  contain: layout paint;
+  -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  transform: translate3d(-50%, 0, 0);
 }
 
-.tournament-activity-track.is-running {
-  animation-name: tournament-activity-marquee;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  animation-play-state: running;
+.tournament-activity-marquee {
+  direction: ltr;
+  animation-name: tournamentActivityTicker !important;
+  animation-duration: var(--tournament-ticker-duration, 30s) !important;
+  animation-timing-function: linear !important;
+  animation-iteration-count: infinite !important;
+  animation-play-state: running !important;
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
-.tournament-activity-lane {
+.tournament-activity-group {
   direction: ltr;
   min-width: max-content;
 }
 
-@keyframes tournament-activity-marquee {
-  from { transform: translate3d(-50%, 0, 0); }
-  to { transform: translate3d(0, 0, 0); }
+/* The two live information strips are status feeds, not decorative motion.
+   Keep their continuous marquee running even when the OS reduces other motion. */
+@media (prefers-reduced-motion: reduce) {
+  .tournament-activity-marquee {
+    animation-name: tournamentActivityTicker !important;
+    animation-duration: var(--tournament-ticker-duration, 30s) !important;
+    animation-timing-function: linear !important;
+    animation-iteration-count: infinite !important;
+    animation-play-state: running !important;
+  }
 }
 
