@@ -695,8 +695,10 @@ function mapEmbeddedFixtureLineups(
 }
 
 /**
- * Uses the enriched /fixtures?ids response so several historical lineups can
- * be retrieved in one API request (up to 20 fixture ids per chunk).
+ * Prefer the enriched /fixtures?ids response so several historical lineups
+ * share one request. If a competition/provider response omits the embedded
+ * block, fall back to the dedicated /fixtures/lineups endpoint only for the
+ * missing fixture. The composed match result is cached by the server layer.
  */
 export async function getApiFootballLineupsByFixtureIds(ids: number[]) {
   const uniqueIds = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
@@ -707,17 +709,35 @@ export async function getApiFootballLineupsByFixtureIds(ids: number[]) {
     const chunk = uniqueIds.slice(index, index + 20);
     if (!chunk.length) continue;
 
-    const result = await apiFootballGet<Array<Record<string, unknown>>>(
-      "/fixtures",
-      { ids: chunk.join("-") },
-    );
+    const resolved = new Set<number>();
+    try {
+      const result = await apiFootballGet<Array<Record<string, unknown>>>(
+        "/fixtures",
+        { ids: chunk.join("-") },
+      );
+      quotaRemaining = result.quotaRemaining;
+      for (const row of result.data) {
+        const mapped = mapEmbeddedFixtureLineups(row);
+        if (!mapped || !mapped.lineups.length) continue;
+        fixtures.push(mapped);
+        resolved.add(mapped.fixtureId);
+      }
+    } catch {
+      // Dedicated fallback below handles the whole chunk if enrichment fails.
+    }
 
-    fixtures.push(
-      ...result.data
-        .map(mapEmbeddedFixtureLineups)
-        .filter((item): item is ApiFootballFixtureLineups => Boolean(item)),
-    );
-    quotaRemaining = result.quotaRemaining;
+    for (const fixtureId of chunk) {
+      if (resolved.has(fixtureId)) continue;
+      try {
+        const result = await getApiFootballFixtureLineups(fixtureId);
+        quotaRemaining = result.quotaRemaining;
+        if (result.lineups.length) {
+          fixtures.push({ fixtureId, lineups: result.lineups });
+        }
+      } catch {
+        // One uncovered old fixture must not break the current match view.
+      }
+    }
   }
 
   return { fixtures, quotaRemaining };

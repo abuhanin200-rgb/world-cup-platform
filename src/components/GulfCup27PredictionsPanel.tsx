@@ -121,12 +121,15 @@ function formatKickoff(timestamp: number) {
 
 function formatCountdown(milliseconds: number) {
   const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds]
+  const clock = [hours, minutes, seconds]
     .map((value) => String(value).padStart(2, "0"))
     .join(":");
+
+  return { days, clock };
 }
 
 function Countdown({
@@ -150,18 +153,27 @@ function Countdown({
         ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
         : "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
 
+  const countdown = formatCountdown(remaining);
+
   return (
     <span
-      className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black ${tone}`}
+      dir="rtl"
+      className={`inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-black ${tone}`}
     >
       <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       <span>{mode === "open" ? "يفتح بعد" : "يغلق بعد"}</span>
-      <span
+      {countdown.days > 0 ? (
+        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+          <bdi dir="ltr" className="tabular-nums">{countdown.days}</bdi>
+          <span>{countdown.days === 1 ? "يوم" : "أيام"}</span>
+        </span>
+      ) : null}
+      <bdi
         dir="ltr"
-        className="font-mono text-[13px] font-black tabular-nums tracking-[0.08em] [unicode-bidi:isolate]"
+        className="font-mono text-[13px] font-black tabular-nums tracking-[0.06em]"
       >
-        {formatCountdown(remaining)}
-      </span>
+        {countdown.clock}
+      </bdi>
     </span>
   );
 }

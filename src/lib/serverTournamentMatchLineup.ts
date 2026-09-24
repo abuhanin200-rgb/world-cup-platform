@@ -15,14 +15,15 @@ import {
 } from "@/lib/serverApiFootball";
 import {
   getVerifiedGulfCup27Coach,
+  getVerifiedGulfCup27ExpectedLineupOverride,
+  getVerifiedGulfCup27ManualAbsences,
   resolveVerifiedGulfCup27Player,
-  type GulfCup27VerifiedRole,
 } from "@/domain/tournaments/gulfCup27VerifiedRosters";
 
 const LINEUP_CACHE_COLLECTION = "tournamentMatchLineupCache";
 const SQUAD_CACHE_COLLECTION = "apiFootballTeamSquadCache";
-const LINEUP_SCHEMA_VERSION = 4;
-const SQUAD_SCHEMA_VERSION = 1;
+const LINEUP_SCHEMA_VERSION = 10;
+const SQUAD_SCHEMA_VERSION = 3;
 const SQUAD_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const EXPECTED_LINEUP_TTL_MS = 90 * 60 * 1000;
 const NEAR_MATCH_TTL_MS = 30 * 60 * 1000;
@@ -235,14 +236,6 @@ async function getTeamSquad(providerTeamId: number) {
   }
 }
 
-function normalizeRole(position: string): GulfCup27VerifiedRole {
-  const value = clean(position).toUpperCase();
-  if (value === "G" || value.includes("GOAL")) return "G";
-  if (value === "D" || value.includes("DEF")) return "D";
-  if (value === "M" || value.includes("MID")) return "M";
-  return "F";
-}
-
 function verifiedPlayer(localTeamId: string, player: ApiFootballLineupPlayer | ApiFootballSquadPlayer) {
   return resolveVerifiedGulfCup27Player({
     teamId: localTeamId,
@@ -261,11 +254,13 @@ function enrichPlayer(
     verifiedPlayer(localTeamId, player) ||
     (squad ? verifiedPlayer(localTeamId, squad) : null);
 
+  const explicitArabicName = /[\u0600-\u06FF]/.test(player.name) ? player.name : "";
+
   return {
     id: player.id,
-    name: verified?.nameAr || squad?.name || player.name,
+    name: verified?.nameAr || explicitArabicName || "الاسم غير متاح",
     number: player.number ?? squad?.number ?? null,
-    position: verified?.role || player.position || squad?.position || "",
+    position: player.position || squad?.position || verified?.role || "",
     grid: player.grid,
     photo:
       squad?.photo ||
@@ -344,6 +339,16 @@ function expectedGridSlots(formation: string | null) {
   return slots;
 }
 
+function roleForFormationSlot(slot: string, formation: string | null) {
+  const row = Number(slot.split(":")[0]);
+  const parts = formationParts(formation);
+  if (row === 1) return "G" as const;
+  if (!parts) return null;
+  if (row === 2) return "D" as const;
+  if (row === parts.length + 1) return "F" as const;
+  return "M" as const;
+}
+
 function lineupsForTeam(input: {
   providerTeamId: number;
   recentFixtures: RecentFixture[];
@@ -367,126 +372,153 @@ function lineupsForTeam(input: {
     .slice(0, 6);
 }
 
-function buildExpectedLineup(input: {
+
+function buildCuratedExpectedLineup(input: {
+  matchId: string;
   localTeamId: string;
   providerTeamId: number;
+  squad: ApiFootballSquadPlayer[];
   recentFixtures: RecentFixture[];
   fixtureLineups: Array<{ fixtureId: number; lineups: ApiFootballTeamLineup[] }>;
+  excludedPlayerIds?: Set<number>;
 }) {
+  const override = getVerifiedGulfCup27ExpectedLineupOverride(
+    input.matchId,
+    input.localTeamId,
+  );
+  if (!override || override.starters.length !== 11) return null;
+
+  const excluded = input.excludedPlayerIds || new Set<number>();
   const samples = lineupsForTeam(input);
-  if (!samples.length) return null;
+  const latest = samples[0] || null;
+  const recentPlayers = samples.flatMap((sample) => [
+    ...sample.lineup.startXI,
+    ...sample.lineup.substitutes,
+  ]);
 
-  const formationScores = new Map<string, number>();
-  samples.forEach((sample, index) => {
-    const formation = clean(sample.lineup.formation);
-    if (!formation || !formationParts(formation)) return;
-    const weight = Math.max(1, 8 - index * 2);
-    formationScores.set(formation, (formationScores.get(formation) || 0) + weight);
-  });
+  const squadByArabic = new Map<string, ApiFootballSquadPlayer>();
+  for (const player of input.squad) {
+    const verified = verifiedPlayer(input.localTeamId, player);
+    if (!verified || excluded.has(player.id)) continue;
+    if (!squadByArabic.has(verified.nameAr)) squadByArabic.set(verified.nameAr, player);
+  }
 
-  const preferredFormation =
-    [...formationScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ||
-    samples[0].lineup.formation ||
-    null;
+  const recentByArabic = new Map<string, ApiFootballLineupPlayer>();
+  for (const player of recentPlayers) {
+    const verified = verifiedPlayer(input.localTeamId, player);
+    if (!verified || excluded.has(player.id)) continue;
+    if (!recentByArabic.has(verified.nameAr)) recentByArabic.set(verified.nameAr, player);
+  }
 
-  const matchingFormation = samples.filter(
-    (sample) => clean(sample.lineup.formation) === clean(preferredFormation),
-  );
-  const base = matchingFormation[0] || samples[0];
-  const formation = preferredFormation || base.lineup.formation;
-  const slots = expectedGridSlots(formation);
-
-  const verifiedStart = base.lineup.startXI.filter((player) =>
-    Boolean(verifiedPlayer(input.localTeamId, player)),
-  );
-
-  const baseByGrid = new Map(
-    verifiedStart
-      .filter((player) => clean(player.grid))
-      .map((player) => [clean(player.grid), player] as const),
-  );
   const used = new Set<number>();
   const startXI: ApiFootballLineupPlayer[] = [];
 
-  const chooseForSlot = (slot: string) => {
-    const exactBase = baseByGrid.get(slot);
-    if (exactBase && !used.has(exactBase.id)) return exactBase;
+  for (const starter of override.starters) {
+    const squadPlayer = squadByArabic.get(starter.nameAr);
+    const recentPlayer = recentByArabic.get(starter.nameAr);
+    const id = squadPlayer?.id || recentPlayer?.id || 0;
 
-    const candidates: Array<{ player: ApiFootballLineupPlayer; score: number }> = [];
-    samples.forEach((sample, index) => {
-      sample.lineup.startXI.forEach((player) => {
-        if (used.has(player.id)) return;
-        const verified = verifiedPlayer(input.localTeamId, player);
-        if (!verified) return;
-        const exactGrid = clean(player.grid) === slot;
-        const sameRow = clean(player.grid).split(":")[0] === slot.split(":")[0];
-        const recency = Math.max(1, 8 - index);
-        const score = exactGrid ? 100 + recency : sameRow ? 40 + recency : recency;
-        candidates.push({ player, score });
-      });
-    });
-    candidates.sort((a, b) => b.score - a.score);
-    return candidates[0]?.player || null;
-  };
+    // لا نستبدل اللاعب المتوقع بلاعب آخر من نفس الخانة؛ إما الاسم الموثق نفسه
+    // أو نترك المسار التالي يستخدم تشكيلاً رسمياً سابقاً كاملاً كما هو.
+    if (!id || excluded.has(id) || used.has(id)) return null;
 
-  if (slots.length === 11) {
-    for (const slot of slots) {
-      const selected = chooseForSlot(slot);
-      if (!selected) continue;
-      used.add(selected.id);
-      startXI.push({ ...selected, grid: slot });
-    }
-  } else {
-    verifiedStart.slice(0, 11).forEach((player) => {
-      if (used.has(player.id)) return;
-      used.add(player.id);
-      startXI.push(player);
+    used.add(id);
+    startXI.push({
+      id,
+      name: starter.nameAr,
+      number: starter.number ?? squadPlayer?.number ?? recentPlayer?.number ?? null,
+      position: starter.position,
+      grid: starter.grid,
+      photo:
+        squadPlayer?.photo ||
+        recentPlayer?.photo ||
+        `https://media.api-sports.io/football/players/${id}.png`,
     });
   }
 
-  if (startXI.length < 10) {
-    return null;
-  }
+  if (startXI.length !== 11 || used.size !== 11) return null;
 
-  if (startXI.length < 11) {
-    const candidates = samples
-      .flatMap((sample, index) =>
-        sample.lineup.startXI.map((player) => ({ player, score: Math.max(1, 8 - index) })),
-      )
-      .filter(({ player }) => !used.has(player.id) && Boolean(verifiedPlayer(input.localTeamId, player)))
-      .sort((a, b) => b.score - a.score);
-    const extra = candidates[0]?.player;
-    if (extra) {
-      used.add(extra.id);
-      startXI.push({ ...extra, grid: null });
-    }
-  }
-
-  const substitutes: ApiFootballLineupPlayer[] = [];
-  const addSubstitute = (player: ApiFootballLineupPlayer) => {
-    if (used.has(player.id)) return;
-    if (!verifiedPlayer(input.localTeamId, player)) return;
-    if (substitutes.some((item) => item.id === player.id)) return;
-    substitutes.push({ ...player, grid: null });
-  };
-
-  base.lineup.substitutes.forEach(addSubstitute);
-  samples.forEach((sample) => {
-    sample.lineup.substitutes.forEach(addSubstitute);
-    sample.lineup.startXI.forEach(addSubstitute);
-  });
+  const starterIds = new Set(startXI.map((player) => player.id));
+  const squadById = new Map(input.squad.map((player) => [player.id, player]));
+  const substitutes = (latest?.lineup.substitutes || [])
+    .filter((player) => !starterIds.has(player.id) && !excluded.has(player.id))
+    .filter((player) => {
+      const squadPlayer = squadById.get(player.id);
+      return Boolean(
+        verifiedPlayer(input.localTeamId, player) ||
+        (squadPlayer && verifiedPlayer(input.localTeamId, squadPlayer)),
+      );
+    })
+    .map((player) => ({ ...player, grid: null }))
+    .slice(0, 15);
 
   return {
-    fixtureId: base.fixture.fixtureId,
-    fixtureAt: base.fixture.kickoffAt,
+    fixtureId: latest?.fixture.fixtureId || 0,
+    fixtureAt: latest?.fixture.kickoffAt || 0,
     lineup: {
-      ...base.lineup,
-      formation,
-      startXI: startXI.slice(0, 11),
-      substitutes: substitutes.slice(0, 15),
-    },
+      teamId: input.providerTeamId,
+      teamName: latest?.lineup.teamName || "",
+      teamLogo: latest?.lineup.teamLogo || null,
+      formation: override.formation,
+      coach: latest?.lineup.coach || null,
+      startXI,
+      substitutes,
+    } satisfies ApiFootballTeamLineup,
   };
 }
+
+function buildExpectedLineup(input: {
+  localTeamId: string;
+  providerTeamId: number;
+  squad: ApiFootballSquadPlayer[];
+  recentFixtures: RecentFixture[];
+  fixtureLineups: Array<{ fixtureId: number; lineups: ApiFootballTeamLineup[] }>;
+  excludedPlayerIds?: Set<number>;
+}) {
+  const samples = lineupsForTeam(input);
+  const excluded = input.excludedPlayerIds || new Set<number>();
+  const squadById = new Map(input.squad.map((player) => [player.id, player]));
+  const isVerifiedCurrentPlayer = (player: ApiFootballLineupPlayer) => {
+    const squadPlayer = squadById.get(player.id);
+    return Boolean(
+      verifiedPlayer(input.localTeamId, player) ||
+      (squadPlayer && verifiedPlayer(input.localTeamId, squadPlayer)),
+    );
+  };
+
+  // للتوقع العام نستخدم تشكيلاً رسمياً سابقاً كاملاً كما نزل من المزود.
+  // لا نخلط لاعبين من مباريات مختلفة ولا نعيد توزيعهم تخمينياً.
+  for (const sample of samples) {
+    if (sample.lineup.startXI.length !== 11) continue;
+
+    const startersAreValid = sample.lineup.startXI.every(
+      (player) => !excluded.has(player.id) && isVerifiedCurrentPlayer(player),
+    );
+    if (!startersAreValid) continue;
+
+    const ids = sample.lineup.startXI.map((player) => player.id);
+    if (new Set(ids).size !== 11) continue;
+
+    const substitutes = sample.lineup.substitutes
+      .filter((player) => !excluded.has(player.id))
+      .filter((player) => isVerifiedCurrentPlayer(player))
+      .map((player) => ({ ...player, grid: null }))
+      .slice(0, 15);
+
+    return {
+      fixtureId: sample.fixture.fixtureId,
+      fixtureAt: sample.fixture.kickoffAt,
+      lineup: {
+        ...sample.lineup,
+        startXI: sample.lineup.startXI.map((player) => ({ ...player })),
+        substitutes,
+      },
+    };
+  }
+
+  return null;
+}
+
 
 function reasonArabic(type: string, reason: string) {
   const joined = `${type} ${reason}`.trim();
@@ -515,25 +547,61 @@ function buildAbsences(input: {
   const squadById = new Map(input.squad.map((player) => [player.id, player]));
   return input.injuries
     .filter((injury) => injury.teamId === input.providerTeamId)
-    .map((injury): LineupAbsence => {
+    .map((injury): LineupAbsence | null => {
       const squad = squadById.get(injury.playerId);
       const verified = resolveVerifiedGulfCup27Player({
         teamId: input.localTeamId,
         apiName: squad?.name || injury.playerName,
         apiPosition: squad?.position,
       });
+      // لا نظهر اسماً إنجليزياً أو لاعباً خارج قائمة البطولة الموثقة.
+      if (!verified) return null;
       return {
         id: injury.playerId,
-        name: verified?.nameAr || squad?.name || injury.playerName,
-        position: verified?.role || squad?.position || "",
+        name: verified.nameAr,
+        position: squad?.position || verified.role,
         photo:
-          injury.playerPhoto ||
+          injury.photo ||
           squad?.photo ||
           `https://media.api-sports.io/football/players/${injury.playerId}.png`,
         reason: reasonArabic(injury.type, injury.reason),
       };
     })
+    .filter((item): item is LineupAbsence => Boolean(item))
     .filter((item, index, array) => array.findIndex((other) => other.id === item.id) === index);
+}
+
+function buildManualAbsences(input: {
+  matchId: string;
+  localTeamId: string;
+  squad: ApiFootballSquadPlayer[];
+}): LineupAbsence[] {
+  const overrides = getVerifiedGulfCup27ManualAbsences(input.matchId, input.localTeamId);
+  return overrides.map((override, index) => {
+    const squadPlayer = input.squad.find((player) => {
+      const verified = verifiedPlayer(input.localTeamId, player);
+      return verified?.nameAr === override.nameAr;
+    });
+    const verified = squadPlayer ? verifiedPlayer(input.localTeamId, squadPlayer) : null;
+    return {
+      id: squadPlayer?.id ?? -(index + 1),
+      name: override.nameAr,
+      position: squadPlayer?.position || verified?.role || "",
+      photo:
+        squadPlayer?.photo ||
+        (squadPlayer?.id ? `https://media.api-sports.io/football/players/${squadPlayer.id}.png` : null),
+      reason: override.reason,
+    };
+  });
+}
+
+function mergeAbsences(...groups: LineupAbsence[][]) {
+  const result: LineupAbsence[] = [];
+  for (const item of groups.flat()) {
+    if (result.some((existing) => existing.id === item.id || existing.name === item.name)) continue;
+    result.push(item);
+  }
+  return result;
 }
 
 export async function getTournamentMatchLineup(input: {
@@ -603,6 +671,25 @@ export async function getTournamentMatchLineup(input: {
   const officialHome = officialHomeRaw && officialHomeRaw.startXI.length >= 10 ? officialHomeRaw : null;
   const officialAway = officialAwayRaw && officialAwayRaw.startXI.length >= 10 ? officialAwayRaw : null;
   const bothOfficial = Boolean(officialHome && officialAway);
+  const injuries = injuriesResult.injuries || [];
+  const homeManualAbsences = buildManualAbsences({
+    matchId: input.matchId,
+    localTeamId: match.homeTeamId,
+    squad: homeSquad,
+  });
+  const awayManualAbsences = buildManualAbsences({
+    matchId: input.matchId,
+    localTeamId: match.awayTeamId,
+    squad: awaySquad,
+  });
+  const homeExcludedIds = new Set([
+    ...injuries.filter((injury) => injury.teamId === providerHomeTeamId).map((injury) => injury.playerId),
+    ...homeManualAbsences.map((absence) => absence.id).filter((id) => id > 0),
+  ]);
+  const awayExcludedIds = new Set([
+    ...injuries.filter((injury) => injury.teamId === providerAwayTeamId).map((injury) => injury.playerId),
+    ...awayManualAbsences.map((absence) => absence.id).filter((id) => id > 0),
+  ]);
 
   let expectedHome: ReturnType<typeof buildExpectedLineup> = null;
   let expectedAway: ReturnType<typeof buildExpectedLineup> = null;
@@ -616,11 +703,11 @@ export async function getTournamentMatchLineup(input: {
     const homeRecentRows = recentHome.fixtures
       .filter((row) => row.fixtureId !== match.providerFixtureId)
       .filter((row) => FINISHED_STATUSES.has(row.statusShort))
-      .slice(0, 6);
+      .slice(0, 4);
     const awayRecentRows = recentAway.fixtures
       .filter((row) => row.fixtureId !== match.providerFixtureId)
       .filter((row) => FINISHED_STATUSES.has(row.statusShort))
-      .slice(0, 6);
+      .slice(0, 4);
 
     const ids = [...new Set([
       ...homeRecentRows.map((row) => row.fixtureId),
@@ -631,18 +718,42 @@ export async function getTournamentMatchLineup(input: {
       ? await getApiFootballLineupsByFixtureIds(ids)
       : { fixtures: [] as Array<{ fixtureId: number; lineups: ApiFootballTeamLineup[] }> };
 
-    expectedHome = buildExpectedLineup({
-      localTeamId: match.homeTeamId,
-      providerTeamId: providerHomeTeamId,
-      recentFixtures: homeRecentRows,
-      fixtureLineups: detailed.fixtures,
-    });
-    expectedAway = buildExpectedLineup({
-      localTeamId: match.awayTeamId,
-      providerTeamId: providerAwayTeamId,
-      recentFixtures: awayRecentRows,
-      fixtureLineups: detailed.fixtures,
-    });
+    expectedHome =
+      buildCuratedExpectedLineup({
+        matchId: input.matchId,
+        localTeamId: match.homeTeamId,
+        providerTeamId: providerHomeTeamId,
+        squad: homeSquad,
+        recentFixtures: homeRecentRows,
+        fixtureLineups: detailed.fixtures,
+        excludedPlayerIds: homeExcludedIds,
+      }) ||
+      buildExpectedLineup({
+        localTeamId: match.homeTeamId,
+        providerTeamId: providerHomeTeamId,
+        squad: homeSquad,
+        recentFixtures: homeRecentRows,
+        fixtureLineups: detailed.fixtures,
+        excludedPlayerIds: homeExcludedIds,
+      });
+    expectedAway =
+      buildCuratedExpectedLineup({
+        matchId: input.matchId,
+        localTeamId: match.awayTeamId,
+        providerTeamId: providerAwayTeamId,
+        squad: awaySquad,
+        recentFixtures: awayRecentRows,
+        fixtureLineups: detailed.fixtures,
+        excludedPlayerIds: awayExcludedIds,
+      }) ||
+      buildExpectedLineup({
+        localTeamId: match.awayTeamId,
+        providerTeamId: providerAwayTeamId,
+        squad: awaySquad,
+        recentFixtures: awayRecentRows,
+        fixtureLineups: detailed.fixtures,
+        excludedPlayerIds: awayExcludedIds,
+      });
   }
 
   const homeSelected = officialHome || expectedHome?.lineup || null;
@@ -654,19 +765,24 @@ export async function getTournamentMatchLineup(input: {
     ? enrichTeamLineup(match.awayTeamId, awaySelected, awaySquad)
     : null;
 
-  const injuries = injuriesResult.injuries || [];
-  const homeAbsences = buildAbsences({
-    localTeamId: match.homeTeamId,
-    providerTeamId: providerHomeTeamId,
-    injuries,
-    squad: homeSquad,
-  });
-  const awayAbsences = buildAbsences({
-    localTeamId: match.awayTeamId,
-    providerTeamId: providerAwayTeamId,
-    injuries,
-    squad: awaySquad,
-  });
+  const homeAbsences = mergeAbsences(
+    buildAbsences({
+      localTeamId: match.homeTeamId,
+      providerTeamId: providerHomeTeamId,
+      injuries,
+      squad: homeSquad,
+    }),
+    homeManualAbsences,
+  );
+  const awayAbsences = mergeAbsences(
+    buildAbsences({
+      localTeamId: match.awayTeamId,
+      providerTeamId: providerAwayTeamId,
+      injuries,
+      squad: awaySquad,
+    }),
+    awayManualAbsences,
+  );
 
   const home: TournamentMatchTeamLineup = homeEnriched
     ? {
