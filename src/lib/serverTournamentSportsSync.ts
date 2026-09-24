@@ -738,6 +738,23 @@ function buildLeaderboardAggregateRows(
   );
 }
 
+function buildLeaderboardRevision(predictions: TournamentPredictionV2[]) {
+  const source = [...predictions]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(
+      (prediction) =>
+        `${prediction.id}:${prediction.points ?? ""}:${prediction.resultType ?? ""}:${prediction.calculatedAt ?? 0}:${prediction.calculationRunId ?? ""}`,
+    )
+    .join("|");
+
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `v1:${predictions.length}:${(hash >>> 0).toString(36)}`;
+}
+
 function buildHistoricalPreviousRankMap(
   predictions: TournamentPredictionV2[],
   matchById: Map<string, MatchRow>,
@@ -806,6 +823,14 @@ export async function rebuildLeaderboardServer(tournamentId: string) {
       return [clean(data.userId) || item.id, data] as const;
     }),
   );
+  const leaderboardRevision = buildLeaderboardRevision(predictions);
+  const storedRevision =
+    existingStats.docs
+      .map((item) => clean(item.data().leaderboardRevision))
+      .find(Boolean) || "";
+  const sameRevision =
+    storedRevision !== "" && storedRevision === leaderboardRevision;
+
   const hasStoredMovementMetadata = existingStats.docs.some((item) => {
     const data = item.data();
     return (
@@ -815,19 +840,36 @@ export async function rebuildLeaderboardServer(tournamentId: string) {
       num(data.rankChange) > 0
     );
   });
-  const historicalPreviousRanks = hasStoredMovementMetadata
-    ? new Map<string, number>()
-    : buildHistoricalPreviousRankMap(predictions, matchById);
+  const historicalPreviousRanks =
+    !sameRevision && !hasStoredMovementMetadata
+      ? buildHistoricalPreviousRankMap(predictions, matchById)
+      : new Map<string, number>();
 
   const now = Date.now();
   const rowsWithMovement = sorted.map((row, index) => {
     const rank = index + 1;
     const existing = existingByUserId.get(row.userId);
     const storedRank = existing ? num(existing.rank) : 0;
+
+    if (sameRevision && existing) {
+      const previousRank =
+        existing.previousRank != null ? num(existing.previousRank) || null : null;
+      const rankChange = num(existing.rankChange);
+      const rankDirection =
+        existing.rankDirection === "up" || existing.rankDirection === "down"
+          ? existing.rankDirection
+          : "-";
+      return {
+        ...row,
+        rank,
+        previousRank,
+        rankChange,
+        rankDirection: rankDirection as "up" | "down" | "-",
+      };
+    }
+
     const historicalRank = historicalPreviousRanks.get(row.userId) || 0;
-    const previousRank = hasStoredMovementMetadata
-      ? storedRank || null
-      : historicalRank || storedRank || null;
+    const previousRank = storedRank || historicalRank || null;
     const rankChange = previousRank == null ? 0 : Math.abs(previousRank - rank);
     const rankDirection =
       previousRank == null || previousRank === rank
@@ -857,7 +899,8 @@ export async function rebuildLeaderboardServer(tournamentId: string) {
           ...row,
           updatedAt: now,
           rankMovementUpdatedAt: now,
-          schemaVersion: 3,
+          leaderboardRevision,
+          schemaVersion: 4,
         },
       ),
     ),
