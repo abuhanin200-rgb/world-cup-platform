@@ -73,33 +73,69 @@ function RankBadge({ rank }: { rank: number }) {
   );
 }
 
+function getRankMovement(row: TournamentUserStatsV2) {
+  const currentRank = row.rank && row.rank > 0 ? row.rank : null;
+  const previousRank =
+    row.previousRank && row.previousRank > 0 ? row.previousRank : null;
+  const inferredDirection =
+    currentRank == null || previousRank == null || currentRank === previousRank
+      ? "-"
+      : previousRank > currentRank
+        ? "up"
+        : "down";
+  const direction = row.rankDirection === "-" ? inferredDirection : row.rankDirection;
+  const change =
+    row.rankChange > 0
+      ? row.rankChange
+      : currentRank != null && previousRank != null
+        ? Math.abs(previousRank - currentRank)
+        : 0;
+
+  return { direction, change } as const;
+}
+
 function RankMovement({ row }: { row: TournamentUserStatsV2 }) {
-  if (row.rankDirection === "up") {
+  const movement = getRankMovement(row);
+
+  if (movement.direction === "up") {
     return (
       <span
-        title={row.rankChange > 0 ? `صعد ${row.rankChange} مركز` : "صعود"}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
+        title={movement.change > 0 ? `صعد ${movement.change} مركز` : "صعود"}
+        aria-label={movement.change > 0 ? `صعد ${movement.change} مركز` : "صعود"}
+        dir="ltr"
+        className="inline-flex min-w-[30px] shrink-0 items-center justify-center gap-0.5 rounded-full border border-emerald-300/25 bg-emerald-500/15 px-1.5 py-1 text-emerald-300 shadow-sm shadow-emerald-500/10"
       >
-        <ArrowUp className="h-3 w-3" strokeWidth={3.2} aria-hidden="true" />
+        <ArrowUp className="h-3.5 w-3.5" strokeWidth={3.2} aria-hidden="true" />
+        {movement.change > 0 ? (
+          <span className="text-[9px] font-black tabular-nums">{movement.change}</span>
+        ) : null}
       </span>
     );
   }
-  if (row.rankDirection === "down") {
+
+  if (movement.direction === "down") {
     return (
       <span
-        title={row.rankChange > 0 ? `نزل ${row.rankChange} مركز` : "نزول"}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-500 text-white shadow-sm shadow-red-500/20"
+        title={movement.change > 0 ? `نزل ${movement.change} مركز` : "نزول"}
+        aria-label={movement.change > 0 ? `نزل ${movement.change} مركز` : "نزول"}
+        dir="ltr"
+        className="inline-flex min-w-[30px] shrink-0 items-center justify-center gap-0.5 rounded-full border border-red-300/25 bg-red-500/15 px-1.5 py-1 text-red-300 shadow-sm shadow-red-500/10"
       >
-        <ArrowDown className="h-3 w-3" strokeWidth={3.2} aria-hidden="true" />
+        <ArrowDown className="h-3.5 w-3.5" strokeWidth={3.2} aria-hidden="true" />
+        {movement.change > 0 ? (
+          <span className="text-[9px] font-black tabular-nums">{movement.change}</span>
+        ) : null}
       </span>
     );
   }
+
   return (
     <span
       title="ثابت"
-      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-600 text-white shadow-sm shadow-slate-700/20"
+      aria-label="المركز ثابت"
+      className="inline-flex min-w-[30px] shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.055] px-1.5 py-1 text-slate-400"
     >
-      <Minus className="h-3 w-3" strokeWidth={3.2} aria-hidden="true" />
+      <Minus className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
     </span>
   );
 }

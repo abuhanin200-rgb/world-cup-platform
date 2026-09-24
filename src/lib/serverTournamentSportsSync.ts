@@ -674,6 +674,110 @@ function predictionFromData(id: string, data: Record<string, unknown>): Tourname
   };
 }
 
+type LeaderboardAggregateRow = {
+  userId: string;
+  fullName: string;
+  points: number;
+  played: number;
+  exact: number;
+  correctOutcome: number;
+  wrong: number;
+  currentStreak: number;
+  bestStreak: number;
+};
+
+function buildLeaderboardAggregateRows(
+  predictions: TournamentPredictionV2[],
+  matchById: Map<string, MatchRow>,
+) {
+  const rows = new Map<string, LeaderboardAggregateRow>();
+  const ordered = [...predictions].sort((a, b) => {
+    const aKickoff = matchById.get(a.matchId)?.kickoffAt || 0;
+    const bKickoff = matchById.get(b.matchId)?.kickoffAt || 0;
+    if (aKickoff !== bKickoff) return aKickoff - bKickoff;
+    return a.matchId.localeCompare(b.matchId);
+  });
+
+  ordered.forEach((prediction) => {
+    const row = rows.get(prediction.userId) || {
+      userId: prediction.userId,
+      fullName: clean(prediction.userName) || "عضو",
+      points: 0,
+      played: 0,
+      exact: 0,
+      correctOutcome: 0,
+      wrong: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+    };
+    row.fullName = clean(prediction.userName) || row.fullName;
+    row.points += prediction.points || 0;
+    row.played += 1;
+    if (prediction.resultType === "exact") {
+      row.exact += 1;
+      row.currentStreak += 1;
+    } else if (prediction.resultType === "outcome") {
+      row.correctOutcome += 1;
+      row.currentStreak += 1;
+    } else {
+      row.wrong += 1;
+      row.currentStreak = 0;
+    }
+    row.bestStreak = Math.max(row.bestStreak, row.currentStreak);
+    rows.set(prediction.userId, row);
+  });
+
+  return [...rows.values()].sort(
+    (a, b) =>
+      b.points - a.points ||
+      b.exact - a.exact ||
+      b.correctOutcome - a.correctOutcome ||
+      a.wrong - b.wrong ||
+      a.fullName.localeCompare(b.fullName, "ar"),
+  );
+}
+
+function buildHistoricalPreviousRankMap(
+  predictions: TournamentPredictionV2[],
+  matchById: Map<string, MatchRow>,
+) {
+  if (!predictions.length) return new Map<string, number>();
+
+  const latestCalculatedAt = predictions.reduce(
+    (latest, prediction) => Math.max(latest, prediction.calculatedAt || 0),
+    0,
+  );
+  const latestPrediction = [...predictions]
+    .filter((prediction) => (prediction.calculatedAt || 0) === latestCalculatedAt)
+    .sort((a, b) => (b.calculatedAt || 0) - (a.calculatedAt || 0))[0];
+  const latestRunId = clean(latestPrediction?.calculationRunId);
+
+  let previousPredictions: TournamentPredictionV2[];
+  if (latestRunId) {
+    previousPredictions = predictions.filter(
+      (prediction) => clean(prediction.calculationRunId) !== latestRunId,
+    );
+  } else {
+    const latestMatchId = [...predictions]
+      .sort((a, b) => {
+        const aKickoff = matchById.get(a.matchId)?.kickoffAt || 0;
+        const bKickoff = matchById.get(b.matchId)?.kickoffAt || 0;
+        return bKickoff - aKickoff;
+      })[0]?.matchId;
+    previousPredictions = latestMatchId
+      ? predictions.filter((prediction) => prediction.matchId !== latestMatchId)
+      : [];
+  }
+
+  const previousRows = buildLeaderboardAggregateRows(
+    previousPredictions,
+    matchById,
+  );
+  return new Map(
+    previousRows.map((row, index) => [row.userId, index + 1] as const),
+  );
+}
+
 export async function rebuildLeaderboardServer(tournamentId: string) {
   const [matchesSnapshot, predictionsSnapshot, existingStats] = await Promise.all([
     adminDb.collection(COLLECTIONS.matches).where("tournamentId", "==", tournamentId).get(),
@@ -686,30 +790,96 @@ export async function rebuildLeaderboardServer(tournamentId: string) {
   }));
   const predictions = predictionsSnapshot.docs
     .map((item) => predictionFromData(item.id, item.data()))
-    .filter((prediction) => prediction.isCalculated && prediction.points != null && prediction.resultType && matchById.has(prediction.matchId))
-    .sort((a, b) => (matchById.get(a.matchId)?.kickoffAt || 0) - (matchById.get(b.matchId)?.kickoffAt || 0));
+    .filter(
+      (prediction) =>
+        prediction.isCalculated &&
+        prediction.points != null &&
+        prediction.resultType &&
+        matchById.has(prediction.matchId),
+    );
 
-  const rows = new Map<string, { userId: string; fullName: string; points: number; played: number; exact: number; correctOutcome: number; wrong: number; currentStreak: number; bestStreak: number }>();
-  predictions.forEach((prediction) => {
-    const row = rows.get(prediction.userId) || { userId: prediction.userId, fullName: clean(prediction.userName) || "عضو", points: 0, played: 0, exact: 0, correctOutcome: 0, wrong: 0, currentStreak: 0, bestStreak: 0 };
-    row.fullName = clean(prediction.userName) || row.fullName;
-    row.points += prediction.points || 0;
-    row.played += 1;
-    if (prediction.resultType === "exact") { row.exact += 1; row.currentStreak += 1; }
-    else if (prediction.resultType === "outcome") { row.correctOutcome += 1; row.currentStreak += 1; }
-    else { row.wrong += 1; row.currentStreak = 0; }
-    row.bestStreak = Math.max(row.bestStreak, row.currentStreak);
-    rows.set(prediction.userId, row);
+  const sorted = buildLeaderboardAggregateRows(predictions, matchById);
+  const existingByUserId = new Map(
+    existingStats.docs.map((item) => {
+      const data = item.data();
+      return [clean(data.userId) || item.id, data] as const;
+    }),
+  );
+  const hasStoredMovementMetadata = existingStats.docs.some((item) => {
+    const data = item.data();
+    return (
+      data.previousRank != null ||
+      data.rankDirection === "up" ||
+      data.rankDirection === "down" ||
+      num(data.rankChange) > 0
+    );
   });
-  const sorted = [...rows.values()].sort((a, b) => b.points - a.points || b.exact - a.exact || b.correctOutcome - a.correctOutcome || a.wrong - b.wrong || a.fullName.localeCompare(b.fullName, "ar"));
+  const historicalPreviousRanks = hasStoredMovementMetadata
+    ? new Map<string, number>()
+    : buildHistoricalPreviousRankMap(predictions, matchById);
+
   const now = Date.now();
+  const rowsWithMovement = sorted.map((row, index) => {
+    const rank = index + 1;
+    const existing = existingByUserId.get(row.userId);
+    const storedRank = existing ? num(existing.rank) : 0;
+    const historicalRank = historicalPreviousRanks.get(row.userId) || 0;
+    const previousRank = hasStoredMovementMetadata
+      ? storedRank || null
+      : historicalRank || storedRank || null;
+    const rankChange = previousRank == null ? 0 : Math.abs(previousRank - rank);
+    const rankDirection =
+      previousRank == null || previousRank === rank
+        ? "-"
+        : previousRank > rank
+          ? "up"
+          : "down";
+
+    return {
+      ...row,
+      rank,
+      previousRank,
+      rankChange,
+      rankDirection: rankDirection as "up" | "down" | "-",
+    };
+  });
+
   const operations: Array<(batch: WriteBatch) => void> = [];
   existingStats.docs.forEach((item) => operations.push((batch) => batch.delete(item.ref)));
-  sorted.forEach((row, index) => operations.push((batch) => batch.set(adminDb.collection(COLLECTIONS.stats).doc(entityId(tournamentId, row.userId)), {
-    id: entityId(tournamentId, row.userId), tournamentId, ...row, rank: index + 1, updatedAt: now, schemaVersion: 2,
-  })));
+  rowsWithMovement.forEach((row) =>
+    operations.push((batch) =>
+      batch.set(
+        adminDb.collection(COLLECTIONS.stats).doc(entityId(tournamentId, row.userId)),
+        {
+          id: entityId(tournamentId, row.userId),
+          tournamentId,
+          ...row,
+          updatedAt: now,
+          rankMovementUpdatedAt: now,
+          schemaVersion: 3,
+        },
+      ),
+    ),
+  );
   await commitOperations(operations);
-  return sorted.map((row, index) => ({ ...row, rank: index + 1 }));
+  return rowsWithMovement;
+}
+
+async function ensureLeaderboardMovementMetadataServer(tournamentId: string) {
+  const snapshot = await adminDb
+    .collection(COLLECTIONS.stats)
+    .where("tournamentId", "==", tournamentId)
+    .get();
+  if (snapshot.empty) return false;
+
+  const hasMetadata = snapshot.docs.some((item) => {
+    const data = item.data();
+    return data.previousRank != null || clean(data.rankDirection) !== "";
+  });
+  if (hasMetadata) return false;
+
+  await rebuildLeaderboardServer(tournamentId);
+  return true;
 }
 
 export async function syncKnockoutBracketServer(tournamentId: string) {
@@ -1367,7 +1537,20 @@ export async function runTournamentSportsAutomation(options?: { force?: boolean 
 
   const mapped = rows.map((item) => item.match).filter((match) => Boolean(match.providerFixtureId));
   if (!mapped.length) return { skipped: true, reason: "no_mapped_matches" };
-  try { return await syncTournamentSportsProvider(tournamentId, options?.force ? "admin" : "automation"); }
+  try {
+    const result = await syncTournamentSportsProvider(
+      tournamentId,
+      options?.force ? "admin" : "automation",
+    );
+    let leaderboardMovementRepaired = false;
+    try {
+      leaderboardMovementRepaired =
+        await ensureLeaderboardMovementMetadataServer(tournamentId);
+    } catch (movementError) {
+      console.error("Leaderboard movement metadata repair failed:", movementError);
+    }
+    return { ...result, leaderboardMovementRepaired };
+  }
   catch (error) {
     const message = error instanceof Error ? error.message : "تعذر مزامنة Sports API";
     await adminDb.collection(COLLECTIONS.integrations).doc(tournamentId).set({ lastSyncAt: now, lastError: message.slice(0, 300), updatedAt: now }, { merge: true });
