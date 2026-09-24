@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import TeamFlag from "@/components/TeamFlag";
 import TournamentMatchInsights from "@/components/tournaments/TournamentMatchInsights";
+import TournamentMatchLineup from "@/components/tournaments/TournamentMatchLineup";
 import {
   GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT_ID,
@@ -287,8 +288,17 @@ function RuntimeMatchCard({ match, now }: { match: TournamentMatchRuntimeV2; now
       {kickoffCountdown ? <div dir="ltr" className="mt-3 text-center text-[11px] font-black text-[var(--tournament-accent)] [unicode-bidi:isolate]">{kickoffCountdown}</div> : null}
 
       {home && away ? (
-        <div className="mt-3">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <TournamentMatchInsights
+            tournamentId={GULF_CUP_27_TOURNAMENT_ID}
+            matchId={match.id}
+            homeName={home.nameAr}
+            awayName={away.nameAr}
+            homeFlagCode={home.flagCode}
+            awayFlagCode={away.flagCode}
+            compact
+          />
+          <TournamentMatchLineup
             tournamentId={GULF_CUP_27_TOURNAMENT_ID}
             matchId={match.id}
             homeName={home.nameAr}

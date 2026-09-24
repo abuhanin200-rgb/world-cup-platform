@@ -562,3 +562,198 @@ export async function getApiFootballRecentTeamFixtures(input: {
     quotaRemaining: result.quotaRemaining,
   };
 }
+
+export type ApiFootballLineupPlayer = {
+  id: number;
+  name: string;
+  number: number | null;
+  position: string;
+  grid: string | null;
+  photo: string | null;
+};
+
+export type ApiFootballTeamLineup = {
+  teamId: number;
+  teamName: string;
+  teamLogo: string | null;
+  formation: string | null;
+  coach: {
+    id: number | null;
+    name: string;
+    photo: string | null;
+  } | null;
+  startXI: ApiFootballLineupPlayer[];
+  substitutes: ApiFootballLineupPlayer[];
+};
+
+export type ApiFootballFixtureLineups = {
+  fixtureId: number;
+  lineups: ApiFootballTeamLineup[];
+};
+
+export type ApiFootballSquadPlayer = {
+  id: number;
+  name: string;
+  age: number | null;
+  number: number | null;
+  position: string;
+  photo: string | null;
+};
+
+function playerPhotoUrl(playerId: number) {
+  return Number.isInteger(playerId) && playerId > 0
+    ? `https://media.api-sports.io/football/players/${playerId}.png`
+    : null;
+}
+
+function coachPhotoUrl(coachId: number | null) {
+  return coachId && Number.isInteger(coachId) && coachId > 0
+    ? `https://media.api-sports.io/football/coachs/${coachId}.png`
+    : null;
+}
+
+function mapLineupPlayer(item: unknown): ApiFootballLineupPlayer | null {
+  const row = (item || {}) as Record<string, unknown>;
+  const player = (row.player || {}) as Record<string, unknown>;
+  const id = Number(player.id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+
+  const number = numberOrNull(player.number);
+  return {
+    id,
+    name: clean(player.name),
+    number: number == null ? null : Math.trunc(number),
+    position: clean(player.pos),
+    grid: clean(player.grid) || null,
+    photo: playerPhotoUrl(id),
+  };
+}
+
+function mapTeamLineup(row: Record<string, unknown>): ApiFootballTeamLineup | null {
+  const team = (row.team || {}) as Record<string, unknown>;
+  const coach = (row.coach || {}) as Record<string, unknown>;
+  const teamId = Number(team.id);
+  if (!Number.isInteger(teamId) || teamId <= 0) return null;
+
+  const coachIdRaw = Number(coach.id);
+  const coachId = Number.isInteger(coachIdRaw) && coachIdRaw > 0 ? coachIdRaw : null;
+
+  return {
+    teamId,
+    teamName: clean(team.name),
+    teamLogo: clean(team.logo) || null,
+    formation: clean(row.formation) || null,
+    coach:
+      coachId || clean(coach.name)
+        ? {
+            id: coachId,
+            name: clean(coach.name),
+            photo: coachPhotoUrl(coachId),
+          }
+        : null,
+    startXI: (Array.isArray(row.startXI) ? row.startXI : [])
+      .map(mapLineupPlayer)
+      .filter((item): item is ApiFootballLineupPlayer => Boolean(item)),
+    substitutes: (Array.isArray(row.substitutes) ? row.substitutes : [])
+      .map(mapLineupPlayer)
+      .filter((item): item is ApiFootballLineupPlayer => Boolean(item)),
+  };
+}
+
+export async function getApiFootballFixtureLineups(fixtureId: number) {
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) {
+    throw new Error("Fixture ID غير صحيح");
+  }
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/fixtures/lineups",
+    { fixture: fixtureId },
+  );
+
+  return {
+    lineups: result.data
+      .map(mapTeamLineup)
+      .filter((item): item is ApiFootballTeamLineup => Boolean(item)),
+    quotaRemaining: result.quotaRemaining,
+  };
+}
+
+function mapEmbeddedFixtureLineups(
+  row: Record<string, unknown>,
+): ApiFootballFixtureLineups | null {
+  const fixture = (row.fixture || {}) as Record<string, unknown>;
+  const fixtureId = Number(fixture.id);
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) return null;
+
+  const rawLineups = Array.isArray(row.lineups) ? row.lineups : [];
+  return {
+    fixtureId,
+    lineups: rawLineups
+      .map((item) => mapTeamLineup((item || {}) as Record<string, unknown>))
+      .filter((item): item is ApiFootballTeamLineup => Boolean(item)),
+  };
+}
+
+/**
+ * Uses the enriched /fixtures?ids response so several historical lineups can
+ * be retrieved in one API request (up to 20 fixture ids per chunk).
+ */
+export async function getApiFootballLineupsByFixtureIds(ids: number[]) {
+  const uniqueIds = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+  const fixtures: ApiFootballFixtureLineups[] = [];
+  let quotaRemaining: number | null = null;
+
+  for (let index = 0; index < uniqueIds.length; index += 20) {
+    const chunk = uniqueIds.slice(index, index + 20);
+    if (!chunk.length) continue;
+
+    const result = await apiFootballGet<Array<Record<string, unknown>>>(
+      "/fixtures",
+      { ids: chunk.join("-") },
+    );
+
+    fixtures.push(
+      ...result.data
+        .map(mapEmbeddedFixtureLineups)
+        .filter((item): item is ApiFootballFixtureLineups => Boolean(item)),
+    );
+    quotaRemaining = result.quotaRemaining;
+  }
+
+  return { fixtures, quotaRemaining };
+}
+
+export async function getApiFootballTeamSquad(teamId: number) {
+  if (!Number.isInteger(teamId) || teamId <= 0) {
+    throw new Error("Team ID غير صحيح");
+  }
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/players/squads",
+    { team: teamId },
+  );
+
+  const row = result.data[0] || {};
+  const players = Array.isArray(row.players) ? row.players : [];
+
+  return {
+    players: players
+      .map((item) => {
+        const player = (item || {}) as Record<string, unknown>;
+        const id = Number(player.id);
+        if (!Number.isInteger(id) || id <= 0) return null;
+        const number = numberOrNull(player.number);
+        const age = numberOrNull(player.age);
+        return {
+          id,
+          name: clean(player.name),
+          age: age == null ? null : Math.trunc(age),
+          number: number == null ? null : Math.trunc(number),
+          position: clean(player.position),
+          photo: clean(player.photo) || playerPhotoUrl(id),
+        } satisfies ApiFootballSquadPlayer;
+      })
+      .filter((item): item is ApiFootballSquadPlayer => Boolean(item)),
+    quotaRemaining: result.quotaRemaining,
+  };
+}

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import TeamFlag from "@/components/TeamFlag";
 import TournamentMatchInsights from "@/components/tournaments/TournamentMatchInsights";
+import TournamentMatchLineup from "@/components/tournaments/TournamentMatchLineup";
 import AuthGateCard from "@/components/auth/AuthGateCard";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -376,8 +377,17 @@ function MatchPredictionCard({
       </div>
 
       {home && away ? (
-        <div className="mt-4">
+        <div className="mt-4 grid grid-cols-2 gap-2">
           <TournamentMatchInsights
+            tournamentId={GULF_CUP_27_TOURNAMENT_ID}
+            matchId={match.id}
+            homeName={home.nameAr}
+            awayName={away.nameAr}
+            homeFlagCode={home.flagCode}
+            awayFlagCode={away.flagCode}
+            compact
+          />
+          <TournamentMatchLineup
             tournamentId={GULF_CUP_27_TOURNAMENT_ID}
             matchId={match.id}
             homeName={home.nameAr}
