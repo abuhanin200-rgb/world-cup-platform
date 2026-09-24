@@ -447,18 +447,19 @@ export async function discoverTournamentSportsFixtures(tournamentId: string) {
   const { config } = integration;
   if (!config.leagueId) throw new Error("اختر البطولة من مزود البيانات أولًا");
 
-  const seasonState = await checkTournamentSportsSeasonAvailability(tournamentId, { force: true });
-  if (!seasonState.available) {
+  // لا نعيد فحص الموسم من API أثناء الاكتشاف بعد تأكيد توفره.
+  // فحص الموسم أصبح إجراءً يدويًا فقط من لوحة الإدارة.
+  if (config.seasonAvailability !== "available") {
     return {
       linked: 0,
       alreadyLinked: integration.mappings.filter((item) => Boolean(item.providerFixtureId)).length,
       unmatched: integration.mappings.filter((item) => !item.providerFixtureId).map((item) => item.matchId),
       providerFixtures: 0,
-      quotaRemaining: seasonState.quotaRemaining,
+      quotaRemaining: null,
       seasonPending: true,
       season: config.season,
-      availableSeasons: seasonState.seasons,
-      message: `موسم ${config.season} غير متاح بعد لدى ${seasonState.leagueName || "API-FOOTBALL"}. سيستمر النظام في مراقبته تلقائيًا.`,
+      availableSeasons: config.providerAvailableSeasons,
+      message: `موسم ${config.season} غير مؤكد لدى API-FOOTBALL. استخدم فحص الموسم يدويًا من لوحة الإدارة ثم أعد المحاولة.`,
     };
   }
 
@@ -700,30 +701,14 @@ export async function rebuildLeaderboardServer(tournamentId: string) {
     rows.set(prediction.userId, row);
   });
   const sorted = [...rows.values()].sort((a, b) => b.points - a.points || b.exact - a.exact || b.correctOutcome - a.correctOutcome || a.wrong - b.wrong || a.fullName.localeCompare(b.fullName, "ar"));
-  const previousRankByUserId = new Map<string, number>();
-  existingStats.docs.forEach((item) => {
-    const data = item.data();
-    const userId = clean(data.userId) || item.id.replace(`${tournamentId}_`, "");
-    const rank = num(data.rank);
-    if (userId && rank > 0) previousRankByUserId.set(userId, rank);
-  });
-
   const now = Date.now();
-  const ranked = sorted.map((row, index) => {
-    const rank = index + 1;
-    const previousRank = previousRankByUserId.get(row.userId) ?? rank;
-    const rankDirection: "up" | "down" | "-" = previousRank > rank ? "up" : previousRank < rank ? "down" : "-";
-    const rankChange = Math.abs(previousRank - rank);
-    return { ...row, rank, previousRank, rankChange, rankDirection };
-  });
-
   const operations: Array<(batch: WriteBatch) => void> = [];
   existingStats.docs.forEach((item) => operations.push((batch) => batch.delete(item.ref)));
-  ranked.forEach((row) => operations.push((batch) => batch.set(adminDb.collection(COLLECTIONS.stats).doc(entityId(tournamentId, row.userId)), {
-    id: entityId(tournamentId, row.userId), tournamentId, ...row, updatedAt: now, schemaVersion: 2,
+  sorted.forEach((row, index) => operations.push((batch) => batch.set(adminDb.collection(COLLECTIONS.stats).doc(entityId(tournamentId, row.userId)), {
+    id: entityId(tournamentId, row.userId), tournamentId, ...row, rank: index + 1, updatedAt: now, schemaVersion: 2,
   })));
   await commitOperations(operations);
-  return ranked;
+  return sorted.map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
 export async function syncKnockoutBracketServer(tournamentId: string) {
@@ -1250,8 +1235,9 @@ export async function syncTournamentSportsProvider(tournamentId: string, source:
   if (!config.leagueId) throw new Error("لم يتم اختيار League ID للبطولة");
   if (!hasApiFootballKey()) throw new Error("API_FOOTBALL_KEY_MISSING");
 
-  const seasonState = await checkTournamentSportsSeasonAvailability(tournamentId);
-  if (!seasonState.available) {
+  // الموسم تم التحقق منه وربطه مسبقًا. لا نستهلك API بإعادة فحصه أثناء كل مزامنة.
+  // عند الحاجة، فحص الموسم يتم يدويًا فقط من لوحة الإدارة.
+  if (config.seasonAvailability !== "available") {
     return {
       skipped: true,
       reason: "season_not_available",
@@ -1261,8 +1247,8 @@ export async function syncTournamentSportsProvider(tournamentId: string, source:
       conflicts: 0,
       awaitingReview: 0,
       season: config.season,
-      availableSeasons: seasonState.seasons,
-      nextSeasonCheckAt: seasonState.nextCheckAt,
+      availableSeasons: config.providerAvailableSeasons,
+      nextSeasonCheckAt: null,
     };
   }
 
@@ -1351,14 +1337,15 @@ export async function runTournamentSportsAutomation(options?: { force?: boolean 
   });
   if (!acquired) return { skipped: true, reason: "throttled", nextGapMs: gap };
 
-  const seasonState = await checkTournamentSportsSeasonAvailability(tournamentId);
-  if (!seasonState.available) {
+  // لا يوجد فحص دوري للموسم داخل الـ heartbeat/cron.
+  // نعتمد حالة الموسم المحفوظة، ويظل الفحص متاحًا يدويًا للأدمن فقط.
+  if (integration.config.seasonAvailability !== "available") {
     return {
       skipped: true,
       reason: "season_not_available",
       season: integration.config.season,
-      availableSeasons: seasonState.seasons,
-      nextSeasonCheckAt: seasonState.nextCheckAt,
+      availableSeasons: integration.config.providerAvailableSeasons,
+      nextSeasonCheckAt: null,
     };
   }
 

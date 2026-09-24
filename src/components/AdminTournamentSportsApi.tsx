@@ -190,7 +190,7 @@ export default function AdminTournamentSportsApi() {
         setMessage(`ممتاز: موسم ${data.season || 2026} أصبح متاحًا لدى ${data.leagueName || "Gulf Cup of Nations"}. يمكن الآن اكتشاف وربط المباريات.`);
       } else {
         const seasons = Array.isArray(data.seasons) ? (data.seasons as number[]).join("، ") : "";
-        setMessage(`تم اعتماد Gulf Cup of Nations (ID 25)، لكن موسم 2026 لم يظهر بعد${seasons ? ` · المواسم الحالية: ${seasons}` : ""}. النظام سيعيد الفحص تلقائيًا.`);
+        setMessage(`تم اعتماد Gulf Cup of Nations (ID 25)، لكن موسم 2026 لم يظهر بعد${seasons ? ` · المواسم الحالية: ${seasons}` : ""}. الفحص التلقائي للموسم متوقف؛ استخدم هذا الزر يدويًا عند الحاجة.`);
       }
       await load();
     } catch (seasonError) {
@@ -222,7 +222,7 @@ export default function AdminTournamentSportsApi() {
       setMessage(
         season.available === true
           ? "تم اعتماد إعداد Sports API لخليجي الديار العربية 27 على Gulf Cup of Nations (ID 25) وموسم 2026 متاح الآن. هذا الإجراء لا يغيّر جدول المباريات المخزن في Firestore."
-          : "تم اعتماد إعداد Sports API لخليجي الديار العربية 27 على Gulf Cup of Nations (ID 25). هذا الإجراء لا يغيّر جدول المباريات المخزن في Firestore. موسم 2026 غير متاح بعد وسيتم رصده تلقائيًا دون استخدام بطولة U23.",
+          : "تم اعتماد إعداد Sports API لخليجي الديار العربية 27 على Gulf Cup of Nations (ID 25). هذا الإجراء لا يغيّر جدول المباريات المخزن في Firestore. موسم 2026 غير متاح بعد. استخدم زر «فحص موسم 2026 الآن» يدويًا عند الحاجة، ولن نستخدم بطولة U23.",
       );
     } catch (configError) {
       setError(configError instanceof Error ? configError.message : "تعذر اعتماد إعداد خليجي الديار العربية 27");
@@ -236,7 +236,7 @@ export default function AdminTournamentSportsApi() {
     try {
       const data = await post("discover");
       if (data.seasonPending === true) {
-        setMessage(String(data.message || "موسم 2026 غير متاح بعد لدى API-FOOTBALL، وسيستمر النظام في مراقبته تلقائيًا."));
+        setMessage(String(data.message || "موسم 2026 غير متاح بعد لدى API-FOOTBALL. الفحص التلقائي متوقف؛ افحص الموسم يدويًا ثم أعد المحاولة."));
       } else {
         setMessage(`اكتشاف المباريات: تم ربط ${data.linked || 0} مباراة، والمتبقي بدون ربط ${(data.unmatched as unknown[])?.length || 0}.`);
       }
@@ -250,9 +250,9 @@ export default function AdminTournamentSportsApi() {
     try {
       const data = await post("sync");
       if (data.skipped === true && data.reason === "season_not_available") {
-        setMessage("المزامنة جاهزة، لكن موسم خليجي الديار العربية 27 لعام 2026 لم يظهر لدى API-FOOTBALL بعد. سيتم فحص توفره تلقائيًا كل 3 ساعات، ومحاولة اكتشاف المباريات كل ساعة بعد توفر الموسم.");
+        setMessage("المزامنة جاهزة، لكن موسم خليجي الديار العربية 27 لعام 2026 غير مؤكد حاليًا. الفحص التلقائي للموسم متوقف؛ استخدم زر «فحص موسم 2026 الآن» يدويًا ثم أعد المحاولة.");
       } else if (data.skipped === true && data.reason === "no_mapped_matches") {
-        setMessage("لا توجد مباريات مرتبطة بعد. عند ظهور موسم 2026 سيحاول النظام اكتشافها وربطها تلقائيًا.");
+        setMessage("لا توجد مباريات مرتبطة بعد. بعد تأكيد الموسم يدويًا استخدم «اكتشاف وربط تلقائي».");
       } else {
         setMessage(`المزامنة: فحص ${data.checked || 0} · تحديث ${data.updated || 0} · احتساب تلقائي ${data.calculated || 0} · تعارض ${data.conflicts || 0} · بانتظار تحقق ${data.awaitingReview || 0}.`);
       }
@@ -361,13 +361,13 @@ export default function AdminTournamentSportsApi() {
             {isOfficialGulfCup ? (
               <p className={`mt-2 text-xs font-black ${seasonIsAvailable ? "text-emerald-200" : "text-amber-100"}`}>
                 {seasonIsAvailable
-                  ? "موسم 2026 متاح — الربط والمزامنة التلقائية جاهزان."
+                  ? "موسم 2026 متاح — ربط المباريات والمزامنة جاهزان، وفحص الموسم الدوري متوقف."
                   : `موسم 2026 لم يظهر بعد. آخر المواسم لدى المزود: ${config.providerAvailableSeasons.length ? config.providerAvailableSeasons.join("، ") : "لم يتم الفحص بعد"}.`}
               </p>
             ) : (
               <p className="mt-2 text-xs font-black text-amber-100">الإعداد الحالي ليس خليجي الديار العربية 27 الرسمي. استخدم زر الاعتماد أدناه.</p>
             )}
-            {config.lastSeasonCheckAt && <p className="mt-1 text-[11px] font-semibold text-slate-500">آخر فحص للموسم: {formatDate(config.lastSeasonCheckAt)} · الفحص التلقائي كل 3 ساعات أثناء عدم توفر الموسم.</p>}
+            {config.lastSeasonCheckAt && <p className="mt-1 text-[11px] font-semibold text-slate-500">آخر فحص للموسم: {formatDate(config.lastSeasonCheckAt)} · الفحص التلقائي للموسم متوقف.</p>}
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => void configureGulfCup27()} disabled={Boolean(working)} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-amber-300 px-4 text-xs font-black text-slate-950 disabled:opacity-50">{working === "configure-gulf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}اعتماد Sports API لخليجي 27</button>
