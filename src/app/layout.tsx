@@ -6,6 +6,7 @@ import MaintenanceGate from "@/components/MaintenanceGate";
 import PresenceTracker from "@/components/PresenceTracker";
 import SuperGoldenNotice from "@/components/SuperGoldenNotice";
 import PlatformChrome from "@/components/PlatformChrome";
+import PWAClient from "@/components/PWAClient";
 
 const alexandria = Alexandria({
   subsets: ["arabic", "latin"],
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
   description: brandDescription,
   applicationName: brandName,
   manifest: "/manifest.json",
-  keywords: ["التحدي", "توقعات كرة القدم", "خليجي الديار العربية 27", "خليجي 27", "كأس العالم 2026", "كأس آسيا 2027", "ألعاب رياضية"],
+  keywords: ["التحدي", "توقعات كرة القدم", "خليجي 27", "كأس العالم 2026", "كأس آسيا 2027", "ألعاب رياضية"],
   authors: [{ name: "منصة التحدي" }],
   creator: "منصة التحدي",
   publisher: "منصة التحدي",
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <AuthProvider>
           <PresenceTracker />
+          <PWAClient />
           <MaintenanceGate><PlatformChrome>{children}</PlatformChrome></MaintenanceGate>
           <SuperGoldenNotice />
         </AuthProvider>

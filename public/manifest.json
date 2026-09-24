@@ -1,45 +1,26 @@
 {
-  "name": "التحدي | منصة التوقعات والألعاب الرياضية",
+  "id": "/",
+  "name": "التحدي | توقعات · بطولات · ألعاب",
   "short_name": "التحدي",
   "description": "منصة التحدي للبطولات والتوقعات والألعاب الرياضية.",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "dir": "rtl",
   "lang": "ar-SA",
-  "background_color": "#001E5F",
-  "theme_color": "#001E5F",
+  "background_color": "#04133A",
+  "theme_color": "#061A4D",
+  "categories": ["sports", "games", "entertainment"],
+  "prefer_related_applications": false,
   "icons": [
-    {
-      "src": "/app-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/app-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/app-icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "/app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    {
-      "name": "البطولات",
-      "short_name": "البطولات",
-      "url": "/tournaments"
-    },
-    {
-      "name": "الألعاب والتحديات",
-      "short_name": "الألعاب",
-      "url": "/games"
-    }
+    { "name": "البطولات", "short_name": "البطولات", "url": "/tournaments?source=pwa-shortcut", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] },
+    { "name": "الألعاب والتحديات", "short_name": "الألعاب", "url": "/games?source=pwa-shortcut", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] },
+    { "name": "الترتيب", "short_name": "الترتيب", "url": "/tournaments/gulf-cup-27/leaderboard?source=pwa-shortcut", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] }
   ]
 }

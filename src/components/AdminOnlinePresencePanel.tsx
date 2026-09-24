@@ -24,7 +24,6 @@ import {
 import type { OnlinePresence, PresenceDeviceType } from "@/types/presence";
 
 const OFFLINE_PAGE_SIZE = 25;
-const AUTO_REFRESH_MS = 30 * 1000;
 const TABLE_GRID = "grid-cols-[minmax(165px,1.05fr)_minmax(195px,1.2fr)_minmax(145px,.85fr)_minmax(135px,.8fr)_minmax(110px,.65fr)_minmax(130px,.75fr)_110px]";
 
 type StatusFilter = "all" | "online" | "offline";
@@ -255,6 +254,7 @@ export default function AdminOnlinePresencePanel() {
   const [deviceFilter, setDeviceFilter] = useState<DeviceFilter>("all");
   const [offlinePage, setOfflinePage] = useState(1);
   const [now, setNow] = useState(Date.now());
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
 
   async function loadData(initial = false) {
     try {
@@ -262,7 +262,9 @@ export default function AdminOnlinePresencePanel() {
       else setRefreshing(true);
       const data = await getAllPresenceMembers();
       setMembers(data);
-      setNow(Date.now());
+      const refreshedAt = Date.now();
+      setNow(refreshedAt);
+      setLastUpdatedAt(refreshedAt);
     } catch (error) {
       console.error("Presence history load error:", error);
     } finally {
@@ -273,10 +275,8 @@ export default function AdminOnlinePresencePanel() {
 
   useEffect(() => {
     void loadData(true);
-    const refreshTimer = window.setInterval(() => void loadData(false), AUTO_REFRESH_MS);
     const clockTimer = window.setInterval(() => setNow(Date.now()), 15 * 1000);
     return () => {
-      window.clearInterval(refreshTimer);
       window.clearInterval(clockTimer);
     };
   }, []);
@@ -348,19 +348,24 @@ export default function AdminOnlinePresencePanel() {
               <h2 className="text-xl font-black md:text-2xl">حضور الأعضاء ونشاطهم</h2>
             </div>
             <p className="mt-2 max-w-3xl text-xs font-bold leading-6 text-slate-400 md:text-sm">
-              نفس عرض الجدول على الكمبيوتر والجوال. المتواجدون الآن أولًا، ثم آخر ظهور، مع الصفحة والجهاز والاتصال والبطارية عندما يسمح المتصفح بذلك.
+              نفس عرض الجدول على الكمبيوتر والجوال. البيانات تُحدّث يدويًا فقط من زر «تحديث الآن»، مع بقاء عداد «منذ...» حيًا على الشاشة دون طلب بيانات جديدة.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void loadData(false)}
-            disabled={refreshing}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 text-xs font-black text-white hover:bg-white/10 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            {refreshing ? "جاري التحديث" : "تحديث الآن"}
-          </button>
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            <button
+              type="button"
+              onClick={() => void loadData(false)}
+              disabled={refreshing}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 text-xs font-black text-white hover:bg-white/10 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "جاري التحديث" : "تحديث الآن"}
+            </button>
+            <span className="text-center text-[10px] font-bold text-slate-500 sm:text-left">
+              آخر تحديث: {lastUpdatedAt ? formatExactLastSeen(lastUpdatedAt) : "-"} · يدوي فقط
+            </span>
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
