@@ -1,11 +1,53 @@
-# PWA install prompt — show once
+# التحدي — المواجهات والإحصائيات H2H
 
-- The automatic PWA install prompt now appears only once per browser/device.
-- The first time it is actually displayed, a persistent localStorage flag is written.
-- Pressing the close button or «ليس الآن» keeps that flag, so the automatic prompt never appears again on that browser/device.
-- Android native install-prompt dismissal also does not trigger the custom prompt again.
-- Successful installs still set the existing installed flag.
-- No Firestore rules or backend changes are required.
+## المنفذ
 
-Modified file:
-- `src/components/PWAClient.tsx`
+- زر **المواجهات والإحصائيات** داخل بطاقة المباراة في قسم المباريات.
+- نفس الزر داخل بطاقة التوقع بدون كشف أو تغيير التوقع.
+- Bottom Sheet على الجوال / Modal على الكمبيوتر حتى لا نزدحم ببطاقة المباراة.
+- جلب البيانات **عند الضغط فقط** لتوفير سرعة الصفحة وحصة Sports API.
+- تخزين النتيجة في Firestore server-side cache حتى لا يكرر كل عضو نفس استدعاءات المزود.
+
+## داخل نافذة المواجهة
+
+- احتمالات: فوز المنتخب الأول / تعادل / فوز المنتخب الثاني.
+- إذا كانت Prediction API متاحة: تعرض النسب من نموذج API-FOOTBALL.
+- إذا لم تكن المباراة مربوطة بعد: يعرض تقديرًا تاريخيًا واضح التسمية من سجل H2H بدل إظهار رقم مزيف.
+- إجمالي المواجهات.
+- عدد انتصارات كل منتخب والتعادلات.
+- إجمالي الأهداف ومتوسط أهداف المواجهة.
+- آخر 5 مواجهات بصيغة W / D / L.
+- مقارنة المؤشرات عند توفر Prediction API: الفورمة، الهجوم، الدفاع، H2H.
+- آخر 5 مباريات ظاهرة أولًا، وزر **عرض جميع المواجهات** يعرض كل التاريخ المتاح من المزود.
+- آخر تحديث + مصدر البيانات + تنبيه أن الاحتمالات تقديرية وليست ضمانًا.
+
+## الاعتمادية
+
+- API key يبقى على السيرفر ولا يخرج للمتصفح.
+- Route عام مقيد فقط بمعرف بطولة ومباراة صالحين، ويقرأ البيانات من Firestore server-side.
+- إذا كانت المباراة مرتبطة بـ Fixture ID يستخدم الربط للحصول على Prediction API الكاملة.
+- إذا لم تكن مرتبطة، يحاول التعرف على المنتخبين بالاسم الإنجليزي من tournamentTeams ثم يجلب H2H؛ الاحتمالات في هذه الحالة تاريخية فقط.
+- cache يتغير تلقائيًا إذا أصبح Fixture ID مربوطًا لاحقًا، فلا يحتفظ بالنسخة التاريخية القديمة بعد اكتمال الربط.
+- Cache للمباراة القادمة 6 ساعات، وللمباراة المنتهية 30 يومًا.
+
+## الملفات
+
+- `src/components/GulfCup27CompetitionPanel.tsx`
+- `src/components/GulfCup27PredictionsPanel.tsx`
+- `src/components/tournaments/TournamentMatchInsights.tsx` جديد
+- `src/app/api/tournaments/match-insights/route.ts` جديد
+- `src/lib/serverTournamentMatchInsights.ts` جديد
+- `src/lib/serverApiFootball.ts`
+
+## بعد التركيب
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+لا يحتاج تعديل Firestore Rules لأن قراءة/كتابة cache تتم عبر Firebase Admin على السيرفر.
+
+## ملاحظة
+
+للحصول على **نموذج الاحتمالات الكامل** يجب أن تكون المباراة مرتبطة بـ Fixture ID صالح لدى API-FOOTBALL. بدون الربط تظل نافذة H2H مفيدة وتعرض المواجهات السابقة والتقدير التاريخي فقط.

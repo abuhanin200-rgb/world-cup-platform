@@ -267,3 +267,271 @@ export async function getApiFootballFixturesByIds(ids: number[]) {
 export function hasApiFootballKey() {
   return Boolean(clean(process.env.API_FOOTBALL_KEY || process.env.API_SPORTS_KEY));
 }
+
+export type ApiFootballHeadToHeadFixture = {
+  fixtureId: number;
+  kickoffAt: number;
+  leagueName: string;
+  leagueCountry: string;
+  statusShort: string;
+  homeTeamId: number;
+  homeName: string;
+  homeLogo: string | null;
+  awayTeamId: number;
+  awayName: string;
+  awayLogo: string | null;
+  homeGoals: number | null;
+  awayGoals: number | null;
+};
+
+export type ApiFootballFixturePrediction = {
+  fixtureId: number;
+  homeTeamId: number;
+  homeTeamName: string;
+  awayTeamId: number;
+  awayTeamName: string;
+  winnerTeamId: number | null;
+  winnerName: string | null;
+  winnerComment: string | null;
+  advice: string | null;
+  underOver: string | null;
+  predictedGoalsHome: string | null;
+  predictedGoalsAway: string | null;
+  percentages: {
+    home: number | null;
+    draw: number | null;
+    away: number | null;
+  };
+  comparison: {
+    formHome: number | null;
+    formAway: number | null;
+    attackHome: number | null;
+    attackAway: number | null;
+    defenceHome: number | null;
+    defenceAway: number | null;
+    poissonHome: number | null;
+    poissonAway: number | null;
+    h2hHome: number | null;
+    h2hAway: number | null;
+    goalsHome: number | null;
+    goalsAway: number | null;
+    totalHome: number | null;
+    totalAway: number | null;
+  };
+};
+
+function percentNumber(value: unknown): number | null {
+  const text = clean(value).replace("%", "");
+  if (!text) return null;
+  const parsed = Number(text);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(0, Math.min(100, parsed));
+}
+
+function mapHeadToHeadFixture(row: Record<string, unknown>): ApiFootballHeadToHeadFixture | null {
+  const fixture = (row.fixture || {}) as Record<string, unknown>;
+  const league = (row.league || {}) as Record<string, unknown>;
+  const teams = (row.teams || {}) as Record<string, unknown>;
+  const home = (teams.home || {}) as Record<string, unknown>;
+  const away = (teams.away || {}) as Record<string, unknown>;
+  const goals = (row.goals || {}) as Record<string, unknown>;
+  const status = (fixture.status || {}) as Record<string, unknown>;
+
+  const fixtureId = Number(fixture.id);
+  const timestampSeconds = Number(fixture.timestamp);
+  const homeTeamId = Number(home.id);
+  const awayTeamId = Number(away.id);
+  if (
+    !Number.isInteger(fixtureId) ||
+    fixtureId <= 0 ||
+    !Number.isFinite(timestampSeconds) ||
+    !Number.isInteger(homeTeamId) ||
+    !Number.isInteger(awayTeamId)
+  ) {
+    return null;
+  }
+
+  return {
+    fixtureId,
+    kickoffAt: timestampSeconds * 1000,
+    leagueName: clean(league.name),
+    leagueCountry: clean(league.country),
+    statusShort: clean(status.short),
+    homeTeamId,
+    homeName: clean(home.name),
+    homeLogo: clean(home.logo) || null,
+    awayTeamId,
+    awayName: clean(away.name),
+    awayLogo: clean(away.logo) || null,
+    homeGoals: numberOrNull(goals.home),
+    awayGoals: numberOrNull(goals.away),
+  };
+}
+
+export async function getApiFootballHeadToHead(input: {
+  homeTeamId: number;
+  awayTeamId: number;
+}) {
+  if (
+    !Number.isInteger(input.homeTeamId) ||
+    input.homeTeamId <= 0 ||
+    !Number.isInteger(input.awayTeamId) ||
+    input.awayTeamId <= 0
+  ) {
+    throw new Error("معرّفات الفريقين لدى مزود البيانات غير صحيحة");
+  }
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/fixtures/headtohead",
+    { h2h: `${input.homeTeamId}-${input.awayTeamId}` },
+  );
+
+  return {
+    fixtures: result.data
+      .map(mapHeadToHeadFixture)
+      .filter((item): item is ApiFootballHeadToHeadFixture => Boolean(item))
+      .sort((a, b) => b.kickoffAt - a.kickoffAt),
+    quotaRemaining: result.quotaRemaining,
+  };
+}
+
+export async function getApiFootballPredictionByFixture(
+  fixtureId: number,
+): Promise<{
+  prediction: ApiFootballFixturePrediction | null;
+  quotaRemaining: number | null;
+}> {
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) {
+    throw new Error("Fixture ID غير صحيح");
+  }
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/predictions",
+    { fixture: fixtureId },
+  );
+  const row = result.data[0];
+  if (!row) {
+    return { prediction: null, quotaRemaining: result.quotaRemaining };
+  }
+
+  const predictions = (row.predictions || {}) as Record<string, unknown>;
+  const winner = (predictions.winner || {}) as Record<string, unknown>;
+  const goals = (predictions.goals || {}) as Record<string, unknown>;
+  const percent = (predictions.percent || {}) as Record<string, unknown>;
+  const teams = (row.teams || {}) as Record<string, unknown>;
+  const home = (teams.home || {}) as Record<string, unknown>;
+  const away = (teams.away || {}) as Record<string, unknown>;
+  const comparison = (row.comparison || {}) as Record<string, unknown>;
+  const form = (comparison.form || {}) as Record<string, unknown>;
+  const attack = (comparison.att || {}) as Record<string, unknown>;
+  const defence = (comparison.def || {}) as Record<string, unknown>;
+  const poisson = (comparison.poisson_distribution || {}) as Record<string, unknown>;
+  const h2h = (comparison.h2h || {}) as Record<string, unknown>;
+  const comparisonGoals = (comparison.goals || {}) as Record<string, unknown>;
+  const total = (comparison.total || {}) as Record<string, unknown>;
+
+  const homeTeamId = Number(home.id);
+  const awayTeamId = Number(away.id);
+  if (!Number.isInteger(homeTeamId) || !Number.isInteger(awayTeamId)) {
+    return { prediction: null, quotaRemaining: result.quotaRemaining };
+  }
+
+  const winnerId = Number(winner.id);
+  return {
+    prediction: {
+      fixtureId,
+      homeTeamId,
+      homeTeamName: clean(home.name),
+      awayTeamId,
+      awayTeamName: clean(away.name),
+      winnerTeamId: Number.isInteger(winnerId) && winnerId > 0 ? winnerId : null,
+      winnerName: clean(winner.name) || null,
+      winnerComment: clean(winner.comment) || null,
+      advice: clean(predictions.advice) || null,
+      underOver: clean(predictions.under_over) || null,
+      predictedGoalsHome: clean(goals.home) || null,
+      predictedGoalsAway: clean(goals.away) || null,
+      percentages: {
+        home: percentNumber(percent.home),
+        draw: percentNumber(percent.draw),
+        away: percentNumber(percent.away),
+      },
+      comparison: {
+        formHome: percentNumber(form.home),
+        formAway: percentNumber(form.away),
+        attackHome: percentNumber(attack.home),
+        attackAway: percentNumber(attack.away),
+        defenceHome: percentNumber(defence.home),
+        defenceAway: percentNumber(defence.away),
+        poissonHome: percentNumber(poisson.home),
+        poissonAway: percentNumber(poisson.away),
+        h2hHome: percentNumber(h2h.home),
+        h2hAway: percentNumber(h2h.away),
+        goalsHome: percentNumber(comparisonGoals.home),
+        goalsAway: percentNumber(comparisonGoals.away),
+        totalHome: percentNumber(total.home),
+        totalAway: percentNumber(total.away),
+      },
+    },
+    quotaRemaining: result.quotaRemaining,
+  };
+}
+
+export type ApiFootballTeamLookup = {
+  id: number;
+  name: string;
+  code: string;
+  country: string;
+  national: boolean;
+  logo: string | null;
+};
+
+function normalizeTeamLookupName(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export async function findApiFootballTeamByName(
+  teamName: string,
+): Promise<{
+  team: ApiFootballTeamLookup | null;
+  quotaRemaining: number | null;
+}> {
+  const query = clean(teamName);
+  if (query.length < 2) throw new Error("اسم المنتخب قصير جدًا");
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/teams",
+    { search: query },
+  );
+  const candidates = result.data
+    .map((row) => {
+      const team = (row.team || {}) as Record<string, unknown>;
+      const id = Number(team.id);
+      if (!Number.isInteger(id) || id <= 0) return null;
+      return {
+        id,
+        name: clean(team.name),
+        code: clean(team.code),
+        country: clean(team.country),
+        national: team.national === true,
+        logo: clean(team.logo) || null,
+      } satisfies ApiFootballTeamLookup;
+    })
+    .filter((team): team is ApiFootballTeamLookup => Boolean(team));
+
+  const normalizedQuery = normalizeTeamLookupName(query);
+  const exact = candidates.find(
+    (team) => normalizeTeamLookupName(team.name) === normalizedQuery,
+  );
+  const national = candidates.find((team) => team.national);
+
+  return {
+    team: exact || national || candidates[0] || null,
+    quotaRemaining: result.quotaRemaining,
+  };
+}

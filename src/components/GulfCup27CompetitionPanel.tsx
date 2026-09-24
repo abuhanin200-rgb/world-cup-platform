@@ -14,6 +14,7 @@ import {
   Trophy,
 } from "lucide-react";
 import TeamFlag from "@/components/TeamFlag";
+import TournamentMatchInsights from "@/components/tournaments/TournamentMatchInsights";
 import {
   GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT_ID,
@@ -95,7 +96,7 @@ function StandingTable({
     <article className="overflow-hidden rounded-[24px] border border-white/10 bg-white/5 shadow-xl shadow-black/10">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
         <div>
-          <p className="text-[11px] font-black text-[var(--tournament-primary)]">خليجي الديار العربية 27</p>
+          <p className="text-[11px] font-black text-[var(--tournament-primary)]">خليجي 27</p>
           <h3 className="mt-1 text-lg font-black">المجموعة {group}</h3>
         </div>
         <Trophy className="h-5 w-5 text-white/35" aria-hidden="true" />
@@ -285,6 +286,20 @@ function RuntimeMatchCard({ match, now }: { match: TournamentMatchRuntimeV2; now
 
       {kickoffCountdown ? <div dir="ltr" className="mt-3 text-center text-[11px] font-black text-[var(--tournament-accent)] [unicode-bidi:isolate]">{kickoffCountdown}</div> : null}
 
+      {home && away ? (
+        <div className="mt-3">
+          <TournamentMatchInsights
+            tournamentId={GULF_CUP_27_TOURNAMENT_ID}
+            matchId={match.id}
+            homeName={home.nameAr}
+            awayName={away.nameAr}
+            homeFlagCode={home.flagCode}
+            awayFlagCode={away.flagCode}
+            compact
+          />
+        </div>
+      ) : null}
+
       {open && (
         <Link
           href="/tournaments/gulf-cup-27/predictions"
@@ -312,7 +327,7 @@ export default function GulfCup27CompetitionPanel() {
       setMatches(await getTournamentMatchesV2(GULF_CUP_27_TOURNAMENT_ID));
     } catch (loadError) {
       console.error("Gulf 27 competition load error:", loadError);
-      setError("تعذر تحميل مباريات وترتيب خليجي الديار العربية 27");
+      setError("تعذر تحميل مباريات وترتيب خليجي 27");
     } finally {
       setLoading(false);
     }
@@ -398,7 +413,7 @@ export default function GulfCup27CompetitionPanel() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-black text-[var(--tournament-primary)]">الجدول والنتائج</p>
-            <h2 id="matches-heading" className="mt-1 text-xl font-black md:text-2xl">مباريات خليجي الديار العربية 27</h2>
+            <h2 id="matches-heading" className="mt-1 text-xl font-black md:text-2xl">مباريات خليجي 27</h2>
           </div>
           <button
             type="button"
@@ -410,7 +425,7 @@ export default function GulfCup27CompetitionPanel() {
           </button>
         </div>
 
-        <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="فلترة مباريات خليجي الديار العربية 27">
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="فلترة مباريات خليجي 27">
           {(
             [
               ["all", "الكل"],
