@@ -202,6 +202,44 @@ function resultReason(prediction: TournamentPredictionV2) {
   return reasons.length > 0 ? reasons.join(" + ") : "توقع غير صحيح";
 }
 
+
+function resultPresentation(prediction: TournamentPredictionV2) {
+  const exact =
+    prediction.resultType === "exact" || prediction.pointsBreakdown?.score === 3;
+
+  if (exact) {
+    return {
+      label: "جابها بالملي",
+      badgeClass:
+        "border-amber-300/30 bg-amber-300/10 text-amber-100",
+      pointsClass:
+        "border-amber-300/30 bg-amber-300/10 text-amber-100",
+      panelClass:
+        "border-amber-300/20 bg-gradient-to-b from-amber-300/[0.08] to-white/[0.025]",
+    };
+  }
+
+  if ((prediction.points ?? 0) > 0) {
+    return {
+      label: "توقع صحيح",
+      badgeClass:
+        "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+      pointsClass:
+        "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+      panelClass:
+        "border-emerald-300/20 bg-gradient-to-b from-emerald-300/[0.07] to-white/[0.025]",
+    };
+  }
+
+  return {
+    label: "لم يصب التوقع",
+    badgeClass: "border-white/10 bg-white/[0.055] text-white/55",
+    pointsClass: "border-white/10 bg-white/[0.055] text-white/60",
+    panelClass:
+      "border-white/10 bg-gradient-to-b from-white/[0.045] to-white/[0.02]",
+  };
+}
+
 function statusTone(state: TournamentPredictionWindowStateV2) {
   if (state === "open") {
     return "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
@@ -275,6 +313,9 @@ function MatchPredictionCard({
       !awayInvalid &&
       !knockoutSelectionMissing,
   );
+  const calculatedResult = prediction?.isCalculated
+    ? resultPresentation(prediction)
+    : null;
 
   return (
     <article className="min-w-0 rounded-[26px] border border-white/10 bg-black/20 p-4 shadow-xl shadow-black/10 md:p-5">
@@ -425,7 +466,8 @@ function MatchPredictionCard({
         </div>
       ) : null}
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs font-bold leading-6 text-white/55">
+      {!prediction?.isCalculated ? (
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 text-xs font-bold leading-6 text-white/55">
         {state === "teams_pending" ? (
           <span>يفتح التوقع بعد تحديد طرفي المباراة واعتماد الإدارة.</span>
         ) : state === "not_open" ? (
@@ -461,7 +503,8 @@ function MatchPredictionCard({
         ) : (
           <span>أغلق التوقع مع بداية المباراة، وتوقعك محفوظ للقراءة فقط.</span>
         )}
-      </div>
+        </div>
+      ) : null}
 
       {match.stage === "knockout" && formOpen && predictedTie && home && away ? (
         <div className="mt-4 grid gap-3 rounded-2xl border border-amber-300/15 bg-amber-300/[0.05] p-3 sm:grid-cols-2">
@@ -506,59 +549,119 @@ function MatchPredictionCard({
         </div>
       ) : null}
 
-      {prediction?.isCalculated && prediction.points != null ? (
-        <div className="mt-4 grid gap-2 rounded-2xl border border-sky-300/15 bg-sky-300/[0.07] p-3 text-xs font-black sm:grid-cols-4">
-          <div>
-            <span className="block text-white/45">توقعك</span>
-            <span
-              dir="ltr"
-              className="mt-1 block text-base text-white [unicode-bidi:isolate]"
+      {prediction?.isCalculated && prediction.points != null && calculatedResult ? (
+        <section
+          className={`mt-4 overflow-hidden rounded-[22px] border ${calculatedResult.panelClass}`}
+          aria-label="نتيجة توقعك"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-3.5 py-3">
+            <div
+              className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-black ${calculatedResult.badgeClass}`}
             >
-              {prediction.homeScore} - {prediction.awayScore}
-            </span>
-          </div>
-          <div>
-            <span className="block text-white/45">النتيجة الرسمية</span>
-            <span
-              dir="ltr"
-              className="mt-1 block text-base text-white [unicode-bidi:isolate]"
+              {prediction.resultType === "exact" ? (
+                <Trophy className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : prediction.points > 0 ? (
+                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : (
+                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" aria-hidden="true" />
+              )}
+              <span>{calculatedResult.label}</span>
+            </div>
+
+            <div
+              className={`inline-flex min-h-9 items-center gap-1 rounded-xl border px-3 py-1.5 ${calculatedResult.pointsClass}`}
             >
-              {match.result.homeScore ?? "—"} - {match.result.awayScore ?? "—"}
-            </span>
+              <span className="text-[10px] font-black opacity-70">نقاطك</span>
+              <strong
+                dir="ltr"
+                className="text-base font-black tabular-nums [unicode-bidi:isolate]"
+              >
+                {prediction.points > 0 ? `+${prediction.points}` : "0"}
+              </strong>
+            </div>
           </div>
-          <div>
-            <span className="block text-white/45">سبب النقاط</span>
-            <span className="mt-1 block text-sky-100">
-              {resultReason(prediction)}
-            </span>
-          </div>
-          <div>
-            <span className="block text-white/45">نقاط المباراة</span>
-            <span
-              dir="ltr"
-              className="mt-1 block text-lg text-[var(--tournament-primary)] [unicode-bidi:isolate]"
+
+          <div
+            dir="ltr"
+            className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-stretch gap-2.5 p-3"
+          >
+            <div
+              dir="rtl"
+              className="rounded-2xl border border-white/[0.08] bg-black/15 px-3 py-3 text-center"
             >
-              +{prediction.points}
-            </span>
+              <span className="block text-[10px] font-black text-white/40">
+                النتيجة الرسمية
+              </span>
+              <strong
+                dir="ltr"
+                className="mt-1.5 block text-[25px] font-black leading-none tracking-tight text-white tabular-nums [unicode-bidi:isolate]"
+              >
+                {match.result.homeScore ?? "—"} - {match.result.awayScore ?? "—"}
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <span
+                dir="rtl"
+                className="inline-flex h-8 min-w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.045] px-2 text-[10px] font-black text-white/30"
+                aria-hidden="true"
+              >
+                ←
+              </span>
+            </div>
+
+            <div
+              dir="rtl"
+              className="rounded-2xl border border-white/[0.08] bg-black/15 px-3 py-3 text-center"
+            >
+              <span className="block text-[10px] font-black text-white/40">
+                توقعك
+              </span>
+              <strong
+                dir="ltr"
+                className="mt-1.5 block text-[25px] font-black leading-none tracking-tight text-white tabular-nums [unicode-bidi:isolate]"
+              >
+                {prediction.homeScore} - {prediction.awayScore}
+              </strong>
+            </div>
           </div>
+
+          <div className="px-3 pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.07] bg-black/10 px-3 py-2.5">
+              <span className="text-[10px] font-black text-white/38">
+                سبب الاحتساب
+              </span>
+              <strong className="text-[11px] font-black text-white/78">
+                {resultReason(prediction)}
+              </strong>
+            </div>
+          </div>
+
           {match.stage === "knockout" ? (
-            <div className="border-t border-white/10 pt-2 text-white/55 sm:col-span-4">
-              المتأهل: {" "}
-              <strong className="text-white">
-                {getGulfCup27Team(match.result.qualifiedTeamId || "")?.nameAr ||
-                  "—"}
-              </strong>{" "}
-              · {methodLabel(match.result.qualificationMethod)}
-              {prediction.pointsBreakdown ? (
-                <span dir="ltr" className="mr-2 [unicode-bidi:isolate]">
-                  ({prediction.pointsBreakdown.score}+
-                  {prediction.pointsBreakdown.qualified}+
-                  {prediction.pointsBreakdown.method})
+            <div className="border-t border-white/[0.08] px-3.5 py-3 text-[11px] font-bold text-white/55">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  المتأهل: {" "}
+                  <strong className="text-white">
+                    {getGulfCup27Team(match.result.qualifiedTeamId || "")?.nameAr ||
+                      "—"}
+                  </strong>{" "}
+                  · {methodLabel(match.result.qualificationMethod)}
                 </span>
-              ) : null}
+                {prediction.pointsBreakdown ? (
+                  <span
+                    dir="ltr"
+                    className="rounded-lg bg-white/[0.05] px-2 py-1 font-black tabular-nums text-white/45 [unicode-bidi:isolate]"
+                  >
+                    {prediction.pointsBreakdown.score}+
+                    {prediction.pointsBreakdown.qualified}+
+                    {prediction.pointsBreakdown.method}
+                  </span>
+                ) : null}
+              </div>
             </div>
           ) : null}
-        </div>
+        </section>
       ) : null}
 
       {prediction && !editing && !prediction.isCalculated ? (
