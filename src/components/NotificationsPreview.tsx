@@ -19,6 +19,7 @@ import {
   markAllNotificationsAsRead,
   UserNotification,
 } from "@/lib/notifications";
+import { getNotificationDisplayTitle } from "@/lib/predictionResultPresentation";
 
 const sectionMotion: Variants = {
   hidden: {
@@ -94,6 +95,7 @@ function getNotificationIconClass(type: UserNotification["type"]) {
   if (type === "achievement") return "text-amber-300";
   if (type === "exact_hit") return "text-emerald-300";
   if (type === "winner_hit") return "text-amber-300";
+  if (type === "match_result") return "text-red-300";
   if (type === "rank_up") return "text-emerald-300";
   if (type === "rank_down") return "text-red-300";
   if (type === "leader") return "text-amber-300";
@@ -248,7 +250,7 @@ export default function NotificationsPreview() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <h3 className="text-sm font-black text-white">
-                        {notification.title}
+                        {getNotificationDisplayTitle(notification.type, notification.title)}
                       </h3>
 
                       {!notification.isRead && (

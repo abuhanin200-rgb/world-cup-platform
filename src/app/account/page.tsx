@@ -41,10 +41,10 @@ type V2Stats = { points: number; rank: number | null; played: number; exact: num
 
 const EMPTY_V2: V2Stats = { points: 0, rank: null, played: 0, exact: 0, correctOutcome: 0, wrong: 0, bestStreak: 0 };
 
-function Stat({ label, value, accent = false }: { label: string; value: string | number; accent?: boolean }) {
+function Stat({ label, value, accent = false, valueClassName = "" }: { label: string; value: string | number; accent?: boolean; valueClassName?: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3 text-center md:p-4">
-      <div dir="ltr" className={`text-lg font-black md:text-xl ${accent ? "text-[var(--brand-yellow)]" : "text-white"}`}>{value}</div>
+      <div dir="ltr" className={`text-lg font-black md:text-xl ${valueClassName || (accent ? "text-[var(--brand-yellow)]" : "text-white")}`}>{value}</div>
       <div className="mt-1 text-[9px] font-bold text-white/38 md:text-[10px]">{label}</div>
     </div>
   );
@@ -228,7 +228,7 @@ export default function AccountPage() {
         {tab === "gulf" ? (
           <div className="altahaddi-glass rounded-[26px] p-4 md:p-6">
             <SectionIntro eyebrow="خليجي الديار العربية 27" title="أرقامك في البطولة" text="إحصائيات مستقلة عن بقية البطولات والألعاب." />
-            <div className="grid grid-cols-3 gap-2 md:grid-cols-6"><Stat label="المركز" value={gulf.rank || "—"} accent /><Stat label="النقاط" value={gulf.points} /><Stat label="التوقعات" value={gulf.played} /><Stat label="بالملي" value={gulf.exact} /><Stat label="صحيح" value={gulf.correctOutcome} /><Stat label="أفضل سلسلة" value={gulf.bestStreak} /></div>
+            <div className="grid grid-cols-3 gap-2 md:grid-cols-6"><Stat label="المركز" value={gulf.rank || "—"} accent /><Stat label="النقاط" value={gulf.points} /><Stat label="التوقعات" value={gulf.played} /><Stat label="بالملي" value={gulf.exact} valueClassName="text-emerald-300" /><Stat label="الفائز صحيح" value={gulf.correctOutcome} valueClassName="text-amber-300" /><Stat label="أفضل سلسلة" value={gulf.bestStreak} /></div>
             <Link href="/tournaments/gulf-cup-27" className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--brand-yellow)] px-4 text-xs font-black text-[#061a4d]">دخول البطولة <ArrowLeft className="h-4 w-4" /></Link>
           </div>
         ) : null}

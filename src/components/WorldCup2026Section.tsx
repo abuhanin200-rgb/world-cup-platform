@@ -11,8 +11,16 @@ import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { getAccountPredictions, type AccountPrediction } from "@/lib/accountPredictions";
 import type { TournamentSection } from "@/domain/tournaments";
+import { PREDICTION_RESULT_COPY } from "@/lib/predictionResultPresentation";
 
 type Bulletin = { id: string; date: string; summary: string; published: boolean; cards: Array<{ title?: string; content?: string }> };
+
+function legacyResultPresentation(row: AccountPrediction) {
+  if (!row.isCalculated) return { label: PREDICTION_RESULT_COPY.pending.label, className: "text-white/45" };
+  if (row.resultType === "exact") return { label: PREDICTION_RESULT_COPY.exact.label, className: "text-emerald-300" };
+  if (row.points > 0) return { label: PREDICTION_RESULT_COPY.winner.label, className: "text-amber-300" };
+  return { label: PREDICTION_RESULT_COPY.wrong.label, className: "text-red-300" };
+}
 
 function PredictionsArchive() {
   const { user, isLoggedIn } = useAuth();
@@ -31,7 +39,7 @@ function PredictionsArchive() {
   }, [user?.id]);
 
   if (!isLoggedIn) return <div className="rounded-[24px] border border-white/10 bg-white/[0.055] p-6 text-center"><Target className="mx-auto h-8 w-8 text-cyan-300" /><h2 className="mt-3 text-xl font-black">توقعاتك في كأس العالم 2026</h2><p className="mt-2 text-sm font-semibold text-white/55">سجّل الدخول لعرض سجل توقعاتك في البطولة.</p></div>;
-  return <div><div className="mb-4"><h2 className="text-xl font-black md:text-2xl">سجل توقعاتي</h2><p className="mt-1 text-xs font-semibold text-white/50">كل توقعاتك مرتبة من الأحدث إلى الأقدم مع نتائج احتسابها.</p></div>{loading ? <div className="p-8 text-center text-white/50">جاري تحميل التوقعات…</div> : rows.length === 0 ? <div className="rounded-[22px] border border-white/10 bg-white/[0.05] p-7 text-center text-sm font-bold text-white/50">لا توجد توقعات مسجلة لهذا الحساب.</div> : <div className="grid gap-2.5 md:grid-cols-2">{rows.map((row) => <article key={row.id} className="rounded-[20px] border border-white/10 bg-white/[0.05] p-4"><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm font-black"><div className="flex min-w-0 items-center gap-2"><TeamFlag code={row.homeTeamCode} emoji={row.homeTeamEmoji} name={row.homeTeamName} size="sm"/><span className="truncate">{row.homeTeamName}</span></div><span dir="ltr" className="rounded-xl bg-black/20 px-3 py-1.5">{row.homeScore} - {row.awayScore}</span><div className="flex min-w-0 items-center justify-end gap-2"><span className="truncate">{row.awayTeamName}</span><TeamFlag code={row.awayTeamCode} emoji={row.awayTeamEmoji} name={row.awayTeamName} size="sm"/></div></div><div className="mt-3 flex items-center justify-between border-t border-white/[0.07] pt-3 text-xs font-bold text-white/50"><span>{row.isCalculated ? (row.resultType === "exact" ? "بالملي" : row.points > 0 ? "توقع صحيح" : "لم يصب") : "بانتظار الاحتساب"}</span><span dir="ltr" className="font-black text-amber-300">{row.points} نقطة</span></div></article>)}</div>}</div>;
+  return <div><div className="mb-4"><h2 className="text-xl font-black md:text-2xl">سجل توقعاتي</h2><p className="mt-1 text-xs font-semibold text-white/50">كل توقعاتك مرتبة من الأحدث إلى الأقدم مع نتائج احتسابها.</p></div>{loading ? <div className="p-8 text-center text-white/50">جاري تحميل التوقعات…</div> : rows.length === 0 ? <div className="rounded-[22px] border border-white/10 bg-white/[0.05] p-7 text-center text-sm font-bold text-white/50">لا توجد توقعات مسجلة لهذا الحساب.</div> : <div className="grid gap-2.5 md:grid-cols-2">{rows.map((row) => <article key={row.id} className="rounded-[20px] border border-white/10 bg-white/[0.05] p-4"><div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm font-black"><div className="flex min-w-0 items-center gap-2"><TeamFlag code={row.homeTeamCode} emoji={row.homeTeamEmoji} name={row.homeTeamName} size="sm"/><span className="truncate">{row.homeTeamName}</span></div><span dir="ltr" className="rounded-xl bg-black/20 px-3 py-1.5">{row.homeScore} - {row.awayScore}</span><div className="flex min-w-0 items-center justify-end gap-2"><span className="truncate">{row.awayTeamName}</span><TeamFlag code={row.awayTeamCode} emoji={row.awayTeamEmoji} name={row.awayTeamName} size="sm"/></div></div><div className="mt-3 flex items-center justify-between border-t border-white/[0.07] pt-3 text-xs font-bold text-white/50"><span className={legacyResultPresentation(row).className}>{legacyResultPresentation(row).label}</span><span dir="ltr" className={`font-black ${legacyResultPresentation(row).className}`}>{row.points} نقطة</span></div></article>)}</div>}</div>;
 }
 
 function StudioArchive() {

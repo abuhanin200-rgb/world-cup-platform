@@ -137,11 +137,11 @@ export function getPredictionResultLabel(prediction: AdminPrediction) {
   if (!prediction.isCalculated) return "لم يُحتسب";
 
   if (isExactPrediction(prediction)) {
-    return golden ? "ذهبي بالملي +6" : "بالملي +3";
+    return golden ? "ذهبي بالملي +6" : "جابها بالملي +3";
   }
 
   if (isWinnerPrediction(prediction)) {
-    return golden ? "فائز ذهبي +2" : "الفائز +1";
+    return golden ? "فائز ذهبي +2" : "الفائز صحيح +1";
   }
 
   return "خطأ +0";

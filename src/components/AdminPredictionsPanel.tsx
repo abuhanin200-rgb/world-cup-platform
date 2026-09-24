@@ -119,10 +119,10 @@ function getPredictionResultLabel(prediction: AdminPredictionWithType) {
 
   if (!prediction.isCalculated) return "لم يُحتسب";
   if (isExactPrediction(prediction)) {
-    return golden ? "سوبر ذهبي بالملي +10" : "بالملي +3";
+    return golden ? "سوبر ذهبي بالملي +10" : "جابها بالملي +3";
   }
   if (isWinnerPrediction(prediction)) {
-    return golden ? "فائز سوبر ذهبي +4" : "الفائز +1";
+    return golden ? "فائز سوبر ذهبي +4" : "الفائز صحيح +1";
   }
 
   return "خطأ +0";

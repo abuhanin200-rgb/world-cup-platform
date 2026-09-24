@@ -1,3 +1,4 @@
+import { PREDICTION_RESULT_COPY } from "./predictionResultPresentation";
 import {
   collection,
   doc,
@@ -279,19 +280,19 @@ export async function sendTournamentCalculationNotificationsV2(input: {
       prediction.resultType === "exact"
         ? {
             type: "exact_hit" as const,
-            title: "جبتها بالملي 🎯",
+            title: `${PREDICTION_RESULT_COPY.exact.label} 🎯`,
             message: `نتيجة ${input.matchLabel} انتهت ${input.resultLabel}. توقّعك أصاب النتيجة كاملة.${suffix}`,
           }
         : prediction.resultType === "outcome"
           ? {
               type: "winner_hit" as const,
-              title: "توقع صحيح ✅",
-              message: `نتيجة ${input.matchLabel} انتهت ${input.resultLabel}. أصبت نتيجة الفائز/التأهل.${suffix}`,
+              title: `${PREDICTION_RESULT_COPY.winner.label} 🟡`,
+              message: `نتيجة ${input.matchLabel} انتهت ${input.resultLabel}. ${PREDICTION_RESULT_COPY.winner.label}.${suffix}`,
             }
           : {
               type: "match_result" as const,
-              title: "انتهت المباراة",
-              message: `نتيجة ${input.matchLabel} انتهت ${input.resultLabel}. راجع توقعك وترتيبك الجديد.`,
+              title: PREDICTION_RESULT_COPY.wrong.label,
+              message: `نتيجة ${input.matchLabel} انتهت ${input.resultLabel}. لم يطابق توقعك النتيجة النهائية. راجع ترتيبك الجديد.`,
             };
 
     const dedupeKey = `result:${input.tournamentId}:${input.matchId}:${input.resultHash}:${prediction.userId}`;

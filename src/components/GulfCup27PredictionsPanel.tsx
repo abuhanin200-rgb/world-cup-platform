@@ -24,6 +24,7 @@ import {
 import TeamFlag from "@/components/TeamFlag";
 import TournamentMatchInsights from "@/components/tournaments/TournamentMatchInsights";
 import TournamentMatchLineup from "@/components/tournaments/TournamentMatchLineup";
+import { PREDICTION_RESULT_COPY } from "@/lib/predictionResultPresentation";
 import TournamentMatchCenter from "@/components/tournaments/TournamentMatchCenter";
 import AuthGateCard from "@/components/auth/AuthGateCard";
 import { useAuth } from "@/context/AuthContext";
@@ -190,16 +191,16 @@ function resultReason(prediction: TournamentPredictionV2) {
   const breakdown = prediction.pointsBreakdown;
   if (!breakdown) {
     if (prediction.resultType === "exact") return "نتيجة مطابقة";
-    if (prediction.resultType === "outcome") return "اتجاه صحيح";
-    return "توقع غير صحيح";
+    if (prediction.resultType === "outcome") return PREDICTION_RESULT_COPY.winner.label;
+    return PREDICTION_RESULT_COPY.wrong.label;
   }
 
   const reasons: string[] = [];
   if (breakdown.score === 3) reasons.push("نتيجة 90 دقيقة مطابقة");
-  else if (breakdown.score === 1) reasons.push("اتجاه 90 دقيقة صحيح");
+  else if (breakdown.score === 1) reasons.push("الفائز في 90 دقيقة صحيح");
   if (breakdown.qualified === 2) reasons.push("المتأهل صحيح");
   if (breakdown.method === 1) reasons.push("طريقة التأهل صحيحة");
-  return reasons.length > 0 ? reasons.join(" + ") : "توقع غير صحيح";
+  return reasons.length > 0 ? reasons.join(" + ") : PREDICTION_RESULT_COPY.wrong.label;
 }
 
 
@@ -209,34 +210,34 @@ function resultPresentation(prediction: TournamentPredictionV2) {
 
   if (exact) {
     return {
-      label: "جابها بالملي",
+      label: PREDICTION_RESULT_COPY.exact.label,
       badgeClass:
-        "border-amber-300/30 bg-amber-300/10 text-amber-100",
+        "border-emerald-300/35 bg-emerald-300/12 text-emerald-100",
       pointsClass:
-        "border-amber-300/30 bg-amber-300/10 text-amber-100",
+        "border-emerald-300/35 bg-emerald-300/12 text-emerald-100",
       panelClass:
-        "border-amber-300/20 bg-gradient-to-b from-amber-300/[0.08] to-white/[0.025]",
+        "border-emerald-300/25 bg-gradient-to-b from-emerald-300/[0.09] to-white/[0.025]",
     };
   }
 
   if ((prediction.points ?? 0) > 0) {
     return {
-      label: "توقع صحيح",
+      label: PREDICTION_RESULT_COPY.winner.label,
       badgeClass:
-        "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+        "border-amber-300/35 bg-amber-300/12 text-amber-100",
       pointsClass:
-        "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
+        "border-amber-300/35 bg-amber-300/12 text-amber-100",
       panelClass:
-        "border-emerald-300/20 bg-gradient-to-b from-emerald-300/[0.07] to-white/[0.025]",
+        "border-amber-300/25 bg-gradient-to-b from-amber-300/[0.09] to-white/[0.025]",
     };
   }
 
   return {
-    label: "لم يصب التوقع",
-    badgeClass: "border-white/10 bg-white/[0.055] text-white/55",
-    pointsClass: "border-white/10 bg-white/[0.055] text-white/60",
+    label: PREDICTION_RESULT_COPY.wrong.label,
+    badgeClass: "border-red-300/35 bg-red-400/12 text-red-100",
+    pointsClass: "border-red-300/35 bg-red-400/12 text-red-100",
     panelClass:
-      "border-white/10 bg-gradient-to-b from-white/[0.045] to-white/[0.02]",
+      "border-red-300/22 bg-gradient-to-b from-red-400/[0.085] to-white/[0.02]",
   };
 }
 

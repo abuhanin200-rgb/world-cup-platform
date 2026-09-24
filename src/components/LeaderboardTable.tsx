@@ -1530,7 +1530,7 @@ function getPredictionStatus(prediction: Prediction) {
 
   if (prediction.resultType === "exact") {
     return {
-      text: golden ? `سوبر ذهبي بالملي +${getExactPoints(prediction)}` : "النتيجة بالملي",
+      text: golden ? `سوبر ذهبي بالملي +${getExactPoints(prediction)}` : "جابها بالملي",
       className: golden
         ? "border-fuchsia-300/35 bg-gradient-to-r from-fuchsia-500/15 via-amber-400/15 to-yellow-300/10 text-amber-100"
         : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",

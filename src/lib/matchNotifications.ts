@@ -1,4 +1,5 @@
 import { createUserNotification } from "./notifications";
+import { PREDICTION_RESULT_COPY } from "./predictionResultPresentation";
 
 type PredictionForNotification = {
   id: string;
@@ -50,7 +51,7 @@ export async function sendMatchCalculationNotifications({
         createUserNotification({
           userId: prediction.userId,
           type: "exact_hit",
-          title: "🎯 جبتها بالملي",
+          title: `🎯 ${PREDICTION_RESULT_COPY.exact.label}`,
           message: `توقعك في مباراة ${matchName} أصاب النتيجة كاملة (+${prediction.points || 0}).`,
         })
       );
@@ -61,7 +62,7 @@ export async function sendMatchCalculationNotifications({
         createUserNotification({
           userId: prediction.userId,
           type: "winner_hit",
-          title: "🏆 الفائز الصحيح",
+          title: `🟡 ${PREDICTION_RESULT_COPY.winner.label}`,
           message: `توقعك في مباراة ${matchName} أصاب الفائز الصحيح (+${prediction.points || 0}).`,
         })
       );

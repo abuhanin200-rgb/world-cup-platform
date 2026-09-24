@@ -21,6 +21,7 @@ import {
   subscribeUserNotifications,
   type UserNotification,
 } from "@/lib/notifications";
+import { getNotificationDisplayTitle } from "@/lib/predictionResultPresentation";
 
 function formatTime(value?: string) {
   if (!value) return "";
@@ -48,6 +49,27 @@ function NotificationIcon({ type }: { type: UserNotification["type"] }) {
     return <Megaphone className="h-4 w-4" aria-hidden="true" />;
   }
   return <BellRing className="h-4 w-4" aria-hidden="true" />;
+}
+
+function notificationToneClass(type: UserNotification["type"], isRead: boolean) {
+  if (type === "exact_hit") {
+    return isRead
+      ? "border-emerald-300/15 bg-emerald-300/[0.05] text-emerald-200/70"
+      : "border-emerald-300/30 bg-emerald-300/12 text-emerald-200";
+  }
+  if (type === "winner_hit") {
+    return isRead
+      ? "border-amber-300/15 bg-amber-300/[0.05] text-amber-200/70"
+      : "border-amber-300/30 bg-amber-300/12 text-amber-200";
+  }
+  if (type === "match_result") {
+    return isRead
+      ? "border-red-300/15 bg-red-400/[0.045] text-red-200/70"
+      : "border-red-300/30 bg-red-400/12 text-red-200";
+  }
+  return isRead
+    ? "border-white/10 bg-white/[0.05] text-slate-300"
+    : "border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/10 text-[var(--brand-yellow)]";
 }
 
 export default function PlatformNotificationsPopover() {
@@ -199,17 +221,16 @@ export default function PlatformNotificationsPopover() {
                 >
                   <div className="flex min-w-0 items-start gap-3">
                     <span
-                      className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${
-                        item.isRead
-                          ? "border-white/10 bg-white/[0.05] text-slate-300"
-                          : "border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/10 text-[var(--brand-yellow)]"
-                      }`}
+                      className={`mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${notificationToneClass(
+                        item.type,
+                        item.isRead,
+                      )}`}
                     >
                       <NotificationIcon type={item.type} />
                     </span>
                     <span className="min-w-0 flex-1 overflow-hidden">
                       <span className="flex min-w-0 items-start justify-between gap-2">
-                        <span className="min-w-0 break-words text-xs font-black leading-5 text-white">{item.title}</span>
+                        <span className="min-w-0 break-words text-xs font-black leading-5 text-white">{getNotificationDisplayTitle(item.type, item.title)}</span>
                         <span className="shrink-0 whitespace-nowrap text-[10px] font-bold text-slate-500">{formatTime(item.createdAt)}</span>
                       </span>
                       <span className="mt-1 block break-words text-[11px] font-medium leading-5 text-slate-400">{item.message}</span>

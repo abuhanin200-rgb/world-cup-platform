@@ -1,3 +1,4 @@
+import { PREDICTION_RESULT_COPY } from "./predictionResultPresentation";
 import "server-only";
 import type { DocumentReference, WriteBatch } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebaseAdmin";
@@ -794,7 +795,7 @@ async function sendResultNotificationsServer(input: {
   const operations: Array<(batch: WriteBatch) => void> = [];
   input.scored.forEach((row) => {
     const id = `auto_result_${input.tournamentId}_${input.match.id}_${input.resultHash}_${row.userId}`.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 450);
-    const title = row.resultType === "exact" ? "جبتها بالملي 🎯" : row.resultType === "outcome" ? "توقع صحيح ✅" : "انتهت المباراة";
+    const title = row.resultType === "exact" ? `${PREDICTION_RESULT_COPY.exact.label} 🎯` : row.resultType === "outcome" ? `${PREDICTION_RESULT_COPY.winner.label} 🟡` : PREDICTION_RESULT_COPY.wrong.label;
     const message = `انتهت المباراة ${input.candidate.homeScore}-${input.candidate.awayScore}.${row.points > 0 ? ` +${row.points} نقطة` : ""}`;
     operations.push((batch) => batch.set(adminDb.collection(COLLECTIONS.notifications).doc(id), {
       userId: row.userId, type: row.resultType === "exact" ? "exact_hit" : row.resultType === "outcome" ? "winner_hit" : "match_result", title, message,
