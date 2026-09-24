@@ -192,7 +192,7 @@ export default function GulfCup27LeaderboardPanel({
           </div>
           <h2 className="text-xl font-black md:text-2xl">لوحة الصدارة</h2>
           <p className="mx-auto mt-1 max-w-xl text-[11px] leading-5 text-slate-300 md:text-xs">
-            حسب النقاط، ثم النتائج بالملي، ثم الفائز الصحيح والأقل أخطاء.
+            حسب النقاط، ثم بالملي، ثم الفائز الصحيح، ثم عدد التوقعات، ثم الأقل أخطاء.
           </p>
           <button
             type="button"

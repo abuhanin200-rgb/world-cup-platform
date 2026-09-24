@@ -732,6 +732,7 @@ function buildLeaderboardAggregateRows(
       b.points - a.points ||
       b.exact - a.exact ||
       b.correctOutcome - a.correctOutcome ||
+      b.played - a.played ||
       a.wrong - b.wrong ||
       a.fullName.localeCompare(b.fullName, "ar"),
   );

@@ -487,7 +487,7 @@ function MatchPredictionCard({
           <span>
             المباراة مباشرة والتوقع مقفل.
             {match.result.homeScore != null && match.result.awayScore != null
-              ? ` النتيجة الحالية: ${match.result.homeScore} - ${match.result.awayScore}.`
+              ? ` النتيجة الحالية: ${home?.nameAr || "الفريق الأول"} ${match.result.homeScore} - ${match.result.awayScore} ${away?.nameAr || "الفريق الثاني"}.`
               : ""}
             {!prediction ? " لم تسجل توقعًا لهذه المباراة." : ""}
           </span>
@@ -597,7 +597,7 @@ function MatchPredictionCard({
                 dir="ltr"
                 className="mt-1.5 block text-[25px] font-black leading-none tracking-tight text-white tabular-nums [unicode-bidi:isolate]"
               >
-                {match.result.homeScore ?? "—"} - {match.result.awayScore ?? "—"}
+                {match.result.awayScore ?? "—"} - {match.result.homeScore ?? "—"}
               </strong>
             </div>
 
@@ -622,7 +622,7 @@ function MatchPredictionCard({
                 dir="ltr"
                 className="mt-1.5 block text-[25px] font-black leading-none tracking-tight text-white tabular-nums [unicode-bidi:isolate]"
               >
-                {prediction.homeScore} - {prediction.awayScore}
+                {prediction.awayScore} - {prediction.homeScore}
               </strong>
             </div>
           </div>
@@ -669,7 +669,7 @@ function MatchPredictionCard({
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold leading-6 text-white/55">
           توقعك المحفوظ: {" "}
           <strong dir="ltr" className="text-white [unicode-bidi:isolate]">
-            {prediction.homeScore} - {prediction.awayScore}
+            {prediction.awayScore} - {prediction.homeScore}
           </strong>
           {prediction.qualifiedTeamId ? (
             <span>

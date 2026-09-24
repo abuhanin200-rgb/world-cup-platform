@@ -84,6 +84,7 @@ export function buildTournamentLeaderboardRowsV2({
       if (b.correctOutcome !== a.correctOutcome) {
         return b.correctOutcome - a.correctOutcome;
       }
+      if (b.played !== a.played) return b.played - a.played;
       if (a.wrong !== b.wrong) return a.wrong - b.wrong;
       return a.fullName.localeCompare(b.fullName, "ar");
     })

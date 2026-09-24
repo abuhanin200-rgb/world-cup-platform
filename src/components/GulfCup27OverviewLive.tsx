@@ -50,7 +50,7 @@ function formatKickoff(timestamp: number) {
   };
 }
 
-function TeamSide({ teamId }: { teamId: string }) {
+function TeamSide({ teamId, score }: { teamId: string; score?: number | null }) {
   const team = getGulfCup27Team(teamId);
   if (!team) return <span>—</span>;
 
@@ -58,6 +58,11 @@ function TeamSide({ teamId }: { teamId: string }) {
     <div className="min-w-0 text-center">
       <TeamFlag code={team.flagCode} name={team.nameAr} size="lg" />
       <div className="mt-2 truncate text-sm font-black md:text-base">{team.nameAr}</div>
+      {score != null ? (
+        <div dir="ltr" className="mx-auto mt-2 inline-flex min-w-11 items-center justify-center rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 text-xl font-black tabular-nums [unicode-bidi:isolate]">
+          {score}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -176,15 +181,13 @@ export default function GulfCup27OverviewLive() {
         {focusMatch && kickoff ? (
           <>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-[22px] border border-white/10 bg-black/20 p-4">
-              <TeamSide teamId={focusMatch.homeTeamId} />
+              <TeamSide teamId={focusMatch.homeTeamId} score={focusFinished ? focusMatch.result.homeScore : null} />
               {focusFinished ? (
-                <span dir="ltr" className="text-2xl font-black [unicode-bidi:isolate] md:text-3xl">
-                  {focusMatch.result.homeScore} - {focusMatch.result.awayScore}
-                </span>
+                <span className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-[10px] font-black text-white/35">انتهت</span>
               ) : (
                 <span dir="ltr" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-white/50 [unicode-bidi:isolate]">VS</span>
               )}
-              <TeamSide teamId={focusMatch.awayTeamId} />
+              <TeamSide teamId={focusMatch.awayTeamId} score={focusFinished ? focusMatch.result.awayScore : null} />
             </div>
 
             <div className="mt-4 grid gap-2 text-xs font-bold text-white/60 sm:grid-cols-3">

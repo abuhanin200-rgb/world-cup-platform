@@ -196,6 +196,11 @@ function RuntimeMatchCard({ match, now }: { match: TournamentMatchRuntimeV2; now
             <>
               <TeamFlag code={home.flagCode} name={home.nameAr} size="lg" />
               <div className="mt-2 truncate text-sm font-black md:text-base">{home.nameAr}</div>
+              {finished ? (
+                <div dir="ltr" className="mx-auto mt-2 inline-flex min-w-12 items-center justify-center rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 text-2xl font-black tabular-nums text-white [unicode-bidi:isolate]">
+                  {match.result.homeScore}
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="text-xs font-black leading-6 text-white/40">
@@ -206,8 +211,9 @@ function RuntimeMatchCard({ match, now }: { match: TournamentMatchRuntimeV2; now
 
         <div className="min-w-[72px] text-center">
           {finished ? (
-            <div dir="ltr" className="text-2xl font-black text-white [unicode-bidi:isolate] md:text-3xl">
-              {match.result.homeScore} - {match.result.awayScore}
+            <div className="flex flex-col items-center gap-1 text-white/30">
+              <span className="text-lg font-black" aria-hidden="true">—</span>
+              <span className="text-[9px] font-black">النتيجة</span>
             </div>
           ) : (
             <div dir="ltr" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-white/45">
@@ -221,6 +227,11 @@ function RuntimeMatchCard({ match, now }: { match: TournamentMatchRuntimeV2; now
             <>
               <TeamFlag code={away.flagCode} name={away.nameAr} size="lg" />
               <div className="mt-2 truncate text-sm font-black md:text-base">{away.nameAr}</div>
+              {finished ? (
+                <div dir="ltr" className="mx-auto mt-2 inline-flex min-w-12 items-center justify-center rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 text-2xl font-black tabular-nums text-white [unicode-bidi:isolate]">
+                  {match.result.awayScore}
+                </div>
+              ) : null}
             </>
           ) : (
             <div className="text-xs font-black leading-6 text-white/40">
