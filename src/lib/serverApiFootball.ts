@@ -757,3 +757,48 @@ export async function getApiFootballTeamSquad(teamId: number) {
     quotaRemaining: result.quotaRemaining,
   };
 }
+
+export type ApiFootballFixtureInjury = {
+  playerId: number;
+  playerName: string;
+  photo: string | null;
+  teamId: number;
+  teamName: string;
+  type: string;
+  reason: string;
+};
+
+export async function getApiFootballFixtureInjuries(fixtureId: number) {
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) {
+    throw new Error("Fixture ID غير صحيح");
+  }
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/injuries",
+    { fixture: fixtureId },
+  );
+
+  return {
+    injuries: result.data
+      .map((row) => {
+        const player = (row.player || {}) as Record<string, unknown>;
+        const team = (row.team || {}) as Record<string, unknown>;
+        const playerId = Number(player.id);
+        const teamId = Number(team.id);
+        if (!Number.isInteger(playerId) || playerId <= 0) return null;
+        if (!Number.isInteger(teamId) || teamId <= 0) return null;
+
+        return {
+          playerId,
+          playerName: clean(player.name),
+          photo: clean(player.photo) || playerPhotoUrl(playerId),
+          teamId,
+          teamName: clean(team.name),
+          type: clean(player.type),
+          reason: clean(player.reason),
+        } satisfies ApiFootballFixtureInjury;
+      })
+      .filter((item): item is ApiFootballFixtureInjury => Boolean(item)),
+    quotaRemaining: result.quotaRemaining,
+  };
+}

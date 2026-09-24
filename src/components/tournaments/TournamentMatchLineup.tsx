@@ -21,6 +21,14 @@ type LineupPlayer = {
   photo: string | null;
 };
 
+type LineupAbsence = {
+  id: number;
+  name: string;
+  photo: string | null;
+  type: string;
+  reason: string;
+};
+
 type TeamLineup = {
   side: "home" | "away";
   providerTeamId: number;
@@ -38,6 +46,7 @@ type TeamLineup = {
   } | null;
   startXI: LineupPlayer[];
   substitutes: LineupPlayer[];
+  absences: LineupAbsence[];
 };
 
 type MatchLineupData = {
@@ -295,10 +304,10 @@ function PitchPlayer({ player, x, y }: PitchSlot) {
       <div className="relative">
         <PlayerPhoto player={player} size="sm" />
       </div>
-      <div className="mt-0.5 w-full truncate rounded-md bg-black/55 px-1 py-0.5 text-[8px] font-black leading-3 text-white shadow-md backdrop-blur-[2px] sm:text-[9px]">
-        {player.name}
+      <div className="mt-1 flex min-h-[24px] w-full items-start justify-center px-0.5 text-center text-[8px] font-black leading-[11px] text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.95)] sm:text-[9px] sm:leading-3">
+        <span className="line-clamp-2">{player.name}</span>
       </div>
-      <div className="mt-0.5 max-w-full truncate text-[7px] font-bold leading-3 text-white/70 sm:text-[8px]">
+      <div className="mt-0.5 max-w-full truncate text-[7px] font-bold leading-3 text-white/75 [text-shadow:0_1px_2px_rgba(0,0,0,0.9)] sm:text-[8px]">
         {positionLabel(player.position)}
       </div>
     </div>
@@ -372,6 +381,39 @@ function Bench({ players }: { players: LineupPlayer[] }) {
             <div className="mt-1 truncate text-[10px] font-black text-white">{player.name}</div>
             <div className="mt-0.5 truncate text-[9px] font-bold text-white/35">
               {positionLabel(player.position)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Absences({ players }: { players: LineupAbsence[] }) {
+  if (!players.length) return null;
+  return (
+    <section className="rounded-[24px] border border-rose-300/15 bg-rose-300/[0.04] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-black text-white">الغيابات</h3>
+        <span className="rounded-full border border-rose-300/15 bg-rose-300/10 px-2.5 py-1 text-[9px] font-black text-rose-100">
+          {players.length}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {players.map((player) => (
+          <div key={player.id} className="flex items-center gap-3 rounded-2xl border border-white/8 bg-black/15 p-2.5">
+            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-white/15 bg-white/5">
+              {player.photo ? (
+                <img src={player.photo} alt={player.name} className="h-full w-full object-cover object-top" loading="lazy" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[10px] font-black text-white/40">{playerInitials(player.name)}</div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[11px] font-black text-white">{player.name}</div>
+              <div className="mt-1 truncate text-[9px] font-bold text-rose-100/70">
+                {player.reason || player.type || "غير متاح"}
+              </div>
             </div>
           </div>
         ))}
@@ -579,7 +621,7 @@ export default function TournamentMatchLineup({
 
                           {activeTeam.source === "expected" ? (
                             <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.055] px-3 py-2 text-center text-[10px] font-bold leading-5 text-amber-50/75">
-                              متوقع اعتمادًا على أحدث تشكيل رسمي متاح للمنتخب، ويتحول تلقائيًا إلى الرسمي عند صدوره.
+                              التشكيل المتوقع حاليًا، ويتحدث تلقائيًا عند صدور التشكيل الرسمي.
                             </div>
                           ) : null}
 
@@ -593,6 +635,7 @@ export default function TournamentMatchLineup({
 
                           <CoachCard team={activeTeam} />
                           <Bench players={activeTeam.substitutes} />
+                          <Absences players={activeTeam.absences || []} />
                         </>
                       ) : null}
                     </div>
