@@ -9,9 +9,8 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
-const DISMISS_KEY = "altahaddi:pwa-install-dismissed-at";
+const PROMPT_SHOWN_KEY = "altahaddi:pwa-install-prompt-shown";
 const INSTALLED_KEY = "altahaddi:pwa-installed";
-const DISMISS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function isStandaloneMode() {
   if (typeof window === "undefined") return false;
@@ -30,10 +29,9 @@ function detectDevice() {
   return { ios, android };
 }
 
-function recentlyDismissed() {
+function wasPromptShown() {
   if (typeof window === "undefined") return true;
-  const value = Number(window.localStorage.getItem(DISMISS_KEY) || 0);
-  return value > 0 && Date.now() - value < DISMISS_TTL_MS;
+  return window.localStorage.getItem(PROMPT_SHOWN_KEY) === "1";
 }
 
 export default function PWAClient() {
@@ -91,7 +89,7 @@ export default function PWAClient() {
 
   const canShow = useMemo(() => {
     if (excluded || installed || !supportedMobile) return false;
-    if (recentlyDismissed()) return false;
+    if (wasPromptShown()) return false;
     if (ios) return true;
     return android && Boolean(deferredPrompt);
   }, [android, deferredPrompt, excluded, installed, ios, supportedMobile]);
@@ -103,7 +101,10 @@ export default function PWAClient() {
     }
 
     const delay = pathname === "/tournaments/gulf-cup-27" ? 4200 : 2200;
-    const timer = window.setTimeout(() => setVisible(true), delay);
+    const timer = window.setTimeout(() => {
+      window.localStorage.setItem(PROMPT_SHOWN_KEY, "1");
+      setVisible(true);
+    }, delay);
     return () => window.clearTimeout(timer);
   }, [canShow, pathname]);
 
@@ -118,7 +119,6 @@ export default function PWAClient() {
         setInstalled(true);
         setVisible(false);
       } else {
-        window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
         setVisible(false);
       }
     } finally {
@@ -128,7 +128,8 @@ export default function PWAClient() {
   }
 
   function dismiss() {
-    window.localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    // The prompt is intentionally shown only once per browser/device.
+    window.localStorage.setItem(PROMPT_SHOWN_KEY, "1");
     setVisible(false);
   }
 

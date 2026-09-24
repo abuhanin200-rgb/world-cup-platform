@@ -1,19 +1,11 @@
-# التحدي — PWA Phase 1
+# PWA install prompt — show once
 
-## المضاف
-- تسجيل Service Worker عالمي بدون مكتبات إضافية.
-- Install prompt مخصص للجوال:
-  - Android: يستخدم نافذة التثبيت الأصلية عندما تكون متاحة.
-  - iPhone/iPad: تعليمات إضافة التطبيق للشاشة الرئيسية.
-- لا يظهر prompt داخل لوحة الإدارة أو إذا كان التطبيق مثبتًا.
-- عند اختيار «ليس الآن» لا يعاد الإزعاج لمدة 7 أيام.
-- Offline fallback بسيط عند انقطاع الإنترنت.
-- تحديث manifest الحالي مع id/start_url/categories/shortcuts.
+- The automatic PWA install prompt now appears only once per browser/device.
+- The first time it is actually displayed, a persistent localStorage flag is written.
+- Pressing the close button or «ليس الآن» keeps that flag, so the automatic prompt never appears again on that browser/device.
+- Android native install-prompt dismissal also does not trigger the custom prompt again.
+- Successful installs still set the existing installed flag.
+- No Firestore rules or backend changes are required.
 
-## سياسة الكاش
-- صفحات الموقع: Network-first، ولا نخزن صفحات الحساب/التوقعات كنسخة قديمة.
-- API: لا يتم تخزينها إطلاقًا.
-- ملفات Next الثابتة والصور المحلية: Cache-first فقط.
-
-## لا يتضمن هذا التحديث
-- Web Push/VAPID والإشعارات خارج الموقع. هذا يحتاج إعداد مفاتيح وقاعدة اشتراكات ويُنفذ كمرحلة منفصلة.
+Modified file:
+- `src/components/PWAClient.tsx`
