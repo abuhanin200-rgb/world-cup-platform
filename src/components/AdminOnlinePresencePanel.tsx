@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  Battery,
+  BatteryCharging,
   Clock3,
   Laptop,
   MonitorSmartphone,
   RefreshCw,
   Search,
+  Signal,
   Smartphone,
   Tablet,
   Users,
@@ -22,6 +25,7 @@ import type { OnlinePresence, PresenceDeviceType } from "@/types/presence";
 
 const OFFLINE_PAGE_SIZE = 25;
 const AUTO_REFRESH_MS = 30 * 1000;
+const TABLE_GRID = "grid-cols-[minmax(165px,1.05fr)_minmax(195px,1.2fr)_minmax(145px,.85fr)_minmax(135px,.8fr)_minmax(110px,.65fr)_minmax(130px,.75fr)_110px]";
 
 type StatusFilter = "all" | "online" | "offline";
 type DeviceFilter = "all" | PresenceDeviceType;
@@ -59,7 +63,8 @@ function formatLastSeen(lastSeen: number, now = Date.now()) {
 
 function formatExactLastSeen(lastSeen: number) {
   if (!Number.isFinite(lastSeen)) return "-";
-  return new Intl.DateTimeFormat("ar-SA", {
+  return new Intl.DateTimeFormat("ar-SA-u-ca-gregory", {
+    calendar: "gregory",
     timeZone: "Asia/Riyadh",
     day: "numeric",
     month: "short",
@@ -95,6 +100,34 @@ function getDeviceLabel(member: OnlinePresence) {
   return "غير معروف";
 }
 
+function getNetworkLabel(member: OnlinePresence) {
+  const type = (member.networkType || "").toLowerCase();
+  if (type === "wifi") return "Wi‑Fi";
+  if (type === "cellular") return "شبكة جوال";
+  if (type === "ethernet") return "Ethernet";
+  if (type === "none") return "بدون اتصال";
+  if (type && type !== "unknown" && type !== "other") return type;
+  return "غير متاح";
+}
+
+function getEffectiveNetworkLabel(member: OnlinePresence) {
+  const effective = (member.effectiveConnectionType || "").toLowerCase();
+  const parts: string[] = [];
+  if (effective) parts.push(`أداء ${effective.toUpperCase()}`);
+  if (typeof member.downlinkMbps === "number" && Number.isFinite(member.downlinkMbps)) {
+    parts.push(`${member.downlinkMbps.toFixed(member.downlinkMbps >= 10 ? 0 : 1)} Mbps`);
+  }
+  if (member.saveData) parts.push("توفير بيانات");
+  return parts.join(" · ") || "لا يدعم المتصفح التفاصيل";
+}
+
+function getBatteryTone(level?: number) {
+  if (typeof level !== "number") return "text-slate-500";
+  if (level <= 20) return "text-rose-300";
+  if (level <= 40) return "text-amber-300";
+  return "text-emerald-300";
+}
+
 function makkahDayKey(timestamp: number) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Riyadh",
@@ -107,10 +140,12 @@ function makkahDayKey(timestamp: number) {
 function PresenceRow({ member, online, now }: { member: OnlinePresence; online: boolean; now: number }) {
   const DeviceIcon = getDeviceIcon(member.deviceType);
   const pageLabel = getPresencePageLabel(member.path || "/");
+  const hasBattery = typeof member.batteryLevelPct === "number";
+  const BatteryIcon = member.batteryCharging ? BatteryCharging : Battery;
 
   return (
     <div
-      className={`grid gap-3 border-t border-white/8 px-3 py-3 text-[12px] md:grid-cols-[minmax(180px,1.1fr)_minmax(190px,1.1fr)_minmax(150px,.8fr)_130px_120px] md:items-center md:text-sm ${
+      className={`grid ${TABLE_GRID} items-center gap-3 border-t border-white/8 px-3 py-3 text-[12px] md:text-sm ${
         online ? "bg-emerald-400/[0.035]" : "bg-transparent"
       }`}
     >
@@ -143,9 +178,31 @@ function PresenceRow({ member, online, now }: { member: OnlinePresence; online: 
         </div>
       </div>
 
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/8 bg-white/[0.04] text-cyan-200">
+          <Signal className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <div className="truncate font-black text-slate-100">{getNetworkLabel(member)}</div>
+          <div className="mt-0.5 truncate text-[10px] font-bold text-slate-500">{getEffectiveNetworkLabel(member)}</div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <BatteryIcon className={`h-4 w-4 ${getBatteryTone(member.batteryLevelPct)}`} />
+        <div>
+          <div className={`font-black ${getBatteryTone(member.batteryLevelPct)}`}>
+            {hasBattery ? `${member.batteryLevelPct}%` : "غير متاح"}
+          </div>
+          <div className="mt-0.5 text-[10px] font-bold text-slate-500">
+            {hasBattery ? (member.batteryCharging ? "قيد الشحن" : online ? "قراءة حالية" : "آخر قراءة") : "لا يدعمه المتصفح"}
+          </div>
+        </div>
+      </div>
+
       <div>
         <div className={`font-black ${online ? "text-emerald-300" : "text-slate-300"}`}>{formatLastSeen(member.lastSeen, now)}</div>
-        <div className="mt-1 text-[10px] font-bold text-slate-500">{formatExactLastSeen(member.lastSeen)}</div>
+        <div className="mt-1 whitespace-nowrap text-[10px] font-bold text-slate-500">{formatExactLastSeen(member.lastSeen)}</div>
       </div>
 
       <div>
@@ -171,6 +228,20 @@ function MiniStat({ icon: Icon, label, value, tone = "slate" }: { icon: typeof U
         <strong className="text-xl font-black text-white">{value}</strong>
       </div>
       <div className="mt-2 text-[10px] font-black opacity-80">{label}</div>
+    </div>
+  );
+}
+
+function TableHeader({ offline = false }: { offline?: boolean }) {
+  return (
+    <div className={`grid ${TABLE_GRID} gap-3 bg-white/[0.025] px-3 py-2 text-[10px] font-black text-slate-500`}>
+      <div>العضو</div>
+      <div>{offline ? "آخر صفحة" : "الصفحة الحالية"}</div>
+      <div>الجهاز</div>
+      <div>الاتصال</div>
+      <div>البطارية</div>
+      <div>آخر ظهور</div>
+      <div>{offline ? "الحالة" : "الجلسة"}</div>
     </div>
   );
 }
@@ -219,7 +290,8 @@ export default function AdminOnlinePresencePanel() {
     const iphoneCount = members.filter((member) => member.deviceType === "iphone").length;
     const androidCount = members.filter((member) => member.deviceType === "android").length;
     const computerCount = members.filter((member) => member.deviceType === "computer").length;
-    return { onlineCount, activeToday, iphoneCount, androidCount, computerCount };
+    const lowBatteryCount = members.filter((member) => typeof member.batteryLevelPct === "number" && member.batteryLevelPct <= 20).length;
+    return { onlineCount, activeToday, iphoneCount, androidCount, computerCount, lowBatteryCount };
   }, [members, now, todayKey]);
 
   const filtered = useMemo(() => {
@@ -237,6 +309,8 @@ export default function AdminOnlinePresencePanel() {
         member.browserName,
         member.osName,
         member.activity,
+        member.networkType,
+        member.effectiveConnectionType,
         getPresencePageLabel(member.path || "/"),
       ]
         .filter(Boolean)
@@ -274,7 +348,7 @@ export default function AdminOnlinePresencePanel() {
               <h2 className="text-xl font-black md:text-2xl">حضور الأعضاء ونشاطهم</h2>
             </div>
             <p className="mt-2 max-w-3xl text-xs font-bold leading-6 text-slate-400 md:text-sm">
-              المتواجدون الآن يظهرون أولًا، ثم آخر من زار المنصة. الصفحة والجهاز وآخر ظهور تُحدّث تلقائيًا كل 30 ثانية.
+              نفس عرض الجدول على الكمبيوتر والجوال. المتواجدون الآن أولًا، ثم آخر ظهور، مع الصفحة والجهاز والاتصال والبطارية عندما يسمح المتصفح بذلك.
             </p>
           </div>
 
@@ -295,7 +369,7 @@ export default function AdminOnlinePresencePanel() {
           <MiniStat icon={Users} label="دخلوا المنصة" value={members.length} tone="slate" />
           <MiniStat icon={Smartphone} label="iPhone" value={stats.iphoneCount} tone="sky" />
           <MiniStat icon={Smartphone} label="Android" value={stats.androidCount} tone="emerald" />
-          <MiniStat icon={Laptop} label="كمبيوتر" value={stats.computerCount} tone="slate" />
+          <MiniStat icon={Battery} label="بطارية ≤ 20%" value={stats.lowBatteryCount} tone="amber" />
         </div>
 
         <div className="mt-4 grid gap-2 lg:grid-cols-[1fr_auto_auto]">
@@ -304,7 +378,7 @@ export default function AdminOnlinePresencePanel() {
             <input
               value={queryText}
               onChange={(event) => setQueryText(event.target.value)}
-              placeholder="ابحث بالاسم أو الصفحة أو الجهاز..."
+              placeholder="ابحث بالاسم أو الصفحة أو الجهاز أو الاتصال..."
               className="h-11 w-full rounded-xl border border-white/10 bg-slate-950/55 pr-10 pl-3 text-xs font-bold text-white outline-none placeholder:text-slate-600 focus:border-emerald-400/30"
             />
           </label>
@@ -348,11 +422,11 @@ export default function AdminOnlinePresencePanel() {
               <span className="rounded-full bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-300">{onlineMembers.length}</span>
             </div>
             {onlineMembers.length > 0 ? (
-              <div>
-                <div className="hidden grid-cols-[minmax(180px,1.1fr)_minmax(190px,1.1fr)_minmax(150px,.8fr)_130px_120px] bg-white/[0.025] px-3 py-2 text-[10px] font-black text-slate-500 md:grid">
-                  <div>العضو</div><div>الصفحة الحالية</div><div>الجهاز</div><div>آخر ظهور</div><div>الجلسة</div>
+              <div className="overflow-x-auto overscroll-x-contain">
+                <div className="min-w-[1080px]">
+                  <TableHeader />
+                  {onlineMembers.map((member) => <PresenceRow key={member.userId} member={member} online now={now} />)}
                 </div>
-                {onlineMembers.map((member) => <PresenceRow key={member.userId} member={member} online now={now} />)}
               </div>
             ) : (
               <div className="p-6 text-center text-xs font-bold text-slate-500">لا يوجد أعضاء متواجدون ضمن الفلتر الحالي.</div>
@@ -370,11 +444,11 @@ export default function AdminOnlinePresencePanel() {
               <span className="rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-black text-slate-400">{offlineMembers.length}</span>
             </div>
             {visibleOffline.length > 0 ? (
-              <div>
-                <div className="hidden grid-cols-[minmax(180px,1.1fr)_minmax(190px,1.1fr)_minmax(150px,.8fr)_130px_120px] bg-white/[0.02] px-3 py-2 text-[10px] font-black text-slate-600 md:grid">
-                  <div>العضو</div><div>آخر صفحة</div><div>الجهاز</div><div>آخر ظهور</div><div>الحالة</div>
+              <div className="overflow-x-auto overscroll-x-contain">
+                <div className="min-w-[1080px]">
+                  <TableHeader offline />
+                  {visibleOffline.map((member) => <PresenceRow key={member.userId} member={member} online={false} now={now} />)}
                 </div>
-                {visibleOffline.map((member) => <PresenceRow key={member.userId} member={member} online={false} now={now} />)}
               </div>
             ) : (
               <div className="p-6 text-center text-xs font-bold text-slate-500">لا يوجد أعضاء غير متصلين ضمن الفلتر الحالي.</div>
@@ -405,7 +479,7 @@ export default function AdminOnlinePresencePanel() {
         ) : null}
 
         <div className="mt-3 rounded-2xl border border-sky-400/10 bg-sky-400/[0.04] px-4 py-3 text-[10px] font-bold leading-5 text-slate-400">
-          ملاحظة: بيانات نوع الجهاز والمتصفح تبدأ بالظهور بعد زيارة العضو للمنصة بعد تركيب هذا التحديث. الأعضاء القدامى سيظهر جهازهم «غير معروف» إلى أن يدخلوا مرة أخرى.
+          بيانات البطارية ونوع الاتصال اختيارية حسب دعم المتصفح. Safari على iPhone قد لا يتيحها، لذلك يظهر «غير متاح» بدل تخمين بيانات غير صحيحة. التاريخ معروض بالتقويم الميلادي وبتوقيت مكة.
         </div>
       </div>
     </section>

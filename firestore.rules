@@ -224,6 +224,12 @@ service cloud.firestore {
           "deviceLabel",
           "browserName",
           "osName",
+          "batteryLevelPct",
+          "batteryCharging",
+          "networkType",
+          "effectiveConnectionType",
+          "downlinkMbps",
+          "saveData",
           "lastChallengeStudioVisit",
           "updatedAt"
         ]);
@@ -243,6 +249,12 @@ service cloud.firestore {
           "deviceLabel",
           "browserName",
           "osName",
+          "batteryLevelPct",
+          "batteryCharging",
+          "networkType",
+          "effectiveConnectionType",
+          "downlinkMbps",
+          "saveData",
           "lastChallengeStudioVisit",
           "updatedAt"
         ])

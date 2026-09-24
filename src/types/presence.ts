@@ -34,6 +34,12 @@ export type PresenceDeviceInfo = {
   deviceLabel: string;
   browserName: string;
   osName: string;
+  batteryLevelPct?: number;
+  batteryCharging?: boolean;
+  networkType?: string;
+  effectiveConnectionType?: string;
+  downlinkMbps?: number;
+  saveData?: boolean;
 };
 
 export type OnlinePresence = {
@@ -48,5 +54,11 @@ export type OnlinePresence = {
   deviceLabel?: string;
   browserName?: string;
   osName?: string;
+  batteryLevelPct?: number;
+  batteryCharging?: boolean;
+  networkType?: string;
+  effectiveConnectionType?: string;
+  downlinkMbps?: number;
+  saveData?: boolean;
   lastChallengeStudioVisit?: number;
 };

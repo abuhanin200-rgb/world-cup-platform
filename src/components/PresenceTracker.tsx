@@ -11,6 +11,25 @@ const UPDATE_INTERVAL_MS = 60 * 1000;
 const MIN_EVENT_UPDATE_GAP_MS = 30 * 1000;
 const SESSION_START_KEY = "altahaddi_presence_session_started_at";
 
+type BatteryManagerLike = {
+  level: number;
+  charging: boolean;
+};
+
+type NetworkInformationLike = {
+  type?: string;
+  effectiveType?: string;
+  downlink?: number;
+  saveData?: boolean;
+};
+
+type NavigatorWithDeviceSignals = Navigator & {
+  getBattery?: () => Promise<BatteryManagerLike>;
+  connection?: NetworkInformationLike;
+  mozConnection?: NetworkInformationLike;
+  webkitConnection?: NetworkInformationLike;
+};
+
 function detectBrowser(userAgent: string) {
   if (/Edg\//i.test(userAgent)) return "Edge";
   if (/SamsungBrowser\//i.test(userAgent)) return "Samsung Internet";
@@ -64,6 +83,37 @@ function detectDevice(): PresenceDeviceInfo {
   return { deviceType: "other", deviceLabel: "جهاز آخر", browserName, osName: "غير معروف" };
 }
 
+async function readDeviceSignals(baseDevice: PresenceDeviceInfo): Promise<PresenceDeviceInfo> {
+  if (typeof navigator === "undefined") return baseDevice;
+
+  const nav = navigator as NavigatorWithDeviceSignals;
+  const result: PresenceDeviceInfo = { ...baseDevice };
+
+  const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
+  if (connection) {
+    if (connection.type) result.networkType = String(connection.type);
+    if (connection.effectiveType) result.effectiveConnectionType = String(connection.effectiveType);
+    if (Number.isFinite(connection.downlink)) result.downlinkMbps = Number(connection.downlink);
+    if (typeof connection.saveData === "boolean") result.saveData = connection.saveData;
+  }
+
+  if (typeof nav.getBattery === "function") {
+    try {
+      const battery = await nav.getBattery();
+      if (battery && Number.isFinite(battery.level)) {
+        result.batteryLevelPct = Math.max(0, Math.min(100, Math.round(battery.level * 100)));
+      }
+      if (battery && typeof battery.charging === "boolean") {
+        result.batteryCharging = battery.charging;
+      }
+    } catch {
+      // Battery Status API is intentionally optional and unavailable on several browsers.
+    }
+  }
+
+  return result;
+}
+
 function getSessionStartedAt(userId: string) {
   if (typeof window === "undefined") return Date.now();
 
@@ -80,7 +130,7 @@ export default function PresenceTracker() {
   const pathname = usePathname();
   const { user, isLoggedIn, loading } = useAuth();
   const lastUpdateRef = useRef(0);
-  const device = useMemo(() => detectDevice(), []);
+  const baseDevice = useMemo(() => detectDevice(), []);
 
   useEffect(() => {
     if (loading || !isLoggedIn || !user?.id) return;
@@ -96,6 +146,7 @@ export default function PresenceTracker() {
       lastUpdateRef.current = now;
 
       try {
+        const device = await readDeviceSignals(baseDevice);
         await Promise.all([
           updateMemberLastSeen(user.id),
           updateOnlinePresence({
@@ -143,7 +194,7 @@ export default function PresenceTracker() {
       window.removeEventListener("focus", handleActivity);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [loading, isLoggedIn, user?.id, user?.fullName, pathname, device]);
+  }, [loading, isLoggedIn, user?.id, user?.fullName, pathname, baseDevice]);
 
   return null;
 }

@@ -140,6 +140,12 @@ export async function updateOnlinePresence(params: {
           deviceLabel: params.device.deviceLabel,
           browserName: params.device.browserName,
           osName: params.device.osName,
+          ...(typeof params.device.batteryLevelPct === "number" ? { batteryLevelPct: params.device.batteryLevelPct } : {}),
+          ...(typeof params.device.batteryCharging === "boolean" ? { batteryCharging: params.device.batteryCharging } : {}),
+          ...(params.device.networkType ? { networkType: params.device.networkType } : {}),
+          ...(params.device.effectiveConnectionType ? { effectiveConnectionType: params.device.effectiveConnectionType } : {}),
+          ...(typeof params.device.downlinkMbps === "number" ? { downlinkMbps: params.device.downlinkMbps } : {}),
+          ...(typeof params.device.saveData === "boolean" ? { saveData: params.device.saveData } : {}),
         }
       : {}),
     ...(currentPage === "challengeStudio" ? { lastChallengeStudioVisit: now } : {}),
