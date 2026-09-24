@@ -15,7 +15,7 @@ const CACHE_COLLECTION = "tournamentMatchInsightsCache";
 const CACHE_TTL_UPCOMING_MS = 6 * 60 * 60 * 1000;
 const CACHE_TTL_FINISHED_MS = 30 * 24 * 60 * 60 * 1000;
 const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "AWD", "WO"]);
-const INSIGHTS_SCHEMA_VERSION = 2;
+const INSIGHTS_SCHEMA_VERSION = 3;
 
 type MatchInsightMeeting = {
   fixtureId: number;
@@ -516,8 +516,8 @@ export async function getTournamentMatchInsights(input: {
   // from the prediction comparison block, which can legitimately return 0%
   // when a competition has insufficient season data.
   const recentTeamsSettled = await Promise.allSettled([
-    getApiFootballRecentTeamFixtures({ teamId: providerHomeTeamId, last: 5 }),
-    getApiFootballRecentTeamFixtures({ teamId: providerAwayTeamId, last: 5 }),
+    getApiFootballRecentTeamFixtures({ teamId: providerHomeTeamId, last: 10 }),
+    getApiFootballRecentTeamFixtures({ teamId: providerAwayTeamId, last: 10 }),
   ]);
 
   const recentHomeRows =

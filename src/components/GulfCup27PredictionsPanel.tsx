@@ -118,40 +118,48 @@ function formatKickoff(timestamp: number) {
   };
 }
 
-function formatDuration(milliseconds: number) {
+function formatCountdown(milliseconds: number) {
   const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
-  const days = Math.floor(totalSeconds / 86_400);
-  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
-  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-
-  if (days > 0) return `${days}ي ${hours}س ${minutes}د`;
-  if (hours > 0) return `${hours}س ${minutes}د ${seconds}ث`;
-  return `${minutes}د ${seconds}ث`;
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
 }
 
-function Countdown({ deadline, now, mode = "close" }: { deadline: number; now: number; mode?: "open" | "close" }) {
+function Countdown({
+  deadline,
+  now,
+  mode = "close",
+}: {
+  deadline: number;
+  now: number;
+  mode?: "open" | "close";
+}) {
   const remaining = Math.max(0, deadline - now);
   const urgent = remaining > 0 && remaining <= 15 * 60 * 1000;
-  const minutes = Math.max(0, Math.ceil(remaining / 60_000));
 
   if (remaining <= 0) return null;
 
-  const tone = mode === "open"
-    ? "border-sky-300/25 bg-sky-300/10 text-sky-100"
-    : urgent
-      ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
-      : "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
+  const tone =
+    mode === "open"
+      ? "border-sky-300/25 bg-sky-300/10 text-sky-100"
+      : urgent
+        ? "border-amber-300/30 bg-amber-300/10 text-amber-100"
+        : "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
 
   return (
     <span
-      dir="ltr"
-      className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black tabular-nums [unicode-bidi:isolate] ${tone}`}
+      className={`inline-flex min-h-9 items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-black ${tone}`}
     >
-      <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-      <span aria-hidden="true">{formatDuration(remaining)}</span>
-      <span className="sr-only" aria-live="polite" aria-atomic="true">
-        {mode === "open" ? `متبقٍ نحو ${minutes} دقيقة لفتح التوقع` : `متبقٍ نحو ${minutes} دقيقة لإغلاق التوقع`}
+      <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>{mode === "open" ? "يفتح بعد" : "يغلق بعد"}</span>
+      <span
+        dir="ltr"
+        className="font-mono text-[13px] font-black tabular-nums tracking-[0.08em] [unicode-bidi:isolate]"
+      >
+        {formatCountdown(remaining)}
       </span>
     </span>
   );
@@ -386,17 +394,15 @@ function MatchPredictionCard({
           <span>يفتح التوقع بعد تحديد طرفي المباراة واعتماد الإدارة.</span>
         ) : state === "not_open" ? (
           match.predictionOpensAt && match.predictionOpensAt > now ? (
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="text-sky-100/80">يفتح التوقع بعد:</span>
+            <div className="flex items-center justify-center">
               <Countdown deadline={match.predictionOpensAt} now={now} mode="open" />
             </div>
           ) : (
             <span>لم تفتح الإدارة التوقع لهذه المباراة بعد.</span>
           )
         ) : state === "open" || canEditSaved ? (
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className="text-emerald-100/80">يغلق التوقع بعد:</span>
-            {deadline > now ? <Countdown deadline={deadline} now={now} /> : null}
+          <div className="flex items-center justify-center">
+            {deadline > now ? <Countdown deadline={deadline} now={now} mode="close" /> : null}
           </div>
         ) : state === "live" ? (
           <span>
