@@ -305,6 +305,43 @@ const GULF_CUP_27_EXPECTED_LINEUP_OVERRIDES: Record<
   string,
   Partial<Record<string, GulfCup27ExpectedLineupOverride>>
 > = {
+  // الإمارات × اليمن — الجولة الأولى.
+  // الإمارات: مواءم مع القائمة المنشورة يوم المباراة.
+  // اليمن: مواءم مع التشكيل الظاهر في المرجع المرئي المرسل من المستخدم.
+  "g27-b-r1-uae-yem": {
+    uae: {
+      formation: "4-2-3-1",
+      starters: [
+        { nameAr: "خالد عيسى", position: "G", grid: "1:1" },
+        { nameAr: "روبن فيليب", position: "D", grid: "2:1" },
+        { nameAr: "علاء الدين زهير", position: "D", grid: "2:2" },
+        { nameAr: "لوكاس بيمنتا", position: "D", grid: "2:3" },
+        { nameAr: "ماركوس ميلوني", position: "D", grid: "2:4" },
+        { nameAr: "مامادو كوليبالي", position: "M", grid: "3:1" },
+        { nameAr: "عصام فايز", position: "M", grid: "3:2" },
+        { nameAr: "يوري سيزار", position: "M", grid: "4:1" },
+        { nameAr: "نيكولاس خيمينيز", position: "M", grid: "4:2" },
+        { nameAr: "لوان بيريرا", position: "M", grid: "4:3" },
+        { nameAr: "برونو دي أوليفيرا", position: "F", grid: "5:1" },
+      ],
+    },
+    yem: {
+      formation: "4-4-2",
+      starters: [
+        { nameAr: "محمد أمان", position: "G", grid: "1:1", number: 1 },
+        { nameAr: "رامي الوسماني", position: "D", grid: "2:1", number: 6 },
+        { nameAr: "هارون الزبيدي", position: "D", grid: "2:2", number: 3 },
+        { nameAr: "نادر سهل", position: "D", grid: "2:3", number: 2 },
+        { nameAr: "رضوان الحبيشي", position: "D", grid: "2:4", number: 19 },
+        { nameAr: "أسامة عنبر", position: "M", grid: "3:1", number: 15 },
+        { nameAr: "عمر الداحي", position: "M", grid: "3:2", number: 9 },
+        { nameAr: "عبدالواسع المطري", position: "M", grid: "3:3", number: 11 },
+        { nameAr: "عبد المجيد صبارة", position: "M", grid: "3:4", number: 17 },
+        { nameAr: "عمر منصور", position: "F", grid: "4:1", number: 16 },
+        { nameAr: "ناصر محمدوه", position: "F", grid: "4:2", number: 7 },
+      ],
+    },
+  },
   // السعودية × عُمان — الجولة الثانية. مواءم مع التشكيل المتوقع الظاهر في المرجع الحالي.
   "g27-a-r2-ksa-oma": {
     ksa: {
@@ -353,6 +390,18 @@ export function getVerifiedGulfCup27ExpectedLineupOverride(
         starters: value.starters.map((starter) => ({ ...starter })),
       }
     : null;
+}
+
+const GULF_CUP_27_VERIFIED_OFFICIAL_FALLBACKS = new Set([
+  "g27-b-r1-uae-yem:uae",
+  "g27-b-r1-uae-yem:yem",
+]);
+
+export function isVerifiedGulfCup27OfficialLineupFallback(
+  matchId: string,
+  teamId: string,
+) {
+  return GULF_CUP_27_VERIFIED_OFFICIAL_FALLBACKS.has(`${matchId}:${teamId}`);
 }
 
 const ARABIC_TO_LATIN: Record<string, string> = {

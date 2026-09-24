@@ -14,7 +14,7 @@ import { resolveVerifiedGulfCup27Player } from "@/domain/tournaments/gulfCup27Ve
 
 const CACHE_COLLECTION = "tournamentMatchCenterCache";
 const LINEUP_CACHE_COLLECTION = "tournamentMatchLineupCache";
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const LIVE_TTL_MS = 45 * 1000;
 const FINISHED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const OTHER_TTL_MS = 10 * 60 * 1000;
@@ -107,6 +107,23 @@ function docId(tournamentId: string, matchId: string) {
   return `${tournamentId}_${matchId}`;
 }
 
+function normalizeTeamName(value: string) {
+  return clean(value)
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sameTeamName(a: string, b: string) {
+  const left = normalizeTeamName(a);
+  const right = normalizeTeamName(b);
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
+}
+
 function roleLabel(value: string) {
   const normalized = clean(value).toUpperCase();
   if (normalized === "G" || normalized.includes("GOAL")) return "حارس";
@@ -191,6 +208,11 @@ function mapPlayer(
   localTeamId: string,
   lineupNames: Map<number, string>,
 ): MatchCenterPlayer {
+  const verified = resolveVerifiedGulfCup27Player({
+    teamId: localTeamId,
+    apiName: player.name,
+    apiPosition: player.position,
+  });
   return {
     id: player.id,
     name: arabicPlayerName({
@@ -201,7 +223,7 @@ function mapPlayer(
       lineupNames,
     }),
     photo: player.photo,
-    position: roleLabel(player.position),
+    position: roleLabel(verified?.role || player.position),
     number: player.number,
     rating: player.rating == null ? null : Number(player.rating.toFixed(1)),
     minutes: player.minutes,
@@ -298,6 +320,22 @@ export async function getTournamentMatchCenter(input: {
 
   const homeName = clean(homeTeamSnapshot.data()?.nameAr) || clean(homeTeamSnapshot.data()?.nameEn) || fixture.homeName;
   const awayName = clean(awayTeamSnapshot.data()?.nameAr) || clean(awayTeamSnapshot.data()?.nameEn) || fixture.awayName;
+  const homeLookup = clean(homeTeamSnapshot.data()?.nameEn) || clean(homeTeamSnapshot.data()?.nameAr);
+  const awayLookup = clean(awayTeamSnapshot.data()?.nameEn) || clean(awayTeamSnapshot.data()?.nameAr);
+  const providerReversed =
+    Boolean(homeLookup && awayLookup) &&
+    sameTeamName(fixture.awayName, homeLookup) &&
+    sameTeamName(fixture.homeName, awayLookup);
+
+  const homeProviderTeamId = providerReversed
+    ? fixture.awayProviderTeamId
+    : fixture.homeProviderTeamId;
+  const awayProviderTeamId = providerReversed
+    ? fixture.homeProviderTeamId
+    : fixture.awayProviderTeamId;
+  const homeScore = providerReversed ? fixture.goalsAway : fixture.goalsHome;
+  const awayScore = providerReversed ? fixture.goalsHome : fixture.goalsAway;
+
   const isLive = LIVE_STATUSES.has(fixture.statusShort);
   const isFinished = FINISHED_STATUSES.has(fixture.statusShort);
 
@@ -313,9 +351,9 @@ export async function getTournamentMatchCenter(input: {
 
   const events = rawEvents
     .map((event) => {
-      const side = event.teamId === fixture.homeProviderTeamId
+      const side = event.teamId === homeProviderTeamId
         ? "home"
-        : event.teamId === fixture.awayProviderTeamId
+        : event.teamId === awayProviderTeamId
           ? "away"
           : null;
       if (!side) return null;
@@ -347,8 +385,8 @@ export async function getTournamentMatchCenter(input: {
     .filter((event): event is MatchCenterEvent => Boolean(event))
     .reverse();
 
-  const homeStats = rawStats.find((team) => team.teamId === fixture.homeProviderTeamId);
-  const awayStats = rawStats.find((team) => team.teamId === fixture.awayProviderTeamId);
+  const homeStats = rawStats.find((team) => team.teamId === homeProviderTeamId);
+  const awayStats = rawStats.find((team) => team.teamId === awayProviderTeamId);
   const stats = STAT_DEFINITIONS
     .map((definition) => ({
       key: definition.key,
@@ -358,8 +396,8 @@ export async function getTournamentMatchCenter(input: {
     }))
     .filter((row) => row.home !== "—" || row.away !== "—");
 
-  const homePlayers = rawPlayers.find((team) => team.teamId === fixture.homeProviderTeamId)?.players || [];
-  const awayPlayers = rawPlayers.find((team) => team.teamId === fixture.awayProviderTeamId)?.players || [];
+  const homePlayers = rawPlayers.find((team) => team.teamId === homeProviderTeamId)?.players || [];
+  const awayPlayers = rawPlayers.find((team) => team.teamId === awayProviderTeamId)?.players || [];
 
   const now = Date.now();
   const expiresAt = now + (isLive ? LIVE_TTL_MS : isFinished ? FINISHED_TTL_MS : OTHER_TTL_MS);
@@ -376,15 +414,15 @@ export async function getTournamentMatchCenter(input: {
     elapsed: fixture.elapsed,
     isLive,
     isFinished,
-    score: { home: fixture.goalsHome, away: fixture.goalsAway },
+    score: { home: homeScore, away: awayScore },
     home: {
       localTeamId: homeLocalTeamId,
-      providerTeamId: fixture.homeProviderTeamId,
+      providerTeamId: homeProviderTeamId,
       name: homeName,
     },
     away: {
       localTeamId: awayLocalTeamId,
-      providerTeamId: fixture.awayProviderTeamId,
+      providerTeamId: awayProviderTeamId,
       name: awayName,
     },
     events,

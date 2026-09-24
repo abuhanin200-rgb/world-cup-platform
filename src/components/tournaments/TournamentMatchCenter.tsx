@@ -310,17 +310,34 @@ export default function TournamentMatchCenter({
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center">
-                          <div className="min-w-0">
-                            <TeamFlag code={homeFlagCode} name={homeName} size="lg" />
-                            <div className="mt-2 truncate text-sm font-black text-white">{data.home.name || homeName}</div>
+                        <div
+                          dir="ltr"
+                          className="grid grid-cols-[1fr_auto_1fr] items-stretch gap-2.5"
+                          aria-label={`${data.home.name || homeName} ${data.score.home ?? 0}، ${data.away.name || awayName} ${data.score.away ?? 0}`}
+                        >
+                          <div dir="rtl" className="rounded-[22px] border border-white/[0.08] bg-white/[0.035] px-3 py-3 text-center">
+                            <div className="flex justify-center">
+                              <TeamFlag code={awayFlagCode} name={awayName} size="lg" />
+                            </div>
+                            <div className="mt-1.5 truncate text-[12px] font-black text-white">{data.away.name || awayName}</div>
+                            <div dir="ltr" className="mt-1 text-[34px] font-black leading-none tabular-nums text-white [unicode-bidi:isolate]">
+                              {data.score.away ?? 0}
+                            </div>
                           </div>
-                          <div dir="ltr" className="rounded-2xl border border-white/10 bg-black/25 px-4 py-2 text-3xl font-black tabular-nums text-white [unicode-bidi:isolate]">
-                            {data.score.home ?? 0} - {data.score.away ?? 0}
+
+                          <div className="flex min-w-[58px] flex-col items-center justify-center">
+                            <span dir="ltr" className="text-[11px] font-black tracking-[0.2em] text-white/30">VS</span>
+                            <div className={`mt-2 h-2.5 w-2.5 rounded-full ${data.isLive ? "animate-pulse bg-red-400 shadow-[0_0_16px_rgba(248,113,113,.9)]" : "bg-white/15"}`} />
                           </div>
-                          <div className="min-w-0">
-                            <TeamFlag code={awayFlagCode} name={awayName} size="lg" />
-                            <div className="mt-2 truncate text-sm font-black text-white">{data.away.name || awayName}</div>
+
+                          <div dir="rtl" className="rounded-[22px] border border-cyan-300/15 bg-cyan-300/[0.055] px-3 py-3 text-center shadow-[inset_0_0_30px_rgba(34,211,238,.03)]">
+                            <div className="flex justify-center">
+                              <TeamFlag code={homeFlagCode} name={homeName} size="lg" />
+                            </div>
+                            <div className="mt-1.5 truncate text-[12px] font-black text-white">{data.home.name || homeName}</div>
+                            <div dir="ltr" className="mt-1 text-[34px] font-black leading-none tabular-nums text-white [unicode-bidi:isolate]">
+                              {data.score.home ?? 0}
+                            </div>
                           </div>
                         </div>
                       </section>
@@ -332,18 +349,27 @@ export default function TournamentMatchCenter({
                             <h3 className="text-sm font-black text-white">أحداث المباراة</h3>
                           </div>
                           <div className="divide-y divide-white/[0.06]">
-                            {data.events.slice(0, 18).map((event, index) => (
-                              <div key={`${event.minute}-${event.playerName}-${index}`} className="grid grid-cols-[46px_1fr] items-center gap-3 px-4 py-3">
-                                <span dir="ltr" className="text-center text-xs font-black tabular-nums text-white/55">{event.minute}</span>
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${eventTone(event.type)}`}>{event.type}</span>
-                                    <span className="truncate text-xs font-black text-white">{event.playerName}</span>
+                            {data.events.slice(0, 18).map((event, index) => {
+                              const eventTeamName = event.team === "home"
+                                ? (data.home.name || homeName)
+                                : (data.away.name || awayName);
+                              return (
+                                <div key={`${event.minute}-${event.playerName}-${index}`} className="grid grid-cols-[48px_1fr] items-start gap-3 px-4 py-3">
+                                  <div className="pt-0.5 text-center">
+                                    <span dir="ltr" className="block text-xs font-black tabular-nums text-white/65">{event.minute}</span>
+                                    <span className={`mt-1.5 inline-block h-1.5 w-1.5 rounded-full ${event.team === "home" ? "bg-cyan-300" : "bg-emerald-300"}`} />
                                   </div>
-                                  {event.assistName ? <div className="mt-1 text-[9px] font-bold text-white/35">صناعة: {event.assistName}</div> : null}
+                                  <div className="min-w-0">
+                                    <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                                      <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${eventTone(event.type)}`}>{event.type}</span>
+                                      <span className="rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-0.5 text-[8px] font-bold text-white/45">{eventTeamName}</span>
+                                    </div>
+                                    <div className="truncate text-xs font-black text-white">{event.playerName}</div>
+                                    {event.assistName ? <div className="mt-1 text-[9px] font-bold text-white/35">صناعة: {event.assistName}</div> : null}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </section>
                       ) : null}
@@ -354,7 +380,14 @@ export default function TournamentMatchCenter({
                             <BarChart3 className="h-4 w-4 text-cyan-200" aria-hidden="true" />
                             <h3 className="text-sm font-black text-white">إحصائيات المباراة</h3>
                           </div>
-                          <div className="space-y-3 p-4">
+                          <div className="px-4 pt-3">
+                            <div dir="ltr" className="grid grid-cols-[62px_1fr_62px] items-center gap-2 text-center text-[9px] font-black text-white/40">
+                              <span className="truncate">{data.away.name}</span>
+                              <span>المقارنة</span>
+                              <span className="truncate">{data.home.name}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-3 p-4 pt-3">
                             {data.stats.map((stat) => {
                               const homePercent = numericPercent(stat.home);
                               const awayPercent = numericPercent(stat.away);
@@ -364,15 +397,15 @@ export default function TournamentMatchCenter({
                               const awayBar = showBar ? Math.max(0, 100 - homeBar) : 0;
                               return (
                                 <div key={stat.key} className="rounded-2xl border border-white/[0.06] bg-black/15 p-3">
-                                  <div className="grid grid-cols-[54px_1fr_54px] items-center gap-2 text-center">
-                                    <span dir="ltr" className="text-xs font-black text-emerald-100">{stat.home}</span>
-                                    <span className="text-[10px] font-bold text-white/50">{stat.label}</span>
-                                    <span dir="ltr" className="text-xs font-black text-sky-100">{stat.away}</span>
+                                  <div dir="ltr" className="grid grid-cols-[54px_1fr_54px] items-center gap-2 text-center">
+                                    <span dir="ltr" className="text-xs font-black text-emerald-100">{stat.away}</span>
+                                    <span dir="rtl" className="text-[10px] font-bold text-white/50">{stat.label}</span>
+                                    <span dir="ltr" className="text-xs font-black text-sky-100">{stat.home}</span>
                                   </div>
                                   {showBar ? (
                                     <div dir="ltr" className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-white/5">
-                                      <span className="bg-emerald-400/85" style={{ width: `${homeBar}%` }} />
-                                      <span className="bg-sky-400/85" style={{ width: `${awayBar}%` }} />
+                                      <span className="bg-emerald-400/85" style={{ width: `${awayBar}%` }} />
+                                      <span className="bg-sky-400/85" style={{ width: `${homeBar}%` }} />
                                     </div>
                                   ) : null}
                                 </div>
