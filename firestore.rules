@@ -219,6 +219,11 @@ service cloud.firestore {
           "activity",
           "path",
           "lastSeen",
+          "sessionStartedAt",
+          "deviceType",
+          "deviceLabel",
+          "browserName",
+          "osName",
           "lastChallengeStudioVisit",
           "updatedAt"
         ]);
@@ -233,6 +238,11 @@ service cloud.firestore {
           "activity",
           "path",
           "lastSeen",
+          "sessionStartedAt",
+          "deviceType",
+          "deviceLabel",
+          "browserName",
+          "osName",
           "lastChallengeStudioVisit",
           "updatedAt"
         ])
