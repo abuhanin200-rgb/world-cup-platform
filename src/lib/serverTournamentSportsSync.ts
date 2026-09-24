@@ -1314,10 +1314,10 @@ export async function syncTournamentSportsProvider(tournamentId: string, source:
 }
 
 function desiredAutomationGap(matches: MatchRow[], now: number) {
-  if (matches.some((match) => match.status === "live")) return 5 * 60 * 1000;
+  if (matches.some((match) => match.status === "live")) return 2 * 60 * 1000;
   const diffs = matches.map((match) => match.kickoffAt - now);
-  if (diffs.some((diff) => diff >= -5 * 60 * 60 * 1000 && diff <= 3 * 60 * 60 * 1000)) return 5 * 60 * 1000;
-  if (diffs.some((diff) => diff > 0 && diff <= 24 * 60 * 60 * 1000)) return 30 * 60 * 1000;
+  if (diffs.some((diff) => diff >= -5 * 60 * 60 * 1000 && diff <= 3 * 60 * 60 * 1000)) return 2 * 60 * 1000;
+  if (diffs.some((diff) => diff > 0 && diff <= 24 * 60 * 60 * 1000)) return 15 * 60 * 1000;
   return 6 * 60 * 60 * 1000;
 }
 

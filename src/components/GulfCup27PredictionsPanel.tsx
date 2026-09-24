@@ -24,6 +24,7 @@ import {
 import TeamFlag from "@/components/TeamFlag";
 import TournamentMatchInsights from "@/components/tournaments/TournamentMatchInsights";
 import TournamentMatchLineup from "@/components/tournaments/TournamentMatchLineup";
+import TournamentMatchCenter from "@/components/tournaments/TournamentMatchCenter";
 import AuthGateCard from "@/components/auth/AuthGateCard";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -408,6 +409,19 @@ function MatchPredictionCard({
             awayFlagCode={away.flagCode}
             compact
           />
+          {(state === "live" || state === "finished" || now >= match.kickoffAt) ? (
+            <div className="col-span-2">
+              <TournamentMatchCenter
+                tournamentId={GULF_CUP_27_TOURNAMENT_ID}
+                matchId={match.id}
+                homeName={home.nameAr}
+                awayName={away.nameAr}
+                homeFlagCode={home.flagCode}
+                awayFlagCode={away.flagCode}
+                compact
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 

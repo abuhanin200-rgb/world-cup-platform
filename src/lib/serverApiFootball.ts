@@ -822,3 +822,205 @@ export async function getApiFootballFixtureInjuries(fixtureId: number) {
     quotaRemaining: result.quotaRemaining,
   };
 }
+
+export type ApiFootballFixtureEvent = {
+  elapsed: number | null;
+  extra: number | null;
+  teamId: number;
+  teamName: string;
+  playerId: number | null;
+  playerName: string;
+  assistId: number | null;
+  assistName: string;
+  type: string;
+  detail: string;
+  comments: string;
+};
+
+export async function getApiFootballFixtureEvents(fixtureId: number) {
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) {
+    throw new Error("Fixture ID غير صحيح");
+  }
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/fixtures/events",
+    { fixture: fixtureId },
+  );
+
+  return {
+    events: result.data
+      .map((row) => {
+        const time = (row.time || {}) as Record<string, unknown>;
+        const team = (row.team || {}) as Record<string, unknown>;
+        const player = (row.player || {}) as Record<string, unknown>;
+        const assist = (row.assist || {}) as Record<string, unknown>;
+        const teamId = Number(team.id);
+        if (!Number.isInteger(teamId) || teamId <= 0) return null;
+        return {
+          elapsed: numberOrNull(time.elapsed),
+          extra: numberOrNull(time.extra),
+          teamId,
+          teamName: clean(team.name),
+          playerId: numberOrNull(player.id),
+          playerName: clean(player.name),
+          assistId: numberOrNull(assist.id),
+          assistName: clean(assist.name),
+          type: clean(row.type),
+          detail: clean(row.detail),
+          comments: clean(row.comments),
+        } satisfies ApiFootballFixtureEvent;
+      })
+      .filter((item): item is ApiFootballFixtureEvent => Boolean(item)),
+    quotaRemaining: result.quotaRemaining,
+  };
+}
+
+export type ApiFootballFixtureTeamStatistics = {
+  teamId: number;
+  teamName: string;
+  teamLogo: string | null;
+  statistics: Array<{
+    type: string;
+    value: string | number | null;
+  }>;
+};
+
+export async function getApiFootballFixtureStatistics(fixtureId: number) {
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) {
+    throw new Error("Fixture ID غير صحيح");
+  }
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/fixtures/statistics",
+    { fixture: fixtureId },
+  );
+
+  return {
+    teams: result.data
+      .map((row) => {
+        const team = (row.team || {}) as Record<string, unknown>;
+        const teamId = Number(team.id);
+        if (!Number.isInteger(teamId) || teamId <= 0) return null;
+        const rawStats = Array.isArray(row.statistics) ? row.statistics : [];
+        return {
+          teamId,
+          teamName: clean(team.name),
+          teamLogo: clean(team.logo) || null,
+          statistics: rawStats.map((item) => {
+            const stat = (item || {}) as Record<string, unknown>;
+            const value = stat.value;
+            return {
+              type: clean(stat.type),
+              value:
+                typeof value === "number" || typeof value === "string"
+                  ? value
+                  : value == null
+                    ? null
+                    : clean(value),
+            };
+          }),
+        } satisfies ApiFootballFixtureTeamStatistics;
+      })
+      .filter((item): item is ApiFootballFixtureTeamStatistics => Boolean(item)),
+    quotaRemaining: result.quotaRemaining,
+  };
+}
+
+export type ApiFootballFixturePlayerPerformance = {
+  id: number;
+  name: string;
+  photo: string | null;
+  position: string;
+  number: number | null;
+  rating: number | null;
+  minutes: number | null;
+  captain: boolean;
+  substitute: boolean;
+  goals: number;
+  assists: number;
+  shots: number;
+  shotsOn: number;
+  passes: number;
+  passesKey: number;
+  passAccuracy: number | null;
+  tackles: number;
+  saves: number;
+};
+
+export type ApiFootballFixtureTeamPlayers = {
+  teamId: number;
+  teamName: string;
+  teamLogo: string | null;
+  players: ApiFootballFixturePlayerPerformance[];
+};
+
+export async function getApiFootballFixturePlayers(fixtureId: number) {
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) {
+    throw new Error("Fixture ID غير صحيح");
+  }
+
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/fixtures/players",
+    { fixture: fixtureId },
+  );
+
+  return {
+    teams: result.data
+      .map((row) => {
+        const team = (row.team || {}) as Record<string, unknown>;
+        const teamId = Number(team.id);
+        if (!Number.isInteger(teamId) || teamId <= 0) return null;
+        const rawPlayers = Array.isArray(row.players) ? row.players : [];
+        const players = rawPlayers
+          .map((item) => {
+            const playerRow = (item || {}) as Record<string, unknown>;
+            const player = (playerRow.player || {}) as Record<string, unknown>;
+            const statistics = Array.isArray(playerRow.statistics)
+              ? ((playerRow.statistics[0] || {}) as Record<string, unknown>)
+              : {};
+            const games = (statistics.games || {}) as Record<string, unknown>;
+            const goals = (statistics.goals || {}) as Record<string, unknown>;
+            const shots = (statistics.shots || {}) as Record<string, unknown>;
+            const passes = (statistics.passes || {}) as Record<string, unknown>;
+            const tackles = (statistics.tackles || {}) as Record<string, unknown>;
+            const goalkeeper = (statistics.goals || {}) as Record<string, unknown>;
+            const id = Number(player.id);
+            if (!Number.isInteger(id) || id <= 0) return null;
+
+            const parsedRating = Number(games.rating);
+            const parsedAccuracy = Number(String(passes.accuracy ?? "").replace("%", ""));
+
+            return {
+              id,
+              name: clean(player.name),
+              photo: clean(player.photo) || playerPhotoUrl(id),
+              position: clean(games.position),
+              number: numberOrNull(games.number),
+              rating: Number.isFinite(parsedRating) ? parsedRating : null,
+              minutes: numberOrNull(games.minutes),
+              captain: games.captain === true,
+              substitute: games.substitute === true,
+              goals: Math.max(0, Math.trunc(numberOrNull(goals.total) || 0)),
+              assists: Math.max(0, Math.trunc(numberOrNull(goals.assists) || 0)),
+              shots: Math.max(0, Math.trunc(numberOrNull(shots.total) || 0)),
+              shotsOn: Math.max(0, Math.trunc(numberOrNull(shots.on) || 0)),
+              passes: Math.max(0, Math.trunc(numberOrNull(passes.total) || 0)),
+              passesKey: Math.max(0, Math.trunc(numberOrNull(passes.key) || 0)),
+              passAccuracy: Number.isFinite(parsedAccuracy) ? parsedAccuracy : null,
+              tackles: Math.max(0, Math.trunc(numberOrNull(tackles.total) || 0)),
+              saves: Math.max(0, Math.trunc(numberOrNull(goalkeeper.saves) || 0)),
+            } satisfies ApiFootballFixturePlayerPerformance;
+          })
+          .filter((item): item is ApiFootballFixturePlayerPerformance => Boolean(item));
+
+        return {
+          teamId,
+          teamName: clean(team.name),
+          teamLogo: clean(team.logo) || null,
+          players,
+        } satisfies ApiFootballFixtureTeamPlayers;
+      })
+      .filter((item): item is ApiFootballFixtureTeamPlayers => Boolean(item)),
+    quotaRemaining: result.quotaRemaining,
+  };
+}

@@ -16,6 +16,7 @@ import {
 import TeamFlag from "@/components/TeamFlag";
 import TournamentMatchInsights from "@/components/tournaments/TournamentMatchInsights";
 import TournamentMatchLineup from "@/components/tournaments/TournamentMatchLineup";
+import TournamentMatchCenter from "@/components/tournaments/TournamentMatchCenter";
 import {
   GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT_ID,
@@ -307,6 +308,19 @@ function RuntimeMatchCard({ match, now }: { match: TournamentMatchRuntimeV2; now
             awayFlagCode={away.flagCode}
             compact
           />
+          {(match.status === "live" || match.status === "finished" || now >= match.kickoffAt) ? (
+            <div className="col-span-2">
+              <TournamentMatchCenter
+                tournamentId={GULF_CUP_27_TOURNAMENT_ID}
+                matchId={match.id}
+                homeName={home.nameAr}
+                awayName={away.nameAr}
+                homeFlagCode={home.flagCode}
+                awayFlagCode={away.flagCode}
+                compact
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -328,7 +342,7 @@ export default function GulfCup27CompetitionPanel() {
   const [filter, setFilter] = useState<MatchFilter>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -346,6 +360,23 @@ export default function GulfCup27CompetitionPanel() {
   useEffect(() => {
     queueMicrotask(() => void load());
   }, [load]);
+
+  useEffect(() => {
+    const clock = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(clock);
+  }, []);
+
+  useEffect(() => {
+    const refresh = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void getTournamentMatchesV2(GULF_CUP_27_TOURNAMENT_ID)
+        .then(setMatches)
+        .catch((refreshError) => {
+          console.error("Gulf 27 competition refresh error:", refreshError);
+        });
+    }, 30_000);
+    return () => window.clearInterval(refresh);
+  }, []);
 
   const groupA = useMemo(
     () =>
