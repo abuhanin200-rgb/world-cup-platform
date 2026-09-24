@@ -6,6 +6,7 @@ import {
   getApiFootballFixturesByIds,
   getApiFootballHeadToHead,
   getApiFootballPredictionByFixture,
+  getApiFootballRecentTeamFixtures,
   type ApiFootballFixturePrediction,
   type ApiFootballHeadToHeadFixture,
 } from "@/lib/serverApiFootball";
@@ -14,6 +15,7 @@ const CACHE_COLLECTION = "tournamentMatchInsightsCache";
 const CACHE_TTL_UPCOMING_MS = 6 * 60 * 60 * 1000;
 const CACHE_TTL_FINISHED_MS = 30 * 24 * 60 * 60 * 1000;
 const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "AWD", "WO"]);
+const INSIGHTS_SCHEMA_VERSION = 2;
 
 type MatchInsightMeeting = {
   fixtureId: number;
@@ -28,6 +30,20 @@ type MatchInsightMeeting = {
   awayGoals: number;
 };
 
+type RecentTeamMetrics = {
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  averageGoalsFor: number;
+  averageGoalsAgainst: number;
+  cleanSheets: number;
+  cleanSheetRate: number;
+  formScore: number;
+};
+
 export type TournamentMatchInsights = {
   tournamentId: string;
   matchId: string;
@@ -35,6 +51,7 @@ export type TournamentMatchInsights = {
   fetchedAt: number;
   expiresAt: number;
   provider: "api-football";
+  schemaVersion: number;
   providerHomeTeamId: number;
   providerAwayTeamId: number;
   providerHomeName: string;
@@ -71,6 +88,10 @@ export type TournamentMatchInsights = {
   recent: {
     home: Array<"W" | "D" | "L">;
     away: Array<"W" | "D" | "L">;
+  };
+  recentTeams: {
+    home: RecentTeamMetrics | null;
+    away: RecentTeamMetrics | null;
   };
   meetings: MatchInsightMeeting[];
   warnings: string[];
@@ -209,6 +230,95 @@ function summarizeMeetings(
   };
 }
 
+
+function normalizeTeamName(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function sameTeamName(a: string, b: string) {
+  const left = normalizeTeamName(a);
+  const right = normalizeTeamName(b);
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+function orientPredictionComparison(
+  comparison: ApiFootballFixturePrediction["comparison"] | null | undefined,
+  reversed: boolean,
+): ApiFootballFixturePrediction["comparison"] | null {
+  if (!comparison) return null;
+  if (!reversed) return comparison;
+  return {
+    formHome: comparison.formAway,
+    formAway: comparison.formHome,
+    attackHome: comparison.attackAway,
+    attackAway: comparison.attackHome,
+    defenceHome: comparison.defenceAway,
+    defenceAway: comparison.defenceHome,
+    poissonHome: comparison.poissonAway,
+    poissonAway: comparison.poissonHome,
+    h2hHome: comparison.h2hAway,
+    h2hAway: comparison.h2hHome,
+    goalsHome: comparison.goalsAway,
+    goalsAway: comparison.goalsHome,
+    totalHome: comparison.totalAway,
+    totalAway: comparison.totalHome,
+  };
+}
+
+function summarizeRecentTeamFixtures(
+  rows: ApiFootballHeadToHeadFixture[],
+  teamId: number,
+): RecentTeamMetrics | null {
+  const finished = rows
+    .filter((row) => FINISHED_STATUSES.has(row.statusShort))
+    .filter((row) => row.homeGoals != null && row.awayGoals != null)
+    .filter((row) => row.homeTeamId === teamId || row.awayTeamId === teamId)
+    .slice(0, 5);
+
+  if (!finished.length) return null;
+
+  let wins = 0;
+  let draws = 0;
+  let losses = 0;
+  let goalsFor = 0;
+  let goalsAgainst = 0;
+  let cleanSheets = 0;
+
+  for (const row of finished) {
+    const isHome = row.homeTeamId === teamId;
+    const scored = isHome ? Number(row.homeGoals) : Number(row.awayGoals);
+    const conceded = isHome ? Number(row.awayGoals) : Number(row.homeGoals);
+    goalsFor += scored;
+    goalsAgainst += conceded;
+    if (conceded === 0) cleanSheets += 1;
+    if (scored > conceded) wins += 1;
+    else if (scored === conceded) draws += 1;
+    else losses += 1;
+  }
+
+  const played = finished.length;
+  const points = wins * 3 + draws;
+  return {
+    played,
+    wins,
+    draws,
+    losses,
+    goalsFor,
+    goalsAgainst,
+    averageGoalsFor: Number((goalsFor / played).toFixed(2)),
+    averageGoalsAgainst: Number((goalsAgainst / played).toFixed(2)),
+    cleanSheets,
+    cleanSheetRate: Math.round((cleanSheets / played) * 100),
+    formScore: Math.round((points / (played * 3)) * 100),
+  };
+}
+
 async function getCached(tournamentId: string, matchId: string) {
   const snapshot = await adminDb
     .collection(CACHE_COLLECTION)
@@ -216,7 +326,12 @@ async function getCached(tournamentId: string, matchId: string) {
     .get();
   if (!snapshot.exists) return null;
   const data = snapshot.data() as TournamentMatchInsights | undefined;
-  if (!data || numberOrNull(data.expiresAt) == null || data.expiresAt <= Date.now()) {
+  if (
+    !data ||
+    data.schemaVersion !== INSIGHTS_SCHEMA_VERSION ||
+    numberOrNull(data.expiresAt) == null ||
+    data.expiresAt <= Date.now()
+  ) {
     return null;
   }
   return data;
@@ -331,6 +446,27 @@ export async function getTournamentMatchInsights(input: {
     throw new Error("PROVIDER_TEAMS_UNAVAILABLE");
   }
 
+  // API-FOOTBALL may return the same two teams in an orientation that differs
+  // from our local match card. Align all statistics to the local home/away order
+  // before calculating wins, probabilities or comparison metrics.
+  const localHomeName = localHome?.nameEn || localHome?.nameAr || "";
+  const localAwayName = localAway?.nameEn || localAway?.nameAr || "";
+  const providerLooksReversed =
+    Boolean(localHomeName && localAwayName) &&
+    sameTeamName(providerAwayName, localHomeName) &&
+    sameTeamName(providerHomeName, localAwayName);
+
+  if (providerLooksReversed) {
+    [providerHomeTeamId, providerAwayTeamId] = [providerAwayTeamId, providerHomeTeamId];
+    [providerHomeName, providerAwayName] = [providerAwayName, providerHomeName];
+  }
+
+  const predictionIsReversed = Boolean(
+    providerPrediction &&
+      providerPrediction.homeTeamId === providerAwayTeamId &&
+      providerPrediction.awayTeamId === providerHomeTeamId,
+  );
+
   let historicalRows: ApiFootballHeadToHeadFixture[] = [];
   try {
     const h2h = await getApiFootballHeadToHead({
@@ -353,9 +489,19 @@ export async function getTournamentMatchInsights(input: {
     providerAwayTeamId,
   );
 
-  const providerProbabilities = providerPrediction
+  const rawProviderProbabilities = providerPrediction
     ? normalizePercentages(providerPrediction.percentages)
     : null;
+  const providerProbabilities = rawProviderProbabilities
+    ? predictionIsReversed
+      ? {
+          home: rawProviderProbabilities.away,
+          draw: rawProviderProbabilities.draw,
+          away: rawProviderProbabilities.home,
+        }
+      : rawProviderProbabilities
+    : null;
+
   const probabilities = providerProbabilities
     ? { source: "api_prediction" as const, ...providerProbabilities }
     : historicalShares
@@ -366,8 +512,48 @@ export async function getTournamentMatchInsights(input: {
     warnings.push("الاحتمالات المعروضة مبنية على نتائج المواجهات السابقة فقط وليست نموذج التنبؤ الكامل.");
   }
 
+  // Current form must come from each national team's own recent matches, not
+  // from the prediction comparison block, which can legitimately return 0%
+  // when a competition has insufficient season data.
+  const recentTeamsSettled = await Promise.allSettled([
+    getApiFootballRecentTeamFixtures({ teamId: providerHomeTeamId, last: 5 }),
+    getApiFootballRecentTeamFixtures({ teamId: providerAwayTeamId, last: 5 }),
+  ]);
+
+  const recentHomeRows =
+    recentTeamsSettled[0].status === "fulfilled"
+      ? recentTeamsSettled[0].value.fixtures
+      : [];
+  const recentAwayRows =
+    recentTeamsSettled[1].status === "fulfilled"
+      ? recentTeamsSettled[1].value.fixtures
+      : [];
+
+  const recentTeams = {
+    home: summarizeRecentTeamFixtures(
+      recentHomeRows.filter((row) => row.fixtureId !== match.providerFixtureId),
+      providerHomeTeamId,
+    ),
+    away: summarizeRecentTeamFixtures(
+      recentAwayRows.filter((row) => row.fixtureId !== match.providerFixtureId),
+      providerAwayTeamId,
+    ),
+  };
+
+  if (recentTeamsSettled[0].status === "rejected" || recentTeamsSettled[1].status === "rejected") {
+    warnings.push("تعذر تحميل بعض بيانات آخر 5 مباريات؛ تم إخفاء المؤشرات غير المكتملة بدل عرض أصفار مضللة.");
+  }
+
+  const orientedComparison = orientPredictionComparison(
+    providerPrediction?.comparison,
+    predictionIsReversed,
+  );
+
   const now = Date.now();
-  const isFinished = match.status === "finished" || (match.kickoffAt > 0 && now > match.kickoffAt + 6 * 60 * 60 * 1000);
+  const isFinished =
+    match.status === "finished" ||
+    (match.kickoffAt > 0 && now > match.kickoffAt + 6 * 60 * 60 * 1000);
+
   const result: TournamentMatchInsights = {
     tournamentId: input.tournamentId,
     matchId: input.matchId,
@@ -375,6 +561,7 @@ export async function getTournamentMatchInsights(input: {
     fetchedAt: now,
     expiresAt: now + (isFinished ? CACHE_TTL_FINISHED_MS : CACHE_TTL_UPCOMING_MS),
     provider: "api-football",
+    schemaVersion: INSIGHTS_SCHEMA_VERSION,
     providerHomeTeamId,
     providerAwayTeamId,
     providerHomeName,
@@ -386,12 +573,17 @@ export async function getTournamentMatchInsights(input: {
       available: Boolean(providerProbabilities),
       predictedWinnerTeamId: providerPrediction?.winnerTeamId ?? null,
       predictedWinnerName: providerPrediction?.winnerName ?? null,
-      predictedGoalsHome: providerPrediction?.predictedGoalsHome ?? null,
-      predictedGoalsAway: providerPrediction?.predictedGoalsAway ?? null,
+      predictedGoalsHome: predictionIsReversed
+        ? providerPrediction?.predictedGoalsAway ?? null
+        : providerPrediction?.predictedGoalsHome ?? null,
+      predictedGoalsAway: predictionIsReversed
+        ? providerPrediction?.predictedGoalsHome ?? null
+        : providerPrediction?.predictedGoalsAway ?? null,
       underOver: providerPrediction?.underOver ?? null,
-      comparison: providerPrediction?.comparison ?? null,
+      comparison: orientedComparison,
     },
     recent,
+    recentTeams,
     meetings,
     warnings,
   };

@@ -535,3 +535,30 @@ export async function findApiFootballTeamByName(
     quotaRemaining: result.quotaRemaining,
   };
 }
+
+/**
+ * Returns a team's most recent fixtures across competitions.
+ * Consumers should filter to final statuses before deriving form metrics.
+ */
+export async function getApiFootballRecentTeamFixtures(input: {
+  teamId: number;
+  last?: number;
+}) {
+  if (!Number.isInteger(input.teamId) || input.teamId <= 0) {
+    throw new Error("Team ID غير صحيح");
+  }
+
+  const last = Math.max(1, Math.min(20, Math.floor(input.last || 5)));
+  const result = await apiFootballGet<Array<Record<string, unknown>>>(
+    "/fixtures",
+    { team: input.teamId, last },
+  );
+
+  return {
+    fixtures: result.data
+      .map(mapHeadToHeadFixture)
+      .filter((item): item is ApiFootballHeadToHeadFixture => Boolean(item))
+      .sort((a, b) => b.kickoffAt - a.kickoffAt),
+    quotaRemaining: result.quotaRemaining,
+  };
+}

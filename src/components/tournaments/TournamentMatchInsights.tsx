@@ -48,11 +48,26 @@ type Comparison = {
   totalAway: number | null;
 };
 
+type RecentTeamMetrics = {
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  averageGoalsFor: number;
+  averageGoalsAgainst: number;
+  cleanSheets: number;
+  cleanSheetRate: number;
+  formScore: number;
+};
+
 type MatchInsights = {
   tournamentId: string;
   matchId: string;
   providerFixtureId: number;
   fetchedAt: number;
+  schemaVersion?: number;
   providerHomeTeamId: number;
   providerAwayTeamId: number;
   providerHomeName: string;
@@ -85,6 +100,10 @@ type MatchInsights = {
   recent: {
     home: Array<"W" | "D" | "L">;
     away: Array<"W" | "D" | "L">;
+  };
+  recentTeams?: {
+    home: RecentTeamMetrics | null;
+    away: RecentTeamMetrics | null;
   };
   meetings: Meeting[];
   warnings: string[];
@@ -177,10 +196,12 @@ function FormDots({ values }: { values: Array<"W" | "D" | "L"> }) {
   );
 }
 
-function average(values: Array<number | null | undefined>) {
-  const valid = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
-  if (!valid.length) return null;
-  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+function recentStrength(metrics: RecentTeamMetrics | null | undefined) {
+  if (!metrics || metrics.played <= 0) return null;
+  // Used only to break an exact probability tie; the displayed API percentages
+  // are never modified. Form carries most weight, followed by recent goal balance.
+  const goalBalance = metrics.averageGoalsFor - metrics.averageGoalsAgainst;
+  return metrics.formScore + goalBalance * 8 + metrics.cleanSheetRate * 0.08;
 }
 
 function buildTechnicalPick(
@@ -191,30 +212,6 @@ function buildTechnicalPick(
   const probabilities = data.probabilities;
   if (!probabilities) return null;
 
-  const comparison = data.prediction.comparison;
-  const homeStrength = comparison
-    ? average([
-        comparison.formHome,
-        comparison.attackHome,
-        comparison.defenceHome,
-        comparison.poissonHome,
-        comparison.h2hHome,
-        comparison.goalsHome,
-        comparison.totalHome,
-      ])
-    : null;
-  const awayStrength = comparison
-    ? average([
-        comparison.formAway,
-        comparison.attackAway,
-        comparison.defenceAway,
-        comparison.poissonAway,
-        comparison.h2hAway,
-        comparison.goalsAway,
-        comparison.totalAway,
-      ])
-    : null;
-
   const maxProbability = Math.max(probabilities.home, probabilities.draw, probabilities.away);
   const tied: PickKind[] = [];
   if (probabilities.home === maxProbability) tied.push("home");
@@ -223,44 +220,51 @@ function buildTechnicalPick(
 
   let kind: PickKind = tied[0] ?? "draw";
 
-  if (tied.length > 1) {
+  // API-Football's explicit predicted winner is the first tie-breaker because it
+  // is part of the same provider response as the percentages.
+  if (
+    tied.includes("home") &&
+    data.prediction.predictedWinnerTeamId === data.providerHomeTeamId
+  ) {
+    kind = "home";
+  } else if (
+    tied.includes("away") &&
+    data.prediction.predictedWinnerTeamId === data.providerAwayTeamId
+  ) {
+    kind = "away";
+  } else if (tied.length > 1) {
+    // If the API percentages are exactly tied, use only objective recent-match
+    // results to choose the analytical lean. Do not alter the provider percentages.
+    const homeStrength = recentStrength(data.recentTeams?.home);
+    const awayStrength = recentStrength(data.recentTeams?.away);
     if (
-      tied.includes("home") &&
-      data.prediction.predictedWinnerTeamId === data.providerHomeTeamId
-    ) {
-      kind = "home";
-    } else if (
-      tied.includes("away") &&
-      data.prediction.predictedWinnerTeamId === data.providerAwayTeamId
-    ) {
-      kind = "away";
-    } else if (
       tied.includes("home") &&
       tied.includes("away") &&
       homeStrength != null &&
       awayStrength != null &&
-      homeStrength !== awayStrength
+      Math.abs(homeStrength - awayStrength) > 0.01
     ) {
       kind = homeStrength > awayStrength ? "home" : "away";
+    } else if (tied.includes("home") && tied.includes("draw") && homeStrength != null) {
+      kind = "home";
+    } else if (tied.includes("away") && tied.includes("draw") && awayStrength != null) {
+      kind = "away";
     } else if (tied.includes("draw")) {
       kind = "draw";
     }
   }
 
   const reasons: string[] = [];
-  const addReason = (label: string, home: number | null, away: number | null) => {
-    if (home == null || away == null || kind === "draw") return;
-    if (kind === "home" && home >= away + 5) reasons.push(label);
-    if (kind === "away" && away >= home + 5) reasons.push(label);
-  };
+  const homeRecent = data.recentTeams?.home;
+  const awayRecent = data.recentTeams?.away;
 
-  if (comparison) {
-    addReason("الفورمة الحالية", comparison.formHome, comparison.formAway);
-    addReason("القوة الهجومية", comparison.attackHome, comparison.attackAway);
-    addReason("الصلابة الدفاعية", comparison.defenceHome, comparison.defenceAway);
-    addReason("المواجهات المباشرة", comparison.h2hHome, comparison.h2hAway);
-    addReason("مؤشر التسجيل", comparison.goalsHome, comparison.goalsAway);
-    addReason("التقييم العام", comparison.totalHome, comparison.totalAway);
+  if (kind !== "draw" && homeRecent && awayRecent) {
+    const chosen = kind === "home" ? homeRecent : awayRecent;
+    const other = kind === "home" ? awayRecent : homeRecent;
+    if (chosen.formScore > other.formScore) reasons.push("فورمة آخر 5 مباريات");
+    if (chosen.averageGoalsFor > other.averageGoalsFor) reasons.push("معدل التسجيل مؤخرًا");
+    if (chosen.averageGoalsAgainst < other.averageGoalsAgainst) reasons.push("معدل استقبال أقل");
+    if (chosen.cleanSheetRate > other.cleanSheetRate) reasons.push("شباك نظيفة أكثر");
   }
 
   if (kind === "home" && data.summary.homeWins > data.summary.awayWins) {
@@ -270,10 +274,10 @@ function buildTechnicalPick(
     reasons.push("أفضلية تاريخية في المواجهات");
   }
   if (!reasons.length && kind !== "draw") {
-    reasons.push("محصلة مؤشرات مزود البيانات");
+    reasons.push("ترجيح مزود البيانات");
   }
   if (kind === "draw") {
-    reasons.push("التعادل هو الاحتمال الأعلى ضمن البيانات المتاحة");
+    reasons.push("التعادل هو الاحتمال الأعلى في بيانات المزود");
   }
 
   return {
@@ -352,6 +356,11 @@ function ProbabilityBlock({
 
   const pick = buildTechnicalPick(data, homeName, awayName);
   const probabilities = data.probabilities;
+  const maxProbability = Math.max(probabilities.home, probabilities.draw, probabilities.away);
+  const topCount = [probabilities.home, probabilities.draw, probabilities.away].filter(
+    (value) => value === maxProbability,
+  ).length;
+  const hasTopTie = topCount > 1;
 
   return (
     <section className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4 sm:p-5">
@@ -378,7 +387,7 @@ function ProbabilityBlock({
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[10px] font-black text-amber-100/80">
                 <TrendingUp className="h-4 w-4" aria-hidden="true" />
-                الترجيح الأعلى حسب البيانات
+                {hasTopTie ? "ترجيح تحليلي لفك تساوي النسب" : "الترجيح الأعلى حسب البيانات"}
               </div>
               <div className="mt-1 truncate text-xl font-black text-white">{pick.label}</div>
             </div>
@@ -426,56 +435,105 @@ function ProbabilityBlock({
 
       <p className="mt-3 flex items-start gap-1.5 text-[10px] font-bold leading-5 text-white/35">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        عند تساوي نسب الفوز، يحسم العرض بين المنتخبين باستخدام مؤشرات الفورمة والهجوم والدفاع والمواجهات والتقييم العام المتاحة من المزود. الغيابات والتشكيلة لا تُفترض إذا لم تتوفر بياناتها.
+        نسب الفوز/التعادل أعلاه تُعرض كما أعادها API-FOOTBALL بدون تعديل. إذا تساوت أعلى نسبة، يكون الترجيح التحليلي منفصلًا ويستخدم الفائز المتوقع من المزود ثم آخر 5 مباريات والمواجهات المباشرة؛ ولا يغيّر النسب الأصلية.
       </p>
     </section>
   );
 }
 
-function ComparisonRow({
-  label,
+function MetricValue({
+  name,
+  value,
+  tone,
+}: {
+  name: string;
+  value: string;
+  tone: "home" | "away";
+}) {
+  const textClass = tone === "home" ? "text-sky-100" : "text-emerald-100";
+  return (
+    <div className="min-w-0 rounded-xl border border-white/[0.07] bg-black/15 px-3 py-2.5 text-center">
+      <div className={`truncate text-[10px] font-black ${textClass}`}>{name}</div>
+      <div dir="ltr" className="mt-1 text-base font-black text-white [unicode-bidi:isolate]">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function RecentPerformanceSection({
   home,
   away,
   homeName,
   awayName,
 }: {
-  label: string;
-  home: number | null;
-  away: number | null;
+  home: RecentTeamMetrics | null | undefined;
+  away: RecentTeamMetrics | null | undefined;
   homeName: string;
   awayName: string;
 }) {
-  if (home == null || away == null) return null;
+  if (!home || !away) {
+    return (
+      <section className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+        <h3 className="text-sm font-black text-white">الأداء الحالي</h3>
+        <div className="mt-3 rounded-2xl border border-white/[0.07] bg-black/15 px-3 py-5 text-center text-xs font-bold text-white/40">
+          بيانات آخر المباريات غير مكتملة لدى المزود، لذلك لم نعرض أرقامًا صفرية مضللة.
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-black/15 p-3">
-      <div className="mb-3 text-center text-[11px] font-black text-white/55">{label}</div>
-      <div className="grid grid-cols-2 gap-3" dir="rtl">
-        <div className="min-w-0">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="truncate text-[10px] font-black text-sky-100">{homeName}</span>
-            <span dir="ltr" className="text-xs font-black text-sky-100 [unicode-bidi:isolate]">
-              {Math.round(home)}%
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]" dir="rtl">
-            <div className="h-full rounded-full bg-sky-400" style={{ width: `${Math.max(0, Math.min(100, home))}%` }} />
-          </div>
+    <section className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-black text-white">الأداء الحالي</h3>
+          <p className="mt-1 text-[10px] font-bold text-white/35">
+            محسوب من آخر {Math.min(home.played, away.played, 5)} مباريات مكتملة لكل منتخب، وليس من أصفار Prediction Comparison.
+          </p>
         </div>
-
-        <div className="min-w-0">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="truncate text-[10px] font-black text-emerald-100">{awayName}</span>
-            <span dir="ltr" className="text-xs font-black text-emerald-100 [unicode-bidi:isolate]">
-              {Math.round(away)}%
-            </span>
-          </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]" dir="ltr">
-            <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.max(0, Math.min(100, away))}%` }} />
-          </div>
-        </div>
+        <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[9px] font-black text-white/45">
+          بيانات فعلية
+        </span>
       </div>
-    </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <MetricValue
+          name={homeName}
+          value={`${home.wins} ف • ${home.draws} ت • ${home.losses} خ`}
+          tone="home"
+        />
+        <MetricValue
+          name={awayName}
+          value={`${away.wins} ف • ${away.draws} ت • ${away.losses} خ`}
+          tone="away"
+        />
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <MetricValue name={`${homeName} • فورمة`} value={`${home.formScore}%`} tone="home" />
+        <MetricValue name={`${awayName} • فورمة`} value={`${away.formScore}%`} tone="away" />
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <MetricValue name={`${homeName} • تسجيل/مباراة`} value={home.averageGoalsFor.toFixed(2)} tone="home" />
+        <MetricValue name={`${awayName} • تسجيل/مباراة`} value={away.averageGoalsFor.toFixed(2)} tone="away" />
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <MetricValue name={`${homeName} • استقبال/مباراة`} value={home.averageGoalsAgainst.toFixed(2)} tone="home" />
+        <MetricValue name={`${awayName} • استقبال/مباراة`} value={away.averageGoalsAgainst.toFixed(2)} tone="away" />
+      </div>
+
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <MetricValue name={`${homeName} • شباك نظيفة`} value={`${home.cleanSheetRate}%`} tone="home" />
+        <MetricValue name={`${awayName} • شباك نظيفة`} value={`${away.cleanSheetRate}%`} tone="away" />
+      </div>
+
+      <p className="mt-3 text-[9px] font-bold leading-5 text-white/30">
+        الفورمة = النقاط المحققة من آخر المباريات ÷ الحد الأقصى الممكن. معدل التسجيل والاستقبال أرقام فعلية لكل مباراة.
+      </p>
+    </section>
   );
 }
 
@@ -773,29 +831,12 @@ export default function TournamentMatchInsights({
                         </div>
                       </section>
 
-                      {data.prediction.comparison ? (
-                        <section className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
-                          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <h3 className="text-sm font-black text-white">مقارنة المؤشرات</h3>
-                              <p className="mt-1 text-[10px] font-bold text-white/35">
-                                الأزرق = {homeName} • الأخضر = {awayName}
-                              </p>
-                            </div>
-                            <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 text-[9px] font-black text-white/45">
-                              كل منتخب له شريط مستقل
-                            </span>
-                          </div>
-                          <div className="space-y-3">
-                            <ComparisonRow label="الفورمة" home={data.prediction.comparison.formHome} away={data.prediction.comparison.formAway} homeName={homeName} awayName={awayName} />
-                            <ComparisonRow label="الهجوم" home={data.prediction.comparison.attackHome} away={data.prediction.comparison.attackAway} homeName={homeName} awayName={awayName} />
-                            <ComparisonRow label="الدفاع" home={data.prediction.comparison.defenceHome} away={data.prediction.comparison.defenceAway} homeName={homeName} awayName={awayName} />
-                            <ComparisonRow label="المواجهات" home={data.prediction.comparison.h2hHome} away={data.prediction.comparison.h2hAway} homeName={homeName} awayName={awayName} />
-                            <ComparisonRow label="الأهداف" home={data.prediction.comparison.goalsHome} away={data.prediction.comparison.goalsAway} homeName={homeName} awayName={awayName} />
-                            <ComparisonRow label="التقييم العام" home={data.prediction.comparison.totalHome} away={data.prediction.comparison.totalAway} homeName={homeName} awayName={awayName} />
-                          </div>
-                        </section>
-                      ) : null}
+                      <RecentPerformanceSection
+                        home={data.recentTeams?.home}
+                        away={data.recentTeams?.away}
+                        homeName={homeName}
+                        awayName={awayName}
+                      />
 
                       <section className="rounded-[24px] border border-white/10 bg-white/[0.035] p-4">
                         <div className="flex items-center justify-between gap-3">
