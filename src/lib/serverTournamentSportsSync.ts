@@ -10,6 +10,7 @@ import {
 import {
   GULF_CUP_27_ACHIEVEMENTS,
   GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
+  GULF_CUP_27_GROUP_MATCHES,
   GULF_CUP_27_SCORING_VERSION,
   GULF_CUP_27_TOURNAMENT_ID,
   calculateTournamentGroupStandingsV2,
@@ -53,6 +54,20 @@ const POSTPONED_STATUSES = new Set(["PST", "SUSP"]);
 const RESULT_VERIFY_GAP_MS = 60_000;
 const MAX_BATCH_WRITES = 350;
 const GULF_CUP_27_API_LEAGUE_ID = 25;
+
+// مواعيد دور المجموعات المعتمدة محليًا بعد مراجعتها مقابل الجدول المنشور للبطولة.
+// نحميها من أي توقيت قديم/تقريبي يرجعه مزود البيانات، مع إبقاء النتائج والحالة من المزود.
+const GULF_CUP_27_VERIFIED_GROUP_SCHEDULE = new Map(
+  GULF_CUP_27_GROUP_MATCHES.map((match) => [
+    match.id,
+    { kickoffAt: match.kickoffAt, stadium: match.stadium, city: match.city },
+  ]),
+);
+
+function verifiedScheduleForMatch(tournamentId: string, matchId: string) {
+  if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return null;
+  return GULF_CUP_27_VERIFIED_GROUP_SCHEDULE.get(matchId) ?? null;
+}
 const GULF_CUP_27_TARGET_SEASON = 2026;
 const SEASON_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const DISCOVERY_RETRY_INTERVAL_MS = 60 * 60 * 1000;
@@ -1486,18 +1501,27 @@ export async function syncTournamentSportsProvider(tournamentId: string, source:
     };
     if (config.syncSchedule && row.match.calculationStatus !== "calculated") {
       const previousKickoff = row.match.kickoffAt;
-      patch.kickoffAt = fixture.kickoffAt;
+      const verifiedSchedule = verifiedScheduleForMatch(tournamentId, row.match.id);
+      const nextKickoff = verifiedSchedule?.kickoffAt ?? fixture.kickoffAt;
+
+      patch.kickoffAt = nextKickoff;
       patch.predictionClosesAt =
         row.match.predictionClosesAt == null || row.match.predictionClosesAt === previousKickoff
-          ? fixture.kickoffAt
+          ? nextKickoff
           : row.match.predictionClosesAt;
       const previousDefaultOpen = previousKickoff - PREDICTION_OPEN_LEAD_MS;
       patch.predictionOpensAt =
         row.match.predictionOpensAt == null || row.match.predictionOpensAt === previousDefaultOpen
-          ? fixture.kickoffAt - PREDICTION_OPEN_LEAD_MS
+          ? nextKickoff - PREDICTION_OPEN_LEAD_MS
           : row.match.predictionOpensAt;
-      if (fixture.venue) patch.stadium = fixture.venue;
-      if (fixture.city) patch.city = fixture.city;
+
+      if (verifiedSchedule) {
+        if (verifiedSchedule.stadium) patch.stadium = verifiedSchedule.stadium;
+        if (verifiedSchedule.city) patch.city = verifiedSchedule.city;
+      } else {
+        if (fixture.venue) patch.stadium = fixture.venue;
+        if (fixture.city) patch.city = fixture.city;
+      }
     }
     const localStatus = config.syncStatus ? mapProviderStatus(fixture.statusShort, row.match.predictionIsOpen) : null;
     if (localStatus) patch.status = localStatus;
