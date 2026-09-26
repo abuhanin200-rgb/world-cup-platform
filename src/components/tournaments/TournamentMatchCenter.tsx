@@ -5,8 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import {
   Activity,
+  ArrowLeftRight,
   BarChart3,
   Clock3,
+  MonitorCheck,
   Radio,
   RefreshCw,
   Star,
@@ -111,7 +113,28 @@ function eventTone(type: string) {
   if (type.includes("هدف")) return "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
   if (type.includes("حمراء")) return "border-red-300/25 bg-red-300/10 text-red-100";
   if (type.includes("صفراء")) return "border-amber-300/25 bg-amber-300/10 text-amber-100";
+  if (type.includes("تبديل")) return "border-cyan-300/25 bg-cyan-300/10 text-cyan-100";
+  if (type.includes("الفيديو")) return "border-violet-300/25 bg-violet-300/10 text-violet-100";
   return "border-white/10 bg-white/5 text-white/70";
+}
+
+function EventVisual({ type }: { type: string }) {
+  if (type.includes("صفراء")) {
+    return <span className="h-5 w-3.5 rounded-[3px] border border-amber-100/40 bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,.35)]" aria-label="بطاقة صفراء" />;
+  }
+  if (type.includes("حمراء")) {
+    return <span className="h-5 w-3.5 rounded-[3px] border border-red-100/40 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,.35)]" aria-label="بطاقة حمراء" />;
+  }
+  if (type.includes("هدف")) {
+    return <span className="text-lg leading-none" role="img" aria-label="هدف">⚽</span>;
+  }
+  if (type.includes("تبديل")) {
+    return <ArrowLeftRight className="h-5 w-5 text-cyan-200" aria-label="تبديل" />;
+  }
+  if (type.includes("الفيديو")) {
+    return <MonitorCheck className="h-5 w-5 text-violet-200" aria-label="تقنية الفيديو" />;
+  }
+  return <Activity className="h-5 w-5 text-white/45" aria-hidden="true" />;
 }
 
 function numericPercent(value: string) {
@@ -267,20 +290,31 @@ export default function TournamentMatchCenter({
                   <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-white/15 md:hidden" />
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-2.5 py-1 text-[10px] font-black text-cyan-100">
-                        <Radio className="h-3.5 w-3.5" aria-hidden="true" />
-                        مركز المباراة
+                      <div className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black ${data?.isLive ? "border-red-300/25 bg-red-400/10 text-red-100" : "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"}`}>
+                        <span className={`h-2 w-2 rounded-full ${data?.isLive ? "animate-pulse bg-red-400 shadow-[0_0_10px_rgba(248,113,113,.9)]" : "bg-cyan-300"}`} aria-hidden="true" />
+                        {data?.isLive ? "مباشر الآن" : "مركز المباراة"}
                       </div>
                       <h2 className="mt-1 text-lg font-black text-white">تفاصيل المباراة</h2>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpen(false)}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white transition hover:bg-white/20"
-                      aria-label="إغلاق"
-                    >
-                      <X className="h-5 w-5" aria-hidden="true" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void load(true)}
+                        disabled={loading}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.07] text-white/70 transition hover:bg-white/15 disabled:opacity-50"
+                        aria-label="تحديث المباراة"
+                      >
+                        <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOpen(false)}
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white transition hover:bg-white/20"
+                        aria-label="إغلاق"
+                      >
+                        <X className="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
                 </header>
 
@@ -344,28 +378,36 @@ export default function TournamentMatchCenter({
 
                       {data.events.length ? (
                         <section className="overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.035]">
-                          <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-                            <Activity className="h-4 w-4 text-cyan-200" aria-hidden="true" />
-                            <h3 className="text-sm font-black text-white">أحداث المباراة</h3>
+                          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <Activity className="h-4 w-4 text-cyan-200" aria-hidden="true" />
+                              <h3 className="text-sm font-black text-white">أحداث المباراة</h3>
+                            </div>
+                            {data.isLive ? <span className="text-[9px] font-black text-white/35">الأحدث أولًا</span> : null}
                           </div>
                           <div className="divide-y divide-white/[0.06]">
-                            {data.events.slice(0, 18).map((event, index) => {
+                            {(data.isLive ? [...data.events].reverse() : data.events).slice(0, 18).map((event, index) => {
                               const eventTeamName = event.team === "home"
                                 ? (data.home.name || homeName)
                                 : (data.away.name || awayName);
                               return (
-                                <div key={`${event.minute}-${event.playerName}-${index}`} className="grid grid-cols-[48px_1fr] items-start gap-3 px-4 py-3">
-                                  <div className="pt-0.5 text-center">
-                                    <span dir="ltr" className="block text-xs font-black tabular-nums text-white/65">{event.minute}</span>
-                                    <span className={`mt-1.5 inline-block h-1.5 w-1.5 rounded-full ${event.team === "home" ? "bg-cyan-300" : "bg-emerald-300"}`} />
+                                <div key={`${event.minute}-${event.playerName}-${index}`} className="grid grid-cols-[48px_42px_1fr] items-center gap-2.5 px-4 py-3.5">
+                                  <div className="text-center">
+                                    <span dir="ltr" className="block text-sm font-black tabular-nums text-white/80">{event.minute}</span>
+                                    <span className={`mx-auto mt-1.5 block h-1.5 w-1.5 rounded-full ${event.team === "home" ? "bg-cyan-300" : "bg-emerald-300"}`} />
+                                  </div>
+                                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${eventTone(event.type)}`}>
+                                    <EventVisual type={event.type} />
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                                      <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${eventTone(event.type)}`}>{event.type}</span>
-                                      <span className="rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-0.5 text-[8px] font-bold text-white/45">{eventTeamName}</span>
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <span className="truncate text-xs font-black text-white">{event.playerName}</span>
+                                      <span className="shrink-0 rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-0.5 text-[8px] font-bold text-white/45">{eventTeamName}</span>
                                     </div>
-                                    <div className="truncate text-xs font-black text-white">{event.playerName}</div>
-                                    {event.assistName ? <div className="mt-1 text-[9px] font-bold text-white/35">صناعة: {event.assistName}</div> : null}
+                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                      <span className={`text-[10px] font-black ${event.type.includes("حمراء") ? "text-red-200" : event.type.includes("صفراء") ? "text-amber-200" : event.type.includes("هدف") ? "text-emerald-200" : "text-white/55"}`}>{event.type}</span>
+                                      {event.assistName ? <><span className="text-white/20">•</span><span className="text-[9px] font-bold text-white/35">صناعة: {event.assistName}</span></> : null}
+                                    </div>
                                   </div>
                                 </div>
                               );

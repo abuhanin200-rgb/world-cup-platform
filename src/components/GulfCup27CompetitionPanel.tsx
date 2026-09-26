@@ -32,7 +32,7 @@ import {
 
 const DATE_LOCALE = "ar-SA-u-ca-gregory-nu-latn";
 
-type MatchFilter = "all" | "open" | "upcoming" | "finished";
+type MatchFilter = "all" | "live" | "open" | "upcoming" | "finished";
 
 function formatDateTime(timestamp: number) {
   const value = new Date(timestamp);
@@ -409,18 +409,28 @@ export default function GulfCup27CompetitionPanel() {
   );
 
   const filteredMatches = useMemo(() => {
-    return matches.filter((match) => {
-      if (filter === "open") return isTournamentPredictionOpen(match);
-      if (filter === "finished") return match.status === "finished";
-      if (filter === "upcoming") {
-        return match.status !== "finished" && match.kickoffAt >= now;
-      }
-      return true;
-    });
+    return matches
+      .filter((match) => {
+        if (filter === "live") return match.status === "live";
+        if (filter === "open") return isTournamentPredictionOpen(match);
+        if (filter === "finished") return match.status === "finished";
+        if (filter === "upcoming") {
+          return match.status !== "finished" && match.kickoffAt >= now;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (filter === "all") {
+          const liveDiff = Number(b.status === "live") - Number(a.status === "live");
+          if (liveDiff !== 0) return liveDiff;
+        }
+        return a.kickoffAt - b.kickoffAt;
+      });
   }, [filter, matches, now]);
 
   const groupMatches = matches.filter((match) => match.stage === "group");
   const finishedCount = groupMatches.filter((match) => match.status === "finished").length;
+  const liveCount = matches.filter((match) => match.status === "live").length;
   const openCount = matches.filter((match) => isTournamentPredictionOpen(match)).length;
 
   if (loading) {
@@ -481,6 +491,7 @@ export default function GulfCup27CompetitionPanel() {
           {(
             [
               ["all", "الكل"],
+              ["live", `مباشر (${liveCount})`],
               ["open", `التوقع مفتوح (${openCount})`],
               ["upcoming", "القادمة"],
               ["finished", "النتائج"],
@@ -493,10 +504,17 @@ export default function GulfCup27CompetitionPanel() {
               aria-pressed={filter === value}
               className={`min-h-[44px] shrink-0 rounded-2xl border px-4 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
                 filter === value
-                  ? "border-[var(--tournament-primary)] bg-[var(--tournament-primary)] text-white"
-                  : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                  ? value === "live"
+                    ? "border-red-300/35 bg-red-400/15 text-red-50 shadow-[0_0_20px_rgba(248,113,113,.08)]"
+                    : "border-[var(--tournament-primary)] bg-[var(--tournament-primary)] text-white"
+                  : value === "live" && liveCount > 0
+                    ? "border-red-300/20 bg-red-400/[0.07] text-red-100 hover:bg-red-400/10"
+                    : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
               }`}
             >
+              {value === "live" && liveCount > 0 ? (
+                <span className="ml-1 inline-block h-2 w-2 animate-pulse rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,.9)]" aria-hidden="true" />
+              ) : null}
               {label}
             </button>
           ))}

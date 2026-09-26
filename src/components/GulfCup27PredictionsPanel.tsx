@@ -59,18 +59,18 @@ type PredictionDraft = {
 
 type MatchFilter =
   | "all"
+  | "live"
   | "available"
   | "missing"
   | "saved"
-  | "closed"
   | "results";
 
 const FILTER_LABELS: Record<MatchFilter, string> = {
   all: "الكل",
+  live: "مباشر",
   available: "متاح الآن",
   missing: "لم أتوقع",
   saved: "محفوظ",
-  closed: "مغلق",
   results: "النتائج",
 };
 
@@ -840,19 +840,19 @@ export default function GulfCup27PredictionsPanel() {
   const counts = useMemo(() => {
     const result = {
       all: matches.length,
+      live: 0,
       available: 0,
       missing: 0,
       saved: 0,
-      closed: 0,
       results: 0,
     };
     for (const match of matches) {
       const prediction = predictionByMatch[match.id];
       const state = getTournamentPredictionWindowStateV2(match, now);
+      if (state === "live") result.live += 1;
       if (state === "open") result.available += 1;
       if (!prediction && state === "open") result.missing += 1;
       if (prediction) result.saved += 1;
-      if (state !== "open" && state !== "not_open") result.closed += 1;
       if (prediction?.isCalculated || state === "finished") result.results += 1;
     }
     return result;
@@ -862,12 +862,10 @@ export default function GulfCup27PredictionsPanel() {
     function included(match: TournamentMatchRuntimeV2) {
       const prediction = predictionByMatch[match.id];
       const state = getTournamentPredictionWindowStateV2(match, now);
+      if (filter === "live") return state === "live";
       if (filter === "available") return state === "open";
       if (filter === "missing") return state === "open" && !prediction;
       if (filter === "saved") return Boolean(prediction);
-      if (filter === "closed") {
-        return state !== "open" && state !== "not_open";
-      }
       if (filter === "results") {
         return Boolean(prediction?.isCalculated || state === "finished");
       }
@@ -877,11 +875,12 @@ export default function GulfCup27PredictionsPanel() {
     function priority(match: TournamentMatchRuntimeV2) {
       const prediction = predictionByMatch[match.id];
       const state = getTournamentPredictionWindowStateV2(match, now);
-      if (state === "open" && !prediction) return 0;
-      if (state === "open" && prediction) return 1;
-      if (state === "not_open") return 2;
-      if (prediction?.isCalculated || state === "finished") return 4;
-      return 3;
+      if (state === "live") return 0;
+      if (state === "open" && !prediction) return 1;
+      if (state === "open" && prediction) return 2;
+      if (state === "not_open") return 3;
+      if (prediction?.isCalculated || state === "finished") return 5;
+      return 4;
     }
 
     return matches
@@ -1100,10 +1099,17 @@ export default function GulfCup27PredictionsPanel() {
               onClick={() => setFilter(key)}
               className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-2xl border px-3 text-xs font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${
                 filter === key
-                  ? "border-[var(--tournament-primary)] bg-[var(--tournament-primary)] text-white"
-                  : "border-white/10 bg-black/20 text-white/65 hover:bg-white/10"
+                  ? key === "live"
+                    ? "border-red-300/35 bg-red-400/15 text-red-50 shadow-[0_0_20px_rgba(248,113,113,.08)]"
+                    : "border-[var(--tournament-primary)] bg-[var(--tournament-primary)] text-white"
+                  : key === "live" && counts.live > 0
+                    ? "border-red-300/20 bg-red-400/[0.07] text-red-100 hover:bg-red-400/10"
+                    : "border-white/10 bg-black/20 text-white/65 hover:bg-white/10"
               }`}
             >
+              {key === "live" && counts.live > 0 ? (
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-400 shadow-[0_0_10px_rgba(248,113,113,.9)]" aria-hidden="true" />
+              ) : null}
               {FILTER_LABELS[key]}
               <span
                 dir="ltr"
