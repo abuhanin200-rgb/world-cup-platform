@@ -14,7 +14,7 @@ import { resolveVerifiedGulfCup27Player } from "@/domain/tournaments/gulfCup27Ve
 
 const CACHE_COLLECTION = "tournamentMatchCenterCache";
 const LINEUP_CACHE_COLLECTION = "tournamentMatchLineupCache";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const LIVE_TTL_MS = 45 * 1000;
 const FINISHED_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const OTHER_TTL_MS = 10 * 60 * 1000;
@@ -28,6 +28,8 @@ export type MatchCenterEvent = {
   detail: string;
   playerName: string;
   assistName: string | null;
+  playerOutName: string | null;
+  playerInName: string | null;
 };
 
 export type MatchCenterStat = {
@@ -373,13 +375,20 @@ export async function getTournamentMatchCenter(input: {
             lineupNames: names,
           })
         : null;
+      const typeLabel = eventTypeLabel(event.type, event.detail);
+      const isSubstitution = typeLabel === "تبديل";
+      const cleanAssistName = assistName === "لاعب" ? null : assistName;
       return {
         minute: eventMinute(event),
         team: side,
-        type: eventTypeLabel(event.type, event.detail),
+        type: typeLabel,
         detail: clean(event.comments),
         playerName,
-        assistName: assistName === "لاعب" ? null : assistName,
+        // في API-FOOTBALL عند التبديل: player = الخارج، assist = الداخل.
+        // لذلك لا نعرض «صناعة» في التبديلات.
+        assistName: isSubstitution ? null : cleanAssistName,
+        playerOutName: isSubstitution ? playerName : null,
+        playerInName: isSubstitution ? cleanAssistName : null,
       } satisfies MatchCenterEvent;
     })
     .filter((event): event is MatchCenterEvent => Boolean(event))

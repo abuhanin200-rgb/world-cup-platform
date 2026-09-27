@@ -106,7 +106,7 @@ const modalMotion: Variants = {
 function sourceLabel(source: TeamLineup["source"]) {
   if (source === "official") return "التشكيل الرسمي";
   if (source === "expected") return "التشكيل المتوقع";
-  return "غير متاح";
+  return "التشكيل المتوقع";
 }
 
 function sourceClass(source: TeamLineup["source"]) {
@@ -412,7 +412,7 @@ function FootballPitch({ players, formation }: { players: LineupPlayer[]; format
           ))
         ) : (
           <div className="absolute inset-0 z-20 flex items-center justify-center text-sm font-black text-white/55">
-            لم يصدر التشكيل بعد
+            جاري تحديث التشكيل المتوقع
           </div>
         )}
 
@@ -518,12 +518,13 @@ export default function TournamentMatchLineup({
 
   useEffect(() => setIsMounted(true), []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     if (loading) return;
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ tournamentId, matchId });
+      if (force) params.set("force", "1");
       const response = await fetch(`/api/tournaments/match-lineup?${params.toString()}`, {
         method: "GET",
         cache: "no-store",
@@ -599,14 +600,25 @@ export default function TournamentMatchLineup({
                       </div>
                       <h2 className="mt-1 text-lg font-black text-white">{activeTeam?.source === "official" ? "التشكيل الرسمي" : "التشكيل المتوقع"}</h2>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpen(false)}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white transition hover:bg-white/20 active:scale-95"
-                      aria-label="إغلاق"
-                    >
-                      <X className="h-5 w-5" aria-hidden="true" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void load(true)}
+                        disabled={loading}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.07] text-white/75 transition hover:bg-white/15 disabled:opacity-50 active:scale-95"
+                        aria-label="تحديث التشكيل والغيابات"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOpen(false)}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white transition hover:bg-white/20 active:scale-95"
+                        aria-label="إغلاق"
+                      >
+                        <X className="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
                 </header>
 
@@ -667,6 +679,11 @@ export default function TournamentMatchLineup({
                               {activeTeam.absences?.length ? (
                                 <span className="rounded-full border border-rose-300/20 bg-rose-300/[0.08] px-2.5 py-1.5 text-[10px] font-black text-rose-100">
                                   {activeTeam.absences.length} غياب
+                                </span>
+                              ) : null}
+                              {activeTeam.source === "expected" && activeTeam.sourceFixtureAt ? (
+                                <span className="rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1.5 text-[9px] font-bold text-cyan-100/75">
+                                  محدث من آخر المباريات
                                 </span>
                               ) : null}
                             </div>

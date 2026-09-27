@@ -23,6 +23,8 @@ type MatchCenterEvent = {
   detail: string;
   playerName: string;
   assistName: string | null;
+  playerOutName: string | null;
+  playerInName: string | null;
 };
 
 type MatchCenterStat = {
@@ -400,14 +402,37 @@ export default function TournamentMatchCenter({
                                     <EventVisual type={event.type} />
                                   </div>
                                   <div className="min-w-0">
-                                    <div className="flex min-w-0 items-center gap-2">
-                                      <span className="truncate text-xs font-black text-white">{event.playerName}</span>
-                                      <span className="shrink-0 rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-0.5 text-[8px] font-bold text-white/45">{eventTeamName}</span>
-                                    </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                      <span className={`text-[10px] font-black ${event.type.includes("حمراء") ? "text-red-200" : event.type.includes("صفراء") ? "text-amber-200" : event.type.includes("هدف") ? "text-emerald-200" : "text-white/55"}`}>{event.type}</span>
-                                      {event.assistName ? <><span className="text-white/20">•</span><span className="text-[9px] font-bold text-white/35">صناعة: {event.assistName}</span></> : null}
-                                    </div>
+                                    {event.type.includes("تبديل") ? (
+                                      <>
+                                        <div className="flex min-w-0 items-center gap-2">
+                                          <span className="shrink-0 rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-0.5 text-[8px] font-bold text-white/45">{eventTeamName}</span>
+                                          <span className="text-[10px] font-black text-cyan-100">تبديل</span>
+                                        </div>
+                                        <div className="mt-1.5 grid gap-1">
+                                          <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-black">
+                                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">↑</span>
+                                            <span className="shrink-0 text-emerald-200">دخل</span>
+                                            <span className="truncate text-white">{event.playerInName || "لاعب"}</span>
+                                          </div>
+                                          <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-black">
+                                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-400/15 text-rose-300">↓</span>
+                                            <span className="shrink-0 text-rose-200">خرج</span>
+                                            <span className="truncate text-white/75">{event.playerOutName || event.playerName}</span>
+                                          </div>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div className="flex min-w-0 items-center gap-2">
+                                          <span className="truncate text-xs font-black text-white">{event.playerName}</span>
+                                          <span className="shrink-0 rounded-full border border-white/[0.07] bg-white/[0.04] px-2 py-0.5 text-[8px] font-bold text-white/45">{eventTeamName}</span>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                          <span className={`text-[10px] font-black ${event.type.includes("حمراء") ? "text-red-200" : event.type.includes("صفراء") ? "text-amber-200" : event.type.includes("هدف") ? "text-emerald-200" : "text-white/55"}`}>{event.type}</span>
+                                          {event.assistName ? <><span className="text-white/20">•</span><span className="text-[9px] font-bold text-white/35">صناعة: {event.assistName}</span></> : null}
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               );

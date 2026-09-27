@@ -18,6 +18,9 @@ type ActivityEvent = {
   awayTeamFlagCode: string;
   resultHomeScore: number | null;
   resultAwayScore: number | null;
+  predictionHomeScore: number | null;
+  predictionAwayScore: number | null;
+  predictionCalculated: boolean;
   createdAt: number;
 };
 
@@ -54,6 +57,15 @@ function ActivityInline({ item, kind }: { item: ActivityEvent; kind: ActivityKin
           {item.resultHomeScore}-{item.resultAwayScore}
         </span>
       ) : null}
+      {!exact && item.predictionCalculated && item.predictionHomeScore != null && item.predictionAwayScore != null ? (
+        <span
+          dir="ltr"
+          className="rounded-md border border-emerald-300/15 bg-emerald-300/10 px-1.5 py-0.5 font-black text-emerald-100 [unicode-bidi:isolate]"
+          title="نتيجة توقع العضو بعد الاحتساب"
+        >
+          {item.predictionHomeScore}-{item.predictionAwayScore}
+        </span>
+      ) : null}
       <span className="inline-flex items-center gap-1">
         <TeamFlag code={item.homeTeamFlagCode || undefined} name={item.homeTeamName} size="xs" />
         <span>{item.homeTeamName}</span>
@@ -80,7 +92,10 @@ function sameActivityList(a: ActivityEvent[], b: ActivityEvent[]) {
       left.homeTeamFlagCode !== right.homeTeamFlagCode ||
       left.awayTeamFlagCode !== right.awayTeamFlagCode ||
       left.resultHomeScore !== right.resultHomeScore ||
-      left.resultAwayScore !== right.resultAwayScore
+      left.resultAwayScore !== right.resultAwayScore ||
+      left.predictionHomeScore !== right.predictionHomeScore ||
+      left.predictionAwayScore !== right.predictionAwayScore ||
+      left.predictionCalculated !== right.predictionCalculated
     ) {
       return false;
     }
@@ -337,7 +352,7 @@ export default function TournamentActivityStrips({
                 <p className="mt-0.5 text-[11px] font-semibold text-white/45">
                   {openKind === "exactHits"
                     ? "التوقعات المطابقة بعد اعتماد النتيجة واحتساب المباراة."
-                    : "نعرض اسم العضو والمباراة فقط، بدون كشف نتيجة توقعه."}
+                    : "اسم العضو والمباراة يظهران مباشرة، ونتيجة توقعه لا تظهر إلا بعد احتساب المباراة."}
                 </p>
               </div>
               <button
@@ -374,6 +389,17 @@ export default function TournamentActivityStrips({
                             className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-sm font-black text-amber-100 [unicode-bidi:isolate]"
                           >
                             {item.resultHomeScore} - {item.resultAwayScore}
+                          </span>
+                        ) : null}
+                        {openKind === "predictions" &&
+                        item.predictionCalculated &&
+                        item.predictionHomeScore != null &&
+                        item.predictionAwayScore != null ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-xs font-black text-emerald-100">
+                            <span>توقعه</span>
+                            <span dir="ltr" className="text-sm [unicode-bidi:isolate]">
+                              {item.predictionHomeScore} - {item.predictionAwayScore}
+                            </span>
                           </span>
                         ) : null}
                       </div>

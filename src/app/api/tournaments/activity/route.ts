@@ -30,6 +30,9 @@ export async function GET(request: NextRequest) {
       awayTeamFlagCode: item.awayTeamFlagCode,
       resultHomeScore: item.resultHomeScore,
       resultAwayScore: item.resultAwayScore,
+      predictionHomeScore: item.predictionHomeScore,
+      predictionAwayScore: item.predictionAwayScore,
+      predictionCalculated: item.predictionCalculated,
       createdAt: item.createdAt,
     });
     return NextResponse.json(

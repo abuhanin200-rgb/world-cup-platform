@@ -20,6 +20,7 @@ function friendlyError(error: unknown) {
 export async function GET(request: NextRequest) {
   const tournamentId = clean(request.nextUrl.searchParams.get("tournamentId"));
   const matchId = clean(request.nextUrl.searchParams.get("matchId"));
+  const force = request.nextUrl.searchParams.get("force") === "1";
 
   if (!tournamentId || !matchId) {
     return NextResponse.json(
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = await getTournamentMatchLineup({ tournamentId, matchId });
+    const data = await getTournamentMatchLineup({ tournamentId, matchId, force });
     return NextResponse.json(
       { ok: true, data },
       {

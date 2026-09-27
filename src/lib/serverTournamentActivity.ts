@@ -21,6 +21,9 @@ export type TournamentActivityEvent = {
   awayTeamFlagCode: string;
   resultHomeScore: number | null;
   resultAwayScore: number | null;
+  predictionHomeScore: number | null;
+  predictionAwayScore: number | null;
+  predictionCalculated: boolean;
   createdAt: number;
 };
 
@@ -243,13 +246,37 @@ export async function getTournamentActivityServer(
 }> {
   await backfillTournamentActivityIfEmpty(tournamentId);
 
-  const [snapshot, teamsSnapshot] = await Promise.all([
+  const [snapshot, teamsSnapshot, predictionsSnapshot] = await Promise.all([
     activityCollection(tournamentId)
       .orderBy("createdAt", "desc")
       .limit(Math.max(20, Math.min(160, limit)))
       .get(),
     adminDb.collection("tournamentTeams").where("tournamentId", "==", tournamentId).get(),
+    adminDb
+      .collection("tournamentPredictions")
+      .where("tournamentId", "==", tournamentId)
+      .limit(1000)
+      .get(),
   ]);
+
+  // اسم العضو والمباراة يبقيان ظاهرين في «آخر التوقعات» فور الحفظ.
+  // نتيجة توقع العضو نفسها لا تُكشف إلا بعد احتساب ذلك التوقع فعليًا.
+  const predictionMap = new Map(
+    predictionsSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      const matchId = clean(data.matchId);
+      const userId = clean(data.userId);
+      const calculated = data.isCalculated === true || Number(data.calculatedAt || 0) > 0;
+      return [
+        `${matchId}_${userId}`,
+        {
+          calculated,
+          homeScore: calculated ? numberOrNull(data.homeScore) : null,
+          awayScore: calculated ? numberOrNull(data.awayScore) : null,
+        },
+      ] as const;
+    }),
+  );
 
   const teamMap = new Map(
     teamsSnapshot.docs.map((doc) => {
@@ -274,12 +301,15 @@ export async function getTournamentActivityServer(
       const awayTeamId = clean(data.awayTeamId);
       const homeTeam = teamMap.get(homeTeamId);
       const awayTeam = teamMap.get(awayTeamId);
+      const matchId = clean(data.matchId);
+      const userId = clean(data.userId);
+      const prediction = type === "prediction" ? predictionMap.get(`${matchId}_${userId}`) : null;
       return {
         id: clean(data.id) || doc.id,
         type,
         tournamentId: clean(data.tournamentId),
-        matchId: clean(data.matchId),
-        userId: clean(data.userId),
+        matchId,
+        userId,
         userName: clean(data.userName) || "عضو",
         homeTeamId,
         awayTeamId,
@@ -289,13 +319,20 @@ export async function getTournamentActivityServer(
         awayTeamFlagCode: awayTeam?.flagCode || "",
         resultHomeScore: numberOrNull(data.resultHomeScore),
         resultAwayScore: numberOrNull(data.resultAwayScore),
+        predictionHomeScore: prediction?.homeScore ?? null,
+        predictionAwayScore: prediction?.awayScore ?? null,
+        predictionCalculated: prediction?.calculated === true,
         createdAt: Number(data.createdAt || 0),
       } satisfies TournamentActivityEvent;
     })
     .filter((item): item is TournamentActivityEvent => Boolean(item));
 
   return {
-    predictions: events.filter((item) => item.type === "prediction").slice(0, 40),
-    exactHits: events.filter((item) => item.type === "exact").slice(0, 40),
+    predictions: events
+      .filter((item) => item.type === "prediction")
+      .slice(0, 40),
+    exactHits: events
+      .filter((item) => item.type === "exact")
+      .slice(0, 40),
   };
 }
