@@ -40,6 +40,51 @@ function formatTime(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
+function ScorePair({
+  homeScore,
+  awayScore,
+  tone = "emerald",
+  label,
+}: {
+  homeScore: number;
+  awayScore: number;
+  tone?: "emerald" | "amber";
+  label?: string;
+}) {
+  const toneClass =
+    tone === "amber"
+      ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
+      : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100";
+
+  return (
+    <span
+      dir="rtl"
+      className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 font-black ${toneClass}`}
+    >
+      {label ? <span className="text-[10px] opacity-75">{label}</span> : null}
+      <span className="text-sm tabular-nums [unicode-bidi:isolate]">{homeScore}</span>
+      <span className="text-white/35">–</span>
+      <span className="text-sm tabular-nums [unicode-bidi:isolate]">{awayScore}</span>
+    </span>
+  );
+}
+
+function MatchupLine({ item }: { item: ActivityEvent }) {
+  return (
+    <span dir="rtl" className="inline-flex min-w-0 flex-wrap items-center gap-2">
+      <span className="inline-flex items-center gap-1.5">
+        <TeamFlag code={item.homeTeamFlagCode || undefined} name={item.homeTeamName} size="sm" />
+        <span>{item.homeTeamName}</span>
+      </span>
+      <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 text-[9px] font-black text-white/30">VS</span>
+      <span className="inline-flex items-center gap-1.5">
+        <TeamFlag code={item.awayTeamFlagCode || undefined} name={item.awayTeamName} size="sm" />
+        <span>{item.awayTeamName}</span>
+      </span>
+    </span>
+  );
+}
+
 
 function ActivityInline({ item, kind }: { item: ActivityEvent; kind: ActivityKind }) {
   const exact = kind === "exactHits";
@@ -50,21 +95,10 @@ function ActivityInline({ item, kind }: { item: ActivityEvent; kind: ActivityKin
       </strong>
       <span className="text-white/45">{exact ? "·" : "توقّع"}</span>
       {exact && item.resultHomeScore != null && item.resultAwayScore != null ? (
-        <span
-          dir="ltr"
-          className="rounded-md border border-amber-300/15 bg-amber-300/10 px-1.5 py-0.5 font-black text-amber-100 [unicode-bidi:isolate]"
-        >
-          {item.resultHomeScore}-{item.resultAwayScore}
-        </span>
+        <ScorePair homeScore={item.resultHomeScore} awayScore={item.resultAwayScore} tone="amber" />
       ) : null}
       {!exact && item.predictionCalculated && item.predictionHomeScore != null && item.predictionAwayScore != null ? (
-        <span
-          dir="ltr"
-          className="rounded-md border border-emerald-300/15 bg-emerald-300/10 px-1.5 py-0.5 font-black text-emerald-100 [unicode-bidi:isolate]"
-          title="نتيجة توقع العضو بعد الاحتساب"
-        >
-          {item.predictionHomeScore}-{item.predictionAwayScore}
-        </span>
+        <ScorePair homeScore={item.predictionHomeScore} awayScore={item.predictionAwayScore} />
       ) : null}
       <span className="inline-flex items-center gap-1">
         <TeamFlag code={item.homeTeamFlagCode || undefined} name={item.homeTeamName} size="xs" />
@@ -373,47 +407,61 @@ export default function TournamentActivityStrips({
                       key={item.id}
                       className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-3">
                         <strong
-                          className={`text-sm font-black ${
+                          className={`min-w-0 truncate text-[15px] font-black ${
                             openKind === "exactHits" ? "text-amber-200" : "text-emerald-200"
                           }`}
                         >
                           {item.userName}
                         </strong>
-                        {openKind === "exactHits" &&
-                        item.resultHomeScore != null &&
-                        item.resultAwayScore != null ? (
-                          <span
-                            dir="ltr"
-                            className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-sm font-black text-amber-100 [unicode-bidi:isolate]"
-                          >
-                            {item.resultHomeScore} - {item.resultAwayScore}
+                        {openKind === "exactHits" ? (
+                          <span className="shrink-0 rounded-full border border-amber-300/15 bg-amber-300/10 px-2 py-0.5 text-[9px] font-black text-amber-100/85">
+                            جابها بالملي
                           </span>
-                        ) : null}
-                        {openKind === "predictions" &&
-                        item.predictionCalculated &&
-                        item.predictionHomeScore != null &&
-                        item.predictionAwayScore != null ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-xs font-black text-emerald-100">
-                            <span>توقعه</span>
-                            <span dir="ltr" className="text-sm [unicode-bidi:isolate]">
-                              {item.predictionHomeScore} - {item.predictionAwayScore}
-                            </span>
+                        ) : item.predictionCalculated ? (
+                          <span className="shrink-0 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-2 py-0.5 text-[9px] font-black text-emerald-100/80">
+                            تم الاحتساب
                           </span>
-                        ) : null}
+                        ) : (
+                          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[9px] font-black text-white/35">
+                            النتيجة مخفية
+                          </span>
+                        )}
                       </div>
-                      <p className="mt-1 inline-flex flex-wrap items-center gap-1.5 text-xs font-bold text-white/70">
-                        <TeamFlag code={item.homeTeamFlagCode || undefined} name={item.homeTeamName} size="sm" />
-                        <span>{item.homeTeamName}</span>
-                        <span className="text-white/30">×</span>
-                        <TeamFlag code={item.awayTeamFlagCode || undefined} name={item.awayTeamName} size="sm" />
-                        <span>{item.awayTeamName}</span>
-                      </p>
-                      <p className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-semibold text-white/35">
-                        <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                        {formatTime(item.createdAt)}
-                      </p>
+
+                      <div dir="rtl" className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl border border-white/[0.07] bg-black/10 px-2.5 py-3">
+                        <div className="flex min-w-0 flex-col items-center gap-1.5 text-center">
+                          <TeamFlag code={item.homeTeamFlagCode || undefined} name={item.homeTeamName} size="sm" />
+                          <span className="max-w-full truncate text-xs font-black text-white/82">{item.homeTeamName}</span>
+                        </div>
+
+                        <div className="flex min-w-[72px] flex-col items-center justify-center">
+                          {openKind === "exactHits" && item.resultHomeScore != null && item.resultAwayScore != null ? (
+                            <>
+                              <span className="mb-1 text-[9px] font-black text-amber-200/65">النتيجة</span>
+                              <ScorePair homeScore={item.resultHomeScore} awayScore={item.resultAwayScore} tone="amber" />
+                            </>
+                          ) : openKind === "predictions" && item.predictionCalculated && item.predictionHomeScore != null && item.predictionAwayScore != null ? (
+                            <>
+                              <span className="mb-1 text-[9px] font-black text-emerald-200/65">توقعه</span>
+                              <ScorePair homeScore={item.predictionHomeScore} awayScore={item.predictionAwayScore} />
+                            </>
+                          ) : (
+                            <span className="rounded-lg bg-white/[0.05] px-2 py-1 text-[10px] font-black text-white/30">VS</span>
+                          )}
+                        </div>
+
+                        <div className="flex min-w-0 flex-col items-center gap-1.5 text-center">
+                          <TeamFlag code={item.awayTeamFlagCode || undefined} name={item.awayTeamName} size="sm" />
+                          <span className="max-w-full truncate text-xs font-black text-white/82">{item.awayTeamName}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-1.5 border-t border-white/[0.06] pt-2.5 text-[10px] font-semibold text-white/38">
+                        <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>{formatTime(item.createdAt)}</span>
+                      </div>
                     </article>
                   ))}
                 </div>
