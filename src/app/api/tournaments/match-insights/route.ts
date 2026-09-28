@@ -40,7 +40,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "طلب غير صالح." }, { status: 400 });
     }
 
-    const data = await getTournamentMatchInsights({ tournamentId, matchId });
+    const force = request.nextUrl.searchParams.get("force") === "1";
+    const data = await getTournamentMatchInsights({ tournamentId, matchId, force });
     return NextResponse.json(
       { ok: true, data },
       {

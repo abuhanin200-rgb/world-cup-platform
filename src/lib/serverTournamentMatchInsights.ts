@@ -2,7 +2,6 @@ import "server-only";
 
 import { adminDb } from "@/lib/firebaseAdmin";
 import {
-  findApiFootballTeamByName,
   getApiFootballFixturesByIds,
   getApiFootballHeadToHead,
   getApiFootballPredictionByFixture,
@@ -12,10 +11,10 @@ import {
 } from "@/lib/serverApiFootball";
 
 const CACHE_COLLECTION = "tournamentMatchInsightsCache";
-const CACHE_TTL_UPCOMING_MS = 6 * 60 * 60 * 1000;
+const CACHE_TTL_UPCOMING_MS = 15 * 60 * 1000;
 const CACHE_TTL_FINISHED_MS = 30 * 24 * 60 * 60 * 1000;
 const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "AWD", "WO"]);
-const INSIGHTS_SCHEMA_VERSION = 3;
+const INSIGHTS_SCHEMA_VERSION = 4;
 
 type MatchInsightMeeting = {
   fixtureId: number;
@@ -71,7 +70,7 @@ export type TournamentMatchInsights = {
     away: number;
   } | null;
   probabilities: {
-    source: "api_prediction" | "head_to_head_history";
+    source: "api_prediction";
     home: number;
     draw: number;
     away: number;
@@ -378,6 +377,7 @@ export async function getTournamentMatchInsights(input: {
 }): Promise<TournamentMatchInsights> {
   const match = await loadMatch(input.tournamentId, input.matchId);
   if (!match.homeTeamId || !match.awayTeamId) throw new Error("TEAMS_PENDING");
+  if (!match.providerFixtureId) throw new Error("FIXTURE_NOT_LINKED");
 
   if (!input.force) {
     const cached = await getCached(input.tournamentId, input.matchId);
@@ -390,28 +390,26 @@ export async function getTournamentMatchInsights(input: {
     loadLocalTeam(input.tournamentId, match.awayTeamId),
   ]);
 
-  const fixtureResult = match.providerFixtureId
-    ? await Promise.allSettled([
-        getApiFootballFixturesByIds([match.providerFixtureId]),
-        getApiFootballPredictionByFixture(match.providerFixtureId),
-      ])
-    : null;
+  const fixtureResult = await Promise.allSettled([
+    getApiFootballFixturesByIds([match.providerFixtureId]),
+    getApiFootballPredictionByFixture(match.providerFixtureId),
+  ]);
 
   const providerFixture =
-    fixtureResult?.[0]?.status === "fulfilled"
+    fixtureResult[0].status === "fulfilled"
       ? fixtureResult[0].value.fixtures.find(
           (fixture) => fixture.fixtureId === match.providerFixtureId,
         ) || null
       : null;
   const providerPrediction =
-    fixtureResult?.[1]?.status === "fulfilled"
+    fixtureResult[1].status === "fulfilled"
       ? fixtureResult[1].value.prediction
       : null;
 
-  if (match.providerFixtureId && fixtureResult?.[0]?.status === "rejected") {
+  if (match.providerFixtureId && fixtureResult[0].status === "rejected") {
     warnings.push("تعذر تحميل تفاصيل المباراة من مزود البيانات.");
   }
-  if (match.providerFixtureId && fixtureResult?.[1]?.status === "rejected") {
+  if (match.providerFixtureId && fixtureResult[1].status === "rejected") {
     warnings.push("الاحتمالات الذكية غير متاحة حاليًا من مزود البيانات.");
   }
 
@@ -423,24 +421,6 @@ export async function getTournamentMatchInsights(input: {
     providerFixture?.homeName || providerPrediction?.homeTeamName || "";
   let providerAwayName =
     providerFixture?.awayName || providerPrediction?.awayTeamName || "";
-
-  if (!providerHomeTeamId || !providerAwayTeamId) {
-    const [homeLookup, awayLookup] = await Promise.allSettled([
-      findApiFootballTeamByName(localHome?.nameEn || localHome?.nameAr || match.homeTeamId),
-      findApiFootballTeamByName(localAway?.nameEn || localAway?.nameAr || match.awayTeamId),
-    ]);
-    if (homeLookup.status === "fulfilled" && homeLookup.value.team) {
-      providerHomeTeamId = homeLookup.value.team.id;
-      providerHomeName = homeLookup.value.team.name;
-    }
-    if (awayLookup.status === "fulfilled" && awayLookup.value.team) {
-      providerAwayTeamId = awayLookup.value.team.id;
-      providerAwayName = awayLookup.value.team.name;
-    }
-    if (!match.providerFixtureId) {
-      warnings.push("المباراة غير مربوطة بعد بـ Fixture ID؛ لذلك يعرض النظام سجل المواجهات والتقدير التاريخي فقط.");
-    }
-  }
 
   if (!providerHomeTeamId || !providerAwayTeamId) {
     throw new Error("PROVIDER_TEAMS_UNAVAILABLE");
@@ -504,12 +484,10 @@ export async function getTournamentMatchInsights(input: {
 
   const probabilities = providerProbabilities
     ? { source: "api_prediction" as const, ...providerProbabilities }
-    : historicalShares
-      ? { source: "head_to_head_history" as const, ...historicalShares }
-      : null;
+    : null;
 
-  if (!providerProbabilities && historicalShares) {
-    warnings.push("الاحتمالات المعروضة مبنية على نتائج المواجهات السابقة فقط وليست نموذج التنبؤ الكامل.");
+  if (!providerProbabilities) {
+    warnings.push("احتمالات المباراة غير متاحة من API-FOOTBALL لهذه المواجهة؛ تم إخفاؤها بدل عرض تقدير غير موثوق.");
   }
 
   // Current form must come from each national team's own recent matches, not

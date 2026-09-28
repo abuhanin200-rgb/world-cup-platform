@@ -106,7 +106,7 @@ const modalMotion: Variants = {
 function sourceLabel(source: TeamLineup["source"]) {
   if (source === "official") return "التشكيل الرسمي";
   if (source === "expected") return "التشكيل المتوقع";
-  return "التشكيل المتوقع";
+  return "غير متاح من المزود";
 }
 
 function sourceClass(source: TeamLineup["source"]) {
@@ -598,7 +598,7 @@ export default function TournamentMatchLineup({
                         <Shirt className="h-3.5 w-3.5" aria-hidden="true" />
                         التشكيل
                       </div>
-                      <h2 className="mt-1 text-lg font-black text-white">{activeTeam?.source === "official" ? "التشكيل الرسمي" : "التشكيل المتوقع"}</h2>
+                      <h2 className="mt-1 text-lg font-black text-white">{activeTeam?.source === "official" ? "التشكيل الرسمي" : activeTeam?.source === "expected" ? "التشكيل المتوقع" : "التشكيل غير متاح"}</h2>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -683,7 +683,7 @@ export default function TournamentMatchLineup({
                               ) : null}
                               {activeTeam.source === "expected" && activeTeam.sourceFixtureAt ? (
                                 <span className="rounded-full border border-cyan-300/15 bg-cyan-300/[0.06] px-2.5 py-1.5 text-[9px] font-bold text-cyan-100/75">
-                                  محدث من آخر المباريات
+                                  مبني على آخر التشكيلات الرسمية
                                 </span>
                               ) : null}
                             </div>
@@ -693,6 +693,14 @@ export default function TournamentMatchLineup({
                               </span>
                             ) : null}
                           </div>
+
+                          {activeTeam.source !== "unavailable" ? (
+                            <div className="rounded-2xl border border-white/[0.07] bg-white/[0.025] px-3 py-2 text-[10px] font-bold leading-5 text-white/45">
+                              {activeTeam.source === "official"
+                                ? "تشكيل رسمي مباشر من API-FOOTBALL لهذه المباراة."
+                                : "تشكيل متوقع آليًا من أحدث التشكيلات الرسمية السابقة لدى API-FOOTBALL، مع استبعاد الغيابات التي يعيدها المزود."}
+                            </div>
+                          ) : null}
 
                           <FootballPitch players={activeTeam.startXI} formation={activeTeam.formation} />
                           <CoachCard team={activeTeam} />

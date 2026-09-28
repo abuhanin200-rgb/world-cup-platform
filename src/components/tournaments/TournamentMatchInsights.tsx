@@ -11,6 +11,7 @@ import {
   Loader2,
   Sparkles,
   Swords,
+  RefreshCw,
   X,
 } from "lucide-react";
 import TeamFlag from "@/components/TeamFlag";
@@ -80,7 +81,7 @@ type MatchInsights = {
   };
   historicalShares: { home: number; draw: number; away: number } | null;
   probabilities: {
-    source: "api_prediction" | "head_to_head_history";
+    source: "api_prediction";
     home: number;
     draw: number;
     away: number;
@@ -606,12 +607,13 @@ export default function TournamentMatchInsights({
     setIsMounted(true);
   }, []);
 
-  const load = useCallback(async () => {
-    if (data || loading) return;
+  const load = useCallback(async (force = false) => {
+    if (loading) return;
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ tournamentId, matchId });
+      if (force) params.set("force", "1");
       const response = await fetch(`/api/tournaments/match-insights?${params.toString()}`, {
         method: "GET",
         cache: "no-store",
@@ -632,7 +634,7 @@ export default function TournamentMatchInsights({
     } finally {
       setLoading(false);
     }
-  }, [data, loading, matchId, tournamentId]);
+  }, [loading, matchId, tournamentId]);
 
   const handleOpen = useCallback(() => {
     setOpen(true);
@@ -694,14 +696,25 @@ export default function TournamentMatchInsights({
                       </div>
                       <h2 className="text-lg font-black text-white">المواجهات والإحصائيات</h2>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setOpen(false)}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white transition hover:bg-white/20 active:scale-95"
-                      aria-label="إغلاق"
-                    >
-                      <X className="h-5 w-5" aria-hidden="true" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void load(true)}
+                        disabled={loading}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.07] text-white/75 transition hover:bg-white/15 disabled:opacity-50 active:scale-95"
+                        aria-label="تحديث المواجهات والإحصائيات من المزود"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOpen(false)}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white transition hover:bg-white/20 active:scale-95"
+                        aria-label="إغلاق"
+                      >
+                        <X className="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
                 </header>
 
@@ -834,7 +847,7 @@ export default function TournamentMatchInsights({
                       </section>
 
                       <div className="flex items-center justify-between gap-3 px-1 text-[9px] font-bold text-white/25">
-                        <span>API-FOOTBALL</span>
+                        <span>المصدر: API-FOOTBALL • Fixture IDs موثقة</span>
                         <span>{relativeUpdated(data.fetchedAt)}</span>
                       </div>
                     </>

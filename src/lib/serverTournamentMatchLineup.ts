@@ -13,21 +13,16 @@ import {
   type ApiFootballSquadPlayer,
   type ApiFootballTeamLineup,
 } from "@/lib/serverApiFootball";
-import {
-  getVerifiedGulfCup27Coach,
-  getVerifiedGulfCup27ExpectedLineupOverride,
-  isVerifiedGulfCup27OfficialLineupFallback,
-  resolveVerifiedGulfCup27Player,
-} from "@/domain/tournaments/gulfCup27VerifiedRosters";
+import { resolveVerifiedGulfCup27Player } from "@/domain/tournaments/gulfCup27VerifiedRosters";
 
 const LINEUP_CACHE_COLLECTION = "tournamentMatchLineupCache";
 const SQUAD_CACHE_COLLECTION = "apiFootballTeamSquadCache";
-const LINEUP_SCHEMA_VERSION = 12;
+const LINEUP_SCHEMA_VERSION = 13;
 const SQUAD_SCHEMA_VERSION = 3;
-const SQUAD_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const EXPECTED_LINEUP_TTL_MS = 20 * 60 * 1000;
-const NEAR_MATCH_TTL_MS = 30 * 60 * 1000;
-const OFFICIAL_RECHECK_TTL_MS = 10 * 60 * 1000;
+const SQUAD_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const EXPECTED_LINEUP_TTL_MS = 15 * 60 * 1000;
+const NEAR_MATCH_TTL_MS = 10 * 60 * 1000;
+const OFFICIAL_RECHECK_TTL_MS = 3 * 60 * 1000;
 const OFFICIAL_LINEUP_TTL_MS = 24 * 60 * 60 * 1000;
 const OFFICIAL_CHECK_WINDOW_MS = 2 * 60 * 60 * 1000;
 const NEAR_MATCH_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -280,11 +275,11 @@ function enrichPlayer(
 
   return {
     id: player.id,
-    name: verified?.nameAr || explicitArabicName || "الاسم غير متاح",
+    name: verified?.nameAr || explicitArabicName || player.name || squad?.name || "—",
     number: player.number ?? squad?.number ?? null,
     // لاعب التشكيل الأساسي يُصنّف بحسب خانته الفعلية في الخطة، لا بحسب
     // المركز العام المخزن في Squad. هذا يمنع ظهور مهاجم باسم «مدافع» والعكس.
-    position: slotRole || verified?.role || squad?.position || player.position || "",
+    position: slotRole || squad?.position || player.position || verified?.role || "",
     grid: player.grid,
     photo,
   };
@@ -296,19 +291,12 @@ function enrichTeamLineup(
   squad: ApiFootballSquadPlayer[],
 ) {
   const squadById = new Map(squad.map((player) => [player.id, player]));
-  const verifiedCoach = getVerifiedGulfCup27Coach(localTeamId);
   const formation = lineup.formation || inferFormationFromGrid(lineup.startXI);
   return {
     formation,
     logo: lineup.teamLogo,
-    coach: lineup.coach
-      ? {
-          ...lineup.coach,
-          name: verifiedCoach || lineup.coach.name,
-        }
-      : verifiedCoach
-        ? { id: null, name: verifiedCoach, photo: null }
-        : null,
+    // اسم المدرب وصورته من مزود المباراة نفسه. لا نستخدم أسماء ثابتة قديمة.
+    coach: lineup.coach,
     startXI: lineup.startXI.map((player) =>
       enrichPlayer(localTeamId, player, squadById, formation, true),
     ),
@@ -399,101 +387,6 @@ function lineupsForTeam(input: {
 }
 
 
-function buildCuratedExpectedLineup(input: {
-  matchId: string;
-  localTeamId: string;
-  providerTeamId: number;
-  squad: ApiFootballSquadPlayer[];
-  recentFixtures: RecentFixture[];
-  fixtureLineups: Array<{ fixtureId: number; lineups: ApiFootballTeamLineup[] }>;
-  excludedPlayerIds?: Set<number>;
-}) {
-  const override = getVerifiedGulfCup27ExpectedLineupOverride(
-    input.matchId,
-    input.localTeamId,
-  );
-  if (!override || override.starters.length !== 11) return null;
-
-  const excluded = input.excludedPlayerIds || new Set<number>();
-  const samples = lineupsForTeam(input);
-  const latest = samples[0] || null;
-  const recentPlayers = samples.flatMap((sample) => [
-    ...sample.lineup.startXI,
-    ...sample.lineup.substitutes,
-  ]);
-
-  const squadByArabic = new Map<string, ApiFootballSquadPlayer>();
-  for (const player of input.squad) {
-    const verified = verifiedPlayer(input.localTeamId, player);
-    if (!verified || excluded.has(player.id)) continue;
-    if (!squadByArabic.has(verified.nameAr)) squadByArabic.set(verified.nameAr, player);
-  }
-
-  const recentByArabic = new Map<string, ApiFootballLineupPlayer>();
-  for (const player of recentPlayers) {
-    const verified = verifiedPlayer(input.localTeamId, player);
-    if (!verified || excluded.has(player.id)) continue;
-    if (!recentByArabic.has(verified.nameAr)) recentByArabic.set(verified.nameAr, player);
-  }
-
-  const used = new Set<number>();
-  const startXI: ApiFootballLineupPlayer[] = [];
-
-  for (const starter of override.starters) {
-    const squadPlayer = squadByArabic.get(starter.nameAr);
-    const recentPlayer = recentByArabic.get(starter.nameAr);
-    // إذا تعذر ربط الاسم بمعرّف المزود لا نسقط التشكيل الموثّق كاملًا.
-    // نستخدم معرّفًا داخليًا سالبًا فقط للعرض، من دون اختراع صورة أو لاعب.
-    const providerId = squadPlayer?.id || recentPlayer?.id || 0;
-    const id = providerId > 0 ? providerId : -(1000 + startXI.length + 1);
-
-    if ((providerId > 0 && excluded.has(providerId)) || used.has(id)) return null;
-
-    used.add(id);
-    startXI.push({
-      id,
-      name: starter.nameAr,
-      number: starter.number ?? squadPlayer?.number ?? recentPlayer?.number ?? null,
-      position: starter.position,
-      grid: starter.grid,
-      photo:
-        squadPlayer?.photo ||
-        recentPlayer?.photo ||
-        (providerId > 0 ? `https://media.api-sports.io/football/players/${providerId}.png` : null),
-    });
-  }
-
-  if (startXI.length !== 11 || used.size !== 11) return null;
-
-  const starterIds = new Set(startXI.map((player) => player.id));
-  const squadById = new Map(input.squad.map((player) => [player.id, player]));
-  const substitutes = (latest?.lineup.substitutes || [])
-    .filter((player) => !starterIds.has(player.id) && !excluded.has(player.id))
-    .filter((player) => {
-      const squadPlayer = squadById.get(player.id);
-      return Boolean(
-        verifiedPlayer(input.localTeamId, player) ||
-        (squadPlayer && verifiedPlayer(input.localTeamId, squadPlayer)),
-      );
-    })
-    .map((player) => ({ ...player, grid: null }))
-    .slice(0, 15);
-
-  return {
-    fixtureId: latest?.fixture.fixtureId || 0,
-    fixtureAt: latest?.fixture.kickoffAt || 0,
-    lineup: {
-      teamId: input.providerTeamId,
-      teamName: latest?.lineup.teamName || "",
-      teamLogo: latest?.lineup.teamLogo || null,
-      formation: override.formation,
-      coach: latest?.lineup.coach || null,
-      startXI,
-      substitutes,
-    } satisfies ApiFootballTeamLineup,
-  };
-}
-
 function buildExpectedLineup(input: {
   localTeamId: string;
   providerTeamId: number;
@@ -506,17 +399,12 @@ function buildExpectedLineup(input: {
   const excluded = input.excludedPlayerIds || new Set<number>();
   const squadById = new Map(input.squad.map((player) => [player.id, player]));
 
-  const isVerifiedCurrentPlayer = (player: ApiFootballLineupPlayer) => {
-    const squadPlayer = squadById.get(player.id);
-    return Boolean(
-      verifiedPlayer(input.localTeamId, player) ||
-      (squadPlayer && verifiedPlayer(input.localTeamId, squadPlayer)),
-    );
-  };
+  const isCurrentProviderPlayer = (player: ApiFootballLineupPlayer) =>
+    Number.isInteger(player.id) && player.id > 0;
 
   const playerRole = (player: ApiFootballLineupPlayer | ApiFootballSquadPlayer) => {
     const verified = verifiedPlayer(input.localTeamId, player);
-    return clean(verified?.role || player.position).toUpperCase().slice(0, 1);
+    return clean(player.position || verified?.role).toUpperCase().slice(0, 1);
   };
 
   // نبني التشكيل المتوقع من آخر التشكيلات الرسمية الفعلية، مع ترجيح
@@ -528,13 +416,13 @@ function buildExpectedLineup(input: {
   samples.forEach((sample, sampleIndex) => {
     const recencyWeight = Math.max(1, 6 - sampleIndex);
     sample.lineup.startXI.forEach((player) => {
-      if (!excluded.has(player.id) && isVerifiedCurrentPlayer(player)) {
+      if (!excluded.has(player.id) && isCurrentProviderPlayer(player)) {
         scoreByPlayer.set(player.id, (scoreByPlayer.get(player.id) || 0) + recencyWeight * 10);
         if (!latestPlayerById.has(player.id)) latestPlayerById.set(player.id, player);
       }
     });
     sample.lineup.substitutes.forEach((player) => {
-      if (!excluded.has(player.id) && isVerifiedCurrentPlayer(player)) {
+      if (!excluded.has(player.id) && isCurrentProviderPlayer(player)) {
         scoreByPlayer.set(player.id, (scoreByPlayer.get(player.id) || 0) + recencyWeight * 2);
         if (!latestPlayerById.has(player.id)) latestPlayerById.set(player.id, player);
       }
@@ -555,7 +443,6 @@ function buildExpectedLineup(input: {
 
   const squadCandidates: ApiFootballLineupPlayer[] = input.squad
     .filter((player) => !excluded.has(player.id))
-    .filter((player) => Boolean(verifiedPlayer(input.localTeamId, player)))
     .map((player) => ({
       id: player.id,
       name: player.name,
@@ -591,7 +478,7 @@ function buildExpectedLineup(input: {
     if (
       !excluded.has(slotPlayer.id) &&
       !used.has(slotPlayer.id) &&
-      isVerifiedCurrentPlayer(slotPlayer)
+      isCurrentProviderPlayer(slotPlayer)
     ) {
       selected = slotPlayer;
     } else {
@@ -684,12 +571,10 @@ function buildAbsences(input: {
         apiName: squad?.name || injury.playerName,
         apiPosition: squad?.position,
       });
-      // لا نظهر اسماً إنجليزياً أو لاعباً خارج قائمة البطولة الموثقة.
-      if (!verified) return null;
       return {
         id: injury.playerId,
-        name: verified.nameAr,
-        position: squad?.position || verified.role,
+        name: verified?.nameAr || injury.playerName || squad?.name || "—",
+        position: squad?.position || verified?.role || "",
         photo:
           injury.photo ||
           squad?.photo ||
@@ -791,25 +676,22 @@ export async function getTournamentMatchLineup(input: {
 
   let expectedHome: ReturnType<typeof buildExpectedLineup> = null;
   let expectedAway: ReturnType<typeof buildExpectedLineup> = null;
-  const verifiedOfficialHomeFallback =
-    !officialHome && isVerifiedGulfCup27OfficialLineupFallback(input.matchId, match.homeTeamId);
-  const verifiedOfficialAwayFallback =
-    !officialAway && isVerifiedGulfCup27OfficialLineupFallback(input.matchId, match.awayTeamId);
 
   if (!bothOfficial) {
     const [recentHome, recentAway] = await Promise.all([
-      getApiFootballRecentTeamFixtures({ teamId: providerHomeTeamId, last: 10 }),
-      getApiFootballRecentTeamFixtures({ teamId: providerAwayTeamId, last: 10 }),
+      getApiFootballRecentTeamFixtures({ teamId: providerHomeTeamId, last: 12 }),
+      getApiFootballRecentTeamFixtures({ teamId: providerAwayTeamId, last: 12 }),
     ]);
 
+    // آخر 6 مباريات مكتملة فقط. كل عينة تشكيل هنا هي Lineup رسمية سابقة من المزود.
     const homeRecentRows = recentHome.fixtures
       .filter((row) => row.fixtureId !== match.providerFixtureId)
       .filter((row) => FINISHED_STATUSES.has(row.statusShort))
-      .slice(0, 4);
+      .slice(0, 6);
     const awayRecentRows = recentAway.fixtures
       .filter((row) => row.fixtureId !== match.providerFixtureId)
       .filter((row) => FINISHED_STATUSES.has(row.statusShort))
-      .slice(0, 4);
+      .slice(0, 6);
 
     const ids = [...new Set([
       ...homeRecentRows.map((row) => row.fixtureId),
@@ -820,49 +702,22 @@ export async function getTournamentMatchLineup(input: {
       ? await getApiFootballLineupsByFixtureIds(ids)
       : { fixtures: [] as Array<{ fixtureId: number; lineups: ApiFootballTeamLineup[] }> };
 
-    expectedHome =
-      buildExpectedLineup({
-        localTeamId: match.homeTeamId,
-        providerTeamId: providerHomeTeamId,
-        squad: homeSquad,
-        recentFixtures: homeRecentRows,
-        fixtureLineups: detailed.fixtures,
-        excludedPlayerIds: homeExcludedIds,
-      }) ||
-      buildCuratedExpectedLineup({
-        matchId: input.matchId,
-        localTeamId: match.homeTeamId,
-        providerTeamId: providerHomeTeamId,
-        squad: homeSquad,
-        recentFixtures: homeRecentRows,
-        fixtureLineups: detailed.fixtures,
-        excludedPlayerIds: homeExcludedIds,
-      });
-    expectedAway =
-      buildExpectedLineup({
-        localTeamId: match.awayTeamId,
-        providerTeamId: providerAwayTeamId,
-        squad: awaySquad,
-        recentFixtures: awayRecentRows,
-        fixtureLineups: detailed.fixtures,
-        excludedPlayerIds: awayExcludedIds,
-      }) ||
-      buildCuratedExpectedLineup({
-        matchId: input.matchId,
-        localTeamId: match.awayTeamId,
-        providerTeamId: providerAwayTeamId,
-        squad: awaySquad,
-        recentFixtures: awayRecentRows,
-        fixtureLineups: detailed.fixtures,
-        excludedPlayerIds: awayExcludedIds,
-      });
-  }
-
-  if (verifiedOfficialHomeFallback && expectedHome?.lineup) {
-    expectedHome = { ...expectedHome, lineup: { ...expectedHome.lineup, substitutes: [] } };
-  }
-  if (verifiedOfficialAwayFallback && expectedAway?.lineup) {
-    expectedAway = { ...expectedAway, lineup: { ...expectedAway.lineup, substitutes: [] } };
+    expectedHome = buildExpectedLineup({
+      localTeamId: match.homeTeamId,
+      providerTeamId: providerHomeTeamId,
+      squad: homeSquad,
+      recentFixtures: homeRecentRows,
+      fixtureLineups: detailed.fixtures,
+      excludedPlayerIds: homeExcludedIds,
+    });
+    expectedAway = buildExpectedLineup({
+      localTeamId: match.awayTeamId,
+      providerTeamId: providerAwayTeamId,
+      squad: awaySquad,
+      recentFixtures: awayRecentRows,
+      fixtureLineups: detailed.fixtures,
+      excludedPlayerIds: awayExcludedIds,
+    });
   }
 
   const homeSelected = officialHome || expectedHome?.lineup || null;
@@ -899,13 +754,9 @@ export async function getTournamentMatchLineup(input: {
         name: localHome?.nameAr || providerHomeName,
         logo: homeEnriched.logo,
         formation: homeEnriched.formation,
-        source: officialHome || verifiedOfficialHomeFallback ? "official" : "expected",
-        sourceFixtureId: officialHome || verifiedOfficialHomeFallback
-          ? match.providerFixtureId
-          : expectedHome?.fixtureId || null,
-        sourceFixtureAt: officialHome || verifiedOfficialHomeFallback
-          ? match.kickoffAt
-          : expectedHome?.fixtureAt || null,
+        source: officialHome ? "official" : "expected",
+        sourceFixtureId: officialHome ? match.providerFixtureId : expectedHome?.fixtureId || null,
+        sourceFixtureAt: officialHome ? match.kickoffAt : expectedHome?.fixtureAt || null,
         coach: homeEnriched.coach,
         startXI: homeEnriched.startXI,
         substitutes: homeEnriched.substitutes,
@@ -928,13 +779,9 @@ export async function getTournamentMatchLineup(input: {
         name: localAway?.nameAr || providerAwayName,
         logo: awayEnriched.logo,
         formation: awayEnriched.formation,
-        source: officialAway || verifiedOfficialAwayFallback ? "official" : "expected",
-        sourceFixtureId: officialAway || verifiedOfficialAwayFallback
-          ? match.providerFixtureId
-          : expectedAway?.fixtureId || null,
-        sourceFixtureAt: officialAway || verifiedOfficialAwayFallback
-          ? match.kickoffAt
-          : expectedAway?.fixtureAt || null,
+        source: officialAway ? "official" : "expected",
+        sourceFixtureId: officialAway ? match.providerFixtureId : expectedAway?.fixtureId || null,
+        sourceFixtureAt: officialAway ? match.kickoffAt : expectedAway?.fixtureAt || null,
         coach: awayEnriched.coach,
         startXI: awayEnriched.startXI,
         substitutes: awayEnriched.substitutes,
