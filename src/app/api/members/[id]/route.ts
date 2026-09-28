@@ -3,6 +3,7 @@ import {
   decodeFields,
   documentId,
   getDocument,
+  listCollection,
   queryCollectionByField,
   type FirestoreDocument,
 } from "@/lib/serverFirebaseRest";
@@ -39,16 +40,26 @@ export async function GET(
     const userId = text(rawId);
     if (!userId) return NextResponse.json({ error: "MEMBER_ID_REQUIRED" }, { status: 400 });
 
-    const [userDocument, v2Documents, gameDocument, legacyPredictions] = await Promise.all([
+    const [userDocument, v2Documents, gameDocument, legacyPredictions, userDocuments] = await Promise.all([
       getDocument("users", userId),
       queryCollectionByField("tournamentUserStats", "userId", userId, 100),
       getDocument("platformGameStats", userId),
       queryCollectionByField("predictions", "userId", userId, 500),
+      listCollection("users", 1000),
     ]);
 
     if (!userDocument) return NextResponse.json({ error: "MEMBER_NOT_FOUND" }, { status: 404 });
 
     const user = dataOf(userDocument);
+    const registrationOrder = [...userDocuments].sort((a, b) => {
+      const aData = dataOf(a);
+      const bData = dataOf(b);
+      const aTime = new Date(text(aData.createdAt) || a.createTime || "9999-12-31").getTime();
+      const bTime = new Date(text(bData.createdAt) || b.createTime || "9999-12-31").getTime();
+      if (aTime !== bTime) return aTime - bTime;
+      return documentId(a).localeCompare(documentId(b));
+    });
+    const memberNumber = Math.max(1, registrationOrder.findIndex((document) => documentId(document) === userId) + 1);
     const legacyStats = legacyPredictions.reduce((stats, document) => {
       const prediction = dataOf(document);
       if (!Boolean(prediction.isCalculated)) return stats;
@@ -152,7 +163,8 @@ export async function GET(
         fullName: text(user.fullName) || "عضو",
         favoriteTeam: text(user.favoriteTeam),
         teamEmoji: text(user.teamEmoji),
-        createdAt: user.createdAt ? String(user.createdAt) : null,
+        createdAt: user.createdAt ? String(user.createdAt) : userDocument.createTime || null,
+        memberNumber,
       },
       summary: {
         tournamentPoints,

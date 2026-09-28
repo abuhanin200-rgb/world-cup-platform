@@ -31,6 +31,7 @@ export type AdminMember = {
 
   createdAt?: string;
   updatedAt?: string;
+  memberNumber: number;
 };
 
 export type UpdateAdminMemberInput = {
@@ -90,6 +91,7 @@ function mapMember(id: string, data: Record<string, unknown>): AdminMember {
 
     createdAt: data.createdAt ? String(data.createdAt) : undefined,
     updatedAt: data.updatedAt ? String(data.updatedAt) : undefined,
+    memberNumber: 0,
   };
 }
 
@@ -143,9 +145,16 @@ async function refreshLeaderboardRanks() {
 
 export async function getAdminMembers(): Promise<AdminMember[]> {
   const snapshot = await getDocs(collection(db, "users"));
+  const members = snapshot.docs.map((docSnap) => mapMember(docSnap.id, docSnap.data()));
+  const registrationOrder = [...members].sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : Number.MAX_SAFE_INTEGER;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : Number.MAX_SAFE_INTEGER;
+    if (aTime !== bTime) return aTime - bTime;
+    return a.id.localeCompare(b.id);
+  });
+  const memberNumbers = new Map(registrationOrder.map((member, index) => [member.id, index + 1]));
 
-  return snapshot.docs
-    .map((docSnap) => mapMember(docSnap.id, docSnap.data()))
+  return members
     .sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.correct !== a.correct) return b.correct - a.correct;
@@ -154,6 +163,7 @@ export async function getAdminMembers(): Promise<AdminMember[]> {
     })
     .map((member, index) => ({
       ...member,
+      memberNumber: memberNumbers.get(member.id) || 0,
       currentRank: index + 1,
     }));
 }

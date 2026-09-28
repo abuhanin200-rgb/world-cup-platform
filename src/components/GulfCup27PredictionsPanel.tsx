@@ -487,7 +487,7 @@ function MatchPredictionCard({
           <span>
             المباراة مباشرة والتوقع مقفل.
             {match.result.homeScore != null && match.result.awayScore != null
-              ? ` النتيجة الحالية: ${home?.nameAr || "الفريق الأول"} ${match.result.homeScore} - ${match.result.awayScore} ${away?.nameAr || "الفريق الثاني"}.`
+              ? ` النتيجة الحالية: ${home?.nameAr || "الفريق الأول"} سجّل ${match.result.homeScore}، و${away?.nameAr || "الفريق الثاني"} سجّل ${match.result.awayScore}.`
               : ""}
             {!prediction ? " لم تسجل توقعًا لهذه المباراة." : ""}
           </span>

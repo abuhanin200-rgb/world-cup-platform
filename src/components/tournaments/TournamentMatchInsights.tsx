@@ -846,9 +846,8 @@ export default function TournamentMatchInsights({
                         ) : null}
                       </section>
 
-                      <div className="flex items-center justify-between gap-3 px-1 text-[9px] font-bold text-white/25">
-                        <span>المصدر: API-FOOTBALL • Fixture IDs موثقة</span>
-                        <span>{relativeUpdated(data.fetchedAt)}</span>
+                      <div className="px-1 text-left text-[9px] font-bold text-white/25">
+                        <span>آخر تحديث {relativeUpdated(data.fetchedAt)}</span>
                       </div>
                     </>
                   ) : null}

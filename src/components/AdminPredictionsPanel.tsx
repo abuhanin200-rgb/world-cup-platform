@@ -277,7 +277,7 @@ export default function AdminPredictionsPanel() {
 
   async function handleDeletePrediction(prediction: AdminPredictionWithType) {
     const confirmMessage = prediction.isCalculated
-      ? `تنبيه مهم:\nسيتم حذف توقع ${prediction.userName} وتصحيح نقاطه تلقائيًا.\n\nالمباراة: ${prediction.homeTeamName} × ${prediction.awayTeamName}\nالتوقع: ${prediction.homeScore} - ${prediction.awayScore}\nالنقاط المحسوبة: ${prediction.points}\n\nهل أنت متأكد؟`
+      ? `تنبيه مهم:\nسيتم حذف توقع ${prediction.userName} وتصحيح نقاطه تلقائيًا.\n\nالمباراة: ${prediction.homeTeamName} × ${prediction.awayTeamName}\nالتوقع: ${prediction.homeTeamName} ${prediction.homeScore} × ${prediction.awayScore} ${prediction.awayTeamName}\nالنقاط المحسوبة: ${prediction.points}\n\nهل أنت متأكد؟`
       : `سيتم حذف توقع ${prediction.userName}.\n\nهل أنت متأكد؟`;
 
     const ok = window.confirm(confirmMessage);

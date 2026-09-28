@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Database,
   GitBranch,
-  Hash,
   LayoutDashboard,
   Loader2,
   LockKeyhole,
@@ -118,6 +117,8 @@ function optionalScore(value: string) {
 }
 
 type TournamentAdminTab = "gulf27" | "asian2027";
+type ResultsView = "predictions" | "results";
+const RESULTS_PAGE_SIZE = 20;
 type GulfAdminSection =
   | "overview"
   | "settings"
@@ -134,6 +135,8 @@ type GulfAdminSection =
 export default function AdminTournamentV2Panel() {
   const [tournamentTab, setTournamentTab] = useState<TournamentAdminTab>("gulf27");
   const [sectionTab, setSectionTab] = useState<GulfAdminSection>("overview");
+  const [resultsView, setResultsView] = useState<ResultsView>("predictions");
+  const [resultsPage, setResultsPage] = useState(1);
   const [matches, setMatches] = useState<TournamentMatchRuntimeV2[]>([]);
   const [resultDrafts, setResultDrafts] = useState<Record<string, ResultDraft>>({});
   const [loading, setLoading] = useState(true);
@@ -464,6 +467,9 @@ export default function AdminTournamentV2Panel() {
     }
   }
 
+  const resultsPages = Math.max(1, Math.ceil(matches.length / RESULTS_PAGE_SIZE));
+  const visibleResultMatches = matches.slice((resultsPage - 1) * RESULTS_PAGE_SIZE, resultsPage * RESULTS_PAGE_SIZE);
+
   const sectionTabs: Array<{ id: GulfAdminSection; label: string; icon: typeof ShieldCheck }> = [
     { id: "overview", label: "نظرة عامة", icon: LayoutDashboard },
     { id: "settings", label: "الإعدادات", icon: Settings2 },
@@ -565,9 +571,11 @@ export default function AdminTournamentV2Panel() {
         </div>
       )}
 
-      {sectionTab === "results" && <AdminTournamentPredictionsManager tournamentId={GULF_CUP_27_TOURNAMENT_ID} tournamentLabel="خليجي الديار العربية 27" />}
+      {sectionTab === "results" && <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/35 p-2"><div className="grid grid-cols-2 gap-2" role="tablist" aria-label="التوقعات والنتائج"><button type="button" role="tab" aria-selected={resultsView === "predictions"} onClick={()=>setResultsView("predictions")} className={`min-h-[44px] rounded-xl px-4 text-xs font-black transition ${resultsView === "predictions" ? "bg-emerald-400 text-slate-950" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}>توقعات الأعضاء</button><button type="button" role="tab" aria-selected={resultsView === "results"} onClick={()=>{setResultsView("results");setResultsPage(1);}} className={`min-h-[44px] rounded-xl px-4 text-xs font-black transition ${resultsView === "results" ? "bg-sky-400 text-slate-950" : "bg-white/5 text-slate-300 hover:bg-white/10"}`}>إدخال النتائج</button></div></div>}
 
-      {sectionTab === "results" && (loading ? (
+      {sectionTab === "results" && resultsView === "predictions" && <AdminTournamentPredictionsManager tournamentId={GULF_CUP_27_TOURNAMENT_ID} tournamentLabel="خليجي الديار العربية 27" />}
+
+      {sectionTab === "results" && resultsView === "results" && (loading ? (
         <div className="mt-5 rounded-2xl border border-white/10 bg-slate-950/50 p-8 text-center text-slate-300">
           <Loader2 className="mx-auto h-7 w-7 animate-spin" aria-hidden="true" />
           <p className="mt-3 font-bold">جاري تحميل بيانات البطولة...</p>
@@ -593,7 +601,7 @@ export default function AdminTournamentV2Panel() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {matches.map((match) => {
+            {visibleResultMatches.map((match) => {
               const draft = resultDrafts[match.id] ?? emptyDraft();
               const calculated = match.calculationStatus === "calculated";
               const tied = draft.home !== "" && draft.away !== "" && Number(draft.home) === Number(draft.away);
@@ -609,7 +617,6 @@ export default function AdminTournamentV2Panel() {
                       </div>
                       <h3 className="mt-2 font-black text-white">{formatMatch(match)}</h3>
                       <p className="mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-400"><CalendarDays className="h-4 w-4" aria-hidden="true" />{formatKickoff(match.kickoffAt)} · {match.stadium}</p>
-                      {match.resultHash && <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-500"><Hash className="h-3.5 w-3.5" aria-hidden="true" /><span dir="ltr" className="[unicode-bidi:isolate]">{match.resultHash}</span> · {match.calculatedPredictions} توقع</p>}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => void toggle(match)} disabled={Boolean(working) || calculated || !teamsReady} className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:opacity-50 ${match.predictionIsOpen ? "border border-red-300/20 bg-red-400/10 text-red-100" : "bg-emerald-400 text-slate-950"}`}>
@@ -625,10 +632,10 @@ export default function AdminTournamentV2Panel() {
 
                   <div className="mt-4 border-t border-white/10 pt-4">
                     <p className="mb-2 text-xs font-black text-slate-400">{match.stage === "knockout" ? "النتيجة بعد 90 دقيقة (نهاية الوقت الأصلي)" : "النتيجة النهائية"}</p>
-                    <div className="flex items-center gap-2">
-                      <input aria-label={`نتيجة ${teamName(match.homeTeamId, match.homeSourceLabel)}`} type="number" inputMode="numeric" min={0} max={30} value={draft.home} disabled={calculated || Boolean(working) || !teamsReady} onChange={(event) => setResultDrafts((current) => ({ ...current, [match.id]: { ...draft, home: event.target.value } }))} className="h-12 w-20 rounded-xl border border-white/10 bg-black/25 text-center text-lg font-black outline-none focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-300/25 disabled:opacity-55" />
-                      <span className="font-black text-slate-500">—</span>
-                      <input aria-label={`نتيجة ${teamName(match.awayTeamId, match.awaySourceLabel)}`} type="number" inputMode="numeric" min={0} max={30} value={draft.away} disabled={calculated || Boolean(working) || !teamsReady} onChange={(event) => setResultDrafts((current) => ({ ...current, [match.id]: { ...draft, away: event.target.value } }))} className="h-12 w-20 rounded-xl border border-white/10 bg-black/25 text-center text-lg font-black outline-none focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-300/25 disabled:opacity-55" />
+                    <div className="grid max-w-xl grid-cols-[1fr_auto_1fr] items-end gap-2" dir="rtl">
+                      <label className="rounded-xl border border-white/10 bg-black/15 p-2 text-center"><span className="mb-1 block truncate text-[11px] font-black text-slate-300">{teamName(match.homeTeamId, match.homeSourceLabel)}</span><input aria-label={`نتيجة ${teamName(match.homeTeamId, match.homeSourceLabel)}`} type="number" inputMode="numeric" min={0} max={30} value={draft.home} disabled={calculated || Boolean(working) || !teamsReady} onChange={(event) => setResultDrafts((current) => ({ ...current, [match.id]: { ...draft, home: event.target.value } }))} className="h-12 w-full rounded-xl border border-white/10 bg-black/25 text-center text-lg font-black outline-none focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-300/25 disabled:opacity-55" dir="ltr" /></label>
+                      <span className="mb-4 font-black text-slate-500">×</span>
+                      <label className="rounded-xl border border-white/10 bg-black/15 p-2 text-center"><span className="mb-1 block truncate text-[11px] font-black text-slate-300">{teamName(match.awayTeamId, match.awaySourceLabel)}</span><input aria-label={`نتيجة ${teamName(match.awayTeamId, match.awaySourceLabel)}`} type="number" inputMode="numeric" min={0} max={30} value={draft.away} disabled={calculated || Boolean(working) || !teamsReady} onChange={(event) => setResultDrafts((current) => ({ ...current, [match.id]: { ...draft, away: event.target.value } }))} className="h-12 w-full rounded-xl border border-white/10 bg-black/25 text-center text-lg font-black outline-none focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-300/25 disabled:opacity-55" dir="ltr" /></label>
                     </div>
 
                     {match.stage === "knockout" && tied && teamsReady && (
@@ -657,6 +664,7 @@ export default function AdminTournamentV2Panel() {
               );
             })}
           </div>
+          {matches.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2"><span className="text-[11px] font-bold text-slate-400">عرض {(resultsPage-1)*RESULTS_PAGE_SIZE+1}–{Math.min(resultsPage*RESULTS_PAGE_SIZE,matches.length)} من {matches.length}</span><div className="flex items-center gap-2"><button disabled={resultsPage===1} onClick={()=>setResultsPage(page=>Math.max(1,page-1))} className="min-h-10 rounded-xl border border-white/10 px-3 text-xs font-black disabled:opacity-30">السابق</button><span className="min-w-16 text-center text-xs font-black">{resultsPage} / {resultsPages}</span><button disabled={resultsPage===resultsPages} onClick={()=>setResultsPage(page=>Math.min(resultsPages,page+1))} className="min-h-10 rounded-xl border border-white/10 px-3 text-xs font-black disabled:opacity-30">التالي</button></div></div>}
         </>
       ))}
 

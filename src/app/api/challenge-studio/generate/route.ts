@@ -613,7 +613,7 @@ function buildLocalCardFromEvent(
       type: "main",
       icon: "🎯",
       title: "نتيجة دقيقة تغيّر المشهد",
-      content: `${primaryName} حضر في العنوان الأبرز بعد احتساب مباراة ${getText(event.data.matchName)}، بعدما أصاب النتيجة ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)} وحصد ${getNumber(event.data.points)} نقاط.`,
+      content: `${primaryName} حضر في العنوان الأبرز بعد احتساب مباراة ${getText(event.data.matchName)}، بعدما توقع ${getText(event.data.homeTeamName)} ${getNumber(event.data.homeScore)} و${getText(event.data.awayTeamName)} ${getNumber(event.data.awayScore)} بدقة، وحصد ${getNumber(event.data.points)} نقاط.`,
       priority: basePriority,
     };
   }
@@ -733,7 +733,7 @@ function buildLocalCardFromEvent(
       type: "watch",
       icon: "🎲",
       title: "توقع تحت المجهر",
-      content: `${primaryName} اختار نتيجة جريئة في مباراة ${getText(event.data.matchName)}: ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)}. إذا تحققت، فقد تتحول إلى واحدة من لقطات الجولة.`,
+      content: `${primaryName} اختار نتيجة جريئة في مباراة ${getText(event.data.matchName)}: ${getText(event.data.homeTeamName)} ${getNumber(event.data.homeScore)} و${getText(event.data.awayTeamName)} ${getNumber(event.data.awayScore)}. إذا تحققت، فقد تتحول إلى واحدة من لقطات الجولة.`,
       priority: basePriority,
     };
   }
@@ -747,7 +747,7 @@ function buildLocalCardFromEvent(
       type: "main",
       icon: "🎯",
       title: "قراءة خروج المغلوب",
-      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} بقراءة ثمينة بعد توقعه ${getNumber(event.data.homeScore)} - ${getNumber(event.data.awayScore)} وحصوله على ${getNumber(event.data.points)} نقاط. ${qualifiedTeamName ? `اختياره للمتأهل ${qualifiedTeamName}` : "اختياره في تفاصيل التأهل"}${qualificationMethod ? ` وطريقة الحسم ${qualificationMethod}` : ""} جعل اللقطة أهم من مجرد نتيجة، لأن مباريات خروج المغلوب تكافئ من يقرأ السيناريو كاملًا لا الفائز فقط.`,
+      content: `${primaryName} خرج من مباراة ${getText(event.data.matchName)} بقراءة ثمينة بعد توقعه ${getText(event.data.homeTeamName)} ${getNumber(event.data.homeScore)} و${getText(event.data.awayTeamName)} ${getNumber(event.data.awayScore)} وحصوله على ${getNumber(event.data.points)} نقاط. ${qualifiedTeamName ? `اختياره للمتأهل ${qualifiedTeamName}` : "اختياره في تفاصيل التأهل"}${qualificationMethod ? ` وطريقة الحسم ${qualificationMethod}` : ""} جعل اللقطة أهم من مجرد نتيجة، لأن مباريات خروج المغلوب تكافئ من يقرأ السيناريو كاملًا لا الفائز فقط.`,
       priority: basePriority,
     };
   }

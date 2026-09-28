@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { AdminLog, getAdminLogs } from "@/lib/adminLogs";
 
+const LOGS_PER_PAGE = 20;
+
 function getActionStyle(action: string) {
   if (action === "add_match") {
     return {
@@ -80,10 +82,13 @@ export default function AdminLogsPanel() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
+  const [page, setPage] = useState(1);
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLowerCase();
     return logs.filter((log) => (actionFilter === "all" || log.action === actionFilter) && (!q || `${log.title} ${log.description}`.toLowerCase().includes(q)));
   }, [logs, query, actionFilter]);
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / LOGS_PER_PAGE));
+  const visibleLogs = filteredLogs.slice((page - 1) * LOGS_PER_PAGE, page * LOGS_PER_PAGE);
 
   async function loadLogs() {
     try {
@@ -103,6 +108,7 @@ export default function AdminLogsPanel() {
   useEffect(() => {
     loadLogs();
   }, []);
+  useEffect(() => { setPage(1); }, [query, actionFilter]);
 
   return (
     <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-6">
@@ -144,7 +150,7 @@ export default function AdminLogsPanel() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredLogs.map((log) => {
+          {visibleLogs.map((log) => {
             const style = getActionStyle(log.action);
 
             return (
@@ -178,6 +184,7 @@ export default function AdminLogsPanel() {
           })}
         </div>
       )}
+      {!loading && filteredLogs.length > 0 && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-2"><span className="text-[11px] font-bold text-slate-400">عرض {(page-1)*LOGS_PER_PAGE+1}–{Math.min(page*LOGS_PER_PAGE,filteredLogs.length)} من {filteredLogs.length}</span><div className="flex items-center gap-2"><button disabled={page===1} onClick={()=>setPage(value=>Math.max(1,value-1))} className="min-h-10 rounded-xl border border-white/10 px-3 text-xs font-black disabled:opacity-30">السابق</button><span className="min-w-16 text-center text-xs font-black">{page} / {totalPages}</span><button disabled={page===totalPages} onClick={()=>setPage(value=>Math.min(totalPages,value+1))} className="min-h-10 rounded-xl border border-white/10 px-3 text-xs font-black disabled:opacity-30">التالي</button></div></div>}
     </section>
   );
 }
