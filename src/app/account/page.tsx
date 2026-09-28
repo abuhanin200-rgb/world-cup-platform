@@ -8,7 +8,9 @@ import { doc, onSnapshot } from "firebase/firestore";
 import {
   ArrowLeft,
   Award,
+  CalendarDays,
   Gamepad2,
+  Hash,
   LogOut,
   Mail,
   Medal,
@@ -40,6 +42,15 @@ type Tab = "overview" | "gulf" | "world" | "asia" | "games" | "settings";
 type V2Stats = { points: number; rank: number | null; played: number; exact: number; correctOutcome: number; wrong: number; bestStreak: number };
 
 const EMPTY_V2: V2Stats = { points: 0, rank: null, played: 0, exact: 0, correctOutcome: 0, wrong: 0, bestStreak: 0 };
+
+type MemberIdentity = { memberNumber: number; createdAt: string | null };
+
+function registrationDate(value: string | null) {
+  if (!value) return "غير متوفر";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "غير متوفر";
+  return new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Riyadh" }).format(date);
+}
 
 function Stat({ label, value, accent = false, valueClassName = "" }: { label: string; value: string | number; accent?: boolean; valueClassName?: string }) {
   return (
@@ -74,6 +85,7 @@ export default function AccountPage() {
   const [teamEmoji, setTeamEmoji] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [memberIdentity, setMemberIdentity] = useState<MemberIdentity | null>(null);
 
   useEffect(() => {
     if (!loading && !isLoggedIn) router.replace("/login");
@@ -85,6 +97,14 @@ export default function AccountPage() {
     setPhone(user.phone);
     setFavoriteTeam(user.favoriteTeam);
     setTeamEmoji(user.teamEmoji || "");
+
+    void fetch(`/api/members/${encodeURIComponent(user.id)}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("member_identity");
+        const payload = await response.json() as { member?: { memberNumber?: number; createdAt?: string | null } };
+        if (payload.member) setMemberIdentity({ memberNumber: Number(payload.member.memberNumber) || 0, createdAt: payload.member.createdAt || null });
+      })
+      .catch((error) => console.error("تعذر تحميل بيانات العضوية:", error));
 
     void getTournamentLeaderboardV2(GULF_CUP_27_TOURNAMENT_ID)
       .then((rows) => {
@@ -177,6 +197,7 @@ export default function AccountPage() {
             <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--brand-yellow)]/18 bg-[var(--brand-yellow)]/[0.06] px-2.5 py-1.5 text-[9px] font-black text-[var(--brand-yellow)]"><Sparkles className="h-3 w-3" /> ملف العضو</div>
             <h1 className="mt-2 truncate text-xl font-black md:text-2xl">{user.fullName}</h1>
             <div className="mt-1 flex items-center gap-2 text-[11px] font-semibold text-white/45 md:text-xs">{user.favoriteTeam ? <><TeamFlag name={user.favoriteTeam} size="sm" /><span>يشجع {user.favoriteTeam}</span></> : <span>عضو في منصة التحدي</span>}</div>
+            {memberIdentity ? <div className="mt-2 flex flex-nowrap items-center gap-1.5"><span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--brand-yellow)]/20 bg-[var(--brand-yellow)]/[0.07] px-2 py-1.5 text-[9px] font-black whitespace-nowrap text-[var(--brand-yellow)] sm:px-2.5 sm:text-[10px]"><Hash className="h-3 w-3"/>رقم العضوية {memberIdentity.memberNumber || "—"}</span><span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-white/10 bg-black/15 px-2 py-1.5 text-[9px] font-bold whitespace-nowrap text-white/60 sm:px-2.5 sm:text-[10px]"><CalendarDays className="h-3 w-3 shrink-0"/>تاريخ التسجيل {registrationDate(memberIdentity.createdAt)}</span></div> : null}
           </div>
           <button type="button" onClick={handleLogout} className="hidden min-h-[44px] items-center gap-1.5 rounded-xl border border-red-300/15 bg-red-400/[0.06] px-3 text-xs font-black text-red-100 transition hover:bg-red-400/[0.12] sm:inline-flex"><LogOut className="h-4 w-4" /> خروج</button>
         </div>
