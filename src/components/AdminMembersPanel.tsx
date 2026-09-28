@@ -1,564 +1,181 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
-  AdminMember,
-  getAdminMembers,
-  resetAdminMemberStats,
-  resetAdminMemberPassword,
-  updateAdminMember,
+  Activity, Copy, Gamepad2, KeyRound, RefreshCw, Search, ShieldCheck,
+  Trophy, UserRound, Users,
+} from "lucide-react";
+import {
+  AdminMember, getAdminMembers, resetAdminMemberPassword, updateAdminMemberProfile,
 } from "@/lib/adminMembers";
 import { addAdminLog } from "@/lib/adminLogs";
 import { getTeams, Team } from "@/lib/teams";
 
-const MEMBERS_PER_PAGE = 10;
+const MEMBERS_PER_PAGE = 12;
 
-type MemberFormState = {
-  fullName: string;
-  phone: string;
-  password: string;
-  teamCode: string;
-
-  points: string;
-  total: string;
-  correct: string;
-  wrong: string;
-  currentStreak: string;
-  bestStreak: string;
+type MemberDetails = {
+  summary: { tournamentPoints: number; tournamentPlayed: number; tournamentExact: number; gameXp: number; gameLevel: number; gamesPlayed: number; gamesWins: number };
+  tournaments: Array<{ id: string; name: string; status: string; legacy: boolean; points: number; rank: number | null; played: number; exact: number; correct: number; wrong: number; bestStreak: number }>;
+  games: { totalXp: number; level: number; gamesPlayed: number; wins: number; breakdown: Array<{ gameId: string; played: number; wins: number; xp: number }> };
 };
 
-function buildFormState(member: AdminMember, teams: Team[]): MemberFormState {
-  const selectedTeam = teams.find((team) => team.nameAr === member.favoriteTeam);
+type FormState = { fullName: string; phone: string; teamCode: string; password: string };
 
-  return {
-    fullName: member.fullName || "",
-    phone: member.phone || "",
-    password: "",
-    teamCode: selectedTeam?.code || "",
-
-    points: String(member.points || 0),
-    total: String(member.total || 0),
-    correct: String(member.correct || 0),
-    wrong: String(member.wrong || 0),
-    currentStreak: String(member.currentStreak || 0),
-    bestStreak: String(member.bestStreak || 0),
-  };
+function dateLabel(value?: string) {
+  if (!value) return "غير متوفر";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "غير متوفر";
+  return new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium", timeZone: "Asia/Riyadh" }).format(date);
 }
 
-function toNumber(value: string) {
-  const numberValue = Number(value);
-  return Number.isFinite(numberValue) ? numberValue : 0;
+function gameLabel(id: string) {
+  if (id === "word-game") return "خمن كلمة اليوم";
+  if (id === "flag-memory") return "تحدي الأعلام";
+  if (id === "ten-seconds") return "العشر ثواني";
+  if (id === "vocabulary") return "تحدي المفردات";
+  return id;
+}
+
+function buildForm(member: AdminMember, teams: Team[]): FormState {
+  return { fullName: member.fullName, phone: member.phone, teamCode: teams.find((team) => team.nameAr === member.favoriteTeam)?.code || "", password: "" };
 }
 
 export default function AdminMembersPanel() {
   const [members, setMembers] = useState<AdminMember[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [formState, setFormState] = useState<MemberFormState | null>(null);
-
+  const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const [form, setForm] = useState<FormState | null>(null);
+  const [details, setDetails] = useState<MemberDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
-
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const selected = members.find((member) => member.id === selectedId) || null;
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter((m) => [m.fullName, m.phone, m.favoriteTeam, m.email, m.id].some((v) => String(v || "").toLowerCase().includes(q)));
+  }, [members, search]);
+  const pages = Math.max(1, Math.ceil(filtered.length / MEMBERS_PER_PAGE));
+  const visible = filtered.slice((page - 1) * MEMBERS_PER_PAGE, page * MEMBERS_PER_PAGE);
+  const withPhone = members.filter((m) => m.phone).length;
+  const newThisMonth = members.filter((m) => {
+    if (!m.createdAt) return false;
+    const d = new Date(m.createdAt); const n = new Date();
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth();
+  }).length;
+  const memberStats: Array<[string, number, LucideIcon]> = [
+    ["إجمالي الأعضاء", members.length, Users],
+    ["بأرقام جوال", withPhone, ShieldCheck],
+    ["جدد هذا الشهر", newThisMonth, UserRound],
+    ["نتائج البحث", filtered.length, Search],
+  ];
+  const activityStats: Array<[string, number, LucideIcon]> = [
+    ["نقاط البطولات", details?.summary.tournamentPoints ?? 0, Trophy],
+    ["مشاركات البطولات", details?.summary.tournamentPlayed ?? 0, Activity],
+    ["نقاط خبرة الألعاب", details?.summary.gameXp ?? 0, Gamepad2],
+    ["مستوى الألعاب", details?.summary.gameLevel ?? 1, ShieldCheck],
+  ];
 
-  const filteredMembers = useMemo(() => {
-    const search = searchTerm.trim().toLowerCase();
-
-    if (!search) return members;
-
-    return members.filter((member) => {
-      return (
-        member.fullName.toLowerCase().includes(search) ||
-        member.phone.toLowerCase().includes(search) ||
-        member.favoriteTeam.toLowerCase().includes(search)
-      );
-    });
-  }, [members, searchTerm]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredMembers.length / MEMBERS_PER_PAGE)
-  );
-
-  const visibleMembers = useMemo(() => {
-    const startIndex = (currentPage - 1) * MEMBERS_PER_PAGE;
-    const endIndex = startIndex + MEMBERS_PER_PAGE;
-
-    return filteredMembers.slice(startIndex, endIndex);
-  }, [filteredMembers, currentPage]);
-
-  const selectedMember = members.find((member) => member.id === selectedMemberId);
-
-  async function loadData() {
+  async function load() {
     try {
-      setLoading(true);
-
-      const [membersData, teamsData] = await Promise.all([
-        getAdminMembers(),
-        getTeams(),
-      ]);
-
-      setMembers(membersData);
-      setTeams(teamsData);
-
-      if (selectedMemberId) {
-        const updatedSelected = membersData.find(
-          (member) => member.id === selectedMemberId
-        );
-
-        if (updatedSelected) {
-          setFormState(buildFormState(updatedSelected, teamsData));
-        }
+      setLoading(true); setError("");
+      const [memberData, teamData] = await Promise.all([getAdminMembers(), getTeams()]);
+      setMembers(memberData); setTeams(teamData);
+      if (selectedId) {
+        const current = memberData.find((m) => m.id === selectedId);
+        if (current) setForm(buildForm(current, teamData));
       }
-    } catch (err) {
-      console.error("فشل تحميل الأعضاء:", err);
-      setError("تعذر تحميل بيانات الأعضاء");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); setError("تعذر تحميل الأعضاء"); } finally { setLoading(false); }
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
-
-  function selectMember(member: AdminMember) {
-    setSelectedMemberId(member.id);
-    setFormState(buildFormState(member, teams));
-    setMessage("");
-    setError("");
+  async function loadDetails(id: string) {
+    try {
+      setDetailsLoading(true); setDetails(null);
+      const response = await fetch(`/api/members/${encodeURIComponent(id)}`, { cache: "no-store" });
+      if (!response.ok) throw new Error("details");
+      setDetails((await response.json()) as MemberDetails);
+    } catch { setError("تعذر تحميل نشاط العضو"); } finally { setDetailsLoading(false); }
   }
 
-  function updateField(field: keyof MemberFormState, value: string) {
-    setFormState((current) => {
-      if (!current) return current;
+  useEffect(() => { void load(); }, []);
+  useEffect(() => { setPage(1); }, [search]);
 
-      return {
-        ...current,
-        [field]: value,
-      };
-    });
+  function choose(member: AdminMember) {
+    setSelectedId(member.id); setForm(buildForm(member, teams)); setMessage(""); setError("");
+    void loadDetails(member.id);
   }
 
-  async function handleSaveMember(event: FormEvent) {
+  async function save(event: FormEvent) {
     event.preventDefault();
-
-    setMessage("");
-    setError("");
-
-    if (!selectedMember || !formState) {
-      setError("اختر العضو أولًا");
-      return;
-    }
-
-    const selectedTeam = teams.find((team) => team.code === formState.teamCode);
-
-    if (!selectedTeam) {
-      setError("اختر المنتخب المرشح");
-      return;
-    }
-
-    setSaving(true);
-
+    if (!selected || !form) return;
+    const team = teams.find((item) => item.code === form.teamCode);
+    if (!team) { setError("اختر المنتخب المفضل"); return; }
     try {
-      await updateAdminMember({
-        userId: selectedMember.id,
-        fullName: formState.fullName,
-        phone: formState.phone,
-        favoriteTeam: selectedTeam.nameAr,
-        teamEmoji: selectedTeam.emoji,
-
-        points: toNumber(formState.points),
-        total: toNumber(formState.total),
-        correct: toNumber(formState.correct),
-        wrong: toNumber(formState.wrong),
-        currentStreak: toNumber(formState.currentStreak),
-        bestStreak: toNumber(formState.bestStreak),
-      });
-
-      if (formState.password.trim()) {
-        await resetAdminMemberPassword(selectedMember.id, formState.password);
-      }
-
-      await addAdminLog({
-        action: "update_member",
-        title: "تعديل بيانات عضو",
-        description: `تم تعديل بيانات العضو: ${selectedMember.fullName}. البيانات الجديدة: الاسم ${formState.fullName}، الجوال ${formState.phone}، المنتخب ${selectedTeam.nameAr}، النقاط ${formState.points}.`,
-      });
-
-      setMessage("تم تحديث بيانات العضو بنجاح ✅");
-      await loadData();
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "تعذر تحديث بيانات العضو";
-      setError(errorMessage);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleResetStats() {
-    setMessage("");
-    setError("");
-
-    if (!selectedMember) {
-      setError("اختر العضو أولًا");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `هل أنت متأكد من تصفير نقاط العضو: ${selectedMember.fullName}؟\n\nسيتم تصفير النقاط والتوقعات الصحيحة والخاطئة والسلاسل.`
-    );
-
-    if (!confirmed) return;
-
-    setResetting(true);
-
-    try {
-      await resetAdminMemberStats(selectedMember.id);
-
-      await addAdminLog({
-        action: "reset_member_stats",
-        title: "تصفير نقاط عضو",
-        description: `تم تصفير نقاط وإحصائيات العضو: ${selectedMember.fullName}.`,
-      });
-
-      setMessage("تم تصفير نقاط العضو بنجاح ✅");
-      await loadData();
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "تعذر تصفير نقاط العضو";
-      setError(errorMessage);
-    } finally {
-      setResetting(false);
-    }
-  }
-
-  function goPrevious() {
-    setCurrentPage((page) => Math.max(1, page - 1));
-  }
-
-  function goNext() {
-    setCurrentPage((page) => Math.min(totalPages, page + 1));
+      setSaving(true); setError(""); setMessage("");
+      await updateAdminMemberProfile({ userId: selected.id, fullName: form.fullName, phone: form.phone, favoriteTeam: team.nameAr, teamEmoji: team.emoji });
+      if (form.password.trim()) await resetAdminMemberPassword(selected.id, form.password);
+      await addAdminLog({ action: "update_member", title: "تحديث حساب عضو", description: `تم تحديث بيانات حساب العضو ${selected.fullName}.` });
+      setMessage("تم حفظ بيانات العضو بنجاح"); await load(); await loadDetails(selected.id);
+      setForm((current) => current ? { ...current, password: "" } : current);
+    } catch (e) { setError(e instanceof Error ? e.message : "تعذر حفظ بيانات العضو"); } finally { setSaving(false); }
   }
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-6">
-      <div className="mb-5">
-        <h2 className="text-2xl font-black">إدارة الأعضاء</h2>
-        <p className="mt-2 text-sm text-slate-300">
-          تعديل بيانات الأعضاء والنقاط والمنتخب المرشح.
-        </p>
-      </div>
-
-      {(message || error) && (
-        <div className="mb-5 space-y-2">
-          {message && (
-            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-100">
-              {message}
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-white/[0.09] to-white/[0.035] shadow-2xl">
+        <div className="border-b border-white/10 p-4 md:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-300 text-slate-950 shadow-lg shadow-amber-300/10"><Users className="h-6 w-6" /></span>
+              <div><h2 className="text-2xl font-black md:text-3xl">إدارة الأعضاء</h2><p className="mt-1 text-sm text-slate-300">إدارة مركزية لحسابات أعضاء منصة التحدي ونشاطهم في جميع البطولات والألعاب.</p></div>
             </div>
-          )}
-
-          {error && (
-            <div className="rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">
-              {error}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1.2fr]">
-        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-          <div className="mb-4">
-            <label className="mb-2 block text-sm font-bold">بحث عن عضو</label>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-              placeholder="ابحث بالاسم أو الجوال أو المنتخب"
-            />
+            <button type="button" onClick={() => void load()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-4 text-sm font-black hover:bg-white/10"><RefreshCw className="h-4 w-4" />تحديث</button>
           </div>
-
-          {loading ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5 text-center text-sm text-slate-300">
-              جاري تحميل الأعضاء...
-            </div>
-          ) : filteredMembers.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5 text-center text-sm text-slate-300">
-              لا يوجد أعضاء مطابقين للبحث.
-            </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                {visibleMembers.map((member) => (
-                  <button
-                    key={member.id}
-                    type="button"
-                    onClick={() => selectMember(member)}
-                    className={`w-full rounded-2xl border p-3 text-right transition ${
-                      selectedMemberId === member.id
-                        ? "border-amber-400 bg-amber-400/10"
-                        : "border-white/10 bg-slate-900/70 hover:bg-white/10"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate font-black">
-                          #{member.currentRank} - {member.fullName}
-                        </div>
-                        <div className="mt-1 truncate text-xs text-slate-300">
-                          {member.phone || "-"} • {member.teamEmoji}{" "}
-                          {member.favoriteTeam || "-"}
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 rounded-full bg-amber-400 px-3 py-1 text-xs font-black text-slate-950">
-                        {member.points} نقطة
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={goPrevious}
-                  disabled={currentPage === 1}
-                  className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  السابق
-                </button>
-
-                <div className="rounded-xl border border-white/10 bg-slate-950/70 px-4 py-2 text-xs text-slate-200">
-                  صفحة {currentPage} من {totalPages}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={goNext}
-                  disabled={currentPage === totalPages}
-                  className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-black text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  التالي
-                </button>
-              </div>
-            </>
-          )}
+          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {memberStats.map(([label, value, Icon]) => <div key={String(label)} className="rounded-2xl border border-white/10 bg-slate-950/45 p-3"><div className="flex items-center justify-between text-xs text-slate-400"><span>{String(label)}</span><Icon className="h-4 w-4" /></div><div className="mt-2 text-2xl font-black">{Number(value)}</div></div>)}
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-          {!selectedMember || !formState ? (
-            <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-white/10 bg-slate-900/70 p-6 text-center text-sm text-slate-300">
-              اختر عضوًا من القائمة لعرض بياناته وتعديلها.
-            </div>
-          ) : (
-            <form onSubmit={handleSaveMember} className="space-y-4">
-              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
-                <div className="text-sm text-amber-100">العضو المحدد</div>
-                <div className="mt-1 text-xl font-black text-amber-300">
-                  {selectedMember.fullName}
-                </div>
-              </div>
+        {(message || error) && <div className="px-4 pt-4 md:px-6">{message && <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm text-emerald-100">{message}</div>}{error && <div className="mt-2 rounded-2xl border border-red-400/20 bg-red-400/10 p-3 text-sm text-red-100">{error}</div>}</div>}
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-bold">الاسم</label>
-                  <input
-                    type="text"
-                    value={formState.fullName}
-                    maxLength={20}
-                    onChange={(event) =>
-                      updateField("fullName", event.target.value)
-                    }
-                    className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-                    required
-                  />
-                </div>
+        <div className="grid min-h-[650px] lg:grid-cols-[390px_minmax(0,1fr)]">
+          <aside className="border-b border-white/10 p-4 lg:border-b-0 lg:border-l lg:p-5">
+            <div className="relative mb-4"><Search className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="الاسم، الجوال، البريد أو المعرّف" className="min-h-12 w-full rounded-2xl border border-white/10 bg-slate-950/70 pr-11 pl-4 text-sm outline-none focus:border-amber-300/60"/></div>
+            {loading ? <div className="p-8 text-center text-sm text-slate-400">جاري تحميل الأعضاء...</div> : <div className="space-y-2">
+              {visible.map((member) => <button key={member.id} type="button" onClick={() => choose(member)} className={`w-full rounded-2xl border p-3 text-right transition ${selectedId === member.id ? "border-amber-300/50 bg-amber-300/10" : "border-white/10 bg-white/[0.035] hover:bg-white/[0.07]"}`}>
+                <div className="flex items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-lg">{member.teamEmoji || "👤"}</span><div className="min-w-0 flex-1"><div className="truncate font-black">{member.fullName}</div><div className="mt-1 truncate text-xs text-slate-400" dir="ltr">{member.phone || member.email || "بدون رقم"}</div></div><span className="text-xs text-slate-500">›</span></div>
+              </button>)}
+              {!visible.length && <div className="p-8 text-center text-sm text-slate-400">لا يوجد أعضاء مطابقون.</div>}
+            </div>}
+            <div className="mt-4 flex items-center justify-between gap-2"><button disabled={page === 1} onClick={() => setPage((p) => Math.max(1,p-1))} className="min-h-10 rounded-xl border border-white/10 px-3 text-xs font-bold disabled:opacity-30">السابق</button><span className="text-xs text-slate-400">{page} / {pages}</span><button disabled={page === pages} onClick={() => setPage((p) => Math.min(pages,p+1))} className="min-h-10 rounded-xl border border-white/10 px-3 text-xs font-bold disabled:opacity-30">التالي</button></div>
+          </aside>
 
-                <div>
-                  <label className="mb-2 block text-sm font-bold">
-                    رقم الجوال
-                  </label>
-                  <input
-                    type="tel"
-                    value={formState.phone}
-                    onChange={(event) => updateField("phone", event.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-                    required
-                  />
-                </div>
+          <div className="p-4 md:p-6">
+            {!selected || !form ? <div className="flex min-h-[520px] flex-col items-center justify-center text-center"><span className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-white/[0.06]"><UserRound className="h-7 w-7 text-slate-400"/></span><h3 className="text-xl font-black">اختر عضوًا</h3><p className="mt-2 max-w-sm text-sm leading-7 text-slate-400">ستظهر هنا بيانات الحساب، البطولات، الألعاب وخيارات إدارة العضو.</p></div> : <div className="space-y-5">
+              <div className="flex flex-col gap-3 rounded-3xl border border-amber-300/20 bg-amber-300/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-xs font-bold text-amber-200">ملف العضو</div><div className="mt-1 text-2xl font-black">{selected.fullName}</div><div className="mt-1 text-xs text-slate-400">عضو منذ {dateLabel(selected.createdAt)}</div></div><div className="flex gap-2"><button type="button" onClick={() => navigator.clipboard?.writeText(selected.id)} className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 px-3 text-xs font-bold"><Copy className="h-4 w-4"/>نسخ المعرّف</button><a href={`/members/${selected.id}`} target="_blank" rel="noreferrer" className="flex min-h-11 items-center gap-2 rounded-xl bg-white/10 px-3 text-xs font-bold">عرض الملف</a></div></div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-bold">
-                    كلمة مرور جديدة <span className="text-xs font-normal text-slate-400">(اختياري)</span>
-                  </label>
-                  <input
-                    type="password"
-                    value={formState.password}
-                    autoComplete="new-password"
-                    placeholder="اتركها فارغة بدون تغيير"
-                    onChange={(event) =>
-                      updateField("password", event.target.value)
-                    }
-                    className="w-full rounded-xl border border-white/10 bg-white px-4 py-3 text-slate-950 outline-none focus:border-amber-400"
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">{activityStats.map(([label,value,Icon]) => <div key={String(label)} className="rounded-2xl border border-white/10 bg-slate-950/50 p-3"><div className="flex items-center gap-2 text-xs text-slate-400"><Icon className="h-4 w-4"/>{String(label)}</div><div className="mt-2 text-xl font-black">{detailsLoading ? "…" : Number(value)}</div></div>)}</div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-bold">
-                    المنتخب المرشح
-                  </label>
-                  <select
-                    value={formState.teamCode}
-                    onChange={(event) =>
-                      updateField("teamCode", event.target.value)
-                    }
-                    className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-amber-400"
-                    required
-                  >
-                    <option value="">اختر المنتخب</option>
-                    {teams.map((team) => (
-                      <option key={team.code} value={team.code}>
-                        {team.emoji} {team.nameAr}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <form onSubmit={save} className="rounded-3xl border border-white/10 bg-slate-950/45 p-4 md:p-5"><div className="mb-4 flex items-center gap-2"><UserRound className="h-5 w-5 text-amber-300"/><h3 className="font-black">بيانات الحساب</h3></div><div className="grid gap-3 md:grid-cols-2">
+                <label className="text-xs font-bold text-slate-300">الاسم<input maxLength={20} required value={form.fullName} onChange={(e)=>setForm({...form,fullName:e.target.value})} className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-white px-3 text-sm text-slate-950 outline-none focus:border-amber-300"/></label>
+                <label className="text-xs font-bold text-slate-300">رقم الجوال<input required value={form.phone} onChange={(e)=>setForm({...form,phone:e.target.value})} className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-white px-3 text-sm text-slate-950 outline-none focus:border-amber-300" dir="ltr"/></label>
+                <label className="text-xs font-bold text-slate-300">المنتخب المفضل<select required value={form.teamCode} onChange={(e)=>setForm({...form,teamCode:e.target.value})} className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-slate-900 px-3 text-sm"><option value="">اختر المنتخب</option>{teams.map((t)=><option key={t.code} value={t.code}>{t.emoji} {t.nameAr}</option>)}</select></label>
+                <label className="text-xs font-bold text-slate-300">كلمة مرور جديدة<input type="password" autoComplete="new-password" value={form.password} onChange={(e)=>setForm({...form,password:e.target.value})} placeholder="اتركها فارغة بدون تغيير" className="mt-2 min-h-11 w-full rounded-xl border border-white/10 bg-white px-3 text-sm text-slate-950 outline-none focus:border-amber-300"/></label>
+              </div><button disabled={saving} className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-300 px-5 text-sm font-black text-slate-950 disabled:opacity-50"><KeyRound className="h-4 w-4"/>{saving ? "جاري الحفظ…" : "حفظ بيانات العضو"}</button></form>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-                <h3 className="mb-3 font-black">تعديل إحصائيات العضو</h3>
+              <section className="rounded-3xl border border-white/10 bg-slate-950/45 p-4 md:p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-black">البطولات</h3><p className="mt-1 text-xs text-slate-400">كل بطولة مستقلة بإحصائياتها وترتيبها.</p></div><Trophy className="h-5 w-5 text-amber-300"/></div>{detailsLoading ? <div className="py-6 text-center text-sm text-slate-400">جاري تحميل النشاط…</div> : <div className="grid gap-3 md:grid-cols-2">{details?.tournaments.map((t)=><div key={t.id} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4"><div className="flex items-center justify-between gap-2"><div className="font-black">{t.name}</div>{t.legacy && <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] text-slate-400">نظام سابق</span>}</div><div className="mt-3 grid grid-cols-4 gap-2 text-center"><div><b className="block text-lg">{t.points}</b><span className="text-[10px] text-slate-400">نقطة</span></div><div><b className="block text-lg">{t.rank || "—"}</b><span className="text-[10px] text-slate-400">الترتيب</span></div><div><b className="block text-lg">{t.played}</b><span className="text-[10px] text-slate-400">محتسبة</span></div><div><b className="block text-lg text-emerald-300">{t.exact}</b><span className="text-[10px] text-slate-400">بالملي</span></div></div></div>)}</div>}</section>
 
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                  <div>
-                    <label className="mb-2 block text-xs font-bold">
-                      النقاط
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formState.points}
-                      onChange={(event) =>
-                        updateField("points", event.target.value)
-                      }
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-center font-black text-slate-950 outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-bold">
-                      التوقعات
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formState.total}
-                      onChange={(event) =>
-                        updateField("total", event.target.value)
-                      }
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-center font-black text-slate-950 outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-bold">الصح</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formState.correct}
-                      onChange={(event) =>
-                        updateField("correct", event.target.value)
-                      }
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-center font-black text-slate-950 outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-bold">
-                      الخطأ
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formState.wrong}
-                      onChange={(event) =>
-                        updateField("wrong", event.target.value)
-                      }
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-center font-black text-slate-950 outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-bold">
-                      السلسلة الحالية
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formState.currentStreak}
-                      onChange={(event) =>
-                        updateField("currentStreak", event.target.value)
-                      }
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-center font-black text-slate-950 outline-none focus:border-amber-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-xs font-bold">
-                      أفضل سلسلة
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formState.bestStreak}
-                      onChange={(event) =>
-                        updateField("bestStreak", event.target.value)
-                      }
-                      className="w-full rounded-xl border border-white/10 bg-white px-3 py-2 text-center font-black text-slate-950 outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <button
-                  type="submit"
-                  disabled={saving || resetting}
-                  className="rounded-xl bg-amber-400 px-4 py-3 font-black text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? "جاري الحفظ..." : "حفظ تعديل العضو"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleResetStats}
-                  disabled={saving || resetting}
-                  className="rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-3 font-black text-red-200 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {resetting ? "جاري التصفير..." : "تصفير نقاط العضو"}
-                </button>
-              </div>
-
-              <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-xs leading-6 text-red-100">
-                تنبيه: تعديل النقاط يدويًا قد يختلف عن نتائج المباريات المحتسبة.
-                استخدمه فقط للتصحيح الإداري.
-              </div>
-            </form>
-          )}
+              <section className="rounded-3xl border border-white/10 bg-slate-950/45 p-4 md:p-5"><div className="mb-4 flex items-center gap-2"><Gamepad2 className="h-5 w-5 text-cyan-300"/><h3 className="font-black">الألعاب والتحديات</h3></div><div className="grid gap-2 sm:grid-cols-2">{details?.games.breakdown.map((g)=><div key={g.gameId} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.035] p-3"><div><div className="text-sm font-black">{gameLabel(g.gameId)}</div><div className="mt-1 text-[11px] text-slate-400">{g.played} لعب • {g.wins} فوز</div></div><span className="rounded-xl bg-cyan-300/10 px-3 py-2 text-xs font-black text-cyan-200">{g.xp} نقطة خبرة</span></div>)}</div></section>
+            </div>}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

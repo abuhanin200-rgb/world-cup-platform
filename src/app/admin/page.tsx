@@ -596,8 +596,8 @@ export default function AdminPage() {
         action: "calculate_match",
         title: "احتساب نتيجة مباراة",
         description: match
-          ? `${formatMatchLabel(match)} — النتيجة ${homeScore} - ${awayScore}`
-          : `احتساب مباراة — النتيجة ${homeScore} - ${awayScore}`,
+          ? `${formatMatchLabel(match)} — النتيجة: ${match.homeTeamName} ${homeScore} × ${awayScore} ${match.awayTeamName}`
+          : `احتساب مباراة — النتيجة: الفريق الأول ${homeScore} × ${awayScore} الفريق الثاني`,
         metadata: {
           matchId: selectedMatchId,
           actualHomeScore: homeScore,
@@ -755,7 +755,7 @@ export default function AdminPage() {
   return (
     <main
       dir="rtl"
-      className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-3 text-white md:p-5"
+      className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(30,64,175,.24),transparent_34%),linear-gradient(135deg,#020617,#071735_48%,#020617)] p-3 text-white md:p-5"
     >
       <div className="mx-auto max-w-7xl">
         <header className="mb-5 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-2xl md:p-5">
@@ -767,10 +767,10 @@ export default function AdminPage() {
 
               <div>
                 <h1 className="text-2xl font-black md:text-3xl">
-                  لوحة تحكم الأدمن
+                  مركز إدارة التحدي
                 </h1>
                 <p className="mt-2 text-sm text-slate-300">
-                  إدارة المباريات، النتائج، الأعضاء، التوقعات، والإعدادات.
+                  لوحة موحدة لإدارة المنصة والبطولات والأعضاء والألعاب.
                 </p>
               </div>
             </div>
@@ -797,13 +797,13 @@ export default function AdminPage() {
           </div>
         </header>
 
-        <nav className="mb-5 flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-white/10 p-3 shadow-2xl">
+        <nav className="sticky top-2 z-30 mb-5 flex gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-slate-950/85 p-3 shadow-2xl backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {ADMIN_TABS.map(({ tab, label, icon: Icon }) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition ${
+              className={`inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition ${
                 activeTab === tab
                   ? "bg-amber-400 text-slate-950"
                   : "border border-white/10 bg-white/5 text-white hover:bg-white/10"
@@ -815,7 +815,7 @@ export default function AdminPage() {
           ))}
         </nav>
 
-        {activeTab === "overview" && <AdminOverviewPanel />}
+        {activeTab === "overview" && <AdminOverviewPanel onNavigate={(tab) => setActiveTab(tab as AdminTab)} />}
         {activeTab === "tournamentsV2" && <AdminTournamentV2Panel />}
 
         {activeTab === "add" && (

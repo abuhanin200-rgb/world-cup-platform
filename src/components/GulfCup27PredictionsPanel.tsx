@@ -597,7 +597,7 @@ function MatchPredictionCard({
                 dir="ltr"
                 className="mt-1.5 block text-[25px] font-black leading-none tracking-tight text-white tabular-nums [unicode-bidi:isolate]"
               >
-                {match.result.awayScore ?? "—"} - {match.result.homeScore ?? "—"}
+                {match.result.homeScore ?? "—"} - {match.result.awayScore ?? "—"}
               </strong>
             </div>
 
@@ -622,7 +622,7 @@ function MatchPredictionCard({
                 dir="ltr"
                 className="mt-1.5 block text-[25px] font-black leading-none tracking-tight text-white tabular-nums [unicode-bidi:isolate]"
               >
-                {prediction.awayScore} - {prediction.homeScore}
+                {prediction.homeScore} - {prediction.awayScore}
               </strong>
             </div>
           </div>
@@ -669,7 +669,7 @@ function MatchPredictionCard({
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold leading-6 text-white/55">
           توقعك المحفوظ: {" "}
           <strong dir="ltr" className="text-white [unicode-bidi:isolate]">
-            {prediction.awayScore} - {prediction.homeScore}
+            {prediction.homeScore} - {prediction.awayScore}
           </strong>
           {prediction.qualifiedTeamId ? (
             <span>

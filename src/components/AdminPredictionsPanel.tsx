@@ -59,7 +59,7 @@ function formatDate(value?: string | null) {
   if (!value) return "—";
 
   try {
-    return new Intl.DateTimeFormat("ar-SA", {
+    return new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
       dateStyle: "short",
       timeStyle: "short",
       timeZone: "Asia/Riyadh",
@@ -67,19 +67,6 @@ function formatDate(value?: string | null) {
   } catch {
     return "—";
   }
-}
-
-function getActualResult(prediction: AdminPredictionWithType) {
-  if (
-    prediction.actualHomeScore === null ||
-    prediction.actualHomeScore === undefined ||
-    prediction.actualAwayScore === null ||
-    prediction.actualAwayScore === undefined
-  ) {
-    return "—";
-  }
-
-  return `${prediction.actualHomeScore} - ${prediction.actualAwayScore}`;
 }
 
 function isGoldenPrediction(prediction: AdminPredictionWithType) {
@@ -930,15 +917,10 @@ export default function AdminPredictionsPanel() {
                       </td>
 
                       <td className="px-3 py-3 text-center">
-                        <span
-                          className={`inline-flex rounded-lg px-3 py-1 font-black ${
-                            golden
-                              ? "bg-gradient-to-r from-amber-300 via-fuchsia-300 to-violet-300 text-slate-950"
-                              : "bg-white/10 text-white"
-                          }`}
-                        >
-                          {prediction.homeScore} - {prediction.awayScore}
-                        </span>
+                        <div className={`grid min-w-[230px] grid-cols-2 gap-2 rounded-xl p-1 ${golden ? "bg-gradient-to-r from-amber-300/15 via-fuchsia-300/10 to-violet-300/15" : "bg-white/[0.04]"}`} dir="rtl">
+                          <div className="rounded-lg bg-black/20 px-2 py-2 text-center"><span className="block truncate text-[10px] font-bold text-slate-400">{prediction.homeTeamName}</span><strong dir="ltr" className="mt-1 block text-lg font-black tabular-nums [unicode-bidi:isolate]">{prediction.homeScore}</strong></div>
+                          <div className="rounded-lg bg-black/20 px-2 py-2 text-center"><span className="block truncate text-[10px] font-bold text-slate-400">{prediction.awayTeamName}</span><strong dir="ltr" className="mt-1 block text-lg font-black tabular-nums [unicode-bidi:isolate]">{prediction.awayScore}</strong></div>
+                        </div>
                       </td>
 
                       <td className="px-3 py-3 align-top">
@@ -1097,9 +1079,7 @@ export default function AdminPredictionsPanel() {
                       </td>
 
                       <td className="px-3 py-3 text-center">
-                        <span className="inline-flex rounded-lg bg-slate-900 px-3 py-1 font-black text-slate-200">
-                          {getActualResult(prediction)}
-                        </span>
+                        {prediction.actualHomeScore == null || prediction.actualAwayScore == null ? <span className="text-slate-500">—</span> : <div className="grid min-w-[230px] grid-cols-2 gap-2" dir="rtl"><div className="rounded-lg bg-slate-900 px-2 py-2 text-center"><span className="block truncate text-[10px] font-bold text-slate-500">{prediction.homeTeamName}</span><strong dir="ltr" className="mt-1 block text-lg font-black tabular-nums text-slate-200 [unicode-bidi:isolate]">{prediction.actualHomeScore}</strong></div><div className="rounded-lg bg-slate-900 px-2 py-2 text-center"><span className="block truncate text-[10px] font-bold text-slate-500">{prediction.awayTeamName}</span><strong dir="ltr" className="mt-1 block text-lg font-black tabular-nums text-slate-200 [unicode-bidi:isolate]">{prediction.actualAwayScore}</strong></div></div>}
                       </td>
 
                       <td className="px-3 py-3 text-center">

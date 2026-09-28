@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { AdminLog, getAdminLogs } from "@/lib/adminLogs";
 
 function getActionStyle(action: string) {
@@ -66,7 +67,7 @@ function formatDate(dateText: string) {
 
   if (Number.isNaN(date.getTime())) return "-";
 
-  return new Intl.DateTimeFormat("ar-SA", {
+  return new Intl.DateTimeFormat("ar-SA-u-ca-gregory-nu-latn", {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "Asia/Riyadh",
@@ -77,6 +78,12 @@ export default function AdminLogsPanel() {
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [actionFilter, setActionFilter] = useState("all");
+  const filteredLogs = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return logs.filter((log) => (actionFilter === "all" || log.action === actionFilter) && (!q || `${log.title} ${log.description}`.toLowerCase().includes(q)));
+  }, [logs, query, actionFilter]);
 
   async function loadLogs() {
     try {
@@ -116,6 +123,11 @@ export default function AdminLogsPanel() {
         </button>
       </div>
 
+      <div className="mb-5 grid gap-2 md:grid-cols-[1fr_220px]">
+        <label className="flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-slate-950/50 px-3"><Search className="h-4 w-4 text-slate-500"/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ابحث في العمليات..." className="w-full bg-transparent text-sm font-bold outline-none placeholder:text-slate-600" /></label>
+        <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} className="min-h-11 rounded-xl border border-white/10 bg-slate-950/70 px-3 text-sm font-bold"><option value="all">كل العمليات</option><option value="add_match">إضافة مباراة</option><option value="calculate_match">احتساب نتيجة</option><option value="undo_match_calculation">تراجع عن حسبة</option><option value="update_member">تعديل عضو</option><option value="reset_member_stats">تصفير عضو</option><option value="update_settings">تعديل إعدادات</option><option value="other">عمليات أخرى</option></select>
+      </div>
+
       {error && (
         <div className="mb-5 rounded-2xl border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-100">
           {error}
@@ -126,13 +138,13 @@ export default function AdminLogsPanel() {
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-sm text-slate-300">
           جاري تحميل سجل العمليات...
         </div>
-      ) : logs.length === 0 ? (
+      ) : filteredLogs.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-5 text-center text-sm text-slate-300">
-          لا يوجد سجل عمليات حتى الآن.
+          لا توجد عمليات مطابقة للبحث الحالي.
         </div>
       ) : (
         <div className="space-y-3">
-          {logs.map((log) => {
+          {filteredLogs.map((log) => {
             const style = getActionStyle(log.action);
 
             return (

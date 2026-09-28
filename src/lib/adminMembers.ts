@@ -12,6 +12,7 @@ export type AdminMember = {
   id: string;
   fullName: string;
   phone: string;
+  email?: string;
   favoriteTeam: string;
   teamEmoji: string;
 
@@ -70,6 +71,7 @@ function mapMember(id: string, data: Record<string, unknown>): AdminMember {
     id,
     fullName: toText(data.fullName) || "عضو بدون اسم",
     phone: toText(data.phone),
+    email: toText(data.email),
     favoriteTeam: toText(data.favoriteTeam),
     teamEmoji: toText(data.teamEmoji),
 
@@ -167,6 +169,31 @@ export async function getAdminMemberById(
   if (!userSnap.exists()) return null;
 
   return mapMember(userSnap.id, userSnap.data());
+}
+
+
+export type UpdateAdminMemberProfileInput = {
+  userId: string;
+  fullName: string;
+  phone: string;
+  favoriteTeam: string;
+  teamEmoji: string;
+};
+
+export async function updateAdminMemberProfile(input: UpdateAdminMemberProfileInput) {
+  const userId = toText(input.userId);
+  const fullName = toText(input.fullName);
+  const phone = toText(input.phone);
+  const favoriteTeam = toText(input.favoriteTeam);
+  const teamEmoji = toText(input.teamEmoji);
+  if (!userId) throw new Error("معرّف العضو غير موجود");
+  if (!fullName) throw new Error("اسم العضو مطلوب");
+  if (fullName.length > 20) throw new Error("اسم العضو يجب ألا يتجاوز 20 حرفًا");
+  if (!phone) throw new Error("رقم الجوال مطلوب");
+  if (!favoriteTeam) throw new Error("المنتخب المفضل مطلوب");
+  const now = new Date().toISOString();
+  await updateDoc(doc(db, "users", userId), { fullName, phone, favoriteTeam, teamEmoji, updatedAt: now, lastUpdated: now });
+  return getAdminMemberById(userId);
 }
 
 export async function updateAdminMember(input: UpdateAdminMemberInput) {

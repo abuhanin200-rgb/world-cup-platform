@@ -8,6 +8,7 @@ import AdminTournamentEngagementV2 from "@/components/AdminTournamentEngagementV
 import AdminTournamentMissingMembersV2 from "@/components/AdminTournamentMissingMembersV2";
 import AdminTournamentSportsApi from "@/components/AdminTournamentSportsApi";
 import AdminTournamentPredictionsManager from "@/components/AdminTournamentPredictionsManager";
+import AdminTournamentHealthPanel from "@/components/AdminTournamentHealthPanel";
 import {
   BellRing,
   Calculator,
@@ -127,6 +128,7 @@ type GulfAdminSection =
   | "missingMembers"
   | "engagement"
   | "sports"
+  | "health"
   | "security";
 
 export default function AdminTournamentV2Panel() {
@@ -395,7 +397,7 @@ export default function AdminTournamentV2Panel() {
     if (
       typeof window !== "undefined" &&
       !window.confirm(
-        `اعتماد نتيجة ${formatMatch(match)} (${homeScore}-${awayScore}) واحتساب جميع التوقعات؟`,
+        `اعتماد نتيجة ${formatMatch(match)} (${teamName(match.homeTeamId, match.homeSourceLabel)} ${homeScore} × ${awayScore} ${teamName(match.awayTeamId, match.awaySourceLabel)}) واحتساب جميع التوقعات؟`,
       )
     ) return;
 
@@ -419,7 +421,7 @@ export default function AdminTournamentV2Panel() {
       await addAdminLog({
         action: "calculate_match",
         title: `احتساب ${match.stage === "knockout" ? "مباراة إقصائية" : "مباراة"} في خليجي الديار العربية 27`,
-        description: `${formatMatch(match)} — النتيجة ${homeScore}-${awayScore} — تم احتساب ${result.predictionsCalculated} توقع.`,
+        description: `${formatMatch(match)} — ${teamName(match.homeTeamId, match.homeSourceLabel)} ${homeScore} × ${awayScore} ${teamName(match.awayTeamId, match.awaySourceLabel)} — تم احتساب ${result.predictionsCalculated} توقع.`,
         metadata: { ...result, homeScore, awayScore, qualifiedTeamId, qualificationMethod },
       });
 
@@ -471,7 +473,8 @@ export default function AdminTournamentV2Panel() {
     { id: "notifications", label: "الإشعارات", icon: BellRing },
     { id: "missingMembers", label: "غير المتوقّعين", icon: UserRoundX },
     { id: "engagement", label: "الاستوديو والجوائز", icon: Newspaper },
-    { id: "sports", label: "Sports API", icon: Satellite },
+    { id: "health", label: "صحة البطولة", icon: ShieldCheck },
+    { id: "sports", label: "مصدر البيانات", icon: Satellite },
     { id: "security", label: "أمان الأعضاء", icon: ShieldCheck },
   ];
 
@@ -531,6 +534,8 @@ export default function AdminTournamentV2Panel() {
       {sectionTab === "missingMembers" && <AdminTournamentMissingMembersV2 />}
 
       {sectionTab === "engagement" && <AdminTournamentEngagementV2 />}
+
+      {sectionTab === "health" && <AdminTournamentHealthPanel />}
 
       {sectionTab === "sports" && <AdminTournamentSportsApi />}
 
