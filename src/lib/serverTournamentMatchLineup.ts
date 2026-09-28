@@ -542,7 +542,7 @@ function reasonArabic(type: string, reason: string) {
   if (!joined) return "غير متاح";
   if (/[\u0600-\u06FF]/.test(joined)) return joined;
   const value = joined.toLowerCase();
-  if (value.includes("suspend")) return "إيقاف";
+  if (value.includes("suspend") || value.includes("ban") || value.includes("red card") || value.includes("yellow card")) return "إيقاف";
   if (value.includes("hamstring")) return "إصابة عضلية";
   if (value.includes("muscle")) return "إصابة عضلية";
   if (value.includes("knee")) return "إصابة في الركبة";
@@ -550,8 +550,10 @@ function reasonArabic(type: string, reason: string) {
   if (value.includes("foot")) return "إصابة في القدم";
   if (value.includes("back")) return "إصابة في الظهر";
   if (value.includes("shoulder")) return "إصابة في الكتف";
-  if (value.includes("illness") || value.includes("sick")) return "وعكة صحية";
-  if (value.includes("injur")) return "إصابة";
+  if (value.includes("illness") || value.includes("sick") || value.includes("virus")) return "وعكة صحية";
+  if (value.includes("international duty")) return "مهمة دولية";
+  if (value.includes("personal")) return "ظروف خاصة";
+  if (value.includes("injur") || value.includes("fracture") || value.includes("knock")) return "إصابة";
   return "غياب";
 }
 
@@ -594,6 +596,19 @@ function mergeAbsences(...groups: LineupAbsence[][]) {
   }
   return result;
 }
+
+function removeOfficialPlayersFromAbsences(
+  absences: LineupAbsence[],
+  official: ApiFootballTeamLineup | null,
+) {
+  if (!official) return absences;
+  const selectedIds = new Set([
+    ...official.startXI.map((player) => player.id),
+    ...official.substitutes.map((player) => player.id),
+  ]);
+  return absences.filter((player) => !selectedIds.has(player.id));
+}
+
 
 export async function getTournamentMatchLineup(input: {
   tournamentId: string;
@@ -729,7 +744,7 @@ export async function getTournamentMatchLineup(input: {
     ? enrichTeamLineup(match.awayTeamId, awaySelected, awaySquad)
     : null;
 
-  const homeAbsences = mergeAbsences(
+  let homeAbsences = mergeAbsences(
     buildAbsences({
       localTeamId: match.homeTeamId,
       providerTeamId: providerHomeTeamId,
@@ -737,7 +752,7 @@ export async function getTournamentMatchLineup(input: {
       squad: homeSquad,
     }),
   );
-  const awayAbsences = mergeAbsences(
+  let awayAbsences = mergeAbsences(
     buildAbsences({
       localTeamId: match.awayTeamId,
       providerTeamId: providerAwayTeamId,
@@ -745,6 +760,11 @@ export async function getTournamentMatchLineup(input: {
       squad: awaySquad,
     }),
   );
+
+  // عند صدور التشكيل الرسمي يصبح هو المرجع النهائي: لا نعرض اللاعب في الغيابات
+  // إذا كان المزود نفسه قد أدرجه ضمن قائمة المباراة الرسمية.
+  homeAbsences = removeOfficialPlayersFromAbsences(homeAbsences, officialHome);
+  awayAbsences = removeOfficialPlayersFromAbsences(awayAbsences, officialAway);
 
   const home: TournamentMatchTeamLineup = homeEnriched
     ? {
