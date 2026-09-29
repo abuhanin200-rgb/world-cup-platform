@@ -84,6 +84,19 @@ const FLAG_CODE_TO_FILE: Record<string, string> = {
   KUW: "kw",
   SYR: "sy",
   LBN: "lb",
+
+  // كأس آسيا السعودية 2027
+  PLE: "ps",
+  UZB: "uz",
+  PRK: "kp",
+  KGZ: "kg",
+  CHN: "cn",
+  TJK: "tj",
+  SGP: "sg",
+  VIE: "vn",
+  YEM: "ye",
+  THA: "th",
+  IDN: "id",
 };
 
 const SIZE_CLASSES: Record<TeamFlagSize, string> = {

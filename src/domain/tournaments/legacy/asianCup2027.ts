@@ -18,10 +18,10 @@ export const ASIAN_CUP_2027_TOURNAMENT = {
   description:
     "كأس آسيا 2027 في السعودية، بواجهة مستقلة مستوحاة من الهوية البصرية الخاصة بالبطولة.",
   hostCountry: "السعودية",
-  hostCities: [],
+  hostCities: ["الرياض", "جدة", "الخبر"],
   startAt: Date.UTC(2027, 0, 7),
   endAt: Date.UTC(2027, 1, 5, 23, 59, 59, 999),
-  status: "coming_soon",
+  status: "active",
   sortOrder: 20,
   isCurrent: false,
   format: "groups_knockout",

@@ -11,6 +11,10 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import {
+  ASIAN_CUP_2027_MATCHES,
+  ASIAN_CUP_2027_TEAMS,
+  ASIAN_CUP_2027_TOURNAMENT,
+  ASIAN_CUP_2027_TOURNAMENT_ID,
   GULF_CUP_27_GROUP_MATCHES,
   GULF_CUP_27_KNOCKOUT_MATCHES,
   GULF_CUP_27_MATCHES,
@@ -99,6 +103,9 @@ function mapMatchDoc(
     homeSourceLabel: data.homeSourceLabel ? cleanText(data.homeSourceLabel) : null,
     awaySourceLabel: data.awaySourceLabel ? cleanText(data.awaySourceLabel) : null,
     kickoffAt: toNumber(data.kickoffAt),
+    kickoffTimeTbd: Boolean(data.kickoffTimeTbd),
+    officialMatchNumber:
+      data.officialMatchNumber == null ? undefined : toNumber(data.officialMatchNumber),
     stadium: cleanText(data.stadium),
     city: cleanText(data.city),
     status:
@@ -365,6 +372,21 @@ export async function initializeGulfCup27V2Data() {
     existingMatches: existingMatchIds.size,
     reconciledMatches: GULF_CUP_27_MATCHES.length,
   };
+}
+
+export async function initializeAsianCup2027V2Data() {
+  const now = Date.now();
+  const batch = writeBatch(db);
+  batch.set(doc(db, TOURNAMENT_V2_COLLECTIONS.tournaments, ASIAN_CUP_2027_TOURNAMENT_ID), {
+    ...dropUndefined(ASIAN_CUP_2027_TOURNAMENT), schemaVersion: 2, initializedAt: now, updatedAt: now, updatedAtServer: serverTimestamp(),
+  }, { merge: true });
+  ASIAN_CUP_2027_TEAMS.forEach((team) => batch.set(doc(db, TOURNAMENT_V2_COLLECTIONS.teams, entityDocId(ASIAN_CUP_2027_TOURNAMENT_ID, team.id)), { ...dropUndefined(team), schemaVersion: 2, updatedAt: now }, { merge: true }));
+  ASIAN_CUP_2027_MATCHES.forEach((match) => batch.set(doc(db, TOURNAMENT_V2_COLLECTIONS.matches, entityDocId(ASIAN_CUP_2027_TOURNAMENT_ID, match.id)), {
+    ...dropUndefined(match), predictionIsOpen: false, predictionEditingIsOpen: true, predictionManualOverride: null, schemaVersion: 2,
+    officialScheduleSyncedAt: now, scheduleSource: "الجدول الرسمي لكأس آسيا 2027 - 5 يونيو 2026", scheduleConfidence: "official_date_venue_time_pending", scheduleTimezone: "Asia/Riyadh", updatedAt: now,
+  }, { merge: true }));
+  await batch.commit();
+  return { tournamentId: ASIAN_CUP_2027_TOURNAMENT_ID, teams: ASIAN_CUP_2027_TEAMS.length, matches: ASIAN_CUP_2027_MATCHES.length };
 }
 
 export async function getTournamentTeamsV2(

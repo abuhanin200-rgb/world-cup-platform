@@ -9,6 +9,7 @@ import AdminTournamentMissingMembersV2 from "@/components/AdminTournamentMissing
 import AdminTournamentSportsApi from "@/components/AdminTournamentSportsApi";
 import AdminTournamentPredictionsManager from "@/components/AdminTournamentPredictionsManager";
 import AdminTournamentHealthPanel from "@/components/AdminTournamentHealthPanel";
+import AdminAsianCup2027Panel from "@/components/AdminAsianCup2027Panel";
 import {
   BellRing,
   Calculator,
@@ -494,11 +495,7 @@ export default function AdminTournamentV2Panel() {
       </div>
 
       {tournamentTab === "asian2027" ? (
-        <div className="mt-5 rounded-3xl border border-violet-300/20 bg-violet-300/[0.06] p-6">
-          <div className="flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-300/10 text-violet-200"><Trophy className="h-6 w-6" aria-hidden="true" /></div><div><p className="text-xs font-black text-violet-200">بطولة مسجلة في المنصة</p><h2 className="mt-1 text-xl font-black text-white">كأس آسيا 2027</h2></div></div>
-          <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-slate-300">سيستخدم كأس آسيا 2027 نفس أدوات الإدارة الموحدة عند تهيئة الفرق والمباريات، بما في ذلك التحكم الكامل في توقعات الأعضاء.</p>
-          <AdminTournamentPredictionsManager tournamentId={ASIAN_CUP_2027_TOURNAMENT_ID} tournamentLabel="كأس آسيا 2027" />
-        </div>
+        <AdminAsianCup2027Panel />
       ) : (
         <>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="أقسام خليجي الديار العربية 27">

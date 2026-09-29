@@ -21,3 +21,5 @@ export * from "./engagementV2";
 export * from "./sportsProviderV2";
 
 export * from "./time";
+
+export * from "./asianCup2027Data";

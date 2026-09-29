@@ -45,6 +45,8 @@ export type TournamentMatchV2 = {
   homeSourceLabel?: string | null;
   awaySourceLabel?: string | null;
   kickoffAt: number;
+  kickoffTimeTbd?: boolean;
+  officialMatchNumber?: number;
   stadium: string;
   city: string;
   status: TournamentMatchStatus;

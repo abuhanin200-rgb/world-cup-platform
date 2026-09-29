@@ -6,6 +6,7 @@ export type TournamentPredictionWindowMatchV2 = {
   homeTeamId: string;
   awayTeamId: string;
   kickoffAt: number;
+  kickoffTimeTbd?: boolean;
   status: TournamentMatchStatus;
   predictionOpensAt: number | null;
   predictionClosesAt: number | null;
@@ -46,6 +47,7 @@ export function isValidTournamentPredictionScoreV2(value: number) {
 export function getTournamentPredictionDeadlineV2(
   match: TournamentPredictionWindowMatchV2,
 ) {
+  if (match.kickoffTimeTbd) return 0;
   const kickoffAt = Number(match.kickoffAt);
   const configuredClose = Number(match.predictionClosesAt ?? kickoffAt);
 
@@ -66,6 +68,7 @@ export function getTournamentPredictionWindowStateV2(
   if (match.status === "postponed") return "postponed";
   if (match.status === "finished") return "finished";
   if (match.status === "live") return "live";
+  if (match.kickoffTimeTbd) return "not_open";
 
   const deadline = getTournamentPredictionDeadlineV2(match);
   if (!deadline || now >= deadline || now >= match.kickoffAt) return "closed";
@@ -88,6 +91,7 @@ export function canEditTournamentPredictionV2(
   now = Date.now(),
 ) {
   if (!match.homeTeamId || !match.awayTeamId) return false;
+  if (match.kickoffTimeTbd) return false;
   if (!match.predictionEditingIsOpen) return false;
   if (match.status !== "scheduled" && match.status !== "prediction_open") {
     return false;

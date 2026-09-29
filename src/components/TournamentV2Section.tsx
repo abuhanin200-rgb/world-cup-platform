@@ -11,12 +11,15 @@ import {
   UsersRound,
 } from "lucide-react";
 import GulfCup27CompetitionPanel from "@/components/GulfCup27CompetitionPanel";
+import AsianCup2027CompetitionPanel from "@/components/AsianCup2027CompetitionPanel";
+import AsianCup2027PredictionsPanel from "@/components/AsianCup2027PredictionsPanel";
 import GulfCup27PredictionsPanel from "@/components/GulfCup27PredictionsPanel";
 import GulfCup27LeaderboardPanel from "@/components/GulfCup27LeaderboardPanel";
 import TournamentSectionPlaceholder from "@/components/tournaments/TournamentSectionPlaceholder";
 import GulfCup27StudioPanel from "@/components/GulfCup27StudioPanel";
 import TournamentAutomationHeartbeat from "@/components/TournamentAutomationHeartbeat";
 import {
+  ASIAN_CUP_2027_TOURNAMENT_ID,
   GULF_CUP_27_KNOCKOUT_DATES,
   GULF_CUP_27_KNOCKOUT_SCORING_V1,
   GULF_CUP_27_SCORING_V1,
@@ -64,9 +67,16 @@ function GulfRulesSection() {
 
 export default function TournamentV2Section({ tournament, section }: { tournament: Tournament; section: TournamentSection }) {
   const isGulf27 = tournament.id === GULF_CUP_27_TOURNAMENT_ID;
+  const isAsian27 = tournament.id === ASIAN_CUP_2027_TOURNAMENT_ID;
   let content: ReactNode;
 
-  if (!isGulf27) {
+  if (isAsian27) {
+    if (section === "matches") content = <AsianCup2027CompetitionPanel />;
+    else if (section === "predictions") content = <AsianCup2027PredictionsPanel />;
+    else if (section === "leaderboard") content = <GulfCup27LeaderboardPanel tournamentId={tournament.id} tournamentLabel={tournament.shortName || tournament.name} />;
+    else if (section === "rules") content = <TournamentSectionPlaceholder tournament={tournament} section={section} />;
+    else content = <TournamentSectionPlaceholder tournament={tournament} section={section} />;
+  } else if (!isGulf27) {
     content = section === "leaderboard"
       ? <GulfCup27LeaderboardPanel tournamentId={tournament.id} tournamentLabel={tournament.shortName || tournament.name} />
       : <TournamentSectionPlaceholder tournament={tournament} section={section} />;
