@@ -18,9 +18,9 @@ import TournamentMatchInsights from "@/components/tournaments/TournamentMatchIns
 import TournamentMatchLineup from "@/components/tournaments/TournamentMatchLineup";
 import TournamentMatchCenter from "@/components/tournaments/TournamentMatchCenter";
 import {
-  GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT_ID,
-  calculateTournamentGroupStandingsV2,
+  calculateGulfCup27GroupStandingsV2,
+  getGulfCup27OfficialTiebreakLabel,
   getGulfCup27Team,
   type TournamentGroupStandingV2,
 } from "@/domain/tournaments";
@@ -143,6 +143,9 @@ function StandingTable({
                     <div className="flex items-center gap-2.5">
                       <TeamFlag code={team.flagCode} name={team.nameAr} size="sm" />
                       <span className="font-black">{team.nameAr}</span>
+                      {getGulfCup27OfficialTiebreakLabel({ group, teamId: row.teamId, rows }) ? (
+                        <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[9px] font-black text-amber-100">بالقرعة</span>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-2 py-3 text-center">{row.played}</td>
@@ -391,8 +394,7 @@ export default function GulfCup27CompetitionPanel() {
 
   const groupA = useMemo(
     () =>
-      calculateTournamentGroupStandingsV2({
-        teams: GULF_CUP_27_TEAMS,
+      calculateGulfCup27GroupStandingsV2({
         matches,
         group: "A",
       }),
@@ -400,8 +402,7 @@ export default function GulfCup27CompetitionPanel() {
   );
   const groupB = useMemo(
     () =>
-      calculateTournamentGroupStandingsV2({
-        teams: GULF_CUP_27_TEAMS,
+      calculateGulfCup27GroupStandingsV2({
         matches,
         group: "B",
       }),
@@ -466,9 +467,15 @@ export default function GulfCup27CompetitionPanel() {
           <StandingTable group="A" rows={groupA} />
           <StandingTable group="B" rows={groupB} />
         </div>
-        <p className="mt-3 text-[11px] font-semibold leading-5 text-white/40">
-          يُرتّب المنتخب حسب النقاط ثم فارق الأهداف ثم الأهداف المسجلة، وتُطبّق معايير البطولة عند تساوي المنتخبات.
-        </p>
+        {getGulfCup27OfficialTiebreakLabel({ group: "A", teamId: "oma", rows: groupA }) ? (
+          <p className="mt-3 rounded-2xl border border-amber-300/15 bg-amber-300/[0.07] px-3 py-2 text-[11px] font-bold leading-5 text-amber-50/80">
+            حُسم المركز الثاني في المجموعة A بالقرعة الرسمية لصالح عُمان بعد التساوي.
+          </p>
+        ) : (
+          <p className="mt-3 text-[11px] font-semibold leading-5 text-white/40">
+            يُرتّب المنتخب حسب النقاط ثم فارق الأهداف ثم الأهداف المسجلة، وتُطبّق معايير البطولة عند تساوي المنتخبات.
+          </p>
+        )}
       </section>
 
       <section aria-labelledby="matches-heading" className="order-1">

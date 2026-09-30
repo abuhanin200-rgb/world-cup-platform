@@ -15,10 +15,9 @@ import {
 import TeamFlag from "@/components/TeamFlag";
 import { useAuth } from "@/context/AuthContext";
 import {
-  GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT,
   GULF_CUP_27_TOURNAMENT_ID,
-  calculateTournamentGroupStandingsV2,
+  calculateGulfCup27GroupStandingsV2,
   getGulfCup27Team,
   type TournamentGroupStandingV2,
   type TournamentUserStatsV2,
@@ -131,11 +130,11 @@ export default function GulfCup27OverviewLive() {
   }, [matches, now]);
 
   const groupA = useMemo(
-    () => calculateTournamentGroupStandingsV2({ teams: GULF_CUP_27_TEAMS, matches, group: "A" }),
+    () => calculateGulfCup27GroupStandingsV2({ matches, group: "A" }),
     [matches],
   );
   const groupB = useMemo(
-    () => calculateTournamentGroupStandingsV2({ teams: GULF_CUP_27_TEAMS, matches, group: "B" }),
+    () => calculateGulfCup27GroupStandingsV2({ matches, group: "B" }),
     [matches],
   );
   const memberRow = useMemo(

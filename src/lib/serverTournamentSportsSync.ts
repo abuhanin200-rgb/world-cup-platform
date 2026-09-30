@@ -1,6 +1,6 @@
 import { PREDICTION_RESULT_COPY } from "./predictionResultPresentation";
 import "server-only";
-import type { DocumentReference, WriteBatch } from "firebase-admin/firestore";
+import type { DocumentReference, QueryDocumentSnapshot, WriteBatch } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebaseAdmin";
 import {
   deleteExactHitActivitiesServer,
@@ -13,7 +13,7 @@ import {
   GULF_CUP_27_GROUP_MATCHES,
   GULF_CUP_27_SCORING_VERSION,
   GULF_CUP_27_TOURNAMENT_ID,
-  calculateTournamentGroupStandingsV2,
+  calculateGulfCup27GroupStandingsV2,
   createTournamentResultHash,
   scoreGulfCup27KnockoutPredictionV1,
   scoreGulfCup27PredictionV1,
@@ -44,6 +44,9 @@ const COLLECTIONS = {
   achievements: "tournamentAchievements",
   notifications: "notifications",
   automation: "systemAutomationState",
+  matchInsightsCache: "tournamentMatchInsightsCache",
+  matchLineupCache: "tournamentMatchLineupCache",
+  matchCenterCache: "tournamentMatchCenterCache",
 } as const;
 
 const AUTO_STATE_ID = "tournament-sports-v2";
@@ -942,27 +945,148 @@ async function ensureLeaderboardMovementMetadataServer(tournamentId: string) {
 }
 
 export async function syncKnockoutBracketServer(tournamentId: string) {
-  if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return;
+  if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) {
+    return { allGroupsFinished: false, changes: [] as Array<Record<string, unknown>> };
+  }
+
   const [matchRows, teams] = await Promise.all([loadMatches(tournamentId), loadTeams(tournamentId)]);
   const matches = matchRows.map((item) => item.match);
   const groupMatches = matches.filter((match) => match.stage === "group");
-  const allGroupsFinished = groupMatches.length >= 12 && groupMatches.every((match) => match.status === "finished" && match.result.homeScore != null && match.result.awayScore != null);
+  const allGroupsFinished =
+    groupMatches.length >= 12 &&
+    groupMatches.every(
+      (match) =>
+        match.status === "finished" &&
+        match.result.homeScore != null &&
+        match.result.awayScore != null,
+    );
+  const teamNameById = new Map(teams.map((team) => [team.id, team.nameAr]));
+  const changes: Array<{
+    matchId: string;
+    homeTeamId: string;
+    awayTeamId: string;
+    predictionsCleared: number;
+  }> = [];
+
+  async function notifyCorrectedPredictions(input: {
+    matchId: string;
+    predictionDocs: QueryDocumentSnapshot[];
+    homeTeamId: string;
+    awayTeamId: string;
+  }) {
+    if (!input.predictionDocs.length) return;
+    const nowIso = new Date().toISOString();
+    const homeName = teamNameById.get(input.homeTeamId) || "الفريق الأول";
+    const awayName = teamNameById.get(input.awayTeamId) || "الفريق الثاني";
+    await commitOperations(
+      input.predictionDocs.map((item) => (batch) => {
+        const userId = clean(item.data().userId);
+        if (!userId) return;
+        const id = `bracket_correction_${tournamentId}_${input.matchId}_${userId}`
+          .replace(/[^a-zA-Z0-9_-]+/g, "_")
+          .slice(0, 450);
+        batch.set(
+          adminDb.collection(COLLECTIONS.notifications).doc(id),
+          {
+            userId,
+            type: "tournament_update",
+            title: "تحديث رسمي لمباراة نصف النهائي",
+            message: `تم اعتماد مواجهة ${homeName} × ${awayName}. أُلغي توقعك السابق لأن طرف المباراة تغيّر رسميًا، ويمكنك تسجيل توقع جديد.`,
+            isRead: false,
+            createdAt: nowIso,
+            readAt: null,
+            tournamentId,
+            matchId: input.matchId,
+            route: "/tournaments/gulf-cup-27/predictions",
+            automated: true,
+            dedupeKey: `bracket-correction:${input.matchId}:${userId}:${input.homeTeamId}:${input.awayTeamId}`,
+          },
+          { merge: true },
+        );
+      }),
+    );
+  }
 
   async function assign(matchId: string, homeTeamId: string, awayTeamId: string) {
     if (!homeTeamId || !awayTeamId) return;
     const row = matchRows.find((item) => item.match.id === matchId);
     if (!row || row.match.calculationStatus === "calculated") return;
     if (row.match.homeTeamId === homeTeamId && row.match.awayTeamId === awayTeamId) return;
-    const predictions = await adminDb.collection(COLLECTIONS.predictions).where("tournamentId", "==", tournamentId).where("matchId", "==", matchId).get();
+
+    const predictions = await adminDb
+      .collection(COLLECTIONS.predictions)
+      .where("tournamentId", "==", tournamentId)
+      .where("matchId", "==", matchId)
+      .get();
+
     if (!predictions.empty) {
+      for (const prediction of predictions.docs) {
+        const userId = clean(prediction.data().userId);
+        if (userId) {
+          await deletePredictionActivityServer({ tournamentId, matchId, userId });
+        }
+      }
       await commitOperations(predictions.docs.map((item) => (batch) => batch.delete(item.ref)));
     }
-    await row.ref.set({ homeTeamId, awayTeamId, predictionIsOpen: false, status: "scheduled", providerFixtureId: null, providerSyncState: "unlinked", updatedAt: Date.now() }, { merge: true });
+
+    await row.ref.set(
+      {
+        homeTeamId,
+        awayTeamId,
+        predictionIsOpen: false,
+        predictionManualOverride: null,
+        status: "scheduled",
+        providerFixtureId: null,
+        sportsProvider: null,
+        providerSyncState: "unlinked",
+        providerSyncMessage: "بانتظار ربط المباراة بعد اعتماد طرفيها",
+        providerMappedAt: null,
+        providerLastSyncedAt: null,
+        providerStatusShort: null,
+        providerStatusLong: null,
+        providerElapsed: null,
+        providerFixtureSnapshot: null,
+        providerCandidateResult: null,
+        providerCandidateHash: null,
+        providerCandidateFirstSeenAt: null,
+        providerCandidateSeenCount: 0,
+        bracketSyncConflict: false,
+        bracketSyncConflictMessage: null,
+        updatedAt: Date.now(),
+      },
+      { merge: true },
+    );
+
+    await Promise.all([
+      adminDb.collection(COLLECTIONS.matchInsightsCache).doc(entityId(tournamentId, matchId)).delete().catch(() => undefined),
+      adminDb.collection(COLLECTIONS.matchLineupCache).doc(entityId(tournamentId, matchId)).delete().catch(() => undefined),
+      adminDb.collection(COLLECTIONS.matchCenterCache).doc(entityId(tournamentId, matchId)).delete().catch(() => undefined),
+    ]);
+
+    await notifyCorrectedPredictions({
+      matchId,
+      predictionDocs: predictions.docs,
+      homeTeamId,
+      awayTeamId,
+    });
+
+    changes.push({
+      matchId,
+      homeTeamId,
+      awayTeamId,
+      predictionsCleared: predictions.size,
+    });
   }
 
   if (allGroupsFinished) {
-    const groupA = calculateTournamentGroupStandingsV2({ teams, matches: groupMatches, group: "A" });
-    const groupB = calculateTournamentGroupStandingsV2({ teams, matches: groupMatches, group: "B" });
+    const groupA = calculateGulfCup27GroupStandingsV2({
+      matches: groupMatches,
+      group: "A",
+    });
+    const groupB = calculateGulfCup27GroupStandingsV2({
+      matches: groupMatches,
+      group: "B",
+    });
     if (groupA.length >= 2 && groupB.length >= 2) {
       await assign("g27-sf-1", groupA[0].teamId, groupB[1].teamId);
       await assign("g27-sf-2", groupB[0].teamId, groupA[1].teamId);
@@ -972,9 +1096,16 @@ export async function syncKnockoutBracketServer(tournamentId: string) {
   const refreshed = (await loadMatches(tournamentId)).map((item) => item.match);
   const sf1 = refreshed.find((match) => match.id === "g27-sf-1");
   const sf2 = refreshed.find((match) => match.id === "g27-sf-2");
-  if (sf1?.calculationStatus === "calculated" && sf2?.calculationStatus === "calculated" && sf1.result.qualifiedTeamId && sf2.result.qualifiedTeamId) {
+  if (
+    sf1?.calculationStatus === "calculated" &&
+    sf2?.calculationStatus === "calculated" &&
+    sf1.result.qualifiedTeamId &&
+    sf2.result.qualifiedTeamId
+  ) {
     await assign("g27-final", sf1.result.qualifiedTeamId, sf2.result.qualifiedTeamId);
   }
+
+  return { allGroupsFinished, changes };
 }
 
 export async function rebuildAchievementsServer(tournamentId: string) {
@@ -1482,6 +1613,15 @@ export async function syncTournamentSportsProvider(tournamentId: string, source:
     };
   }
 
+  const bracketSync = await syncKnockoutBracketServer(tournamentId);
+  if (bracketSync.changes.length > 0 && config.autoDiscover && config.leagueId) {
+    try {
+      await discoverTournamentSportsFixtures(tournamentId);
+    } catch (discoveryError) {
+      console.error("Knockout fixture relink after official bracket correction failed:", discoveryError);
+    }
+  }
+
   const [rows, teams] = await Promise.all([loadMatches(tournamentId), loadTeams(tournamentId)]);
   const mappedRows = rows.filter(({ match }) => Boolean(match.providerFixtureId));
   if (!mappedRows.length) return { skipped: true, reason: "no_mapped_matches", checked: 0, updated: 0, calculated: 0, conflicts: 0 };
@@ -1549,7 +1689,7 @@ export async function syncTournamentSportsProvider(tournamentId: string, source:
     runRef.set({ tournamentId, provider: "api-football", source, checked: mappedRows.length, updated, calculated, conflicts, awaitingReview, quotaRemaining: provider.quotaRemaining, createdAt: now }),
     adminDb.collection(COLLECTIONS.integrations).doc(tournamentId).set({ lastSyncAt: now, lastSuccessAt: now, lastError: null, quotaRemaining: provider.quotaRemaining, updatedAt: now }, { merge: true }),
   ]);
-  return { skipped: false, checked: mappedRows.length, updated, calculated, conflicts, awaitingReview, quotaRemaining: provider.quotaRemaining };
+  return { skipped: false, checked: mappedRows.length, updated, calculated, conflicts, awaitingReview, quotaRemaining: provider.quotaRemaining, bracketSync };
 }
 
 function desiredAutomationGap(matches: MatchRow[], now: number) {

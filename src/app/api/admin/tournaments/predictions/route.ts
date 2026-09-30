@@ -4,6 +4,7 @@ import {
   calculateTournamentMatchManuallyServerV2,
   deleteTournamentMatchPredictionsByAdminServerV2,
   deleteTournamentPredictionByAdminServerV2,
+  syncKnockoutBracketServer,
   undoTournamentMatchCalculationServerV2,
   updateTournamentPredictionByAdminServerV2,
 } from "@/lib/serverTournamentSportsSync";
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
         tournamentId: String(body.tournamentId || ""),
         matchId: String(body.matchId || ""),
       });
+    } else if (body.action === "sync_knockout") {
+      result = await syncKnockoutBracketServer(String(body.tournamentId || ""));
     } else {
       return NextResponse.json({ error: "إجراء غير مدعوم" }, { status: 400 });
     }

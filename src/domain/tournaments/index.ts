@@ -17,6 +17,7 @@ export * from "./predictionPolicyV2";
 export * from "./leaderboardV2";
 
 export * from "./standingsV2";
+export * from "./gulfCup27Standings";
 export * from "./engagementV2";
 export * from "./sportsProviderV2";
 

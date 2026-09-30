@@ -15,15 +15,11 @@ import {
   ASIAN_CUP_2027_TEAMS,
   ASIAN_CUP_2027_TOURNAMENT,
   ASIAN_CUP_2027_TOURNAMENT_ID,
-  GULF_CUP_27_GROUP_MATCHES,
-  GULF_CUP_27_KNOCKOUT_MATCHES,
   GULF_CUP_27_MATCHES,
-  GULF_CUP_27_PREDICTION_OPEN_LEAD_MS,
   GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT,
   GULF_CUP_27_TOURNAMENT_ID,
   getTournamentPredictionWindowStateV2,
-  calculateTournamentGroupStandingsV2,
   type TournamentMatchV2,
   type TournamentPredictionV2,
   type TournamentQualificationMethod,
@@ -431,263 +427,40 @@ export async function getTournamentMatchesV2(
 
 
 export async function syncGulfCup27KnockoutBracketV2() {
-  const now = Date.now();
-
-  // تأكد أن مباريات الإقصائيات الثلاث موجودة حتى لو كانت البطولة قد هُيئت قبل هذه الدفعة.
-  const existingBefore = await getTournamentMatchesV2(
-    GULF_CUP_27_TOURNAMENT_ID,
-    { fallback: false },
-  );
-  const existingIds = new Set(existingBefore.map((match) => match.id));
-  const createBatch = writeBatch(db);
-  let created = 0;
-
-  GULF_CUP_27_KNOCKOUT_MATCHES.forEach((match) => {
-    if (existingIds.has(match.id)) return;
-    created += 1;
-    createBatch.set(
-      doc(
-        db,
-        TOURNAMENT_V2_COLLECTIONS.matches,
-        entityDocId(GULF_CUP_27_TOURNAMENT_ID, match.id),
-      ),
-      {
-        ...dropUndefined(match),
-        predictionIsOpen: false,
-        predictionEditingIsOpen: true,
-        schemaVersion: 2,
-        createdAt: now,
-        updatedAt: now,
-      },
-      { merge: true },
-    );
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) throw new Error("انتهت جلسة الإدارة");
+  const token = await firebaseUser.getIdToken();
+  const response = await fetch("/api/admin/tournaments/predictions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      action: "sync_knockout",
+      tournamentId: GULF_CUP_27_TOURNAMENT_ID,
+    }),
+    cache: "no-store",
   });
-
-  if (created > 0) {
-    await createBatch.commit();
-  }
-
-  const matches = await getTournamentMatchesV2(
-    GULF_CUP_27_TOURNAMENT_ID,
-    { fallback: false },
-  );
-  const groupMatches = matches.filter((match) => match.stage === "group");
-  const allGroupsFinished =
-    groupMatches.length >= GULF_CUP_27_GROUP_MATCHES.length &&
-    groupMatches.every(
-      (match) =>
-        match.status === "finished" &&
-        match.result.homeScore != null &&
-        match.result.awayScore != null,
-    );
-
-  const changes: Array<{
-    matchId: string;
-    homeTeamId: string;
-    awayTeamId: string;
-    predictionsCleared: number;
-  }> = [];
-
-  async function assignMatch(
-    matchId: string,
-    homeTeamId: string,
-    awayTeamId: string,
-  ) {
-    if (!homeTeamId || !awayTeamId) return;
-
-    const current = matches.find((match) => match.id === matchId);
-    if (!current) return;
-
-    if (
-      current.homeTeamId === homeTeamId &&
-      current.awayTeamId === awayTeamId
-    ) {
-      return;
-    }
-
-    if (current.calculationStatus === "calculated") {
-      return;
-    }
-
-    // Never rewrite a knockout pairing after its prediction window has started.
-    // That protects already-saved member predictions from being detached from
-    // their original teams if upstream standings are later corrected.
-    if (
-      current.predictionOpensAt != null &&
-      now >= current.predictionOpensAt &&
-      (current.homeTeamId || current.awayTeamId)
-    ) {
-      await setDoc(
-        doc(
-          db,
-          TOURNAMENT_V2_COLLECTIONS.matches,
-          entityDocId(GULF_CUP_27_TOURNAMENT_ID, matchId),
-        ),
-        {
-          bracketSyncConflict: true,
-          bracketSyncConflictMessage: "تغيّرت أطراف المباراة بعد بدء نافذة التوقعات؛ لم تُعدل حمايةً للتوقعات المحفوظة.",
-          bracketSyncConflictAt: now,
-          updatedAt: now,
-        },
-        { merge: true },
-      );
-      return;
-    }
-
-    const predictionsCleared = 0;
-
-    await setDoc(
-      doc(
-        db,
-        TOURNAMENT_V2_COLLECTIONS.matches,
-        entityDocId(GULF_CUP_27_TOURNAMENT_ID, matchId),
-      ),
-      {
-        homeTeamId,
-        awayTeamId,
-        predictionIsOpen: false,
-        predictionManualOverride: null,
-        status: "scheduled",
-        predictionOpensAt: current.kickoffAt - GULF_CUP_27_PREDICTION_OPEN_LEAD_MS,
-        predictionClosesAt: current.kickoffAt,
-        bracketSyncConflict: false,
-        bracketSyncConflictMessage: null,
-        updatedAt: Date.now(),
-        updatedAtServer: serverTimestamp(),
-      },
-      { merge: true },
-    );
-
-    changes.push({
-      matchId,
-      homeTeamId,
-      awayTeamId,
-      predictionsCleared,
-    });
-  }
-
-  async function clearMatchAssignment(matchId: string) {
-    const current = matches.find((match) => match.id === matchId);
-    if (!current || current.calculationStatus === "calculated") return;
-    if (!current.homeTeamId && !current.awayTeamId) return;
-
-    if (current.predictionOpensAt != null && now >= current.predictionOpensAt) {
-      return;
-    }
-    const predictionsCleared = 0;
-
-    await setDoc(
-      doc(
-        db,
-        TOURNAMENT_V2_COLLECTIONS.matches,
-        entityDocId(GULF_CUP_27_TOURNAMENT_ID, matchId),
-      ),
-      {
-        homeTeamId: "",
-        awayTeamId: "",
-        predictionIsOpen: false,
-        predictionManualOverride: null,
-        status: "scheduled",
-        predictionOpensAt: null,
-        predictionClosesAt: current.kickoffAt,
-        updatedAt: Date.now(),
-        updatedAtServer: serverTimestamp(),
-      },
-      { merge: true },
-    );
-
-    changes.push({
-      matchId,
-      homeTeamId: "",
-      awayTeamId: "",
-      predictionsCleared,
-    });
-  }
-
-
-  if (allGroupsFinished) {
-    const groupA = calculateTournamentGroupStandingsV2({
-      teams: GULF_CUP_27_TEAMS,
-      matches: groupMatches,
-      group: "A",
-    });
-    const groupB = calculateTournamentGroupStandingsV2({
-      teams: GULF_CUP_27_TEAMS,
-      matches: groupMatches,
-      group: "B",
-    });
-
-    if (groupA.length >= 2 && groupB.length >= 2) {
-      await assignMatch("g27-sf-1", groupA[0].teamId, groupB[1].teamId);
-      await assignMatch("g27-sf-2", groupB[0].teamId, groupA[1].teamId);
-    }
-  } else {
-    await clearMatchAssignment("g27-sf-1");
-    await clearMatchAssignment("g27-sf-2");
-    await clearMatchAssignment("g27-final");
-  }
-
-  const refreshed = await getTournamentMatchesV2(
-    GULF_CUP_27_TOURNAMENT_ID,
-    { fallback: false },
-  );
-  const semi1 = refreshed.find((match) => match.id === "g27-sf-1");
-  const semi2 = refreshed.find((match) => match.id === "g27-sf-2");
-
-  if (
-    semi1?.status === "finished" &&
-    semi2?.status === "finished" &&
-    semi1.result.qualifiedTeamId &&
-    semi2.result.qualifiedTeamId
-  ) {
-    await assignMatch(
-      "g27-final",
-      semi1.result.qualifiedTeamId,
-      semi2.result.qualifiedTeamId,
-    );
-  } else if (allGroupsFinished) {
-    const finalMatch = refreshed.find((match) => match.id === "g27-final");
-    if (
-      finalMatch &&
-      finalMatch.calculationStatus !== "calculated" &&
-      (finalMatch.homeTeamId || finalMatch.awayTeamId)
-    ) {
-      if (finalMatch.predictionOpensAt != null && now >= finalMatch.predictionOpensAt) {
-        return { created, allGroupsFinished, changes };
+  const data = (await response.json().catch(() => null)) as
+    | {
+        allGroupsFinished: boolean;
+        changes: Array<{
+          matchId: string;
+          homeTeamId: string;
+          awayTeamId: string;
+          predictionsCleared: number;
+        }>;
+        error?: string;
       }
-      const predictionsCleared = 0;
-      await setDoc(
-        doc(
-          db,
-          TOURNAMENT_V2_COLLECTIONS.matches,
-          entityDocId(GULF_CUP_27_TOURNAMENT_ID, "g27-final"),
-        ),
-        {
-          homeTeamId: "",
-          awayTeamId: "",
-          predictionIsOpen: false,
-          predictionManualOverride: null,
-          status: "scheduled",
-          predictionOpensAt: null,
-          predictionClosesAt: finalMatch.kickoffAt,
-          updatedAt: Date.now(),
-          updatedAtServer: serverTimestamp(),
-        },
-        { merge: true },
-      );
-      changes.push({
-        matchId: "g27-final",
-        homeTeamId: "",
-        awayTeamId: "",
-        predictionsCleared,
-      });
-    }
+    | null;
+  if (!response.ok || !data) {
+    throw new Error(data?.error || "تعذرت مزامنة الأدوار الإقصائية");
   }
-
   return {
-    created,
-    allGroupsFinished,
-    changes,
+    created: 0,
+    allGroupsFinished: data.allGroupsFinished,
+    changes: data.changes,
   };
 }
 

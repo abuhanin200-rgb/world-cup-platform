@@ -229,9 +229,15 @@ export default function AdminTournamentV2Panel() {
         description: `تمت المزامنة. أضيفت ${result.created} مباريات جديدة، وتغيرت ${result.changes.length} مواجهات.`,
         metadata: result,
       });
+      const clearedPredictions = result.changes.reduce(
+        (total, item) => total + item.predictionsCleared,
+        0,
+      );
       setMessage(
         result.allGroupsFinished
-          ? "تمت مزامنة نصف النهائي/النهائي حسب النتائج المعتمدة."
+          ? clearedPredictions > 0
+            ? `تم اعتماد الأدوار الإقصائية حسب النتائج والقرارات الرسمية. أُلغي ${clearedPredictions} توقع سابق لمواجهة تغيّر طرفها، وتم إشعار أصحابه لإعادة التوقع.`
+            : "تم اعتماد الأدوار الإقصائية حسب النتائج والقرارات الرسمية."
           : "تم تجهيز مباريات نصف النهائي والنهائي. سيتم تحديد المنتخبات تلقائيًا بعد اكتمال دور المجموعات.",
       );
       await load();
