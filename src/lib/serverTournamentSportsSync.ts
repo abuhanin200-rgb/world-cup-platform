@@ -10,7 +10,7 @@ import {
 import {
   GULF_CUP_27_ACHIEVEMENTS,
   GULF_CUP_27_KNOCKOUT_SCORING_VERSION,
-  GULF_CUP_27_GROUP_MATCHES,
+  GULF_CUP_27_MATCHES,
   GULF_CUP_27_SCORING_VERSION,
   GULF_CUP_27_TOURNAMENT_ID,
   calculateGulfCup27GroupStandingsV2,
@@ -58,10 +58,10 @@ const RESULT_VERIFY_GAP_MS = 60_000;
 const MAX_BATCH_WRITES = 350;
 const GULF_CUP_27_API_LEAGUE_ID = 25;
 
-// مواعيد دور المجموعات المعتمدة محليًا بعد مراجعتها مقابل الجدول المنشور للبطولة.
+// المواعيد الرسمية المعتمدة لخليجي 27، بما فيها نصف النهائي والنهائي.
 // نحميها من أي توقيت قديم/تقريبي يرجعه مزود البيانات، مع إبقاء النتائج والحالة من المزود.
-const GULF_CUP_27_VERIFIED_GROUP_SCHEDULE = new Map(
-  GULF_CUP_27_GROUP_MATCHES.map((match) => [
+const GULF_CUP_27_VERIFIED_SCHEDULE = new Map(
+  GULF_CUP_27_MATCHES.map((match) => [
     match.id,
     { kickoffAt: match.kickoffAt, stadium: match.stadium, city: match.city },
   ]),
@@ -69,7 +69,7 @@ const GULF_CUP_27_VERIFIED_GROUP_SCHEDULE = new Map(
 
 function verifiedScheduleForMatch(tournamentId: string, matchId: string) {
   if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return null;
-  return GULF_CUP_27_VERIFIED_GROUP_SCHEDULE.get(matchId) ?? null;
+  return GULF_CUP_27_VERIFIED_SCHEDULE.get(matchId) ?? null;
 }
 const GULF_CUP_27_TARGET_SEASON = 2026;
 const SEASON_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
