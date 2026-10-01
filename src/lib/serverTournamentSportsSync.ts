@@ -71,6 +71,63 @@ function verifiedScheduleForMatch(tournamentId: string, matchId: string) {
   if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) return null;
   return GULF_CUP_27_VERIFIED_SCHEDULE.get(matchId) ?? null;
 }
+
+async function enforceGulfCup27VerifiedScheduleServer() {
+  const officialMatches = GULF_CUP_27_MATCHES.filter((match) => match.stage === "knockout");
+  const snapshots = await Promise.all(
+    officialMatches.map(async (official) => ({
+      official,
+      ref: adminDb.collection(COLLECTIONS.matches).doc(entityId(GULF_CUP_27_TOURNAMENT_ID, official.id)),
+    })),
+  );
+  const docs = await Promise.all(
+    snapshots.map(async (item) => ({ ...item, snapshot: await item.ref.get() })),
+  );
+  let corrected = 0;
+
+  await commitOperations(
+    docs
+      .filter((item) => item.snapshot.exists)
+      .map((item) => (batch) => {
+        const current = mapMatchDoc(item.snapshot.id, item.snapshot.data() || {});
+        const previousKickoff = current.kickoffAt;
+        const official = item.official;
+        const previousDefaultOpen = previousKickoff - PREDICTION_OPEN_LEAD_MS;
+        const shouldMoveClose =
+          current.predictionClosesAt == null || current.predictionClosesAt === previousKickoff;
+        const shouldMoveOpen =
+          current.predictionOpensAt == null || current.predictionOpensAt === previousDefaultOpen;
+        const changed =
+          previousKickoff !== official.kickoffAt ||
+          current.stadium !== official.stadium ||
+          current.city !== official.city ||
+          (shouldMoveClose && current.predictionClosesAt !== official.kickoffAt) ||
+          (shouldMoveOpen && current.predictionOpensAt !== official.predictionOpensAt);
+
+        if (!changed) return;
+        corrected += 1;
+        batch.set(
+          item.ref,
+          {
+            kickoffAt: official.kickoffAt,
+            stadium: official.stadium,
+            city: official.city,
+            ...(shouldMoveClose ? { predictionClosesAt: official.kickoffAt } : {}),
+            ...(shouldMoveOpen ? { predictionOpensAt: official.predictionOpensAt } : {}),
+            officialScheduleSyncedAt: Date.now(),
+            scheduleSource: "official-knockout-verified-2026-10-01",
+            scheduleConfidence: "official_verified",
+            scheduleTimezone: "Asia/Riyadh",
+            scheduleLocked: true,
+            updatedAt: Date.now(),
+          },
+          { merge: true },
+        );
+      }),
+  );
+
+  return corrected;
+}
 const GULF_CUP_27_TARGET_SEASON = 2026;
 const SEASON_CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000;
 const DISCOVERY_RETRY_INTERVAL_MS = 60 * 60 * 1000;
@@ -948,6 +1005,10 @@ export async function syncKnockoutBracketServer(tournamentId: string) {
   if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID) {
     return { allGroupsFinished: false, changes: [] as Array<Record<string, unknown>> };
   }
+
+  // صحح المواعيد الرسمية أولًا حتى لو كانت مباراة خروج المغلوب غير مربوطة بالمزود بعد.
+  // هذا يمنع بقاء 18:00 القديمة لنصف النهائي/النهائي عندما لا يوجد Fixture ID.
+  await enforceGulfCup27VerifiedScheduleServer();
 
   const [matchRows, teams] = await Promise.all([loadMatches(tournamentId), loadTeams(tournamentId)]);
   const matches = matchRows.map((item) => item.match);

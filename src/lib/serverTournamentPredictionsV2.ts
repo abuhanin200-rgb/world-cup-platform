@@ -1,4 +1,7 @@
 import {
+  GULF_CUP_27_MATCHES,
+  GULF_CUP_27_PREDICTION_OPEN_LEAD_MS,
+  GULF_CUP_27_TOURNAMENT_ID,
   getTournamentPredictionSubmissionDecisionV2,
   isValidTournamentPredictionScoreV2,
   tournamentPredictionSubmissionMessageV2,
@@ -90,6 +93,34 @@ function readMatchForSubmission(data: Record<string, unknown>) {
   } as const;
 }
 
+const GULF_CUP_27_OFFICIAL_MATCH_BY_ID = new Map(
+  GULF_CUP_27_MATCHES.map((match) => [match.id, match]),
+);
+
+function applyOfficialGulfCup27SubmissionSchedule(
+  tournamentId: string,
+  matchId: string,
+  match: ReturnType<typeof readMatchForSubmission>,
+) {
+  if (tournamentId !== GULF_CUP_27_TOURNAMENT_ID || match.stage !== "knockout") return match;
+  const official = GULF_CUP_27_OFFICIAL_MATCH_BY_ID.get(matchId);
+  if (!official) return match;
+  const previousKickoff = match.kickoffAt;
+  const previousDefaultOpen = previousKickoff - GULF_CUP_27_PREDICTION_OPEN_LEAD_MS;
+  return {
+    ...match,
+    kickoffAt: official.kickoffAt,
+    predictionClosesAt:
+      match.predictionClosesAt == null || match.predictionClosesAt === previousKickoff
+        ? official.kickoffAt
+        : match.predictionClosesAt,
+    predictionOpensAt:
+      match.predictionOpensAt == null || match.predictionOpensAt === previousDefaultOpen
+        ? official.predictionOpensAt
+        : match.predictionOpensAt,
+  };
+}
+
 function rejectSubmission(code: Parameters<typeof tournamentPredictionSubmissionMessageV2>[0]) {
   throw new TournamentPredictionSubmissionError(
     tournamentPredictionSubmissionMessageV2(code),
@@ -150,8 +181,10 @@ export async function saveTournamentPredictionOnServerV2(
     );
   }
 
-  const firstMatch = readMatchForSubmission(
-    decodeFields(firstMatchDocument.fields || {}),
+  const firstMatch = applyOfficialGulfCup27SubmissionSchedule(
+    tournamentId,
+    matchId,
+    readMatchForSubmission(decodeFields(firstMatchDocument.fields || {})),
   );
   const firstDecision = getTournamentPredictionSubmissionDecisionV2({
     match: firstMatch,
@@ -212,8 +245,10 @@ export async function saveTournamentPredictionOnServerV2(
     );
   }
 
-  const latestMatch = readMatchForSubmission(
-    decodeFields(latestMatchDocument.fields || {}),
+  const latestMatch = applyOfficialGulfCup27SubmissionSchedule(
+    tournamentId,
+    matchId,
+    readMatchForSubmission(decodeFields(latestMatchDocument.fields || {})),
   );
   const acceptedAt = Date.now();
   const latestDecision = getTournamentPredictionSubmissionDecisionV2({

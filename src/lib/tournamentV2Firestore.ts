@@ -16,6 +16,7 @@ import {
   ASIAN_CUP_2027_TOURNAMENT,
   ASIAN_CUP_2027_TOURNAMENT_ID,
   GULF_CUP_27_MATCHES,
+  GULF_CUP_27_PREDICTION_OPEN_LEAD_MS,
   GULF_CUP_27_TEAMS,
   GULF_CUP_27_TOURNAMENT,
   GULF_CUP_27_TOURNAMENT_ID,
@@ -251,6 +252,37 @@ function mapUserStatsDoc(
   };
 }
 
+const GULF_CUP_27_OFFICIAL_MATCH_BY_ID = new Map(
+  GULF_CUP_27_MATCHES.map((match) => [match.id, match]),
+);
+
+function applyGulfCup27OfficialSchedule(
+  match: TournamentMatchRuntimeV2,
+): TournamentMatchRuntimeV2 {
+  if (match.tournamentId !== GULF_CUP_27_TOURNAMENT_ID || match.stage !== "knockout") {
+    return match;
+  }
+  const official = GULF_CUP_27_OFFICIAL_MATCH_BY_ID.get(match.id);
+  if (!official) return match;
+
+  const previousKickoff = match.kickoffAt;
+  const previousDefaultOpen = previousKickoff - GULF_CUP_27_PREDICTION_OPEN_LEAD_MS;
+  return {
+    ...match,
+    kickoffAt: official.kickoffAt,
+    stadium: official.stadium,
+    city: official.city,
+    predictionClosesAt:
+      match.predictionClosesAt == null || match.predictionClosesAt === previousKickoff
+        ? official.kickoffAt
+        : match.predictionClosesAt,
+    predictionOpensAt:
+      match.predictionOpensAt == null || match.predictionOpensAt === previousDefaultOpen
+        ? official.predictionOpensAt
+        : match.predictionOpensAt,
+  };
+}
+
 function getGulfStaticFallback(): TournamentMatchRuntimeV2[] {
   return GULF_CUP_27_MATCHES.map((match) => ({
     ...match,
@@ -422,6 +454,11 @@ export async function getTournamentMatchesV2(
 
   return snapshot.docs
     .map((item) => mapMatchDoc(item.id, item.data()))
+    .map((match) =>
+      tournamentId === GULF_CUP_27_TOURNAMENT_ID
+        ? applyGulfCup27OfficialSchedule(match)
+        : match,
+    )
     .sort((a, b) => a.kickoffAt - b.kickoffAt);
 }
 
