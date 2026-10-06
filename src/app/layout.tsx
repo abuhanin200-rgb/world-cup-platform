@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import MaintenanceGate from "@/components/MaintenanceGate";
 import PresenceTracker from "@/components/PresenceTracker";
+import PlatformVisitTracker from "@/components/PlatformVisitTracker";
 import SuperGoldenNotice from "@/components/SuperGoldenNotice";
 import PlatformChrome from "@/components/PlatformChrome";
 import PWAClient from "@/components/PWAClient";
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <AuthProvider>
           <PresenceTracker />
+          <PlatformVisitTracker />
           <PWAClient />
           <MaintenanceGate><PlatformChrome>{children}</PlatformChrome></MaintenanceGate>
           <SuperGoldenNotice />

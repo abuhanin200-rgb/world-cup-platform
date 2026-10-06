@@ -5,6 +5,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+// One-time opening balance chosen by the site owner. This is NOT an
+// independently measured historical visitor count. Keep it separate from
+// Firestore's verified post-tracking session counts.
+const OPENING_VISITS = 7564;
+
 async function collectionCount(
   collectionName: string,
   tournamentId?: string,
@@ -52,7 +57,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [members, legacyPredictions, tournamentPredictions, legacyMatches, tournamentMatches, gamePlayers] =
+    const [members, legacyPredictions, tournamentPredictions, legacyMatches, tournamentMatches, gamePlayers, visitShards] =
       await Promise.all([
         collectionCount("users"),
         collectionCount("predictions"),
@@ -60,6 +65,7 @@ export async function GET(request: NextRequest) {
         collectionCount("matches"),
         collectionCount("tournamentMatches"),
         collectionCount("platformGameStats"),
+        adminDb.collection("platformVisitCounterShards").get(),
       ]);
 
     return NextResponse.json(
@@ -68,6 +74,10 @@ export async function GET(request: NextRequest) {
         predictions: legacyPredictions + tournamentPredictions,
         matches: legacyMatches + tournamentMatches,
         gamePlayers,
+        visits: OPENING_VISITS + visitShards.docs.reduce((sum, shard) => {
+          const count = shard.data().count;
+          return sum + (typeof count === "number" && Number.isFinite(count) ? count : 0);
+        }, 0),
       },
       { headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=120" } },
     );

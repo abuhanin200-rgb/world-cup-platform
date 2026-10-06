@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "framer-motion";
-import { BarChart3, Gamepad2, Target, Trophy, UsersRound } from "lucide-react";
+import { BarChart3, Eye, Target, Trophy, UsersRound } from "lucide-react";
 import { getRegisteredTournaments } from "@/domain/tournaments";
 
 type Stats = {
@@ -10,9 +10,10 @@ type Stats = {
   predictions: number;
   matches: number;
   gamePlayers: number;
+  visits: number;
 };
 
-const INITIAL: Stats = { members: 0, predictions: 0, matches: 0, gamePlayers: 0 };
+const INITIAL: Stats = { members: 0, predictions: 0, matches: 0, gamePlayers: 0, visits: 0 };
 
 function AnimatedStatValue({ value, loading }: { value: number; loading: boolean }) {
   const reduceMotion = useReducedMotion();
@@ -74,8 +75,11 @@ export default function PlatformStatsOverview() {
     }
 
     void load();
+    // Refresh immediately after this browser visit is registered.
+    window.addEventListener("altahaddi:visit-counted", load);
     return () => {
       active = false;
+      window.removeEventListener("altahaddi:visit-counted", load);
     };
   }, []);
 
@@ -88,7 +92,7 @@ export default function PlatformStatsOverview() {
     },
     { label: "التوقعات", value: stats.predictions, icon: Target },
     { label: "المباريات", value: stats.matches, icon: BarChart3 },
-    { label: "لاعبو الألعاب", value: stats.gamePlayers, icon: Gamepad2 },
+    { label: "عدد الزوار", value: stats.visits, icon: Eye },
   ];
 
   return (
