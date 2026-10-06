@@ -10,6 +10,7 @@ import PlatformNotificationsPopover from "@/components/PlatformNotificationsPopo
 import TournamentAutomationHeartbeat from "@/components/TournamentAutomationHeartbeat";
 import InteractionSoundToggle from "@/components/interaction/InteractionSoundToggle";
 import NetworkStatusBanner from "@/components/NetworkStatusBanner";
+import GulfCup27FinalCelebration from "@/components/GulfCup27FinalCelebration";
 import { playInteractionFeedback } from "@/lib/interactionFeedback";
 
 const WHATSAPP_URL = "https://wa.me/966542180200";
@@ -86,7 +87,9 @@ export default function PlatformChrome({ children }: { children: React.ReactNode
         </div>
       </header>
 
-      <motion.div key={pathname} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeOut" }} className="min-h-[calc(100vh-72px)] pb-[calc(108px+env(safe-area-inset-bottom))] md:pb-0">{children}</motion.div>
+      <GulfCup27FinalCelebration>
+        <motion.div key={pathname} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeOut" }} className="min-h-[calc(100vh-72px)] pb-[calc(108px+env(safe-area-inset-bottom))] md:pb-0">{children}</motion.div>
+      </GulfCup27FinalCelebration>
 
       <footer className="border-t border-white/[0.07] bg-[#04133a] px-4 pb-[calc(112px+env(safe-area-inset-bottom))] pt-7 text-center text-xs font-bold text-white/60 md:py-7">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4">

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Gamepad2, Medal, Sparkles, Trophy } from "lucide-react";
+import { ArrowLeft, Crown, Gamepad2, Medal, Sparkles, Trophy } from "lucide-react";
 import PlatformStatsOverview from "@/components/PlatformStatsOverview";
+import { useGulfCup27FinalCelebration } from "@/components/GulfCup27FinalCelebration";
 import MemberNoticeRenderer from "@/components/MemberNoticeRenderer";
 import TournamentShowcase from "@/components/home/TournamentShowcase";
 import GameShowcase from "@/components/home/GameShowcase";
@@ -24,6 +25,7 @@ const TOURNAMENTS = [
 
 export default function PlatformHome() {
   const { user, isLoggedIn } = useAuth();
+  const { isAvailable: isFinalCelebrationAvailable, champion, replay: replayFinalCelebration } = useGulfCup27FinalCelebration();
   const reduceMotion = useReducedMotion();
   const revealTransition = (delay = 0) => ({
     duration: reduceMotion ? 0 : 0.3,
@@ -102,6 +104,38 @@ export default function PlatformHome() {
             </motion.div>
           </div>
         </section>
+
+        {isFinalCelebrationAvailable && champion ? (
+          <section
+            aria-label="حفل تتويج خليجي الديار العربية 27"
+            className="relative mt-4 overflow-hidden rounded-[26px] border border-amber-300/25 bg-[linear-gradient(110deg,#0b2757_0%,#10234b_55%,#30271e_100%)] p-4 shadow-[0_14px_40px_rgba(0,0,0,.15)] sm:p-5"
+          >
+            <div className="pointer-events-none absolute -left-10 -top-20 h-48 w-48 rounded-full bg-amber-300/10 blur-3xl" aria-hidden="true" />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-amber-200/25 bg-amber-300/15 text-amber-200">
+                  <Crown className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black text-amber-200">الترتيب النهائي · خليجي 27</p>
+                  <h2 className="mt-0.5 text-sm font-black text-white sm:text-base">
+                    تُوّج {champion.fullName} بطلًا للتوقعات
+                  </h2>
+                  <p className="mt-1 text-xs font-semibold text-white/60">{champion.points} نقطة · شاهد لحظة التتويج وشارك بطاقة البطل</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { playInteractionFeedback("selection"); replayFinalCelebration(); }}
+                className="inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#ffc210] px-5 text-sm font-black text-[#04133a] shadow-[0_8px_25px_rgba(255,194,16,.16)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:w-auto"
+              >
+                <Trophy className="h-4 w-4" aria-hidden="true" />
+                حفل تتويج خليجي 27
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
