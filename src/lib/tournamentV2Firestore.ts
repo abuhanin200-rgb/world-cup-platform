@@ -304,17 +304,21 @@ export async function initializeGulfCup27V2Data() {
     { fallback: false },
   );
   const existingMatchIds = new Set(existingMatches.map((match) => match.id));
+  const tournamentRef = doc(db, TOURNAMENT_V2_COLLECTIONS.tournaments, GULF_CUP_27_TOURNAMENT_ID);
+  const tournamentExists = (await getDoc(tournamentRef)).exists();
   const batch = writeBatch(db);
 
   batch.set(
-    doc(db, TOURNAMENT_V2_COLLECTIONS.tournaments, GULF_CUP_27_TOURNAMENT_ID),
-    {
-      ...dropUndefined(GULF_CUP_27_TOURNAMENT),
-      schemaVersion: 2,
-      initializedAt: now,
-      updatedAt: now,
-      updatedAtServer: serverTimestamp(),
-    },
+    tournamentRef,
+    tournamentExists
+      ? { schemaVersion: 2, initializedAt: now, updatedAtServer: serverTimestamp() }
+      : {
+          ...dropUndefined(GULF_CUP_27_TOURNAMENT),
+          schemaVersion: 2,
+          initializedAt: now,
+          updatedAt: now,
+          updatedAtServer: serverTimestamp(),
+        },
     { merge: true },
   );
 

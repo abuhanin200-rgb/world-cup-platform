@@ -36,6 +36,7 @@ export function getTournamentDisplayStatus(
   tournament: Tournament,
   now: number = Date.now(),
 ): TournamentStatus {
+  if (tournament.status === "finished") return "finished";
   if (
     tournament.status === "hidden" ||
     tournament.status === "draft" ||
@@ -44,6 +45,9 @@ export function getTournamentDisplayStatus(
   ) {
     return tournament.status;
   }
+
+  // Gulf 27 is archived only after verified scoring, not merely after the scheduled end date.
+  if (tournament.id === "gulf27" && tournament.status === "active") return "active";
 
   if (tournament.startAt != null && now < tournament.startAt) {
     return "coming_soon";

@@ -1,5 +1,6 @@
 import { PREDICTION_RESULT_COPY } from "./predictionResultPresentation";
 import "server-only";
+import { finalizeGulfCup27IfReady, reopenGulfCup27AfterUndo } from "@/lib/serverGulfCup27Finalization";
 import type { DocumentReference, QueryDocumentSnapshot, WriteBatch } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebaseAdmin";
 import {
@@ -1291,6 +1292,12 @@ async function calculateMatchServer(matchRow: { ref: DocumentReference; match: M
   await syncKnockoutBracketServer(match.tournamentId);
   await rebuildAchievementsServer(match.tournamentId);
   await sendResultNotificationsServer({ tournamentId: match.tournamentId, match, candidate, resultHash: candidate.hash, scored });
+  try {
+    await finalizeGulfCup27IfReady();
+  } catch (finalizationError) {
+    // The match was scored successfully. Retry the independent reconciliation later.
+    console.error("Gulf 27 finalization reconciliation failed:", finalizationError);
+  }
   return { predictionsCalculated: predictionsSnapshot.size, leaderboardRows: leaderboard.length, alreadyCalculated: false };
 }
 
@@ -1498,6 +1505,8 @@ export async function undoTournamentMatchCalculationServerV2(input: {
     updatedAt: now,
   }, { merge: true });
 
+  // Keep the operational tournament state consistent with the reset match.
+  await reopenGulfCup27AfterUndo(tournamentId);
   const leaderboard = await rebuildLeaderboardServer(tournamentId);
   await syncKnockoutBracketServer(tournamentId);
   await rebuildAchievementsServer(tournamentId);

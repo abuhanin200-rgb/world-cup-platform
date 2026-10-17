@@ -8,6 +8,7 @@ import TournamentSectionHeader from "@/components/tournaments/TournamentSectionH
 import TournamentV2Section from "@/components/TournamentV2Section";
 import WorldCup2026Section from "@/components/WorldCup2026Section";
 import { getTournamentThemeStyle, TOURNAMENT_SECTIONS, tournamentService, type TournamentSection } from "@/domain/tournaments";
+import { withLiveGulfCup27Status } from "@/lib/serverTournamentPublicStatus";
 
 type Props = { params: Promise<{ slug: string; section: string }> };
 function isTournamentSection(value: string): value is TournamentSection { return TOURNAMENT_SECTIONS.includes(value as TournamentSection); }
@@ -29,7 +30,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function TournamentSectionPage({ params }: Props) {
-  const { slug, section } = await params; const tournament = await tournamentService.getBySlug(slug);
+  const { slug, section } = await params; const registered = await tournamentService.getBySlug(slug);
+  const tournament = registered ? await withLiveGulfCup27Status(registered) : null;
   if (!tournament || tournament.status === "hidden" || tournament.status === "draft" || !isTournamentSection(section)) notFound();
   return <main dir="rtl" style={getTournamentThemeStyle(tournament)} className="min-h-screen bg-[var(--tournament-background)] text-[var(--tournament-text)]"><TournamentCompactHeader tournament={tournament}/>{tournament.engine === "v2" && tournament.status !== "coming_soon" ? <TournamentActivityStrips tournamentId={tournament.id} tournamentName={tournament.shortName || tournament.name} /> : null}<TournamentNavigation tournament={tournament} activeSection={section}/><TournamentSectionHeader tournament={tournament} section={section}/><div className="mx-auto max-w-7xl px-3 sm:px-4 md:px-6"><TournamentStatsSummary tournament={tournament}/></div>{tournament.engine === "legacy_wc2026" ? <WorldCup2026Section section={section}/> : <TournamentV2Section tournament={tournament} section={section}/>}</main>;
 }

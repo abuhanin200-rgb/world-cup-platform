@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, BarChart3, ListChecks, Newspaper, Sparkles, Trophy } from "lucide-react";
 import GulfCup27OverviewLive from "@/components/GulfCup27OverviewLive";
 import TournamentTopThreePodium from "@/components/TournamentTopThreePodium";
+import GulfCup27PodiumSwitch from "@/components/GulfCup27PodiumSwitch";
 import TournamentStatsSummary from "@/components/TournamentStatsSummary";
 import { ASIAN_CUP_2027_TOURNAMENT_ID, GULF_CUP_27_TOURNAMENT_ID, getTournamentSectionHref, getTournamentThemeStyle, type Tournament } from "@/domain/tournaments";
 
@@ -15,7 +16,8 @@ const FEATURES = [
 export default function TournamentOverview({ tournament }: { tournament: Tournament }) {
   return (
     <div style={getTournamentThemeStyle(tournament)} className="mx-auto max-w-7xl px-3 pb-10 sm:px-4 md:px-6 md:pb-16">
-      {tournament.id === GULF_CUP_27_TOURNAMENT_ID || tournament.id === ASIAN_CUP_2027_TOURNAMENT_ID ? <TournamentTopThreePodium tournament={tournament} /> : null}
+      {tournament.id === GULF_CUP_27_TOURNAMENT_ID ? <GulfCup27PodiumSwitch tournament={tournament} /> : null}
+      {tournament.id === ASIAN_CUP_2027_TOURNAMENT_ID ? <TournamentTopThreePodium tournament={tournament} /> : null}
       <TournamentStatsSummary tournament={tournament} />
       {tournament.id === GULF_CUP_27_TOURNAMENT_ID ? <GulfCup27OverviewLive /> : null}
       <div className="mb-3 mt-5 flex items-center justify-between gap-3 md:mt-7">

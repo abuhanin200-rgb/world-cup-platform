@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -214,7 +215,8 @@ export async function updateTournamentV2Metadata(tournamentId: string, input: To
   if (!clean(input.name) || !clean(input.shortName)) throw new Error("اسم البطولة والاسم المختصر مطلوبان");
   if (input.startAt != null && input.endAt != null && input.endAt < input.startAt) throw new Error("تاريخ النهاية يجب أن يكون بعد تاريخ البداية");
 
-  await updateDoc(doc(db, TOURNAMENT_V2_COLLECTIONS.tournaments, tournamentId), {
+  const tournamentRef = doc(db, TOURNAMENT_V2_COLLECTIONS.tournaments, tournamentId);
+  const patch = {
     name: clean(input.name),
     shortName: clean(input.shortName),
     description: clean(input.description),
@@ -228,7 +230,19 @@ export async function updateTournamentV2Metadata(tournamentId: string, input: To
     calculationMode: input.calculationMode,
     updatedAt: Date.now(),
     updatedAtServer: serverTimestamp(),
-  });
+  };
+  if (tournamentId === "gulf27") {
+    // A transaction protects the auto-finished status against stale admin forms.
+    await runTransaction(db, async (transaction) => {
+      const current = await transaction.get(tournamentRef);
+      if (current.data()?.status === "finished" && current.data()?.finalizationSource === "automatic" && input.status !== "finished") {
+        throw new Error("خليجي 27 أُغلقت تلقائيًا. لتصحيح النتائج تراجع عن احتساب المباراة أولًا.");
+      }
+      transaction.update(tournamentRef, patch);
+    });
+  } else {
+    await updateDoc(tournamentRef, patch);
+  }
 }
 
 export async function createTournamentTeamV2(tournamentId: string, input: TournamentV2TeamInput) {

@@ -41,6 +41,7 @@ export default function PlatformChrome({ children }: { children: React.ReactNode
   const reduceMotion = useReducedMotion();
   const { user, isLoggedIn, logout } = useAuth();
   const isAdmin = pathname.startsWith("/admin");
+  const isGulfCup27Page = pathname === "/tournaments/gulf-cup-27" || pathname.startsWith("/tournaments/gulf-cup-27/");
   const accountHref = isLoggedIn ? "/account" : "/login";
 
   function handleLogout() {
@@ -87,9 +88,13 @@ export default function PlatformChrome({ children }: { children: React.ReactNode
         </div>
       </header>
 
-      <GulfCup27FinalCelebration>
+      {isGulfCup27Page ? (
+        <GulfCup27FinalCelebration>
+          <motion.div key={pathname} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeOut" }} className="min-h-[calc(100vh-72px)] pb-[calc(108px+env(safe-area-inset-bottom))] md:pb-0">{children}</motion.div>
+        </GulfCup27FinalCelebration>
+      ) : (
         <motion.div key={pathname} initial={reduceMotion ? false : { opacity: 0, y: 7 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeOut" }} className="min-h-[calc(100vh-72px)] pb-[calc(108px+env(safe-area-inset-bottom))] md:pb-0">{children}</motion.div>
-      </GulfCup27FinalCelebration>
+      )}
 
       <footer className="border-t border-white/[0.07] bg-[#04133a] px-4 pb-[calc(112px+env(safe-area-inset-bottom))] pt-7 text-center text-xs font-bold text-white/60 md:py-7">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4">

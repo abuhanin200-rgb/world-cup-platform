@@ -6,6 +6,7 @@ import TournamentNavigation from "@/components/tournaments/TournamentNavigation"
 import TournamentActivityStrips from "@/components/tournaments/TournamentActivityStrips";
 import TournamentOverview from "@/components/tournaments/TournamentOverview";
 import { getTournamentThemeStyle, tournamentService } from "@/domain/tournaments";
+import { withLiveGulfCup27Status } from "@/lib/serverTournamentPublicStatus";
 
 type TournamentPageProps = {
   params: Promise<{ slug: string }>;
@@ -23,7 +24,8 @@ export async function generateMetadata({ params }: TournamentPageProps): Promise
 
 export default async function TournamentPage({ params }: TournamentPageProps) {
   const { slug } = await params;
-  const tournament = await tournamentService.getBySlug(slug);
+  const registered = await tournamentService.getBySlug(slug);
+  const tournament = registered ? await withLiveGulfCup27Status(registered) : null;
 
   if (!tournament || tournament.status === "hidden" || tournament.status === "draft") {
     notFound();
